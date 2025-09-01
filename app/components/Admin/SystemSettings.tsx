@@ -36,7 +36,7 @@ export function SystemSettings() {
         address: CONTRACT_ADDRESS as `0x${string}`,
         abi: CONTRACT_ABI,
         functionName: 'setPlatformFee',
-        args: [settings.platformFee * 100], // Convert to basis points
+        args: [BigInt(settings.platformFee * 100)], // Convert to basis points
       });
       console.log('✅ Platform fee updated successfully');
     } catch (error) {

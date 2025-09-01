@@ -63,10 +63,10 @@ export function AdminDashboard({
   const stats = {
     totalPredictions: totalPredictions ? Number(totalPredictions) - 1 : predictions.length,
     needsResolution: predictions.filter(p => needsResolution(p)).length,
-    collectedFees: contractStats && contractStats[2] ? Number(contractStats[2]) / 1e18 : 0, // Convert from wei to ETH
+    collectedFees: contractStats && (contractStats as any)[2] ? Number((contractStats as any)[2]) / 1e18 : 0, // Convert from wei to ETH
     activeApprovers: 5, // TODO: Add function to get active approvers count
-    contractBalance: contractStats && contractStats[5] ? Number(contractStats[5]) / 1e18 : 0,
-    platformFee: contractStats && contractStats[1] ? Number(contractStats[1]) / 100 : 1 // Convert to percentage
+    contractBalance: contractStats && (contractStats as any)[5] ? Number((contractStats as any)[5]) / 1e18 : 0,
+    platformFee: contractStats && (contractStats as any)[1] ? Number((contractStats as any)[1]) / 100 : 1 // Convert to percentage
   };
 
   const handleResolve = (predictionId: number, outcome: boolean) => {
