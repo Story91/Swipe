@@ -225,7 +225,7 @@ export function HelpAndFaq() {
           <div className="support-icon">💬</div>
           <div className="support-content">
             <h3>Still need help?</h3>
-            <p>Can't find what you're looking for? Our community and support team are here to help.</p>
+            <p>Can&apos;t find what you&apos;re looking for? Our community and support team are here to help.</p>
             <div className="support-links">
               <a href="#" className="support-link">
                 📧 Contact Support

@@ -425,7 +425,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
                     </h3>
                     <p className="mt-1 text-sm text-yellow-700">
                       You need to pay {(Number(creationFee) / 1e18).toFixed(4)} ETH to create this prediction.
-                      Approved creators don't need to pay this fee.
+                      Approved creators don&apos;t need to pay this fee.
                     </p>
                   </div>
                 </div>

@@ -587,16 +587,16 @@ export const CONTRACT_ABI = [
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "",
+        "name": "_predictionId",
         "type": "uint256"
       }
     ],
     "name": "participants",
     "outputs": [
       {
-        "internalType": "address",
+        "internalType": "address[]",
         "name": "",
-        "type": "address"
+        "type": "address[]"
       }
     ],
     "stateMutability": "view",
@@ -1281,7 +1281,7 @@ export const CONTRACT_ABI = [
 ] as const;
 
 // Contract instance helper
-export function getContract(signer?: any) {
+export function getContract(signer?: ethers.Signer) {
   if (!signer) {
     return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI);
   }

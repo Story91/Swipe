@@ -746,7 +746,7 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
                         display: loadingStates[currentCard.id] ? 'none' : 'block'
                       }}
                       onLoad={() => handleIframeLoad(currentCard.id)}
-                      onError={(e) => {
+                      onError={() => {
                         console.warn(`Failed to load iframe: ${currentCard.image}`);
                         handleIframeError(currentCard.id);
                       }}

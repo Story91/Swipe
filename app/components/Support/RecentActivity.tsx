@@ -304,6 +304,10 @@ export function RecentActivity() {
     }
   });
 
+  const handleFilterChange = (newFilter: 'all' | 'me' | 'predictions' | 'bets') => {
+    setFilter(newFilter);
+  };
+
   return (
     <div className="recent-activity">
       <div className="activity-header">
@@ -318,25 +322,25 @@ export function RecentActivity() {
           <div className="filter-buttons">
             <button
               className={`filter-button ${filter === 'all' ? 'active' : ''}`}
-              onClick={() => setFilter('all')}
+              onClick={() => handleFilterChange('all')}
             >
               All Activity
             </button>
             <button
               className={`filter-button ${filter === 'me' ? 'active' : ''}`}
-              onClick={() => setFilter('me')}
+              onClick={() => handleFilterChange('me')}
             >
               My Activity
             </button>
             <button
               className={`filter-button ${filter === 'predictions' ? 'active' : ''}`}
-              onClick={() => setFilter('predictions')}
+              onClick={() => handleFilterChange('predictions')}
             >
               Predictions
             </button>
             <button
               className={`filter-button ${filter === 'bets' ? 'active' : ''}`}
-              onClick={() => setFilter('bets')}
+              onClick={() => handleFilterChange('bets')}
             >
               Bets & Payouts
             </button>
