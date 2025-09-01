@@ -230,18 +230,6 @@ export function RecentActivity() {
     }
   };
 
-  const getActivityColor = (type: string) => {
-    switch (type) {
-      case 'prediction_created': return 'activity-created';
-      case 'bet_placed': return 'activity-bet';
-      case 'prediction_resolved': return 'activity-resolved';
-      case 'payout_claimed': return 'activity-payout';
-      case 'prediction_approved': return 'activity-approved';
-      case 'user_joined': return 'activity-joined';
-      default: return 'activity-default';
-    }
-  };
-
   const formatActivityText = (activity: ActivityItem) => {
     const user = activity.isCurrentUser ? 'You' : activity.user.displayName;
 
