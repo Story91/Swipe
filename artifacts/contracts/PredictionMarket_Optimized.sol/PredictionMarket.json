@@ -1,0 +1,1286 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "PredictionMarket",
+  "sourceName": "contracts/PredictionMarket_Optimized.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "predictionId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "EmergencyRefund",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "predictionId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "approver",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "totalApprovals",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "isNowLive",
+          "type": "bool"
+        }
+      ],
+      "name": "PredictionApproved",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "predictionId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "reason",
+          "type": "string"
+        }
+      ],
+      "name": "PredictionCancelled",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "predictionId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "question",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "category",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "imageUrl",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "deadline",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "creator",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "verified",
+          "type": "bool"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "needsApproval",
+          "type": "bool"
+        }
+      ],
+      "name": "PredictionCreated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "predictionId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "approver",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "reason",
+          "type": "string"
+        }
+      ],
+      "name": "PredictionRejected",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "predictionId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "outcome",
+          "type": "bool"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "winnersPool",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "losersPool",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "platformFee",
+          "type": "uint256"
+        }
+      ],
+      "name": "PredictionResolved",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "predictionId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "payout",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "originalStake",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "profit",
+          "type": "uint256"
+        }
+      ],
+      "name": "RewardClaimed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "predictionId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "isYes",
+          "type": "bool"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "newYesTotal",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "newNoTotal",
+          "type": "uint256"
+        }
+      ],
+      "name": "StakePlaced",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "approvalCount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_predictionId",
+          "type": "uint256"
+        }
+      ],
+      "name": "approvePrediction",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "approvedCreators",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "approvers",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_predictionId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "_user",
+          "type": "address"
+        }
+      ],
+      "name": "calculatePayout",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "payout",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "profit",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct PredictionMarket.PayoutInfo",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_predictionId",
+          "type": "uint256"
+        }
+      ],
+      "name": "canStillResolve",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_predictionId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "_reason",
+          "type": "string"
+        }
+      ],
+      "name": "cancelPrediction",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_predictionId",
+          "type": "uint256"
+        }
+      ],
+      "name": "claimReward",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "collectedFees",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "_question",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_description",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_category",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_imageUrl",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_durationInHours",
+          "type": "uint256"
+        }
+      ],
+      "name": "createPrediction",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "creationFee",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "emergencyWithdraw",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getContractStats",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "totalPredictions",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "platformFee",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "collectedFees",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "minStake",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "maxStake",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "contractBalance",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct PredictionMarket.ContractStats",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_predictionId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getMarketStats",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "totalPool",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "participantsCount",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "yesPercentage",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "noPercentage",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "timeLeft",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct PredictionMarket.MarketStats",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_predictionId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getParticipants",
+      "outputs": [
+        {
+          "internalType": "address[]",
+          "name": "",
+          "type": "address[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_predictionId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getPredictionBasic",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "string",
+              "name": "question",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "description",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "category",
+              "type": "string"
+            },
+            {
+              "internalType": "uint256",
+              "name": "yesTotalAmount",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "noTotalAmount",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "deadline",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bool",
+              "name": "resolved",
+              "type": "bool"
+            },
+            {
+              "internalType": "bool",
+              "name": "outcome",
+              "type": "bool"
+            },
+            {
+              "internalType": "bool",
+              "name": "approved",
+              "type": "bool"
+            },
+            {
+              "internalType": "address",
+              "name": "creator",
+              "type": "address"
+            }
+          ],
+          "internalType": "struct PredictionMarket.PredictionView",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_predictionId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getPredictionExtended",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "imageUrl",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "resolutionDeadline",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "cancelled",
+          "type": "bool"
+        },
+        {
+          "internalType": "uint256",
+          "name": "createdAt",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "verified",
+          "type": "bool"
+        },
+        {
+          "internalType": "bool",
+          "name": "needsApproval",
+          "type": "bool"
+        },
+        {
+          "internalType": "uint256",
+          "name": "approvalCount_",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_predictionId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "_user",
+          "type": "address"
+        }
+      ],
+      "name": "getUserStakeInfo",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "yesAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "noAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "claimed",
+          "type": "bool"
+        },
+        {
+          "internalType": "uint256",
+          "name": "potentialPayout",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "potentialProfit",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "maxResolutionTime",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "maximumStake",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "minimumStake",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "nextPredictionId",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "participants",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "pause",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_predictionId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "_isYes",
+          "type": "bool"
+        }
+      ],
+      "name": "placeStake",
+      "outputs": [],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "platformFeePercentage",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "predictionApprovals",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "predictions",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "question",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "category",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "imageUrl",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "yesTotalAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "noTotalAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "deadline",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "resolutionDeadline",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "resolved",
+          "type": "bool"
+        },
+        {
+          "internalType": "bool",
+          "name": "outcome",
+          "type": "bool"
+        },
+        {
+          "internalType": "bool",
+          "name": "cancelled",
+          "type": "bool"
+        },
+        {
+          "internalType": "uint256",
+          "name": "createdAt",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "creator",
+          "type": "address"
+        },
+        {
+          "internalType": "bool",
+          "name": "verified",
+          "type": "bool"
+        },
+        {
+          "internalType": "bool",
+          "name": "approved",
+          "type": "bool"
+        },
+        {
+          "internalType": "bool",
+          "name": "needsApproval",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "publicCreationEnabled",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_predictionId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "_reason",
+          "type": "string"
+        }
+      ],
+      "name": "rejectPrediction",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "requiredApprovals",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_predictionId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "_outcome",
+          "type": "bool"
+        }
+      ],
+      "name": "resolvePrediction",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_creator",
+          "type": "address"
+        },
+        {
+          "internalType": "bool",
+          "name": "_approved",
+          "type": "bool"
+        }
+      ],
+      "name": "setApprovedCreator",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_approver",
+          "type": "address"
+        },
+        {
+          "internalType": "bool",
+          "name": "_approved",
+          "type": "bool"
+        }
+      ],
+      "name": "setApprover",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_fee",
+          "type": "uint256"
+        }
+      ],
+      "name": "setCreationFee",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_maxTime",
+          "type": "uint256"
+        }
+      ],
+      "name": "setMaxResolutionTime",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_feePercentage",
+          "type": "uint256"
+        }
+      ],
+      "name": "setPlatformFee",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_predictionId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "_verified",
+          "type": "bool"
+        }
+      ],
+      "name": "setPredictionVerified",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bool",
+          "name": "_enabled",
+          "type": "bool"
+        }
+      ],
+      "name": "setPublicCreation",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_required",
+          "type": "uint256"
+        }
+      ],
+      "name": "setRequiredApprovals",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_minimum",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_maximum",
+          "type": "uint256"
+        }
+      ],
+      "name": "setStakeLimits",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "unpause",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "userStakes",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "yesAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "noAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "claimed",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "withdrawFees",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "stateMutability": "payable",
+      "type": "receive"
+    }
+  ],
+  "bytecode": "0x6080806040523461006b5760016008819055606460095566038d7ea4c68000600a5568056bc75e2d63100000600b5562093a80600d55662386f26fc10000600e55600f805460ff19169055601055600080546001600160a01b03191633179055612f7390816100718239f35b600080fdfe6080604052600436101561001b575b361561001957600080fd5b005b60003560e01c80624fbbb01461275b57806304daaab5146127385780630a144391146126f957806312e8e2c314612685578063222a242e146126005780633300a2d31461254f5780633f4ba83a1461251d57806340ad01ea146124f1578063476343ee1461246d5780634b290b5b146123ed57806355232467146123ae57806356f287f9146122d457806358057fe51461218057806369af332e14612133578063744d336c146120d557806376f3450114611ea857806381fb1fb414611e5e5780638456cb5914611e295780638c9bd1b514611db05780638da5cb5b14611d875780639003adfe14611d69578063906b659414611cd2578063941a0fce14611c4157806394f2a2de14611aa657806397732a05146119e857806399c1aadc146119ca578063a1ff401f146119ac578063ae169a5014611786578063b302c444146115b4578063b5c6b45314611596578063b726be7f1461154a578063b7d862251461151c578063c1e3bd3e14611447578063c451bc9514611401578063cc98ba58146110f6578063cdd78cfc146110d8578063d76fd2e71461107a578063d8d9292e1461105c578063db2e21bc14610f87578063dce0b4e414610f69578063dfe6b5d614610eb3578063e899052414610e4f578063ec5ffac214610e31578063eecf42ba146103ef5763f5b390010361000e57346103ea576020806003193601126103ea57600435801515806103df575b61023590612bce565b336000526006825260ff806040600020541680156103cb575b61025790612cec565b8160005260018352610273816008604060002001541615612c12565b81600052600183526102928160086040600020015460101c1615612c51565b8160005260058352604060002033600052835280604060002054166103865781600052600183526102e46040600020916008600a8401936102d883865460b01c16612d2a565b015460101c1615612c51565b816000526005835260406000203360005283526040600020600160ff198254161790558160005260078352604060002061031e8154612bac565b90558160005260078352604060002080546010541115918261036f575b5054926040519384528301527f747481420f63449cf3acd32536753d7085c4b10d146ae8434d887a139d1bac5d60403393a3005b805460ff60a81b1916600160a81b1790553861033b565b60405162461bcd60e51b815260048101849052601760248201527f416c726561647920617070726f76656420627920796f750000000000000000006044820152606490fd5b506000546001600160a01b0316331461024e565b50600854811061022c565b600080fd5b60a03660031901126103ea576004356001600160401b0381116103ea5761041a903690600401612aa4565b6024356001600160401b0381116103ea57610439903690600401612aa4565b6044356001600160401b0381116103ea57610458903690600401612aa4565b60649081356001600160401b0381116103ea57610479903690600401612aa4565b9060018060a01b0360005416331493849385159586610e19575b8015610e0d575b15610dcb576104ae60ff6011541615612b61565b865115610d955760c8875111610d5f57825115610d29576001608435101580610d1b575b15610ce4578580610ccb575b610c77575b50600854946104f186612bac565b600855610e10806084350290608435820414608435151715610c61576105179042612b9f565b9490610c49575b1591829182610c3c575b610534600d5487612b9f565b60405191826102008101106001600160401b03610200850111176109bf576102008301604052898352602083015282604083015285606083015260006080830152600060a08301528660c083015260e0820152600061010082015260006101208201526000610140820152426101608201523361018082015282156101a082015283156101c08201528315156101e0820152866000526001602052604060002081518051906001600160401b0382116109bf5781906105f384546128a0565b601f8111610bec575b50602090601f8311600114610b8057600092610b75575b50508160011b916000199060031b1c19161781555b60208201518051906001600160401b0382116109bf57819061064d60018501546128a0565b601f8111610b22575b50602090601f8311600114610ab057600092610aa5575b50508160011b916000199060031b1c19161760018201555b60408201518051906001600160401b0382116109bf5781906106aa60028501546128a0565b601f8111610a52575b50602090601f83116001146109e0576000926109d5575b50508160011b916000199060031b1c19161760028201555b60608201518051906001600160401b0382116109bf5761070560038401546128a0565b601f8111610978575b509160209a9593918a9795938c90601f83116001146108d45761089a93836108a897947fccb75847f6a37404f29d02f2851f201152d087c1d2a94a186ea026fecde97ba99c9d9794600a946000926108c9575b50508160011b916000199060031b1c19161760038201555b6080830151600482015560a0830151600582015560c0830151600682015560e08301516007820155600881016107c26101008501511515829060ff801983541691151516179055565b610120840151815461ff00191690151560081b61ff0016178155610140840151815462ff0000191690151560101b62ff0000161790556101608301516009820155610180830151910180546101a08401516001600160a81b03199091166001600160a01b03939093169290921791151560a01b60ff60a01b16919091178155906101c081015182546101e09092015161ffff60a81b1990921690151560a81b60ff60a81b161790151560b01b60ff60b01b1617905560405160c0808252909761088d91890190612a0e565b908782038d890152612a0e565b908582036040870152612a0e565b956060840152156080830152151560a08201528033940390a3604051908152f35b015190503880610761565b999493929190600383016000528d6000209a60005b601f198416811061095e5750926001837fccb75847f6a37404f29d02f2851f201152d087c1d2a94a186ea026fecde97ba99c9d600a946108a89a999761089a9997601f19811610610945575b505050811b016003820155610779565b015160001960f88460031b161c19169055388080610935565b828201518d556001909c019b8e9b50918f01918f016108e9565b600384016000526020600020601f840160051c8101602085106109b8575b601f830160051c820181106109ac57505061070e565b60008155600101610996565b5080610996565b634e487b7160e01b600052604160045260246000fd5b015190508b806106ca565b9250600284016000526020600020906000935b601f1984168510610a37576001945083601f19811610610a1e575b505050811b0160028201556106e2565b015160001960f88460031b161c191690558b8080610a0e565b818101518355602094850194600190930192909101906109f3565b909150600284016000526020600020601f840160051c810160208510610a9e575b90849392915b601f830160051c82018110610a8f5750506106b3565b60008155859450600101610a79565b5080610a73565b015190508b8061066d565b9250600184016000526020600020906000935b601f1984168510610b07576001945083601f19811610610aee575b505050811b016001820155610685565b015160001960f88460031b161c191690558b8080610ade565b81810151835560209485019460019093019290910190610ac3565b909150600184016000526020600020601f840160051c810160208510610b6e575b90849392915b601f830160051c82018110610b5f575050610656565b60008155859450600101610b49565b5080610b43565b015190508b80610613565b9250836000526020600020906000935b601f1984168510610bd1576001945083601f19811610610bb8575b505050811b018155610628565b015160001960f88460031b161c191690558b8080610bab565b81810151835560209485019460019093019290910190610b90565b909150836000526020600020601f840160051c810160208510610c35575b90849392915b601f830160051c82018110610c265750506105fc565b60008155859450600101610c10565b5080610c0a565b600f5460ff169350610528565b5033600052600460205260ff6040600020541661051e565b634e487b7160e01b600052601160045260246000fd5b600e543410610c965750610c8d34600c54612b9f565b600c55866104e3565b60405162461bcd60e51b815260206004820152601060248201526f506179206372656174696f6e2066656560801b6044820152fd5b5033600052600460205260ff60406000205416156104de565b60405162461bcd60e51b8152602060048201526012602482015271223ab930ba34b7b71d1018b41698bcb2b0b960711b6044820152fd5b5061223860843511156104d2565b60405162461bcd60e51b815260206004820152601160248201527010d85d1959dbdc9e481c995c5d5a5c9959607a1b6044820152fd5b60405162461bcd60e51b81526020600482015260116024820152705175657374696f6e20746f6f206c6f6e6760781b6044820152fd5b60405162461bcd60e51b8152602060048201526011602482015270145d595cdd1a5bdb881c995c5d5a5c9959607a1b6044820152fd5b60405162461bcd60e51b815260206004820152601860248201527f4e6f7420617574686f72697a656420746f2063726561746500000000000000006044820152fd5b5060ff600f541661049a565b5033600052600460205260ff60406000205416610493565b346103ea5760003660031901126103ea576020600a54604051908152f35b346103ea5760403660031901126103ea57610e68612a64565b600435600052600260205260406000209060018060a01b03166000526020526060604060002080549060ff600260018301549201541690604051928352602083015215156040820152f35b346103ea5760003660031901126103ea57600060a0604051610ed481612911565b82815282602082015282604082015282606082015282608082015201526008546000198101908111610c615760c090600954600c54600a54600b5491479360a0604051610f2081612911565b87815260208101928352604081019384526060810194855260808101958652019485526040519586525160208601525160408501525160608401525160808301525160a0820152f35b346103ea5760003660031901126103ea576020600e54604051908152f35b346103ea5760003660031901126103ea576000546001600160a01b0316610faf338214612c94565b60ff601154161561101757478015610fdb57600080808093610019955af1610fd5612d75565b50612da5565b60405162461bcd60e51b81526020600482015260146024820152734e6f2066756e647320746f20776974686472617760601b6044820152606490fd5b60405162461bcd60e51b815260206004820152601d60248201527f436f6e7472616374206d757374206265207061757365642066697273740000006044820152606490fd5b346103ea5760003660031901126103ea576020600854604051908152f35b346103ea5760403660031901126103ea57610019611096612a4e565b61109e612a7a565b60005490916001600160a01b03916110b99083163314612c94565b16600052600660205260406000209060ff801983541691151516179055565b346103ea5760003660031901126103ea576020600954604051908152f35b60403660031901126103ea5760043561110d612a7a565b90801515806113f6575b61112090612bce565b80600052600160208181526006604060002001544210156113c1578260005281815261115760ff6008604060002001541615612c12565b8260005281815261117660ff60086040600020015460101c1615612c51565b82600052818152600a6040600020015460ff8160a81c169081156113b2575b501561136e576111aa60ff6011541615612b61565b600a54341061133a57600b5434116113055782600052818152604060002090600281526040600020336000528152604060002090815415806112fa575b611286575b507fe109a4172899128085436521d7cd814ee1fe06ce8a72461a96d171555d9f5ffb9285156112625750611221348254612b9f565b905560048101611232348254612b9f565b90555b600481015460059091015460408051951515865234602087015285019190915260608401523392608090a3005b0161126e348254612b9f565b90556005810161127f348254612b9f565b9055611235565b6003908560005252604060002092835493680100000000000000008510156109bf57846112d891837fe109a4172899128085436521d7cd814ee1fe06ce8a72461a96d171555d9f5ffb97018155612b33565b81546001600160a01b0360039290921b91821b19163390911b179055926111ec565b5083820154156111e7565b6064906040519062461bcd60e51b82526004820152600e60248201526d0a6e8c2d6ca40e8dede40d0d2ced60931b6044820152fd5b6064906040519062461bcd60e51b82526004820152600d60248201526c5374616b6520746f6f206c6f7760981b6044820152fd5b6064906040519062461bcd60e51b82526004820152601b60248201527f50726564696374696f6e206e6f7420617070726f7665642079657400000000006044820152fd5b60ff915060b01c161585611195565b6064906040519062461bcd60e51b82526004820152600e60248201526d10995d1d1a5b99c818db1bdcd95960921b6044820152fd5b506008548110611117565b346103ea5760203660031901126103ea576004358015158091036103ea5761143460018060a01b03600054163314612c94565b60ff8019600f5416911617600f55600080f35b346103ea576020806003193601126103ea5760043580151580611511575b61146e90612bce565b60005260038152604060002060405190818382549182815201908192600052846000209060005b868282106114f45786866114ab82880383612947565b604051928392818401908285525180915260408401929160005b8281106114d457505050500390f35b83516001600160a01b0316855286955093810193928101926001016114c5565b83546001600160a01b031685529093019260019283019201611495565b506008548110611465565b346103ea5760203660031901126103ea5761154260018060a01b03600054163314612c94565b600435600e55005b346103ea5760403660031901126103ea576040611584611568612a64565b6000602084516115778161292c565b8281520152600435612de3565b60208251918051835201516020820152f35b346103ea5760003660031901126103ea576020600b54604051908152f35b346103ea5760203660031901126103ea5760043560006101206040516115d9816128f5565b6060815260606020820152606060408201528260608201528260808201528260a08201528260c08201528260e08201528261010082015201528015158061177b575b61162490612bce565b60005260016020526040600020600481015460ff60058301546006840154600885015491600a860154946116826002604051986116608a6128f5565b61166981612968565b8a5261167760018201612968565b60208b015201612968565b60408801526060870152608086015260a0850152818116151560c085015260081c16151560e083015260ff8160a81c16151561010083015260018060a01b031661012082015260405180916020825261171d6116ec82516101406020860152610160850190612a0e565b611708602084015191601f199283878303016040880152612a0e565b90604084015190858303016060860152612a0e565b9060608101516080840152608081015160a084015260a081015160c084015260c0810151151560e084015260e08101511515610100840152610100810151151561012084015261012060018060a01b03910151166101408301520390f35b50600854811061161b565b346103ea576020806003193601126103ea57600435801515806119a1575b6117ad90612bce565b80600052600182526008604060002001805460ff8116908115611993575b501561195b57816000526002835260406000203360005283526040600020600281019081549160ff8316611924578154928315801590611917575b156118e15760ff19166001908117909155015461182291612b9f565b60ff6000925460101c166000146118b3578093604051828152847fbd634c7bdf536d4ef89dad94ea8933d03e5fbb8be4f85fc7699f5859497d793f833393a35b8461186957005b61187d600080808089335af1610fd5612d75565b60405194855284015260408301527fdb8cb4ab6644b448739f5fde1475b32185c930cb8ff38ed1c275906a7ad73c3460603393a3005b9290506000816040516118c58161292c565b82815201526118d43383612de3565b9281845194015191611862565b60405162461bcd60e51b815260048101889052600e60248201526d139bc81cdd185ad948199bdd5b9960921b6044820152606490fd5b5060018301541515611806565b60405162461bcd60e51b815260048101879052600f60248201526e105b1c9958591e4818db185a5b5959608a1b6044820152606490fd5b60405162461bcd60e51b815260048101849052601060248201526f139bdd081c995cdbdb1d9959081e595d60821b6044820152606490fd5b60ff915060101c16846117cb565b5060085481106117a4565b346103ea5760003660031901126103ea576020600d54604051908152f35b346103ea5760003660031901126103ea576020601054604051908152f35b346103ea5760203660031901126103ea5760043580151580611a9b575b611a0e90612bce565b6000526001602052611a686040600020600781015460ff600883015460101c169160ff6009820154600a830154906007602052611a5360036040600020549501612968565b9560405197889760e0895260e0890190612a0e565b956020880152151560408701526060860152818160a01c161515608086015260b01c16151560a084015260c08301520390f35b506008548110611a05565b346103ea57611ab436612aeb565b9080151580611c36575b611ac790612bce565b336000526020916006835260ff604060002054168015611c22575b611aeb90612cec565b8160005260018352611b0860ff6008604060002001541615612c12565b8160005260018352611b2860ff60086040600020015460101c1615612c51565b816000526001835260086040600020611b4a60ff600a83015460b01c16612d2a565b019283549360ff8560101c16611bdd57620100007f16df958f95890327bd2b2e188d052875769d43607523bdbf47c3c18c5dc4df26949562ff00001916179055604051818152847f40d1392b263858d7a92eb40d3fa8e5cfc2cf5a89c5270f4115e360f40f0e618d339280611bc186820188612a0e565b0390a3611bd8604051928284938452830190612a0e565b0390a2005b60405162461bcd60e51b815260048101839052601c60248201527f50726564696374696f6e20616c72656164792063616e63656c6c6564000000006044820152606490fd5b506000546001600160a01b03163314611ae2565b506008548110611abe565b346103ea5760203660031901126103ea57600435611c6a60018060a01b03600054163314612c94565b610e1081101580611cc5575b15611c8057600d55005b60405162461bcd60e51b815260206004820152601760248201527f496e76616c6964207265736f6c7574696f6e2074696d650000000000000000006044820152606490fd5b5062278d00811115611c76565b346103ea5760203660031901126103ea5760043580151580611d5e575b611cf890612bce565b60005260016020526020604060002060088101549060ff8216159182611d4f575b5081611d40575b81611d31575b506040519015158152f35b60079150015442111582611d26565b60068101544210159150611d20565b60101c60ff1615915083611d19565b506008548110611cef565b346103ea5760003660031901126103ea576020600c54604051908152f35b346103ea5760003660031901126103ea576000546040516001600160a01b039091168152602090f35b346103ea57611dbe36612b1d565b90611dd460018060a01b03600054163314612c94565b80151580611e20575b15611dea57600a55600b55005b60405162461bcd60e51b815260206004820152600e60248201526d496e76616c6964206c696d69747360901b6044820152606490fd5b50818110611ddd565b346103ea5760003660031901126103ea57611e4f60018060a01b03600054163314612c94565b6011805460ff19166001179055005b346103ea57611e6c36612b1d565b906000526003602052604060002080548210156103ea57602091611e8f91612b33565b905460405160039290921b1c6001600160a01b03168152f35b346103ea5760403660031901126103ea57600435611ec4612a7a565b90611eda60018060a01b03600054163314612c94565b801515806120ca575b611eec90612bce565b806000526001602092818452600660406000200154421061208e5782600052818452611f2360ff6008604060002001541615612c12565b82600052818452611f4260ff60086040600020015460101c1615612c51565b826000528184526007604060002001544211612049578183947fd41740bbee5129a7f04fb56cf4e432d7814689974266d8cba4ed40579ed96f029460005252611fb181604060002093600885019060ff198254161781559061ff00825491151560081b169061ff001916179055565b801561203b57611bd86004830154925b821561203257600501545b60009080151580612029575b612002575b6040519485948590949392606092608083019615158352602083015260408201520152565b905061271061201360095483612bbb565b049061202182600c54612b9f565b600c55611fdd565b50841515611fd8565b60040154611fcc565b611bd8600583015492611fc1565b60405162461bcd60e51b815260048101859052601a60248201527f5265736f6c7574696f6e20646561646c696e65207061737365640000000000006044820152606490fd5b60405162461bcd60e51b815260048101859052601460248201527342657474696e67207374696c6c2061637469766560601b6044820152606490fd5b506008548110611ee3565b346103ea5760403660031901126103ea576100196120f1612a4e565b6120f9612a7a565b60005490916001600160a01b03916121149083163314612c94565b16600052600460205260406000209060ff801983541691151516179055565b346103ea5760403660031901126103ea5761214c612a64565b600435600052600560205260406000209060018060a01b0316600052602052602060ff604060002054166040519015158152f35b346103ea576020806003193601126103ea57600435600060806040516121a5816128da565b82815282858201528260408201528260608201520152801515806122c9575b6121cd90612bce565b8060005260018252604060002091600483015460058401546121ef8183612b9f565b9360005260038352604060002054926000916000938661227c575b5050600660a09601548042101560001461226b57506000935b6080604051612231816128da565b8781528381019283526040810194855260608101958652019485526040519586525190850152516040840152516060830152516080820152f35b612276904290612e0a565b93612223565b60649197945080929350029080820460641490151715610c6157846122a091612ccc565b90606486029580870460641490151715610c615760066122c28660a098612ccc565b939661220a565b5060085481106121c4565b346103ea57611bd87f16df958f95890327bd2b2e188d052875769d43607523bdbf47c3c18c5dc4df2661230636612aeb565b61231e60018060a09694961b03600054163314612c94565b831515806123a3575b61233090612bce565b83600052600160205261234e60ff6008604060002001541615612c12565b83600052600160205261236f60ff60086040600020015460101c1615612c51565b83600052600160205260086040600020016201000062ff000019825416179055604051918291602083526020830190612a0e565b506008548410612327565b346103ea5760203660031901126103ea576001600160a01b036123cf612a4e565b166000526004602052602060ff604060002054166040519015158152f35b346103ea5760403660031901126103ea5761001960043561240c612a7a565b9061242260018060a01b03600054163314612c94565b80151580612462575b61243490612bce565b6000908152600160205260409020600a01805460ff60a01b191691151560a01b60ff60a01b16919091179055565b50600854811061242b565b346103ea5760003660031901126103ea576000546001600160a01b0316612495338214612c94565b600c5480156124b6576000808080936100199582600c555af1610fd5612d75565b60405162461bcd60e51b81526020600482015260136024820152724e6f206665657320746f20776974686472617760681b6044820152606490fd5b346103ea5760203660031901126103ea5760043560005260076020526020604060002054604051908152f35b346103ea5760003660031901126103ea5761254360018060a01b03600054163314612c94565b6011805460ff19169055005b346103ea5760403660031901126103ea5760a06004356125be612570612a64565b821515806125f5575b61258290612bce565b8260005260026020526040600020600180861b038216600052602052604060002092600060206040516125b48161292c565b8281520152612de3565b9080549160ff6002600184015493015416602082519201519260405194855260208501521515604084015260608301526080820152f35b506008548310612579565b346103ea5760203660031901126103ea5760043561262960018060a01b03600054163314612c94565b8015158061267a575b1561263c57601055005b60405162461bcd60e51b8152602060048201526016602482015275125b9d985b1a5908185c1c1c9bdd985b0818dbdd5b9d60521b6044820152606490fd5b50600a811115612632565b346103ea5760203660031901126103ea576004356126ae60018060a01b03600054163314612c94565b6103e881116126bc57600955005b60405162461bcd60e51b81526020600482015260156024820152744665652063616e6e6f74206578636565642031302560581b6044820152606490fd5b346103ea5760203660031901126103ea576001600160a01b0361271a612a4e565b166000526006602052602060ff604060002054166040519015158152f35b346103ea5760003660031901126103ea57602060ff600f54166040519015158152f35b346103ea5760203660031901126103ea57600435600052600160205260406000206127f761278882612968565b9161279560018201612968565b926127a260028301612968565b906127af60038401612968565b926004810154936005820154600683015490612821600785015493612813600887015498612805600a60098a0154990154996040519e8f9e8f92610200808552840190612a0e565b916020818403910152612a0e565b8c810360408e015290612a0e565b908a820360608c0152612a0e565b96608089015260a088015260c087015260e086015260ff83818095161515610100880152818160081c16151561012088015260101c16151561014086015261016085015260018060a01b038116610180850152818160a01c1615156101a0850152818160a81c1615156101c085015260b01c1615156101e08301520390f35b90600182811c921680156128d0575b60208310146128ba57565b634e487b7160e01b600052602260045260246000fd5b91607f16916128af565b60a081019081106001600160401b038211176109bf57604052565b61014081019081106001600160401b038211176109bf57604052565b60c081019081106001600160401b038211176109bf57604052565b604081019081106001600160401b038211176109bf57604052565b90601f801991011681019081106001600160401b038211176109bf57604052565b906040519182600082549261297c846128a0565b9081845260019485811690816000146129eb57506001146129a8575b50506129a692500383612947565b565b9093915060005260209081600020936000915b8183106129d35750506129a693508201013880612998565b855488840185015294850194879450918301916129bb565b9150506129a694506020925060ff191682840152151560051b8201013880612998565b919082519283825260005b848110612a3a575050826000602080949584010152601f8019910116010190565b602081830181015184830182015201612a19565b600435906001600160a01b03821682036103ea57565b602435906001600160a01b03821682036103ea57565b6024359081151582036103ea57565b6001600160401b0381116109bf57601f01601f191660200190565b81601f820112156103ea57803590612abb82612a89565b92612ac96040519485612947565b828452602083830101116103ea57816000926020809301838601378301015290565b9060406003198301126103ea5760043591602435906001600160401b0382116103ea57612b1a91600401612aa4565b90565b60409060031901126103ea576004359060243590565b8054821015612b4b5760005260206000200190600090565b634e487b7160e01b600052603260045260246000fd5b15612b6857565b60405162461bcd60e51b815260206004820152600f60248201526e10dbdb9d1c9858dd081c185d5cd959608a1b6044820152606490fd5b91908201809211610c6157565b6000198114610c615760010190565b81810292918115918404141715610c6157565b15612bd557565b60405162461bcd60e51b8152602060048201526015602482015274125b9d985b1a59081c1c99591a58dd1a5bdb881251605a1b6044820152606490fd5b15612c1957565b60405162461bcd60e51b815260206004820152601060248201526f105b1c9958591e481c995cdbdb1d995960821b6044820152606490fd5b15612c5857565b60405162461bcd60e51b8152602060048201526014602482015273141c99591a58dd1a5bdb8818d85b98d95b1b195960621b6044820152606490fd5b15612c9b57565b60405162461bcd60e51b81526020600482015260096024820152682737ba1037bbb732b960b91b6044820152606490fd5b8115612cd6570490565b634e487b7160e01b600052601260045260246000fd5b15612cf357565b60405162461bcd60e51b815260206004820152600f60248201526e2737ba1030b71030b8383937bb32b960891b6044820152606490fd5b15612d3157565b606460405162461bcd60e51b815260206004820152602060248201527f50726564696374696f6e20646f65736e2774206e65656420617070726f76616c6044820152fd5b3d15612da0573d90612d8682612a89565b91612d946040519384612947565b82523d6000602084013e565b606090565b15612dac57565b60405162461bcd60e51b815260206004820152600f60248201526e151c985b9cd9995c8819985a5b1959608a1b6044820152606490fd5b90612b1a9180151580612dff575b612dfa90612bce565b612e17565b506008548110612df1565b91908203918211610c6157565b90600090828252602090600182526040938484209160088301549160ff8316158015612f30575b612f20578552600284528585206001600160a01b039091168552835284842060089190911c60ff16908115612f15576004830154925b8215612f0b5760050154915b15612f015754935b84158015612ef9575b612ee05750612ecc91612ec0612eba612ec593612710612eb360095483612bbb565b0490612e0a565b86612bbb565b612ccc565b8093612b9f565b925192612ed88461292c565b835282015290565b93505050915191612ef08361292c565b81835282015290565b508215612e91565b6001015493612e88565b6004015491612e80565b600583015492612e74565b50505050915191612ef08361292c565b5060ff8360101c16612e3e56fea2646970667358221220a038e0907eece5c544c28fc0a9b83ca8ba22374ec447a1aae5e0de01ff768c5a64736f6c63430008130033",
+  "deployedBytecode": "0x6080604052600436101561001b575b361561001957600080fd5b005b60003560e01c80624fbbb01461275b57806304daaab5146127385780630a144391146126f957806312e8e2c314612685578063222a242e146126005780633300a2d31461254f5780633f4ba83a1461251d57806340ad01ea146124f1578063476343ee1461246d5780634b290b5b146123ed57806355232467146123ae57806356f287f9146122d457806358057fe51461218057806369af332e14612133578063744d336c146120d557806376f3450114611ea857806381fb1fb414611e5e5780638456cb5914611e295780638c9bd1b514611db05780638da5cb5b14611d875780639003adfe14611d69578063906b659414611cd2578063941a0fce14611c4157806394f2a2de14611aa657806397732a05146119e857806399c1aadc146119ca578063a1ff401f146119ac578063ae169a5014611786578063b302c444146115b4578063b5c6b45314611596578063b726be7f1461154a578063b7d862251461151c578063c1e3bd3e14611447578063c451bc9514611401578063cc98ba58146110f6578063cdd78cfc146110d8578063d76fd2e71461107a578063d8d9292e1461105c578063db2e21bc14610f87578063dce0b4e414610f69578063dfe6b5d614610eb3578063e899052414610e4f578063ec5ffac214610e31578063eecf42ba146103ef5763f5b390010361000e57346103ea576020806003193601126103ea57600435801515806103df575b61023590612bce565b336000526006825260ff806040600020541680156103cb575b61025790612cec565b8160005260018352610273816008604060002001541615612c12565b81600052600183526102928160086040600020015460101c1615612c51565b8160005260058352604060002033600052835280604060002054166103865781600052600183526102e46040600020916008600a8401936102d883865460b01c16612d2a565b015460101c1615612c51565b816000526005835260406000203360005283526040600020600160ff198254161790558160005260078352604060002061031e8154612bac565b90558160005260078352604060002080546010541115918261036f575b5054926040519384528301527f747481420f63449cf3acd32536753d7085c4b10d146ae8434d887a139d1bac5d60403393a3005b805460ff60a81b1916600160a81b1790553861033b565b60405162461bcd60e51b815260048101849052601760248201527f416c726561647920617070726f76656420627920796f750000000000000000006044820152606490fd5b506000546001600160a01b0316331461024e565b50600854811061022c565b600080fd5b60a03660031901126103ea576004356001600160401b0381116103ea5761041a903690600401612aa4565b6024356001600160401b0381116103ea57610439903690600401612aa4565b6044356001600160401b0381116103ea57610458903690600401612aa4565b60649081356001600160401b0381116103ea57610479903690600401612aa4565b9060018060a01b0360005416331493849385159586610e19575b8015610e0d575b15610dcb576104ae60ff6011541615612b61565b865115610d955760c8875111610d5f57825115610d29576001608435101580610d1b575b15610ce4578580610ccb575b610c77575b50600854946104f186612bac565b600855610e10806084350290608435820414608435151715610c61576105179042612b9f565b9490610c49575b1591829182610c3c575b610534600d5487612b9f565b60405191826102008101106001600160401b03610200850111176109bf576102008301604052898352602083015282604083015285606083015260006080830152600060a08301528660c083015260e0820152600061010082015260006101208201526000610140820152426101608201523361018082015282156101a082015283156101c08201528315156101e0820152866000526001602052604060002081518051906001600160401b0382116109bf5781906105f384546128a0565b601f8111610bec575b50602090601f8311600114610b8057600092610b75575b50508160011b916000199060031b1c19161781555b60208201518051906001600160401b0382116109bf57819061064d60018501546128a0565b601f8111610b22575b50602090601f8311600114610ab057600092610aa5575b50508160011b916000199060031b1c19161760018201555b60408201518051906001600160401b0382116109bf5781906106aa60028501546128a0565b601f8111610a52575b50602090601f83116001146109e0576000926109d5575b50508160011b916000199060031b1c19161760028201555b60608201518051906001600160401b0382116109bf5761070560038401546128a0565b601f8111610978575b509160209a9593918a9795938c90601f83116001146108d45761089a93836108a897947fccb75847f6a37404f29d02f2851f201152d087c1d2a94a186ea026fecde97ba99c9d9794600a946000926108c9575b50508160011b916000199060031b1c19161760038201555b6080830151600482015560a0830151600582015560c0830151600682015560e08301516007820155600881016107c26101008501511515829060ff801983541691151516179055565b610120840151815461ff00191690151560081b61ff0016178155610140840151815462ff0000191690151560101b62ff0000161790556101608301516009820155610180830151910180546101a08401516001600160a81b03199091166001600160a01b03939093169290921791151560a01b60ff60a01b16919091178155906101c081015182546101e09092015161ffff60a81b1990921690151560a81b60ff60a81b161790151560b01b60ff60b01b1617905560405160c0808252909761088d91890190612a0e565b908782038d890152612a0e565b908582036040870152612a0e565b956060840152156080830152151560a08201528033940390a3604051908152f35b015190503880610761565b999493929190600383016000528d6000209a60005b601f198416811061095e5750926001837fccb75847f6a37404f29d02f2851f201152d087c1d2a94a186ea026fecde97ba99c9d600a946108a89a999761089a9997601f19811610610945575b505050811b016003820155610779565b015160001960f88460031b161c19169055388080610935565b828201518d556001909c019b8e9b50918f01918f016108e9565b600384016000526020600020601f840160051c8101602085106109b8575b601f830160051c820181106109ac57505061070e565b60008155600101610996565b5080610996565b634e487b7160e01b600052604160045260246000fd5b015190508b806106ca565b9250600284016000526020600020906000935b601f1984168510610a37576001945083601f19811610610a1e575b505050811b0160028201556106e2565b015160001960f88460031b161c191690558b8080610a0e565b818101518355602094850194600190930192909101906109f3565b909150600284016000526020600020601f840160051c810160208510610a9e575b90849392915b601f830160051c82018110610a8f5750506106b3565b60008155859450600101610a79565b5080610a73565b015190508b8061066d565b9250600184016000526020600020906000935b601f1984168510610b07576001945083601f19811610610aee575b505050811b016001820155610685565b015160001960f88460031b161c191690558b8080610ade565b81810151835560209485019460019093019290910190610ac3565b909150600184016000526020600020601f840160051c810160208510610b6e575b90849392915b601f830160051c82018110610b5f575050610656565b60008155859450600101610b49565b5080610b43565b015190508b80610613565b9250836000526020600020906000935b601f1984168510610bd1576001945083601f19811610610bb8575b505050811b018155610628565b015160001960f88460031b161c191690558b8080610bab565b81810151835560209485019460019093019290910190610b90565b909150836000526020600020601f840160051c810160208510610c35575b90849392915b601f830160051c82018110610c265750506105fc565b60008155859450600101610c10565b5080610c0a565b600f5460ff169350610528565b5033600052600460205260ff6040600020541661051e565b634e487b7160e01b600052601160045260246000fd5b600e543410610c965750610c8d34600c54612b9f565b600c55866104e3565b60405162461bcd60e51b815260206004820152601060248201526f506179206372656174696f6e2066656560801b6044820152fd5b5033600052600460205260ff60406000205416156104de565b60405162461bcd60e51b8152602060048201526012602482015271223ab930ba34b7b71d1018b41698bcb2b0b960711b6044820152fd5b5061223860843511156104d2565b60405162461bcd60e51b815260206004820152601160248201527010d85d1959dbdc9e481c995c5d5a5c9959607a1b6044820152fd5b60405162461bcd60e51b81526020600482015260116024820152705175657374696f6e20746f6f206c6f6e6760781b6044820152fd5b60405162461bcd60e51b8152602060048201526011602482015270145d595cdd1a5bdb881c995c5d5a5c9959607a1b6044820152fd5b60405162461bcd60e51b815260206004820152601860248201527f4e6f7420617574686f72697a656420746f2063726561746500000000000000006044820152fd5b5060ff600f541661049a565b5033600052600460205260ff60406000205416610493565b346103ea5760003660031901126103ea576020600a54604051908152f35b346103ea5760403660031901126103ea57610e68612a64565b600435600052600260205260406000209060018060a01b03166000526020526060604060002080549060ff600260018301549201541690604051928352602083015215156040820152f35b346103ea5760003660031901126103ea57600060a0604051610ed481612911565b82815282602082015282604082015282606082015282608082015201526008546000198101908111610c615760c090600954600c54600a54600b5491479360a0604051610f2081612911565b87815260208101928352604081019384526060810194855260808101958652019485526040519586525160208601525160408501525160608401525160808301525160a0820152f35b346103ea5760003660031901126103ea576020600e54604051908152f35b346103ea5760003660031901126103ea576000546001600160a01b0316610faf338214612c94565b60ff601154161561101757478015610fdb57600080808093610019955af1610fd5612d75565b50612da5565b60405162461bcd60e51b81526020600482015260146024820152734e6f2066756e647320746f20776974686472617760601b6044820152606490fd5b60405162461bcd60e51b815260206004820152601d60248201527f436f6e7472616374206d757374206265207061757365642066697273740000006044820152606490fd5b346103ea5760003660031901126103ea576020600854604051908152f35b346103ea5760403660031901126103ea57610019611096612a4e565b61109e612a7a565b60005490916001600160a01b03916110b99083163314612c94565b16600052600660205260406000209060ff801983541691151516179055565b346103ea5760003660031901126103ea576020600954604051908152f35b60403660031901126103ea5760043561110d612a7a565b90801515806113f6575b61112090612bce565b80600052600160208181526006604060002001544210156113c1578260005281815261115760ff6008604060002001541615612c12565b8260005281815261117660ff60086040600020015460101c1615612c51565b82600052818152600a6040600020015460ff8160a81c169081156113b2575b501561136e576111aa60ff6011541615612b61565b600a54341061133a57600b5434116113055782600052818152604060002090600281526040600020336000528152604060002090815415806112fa575b611286575b507fe109a4172899128085436521d7cd814ee1fe06ce8a72461a96d171555d9f5ffb9285156112625750611221348254612b9f565b905560048101611232348254612b9f565b90555b600481015460059091015460408051951515865234602087015285019190915260608401523392608090a3005b0161126e348254612b9f565b90556005810161127f348254612b9f565b9055611235565b6003908560005252604060002092835493680100000000000000008510156109bf57846112d891837fe109a4172899128085436521d7cd814ee1fe06ce8a72461a96d171555d9f5ffb97018155612b33565b81546001600160a01b0360039290921b91821b19163390911b179055926111ec565b5083820154156111e7565b6064906040519062461bcd60e51b82526004820152600e60248201526d0a6e8c2d6ca40e8dede40d0d2ced60931b6044820152fd5b6064906040519062461bcd60e51b82526004820152600d60248201526c5374616b6520746f6f206c6f7760981b6044820152fd5b6064906040519062461bcd60e51b82526004820152601b60248201527f50726564696374696f6e206e6f7420617070726f7665642079657400000000006044820152fd5b60ff915060b01c161585611195565b6064906040519062461bcd60e51b82526004820152600e60248201526d10995d1d1a5b99c818db1bdcd95960921b6044820152fd5b506008548110611117565b346103ea5760203660031901126103ea576004358015158091036103ea5761143460018060a01b03600054163314612c94565b60ff8019600f5416911617600f55600080f35b346103ea576020806003193601126103ea5760043580151580611511575b61146e90612bce565b60005260038152604060002060405190818382549182815201908192600052846000209060005b868282106114f45786866114ab82880383612947565b604051928392818401908285525180915260408401929160005b8281106114d457505050500390f35b83516001600160a01b0316855286955093810193928101926001016114c5565b83546001600160a01b031685529093019260019283019201611495565b506008548110611465565b346103ea5760203660031901126103ea5761154260018060a01b03600054163314612c94565b600435600e55005b346103ea5760403660031901126103ea576040611584611568612a64565b6000602084516115778161292c565b8281520152600435612de3565b60208251918051835201516020820152f35b346103ea5760003660031901126103ea576020600b54604051908152f35b346103ea5760203660031901126103ea5760043560006101206040516115d9816128f5565b6060815260606020820152606060408201528260608201528260808201528260a08201528260c08201528260e08201528261010082015201528015158061177b575b61162490612bce565b60005260016020526040600020600481015460ff60058301546006840154600885015491600a860154946116826002604051986116608a6128f5565b61166981612968565b8a5261167760018201612968565b60208b015201612968565b60408801526060870152608086015260a0850152818116151560c085015260081c16151560e083015260ff8160a81c16151561010083015260018060a01b031661012082015260405180916020825261171d6116ec82516101406020860152610160850190612a0e565b611708602084015191601f199283878303016040880152612a0e565b90604084015190858303016060860152612a0e565b9060608101516080840152608081015160a084015260a081015160c084015260c0810151151560e084015260e08101511515610100840152610100810151151561012084015261012060018060a01b03910151166101408301520390f35b50600854811061161b565b346103ea576020806003193601126103ea57600435801515806119a1575b6117ad90612bce565b80600052600182526008604060002001805460ff8116908115611993575b501561195b57816000526002835260406000203360005283526040600020600281019081549160ff8316611924578154928315801590611917575b156118e15760ff19166001908117909155015461182291612b9f565b60ff6000925460101c166000146118b3578093604051828152847fbd634c7bdf536d4ef89dad94ea8933d03e5fbb8be4f85fc7699f5859497d793f833393a35b8461186957005b61187d600080808089335af1610fd5612d75565b60405194855284015260408301527fdb8cb4ab6644b448739f5fde1475b32185c930cb8ff38ed1c275906a7ad73c3460603393a3005b9290506000816040516118c58161292c565b82815201526118d43383612de3565b9281845194015191611862565b60405162461bcd60e51b815260048101889052600e60248201526d139bc81cdd185ad948199bdd5b9960921b6044820152606490fd5b5060018301541515611806565b60405162461bcd60e51b815260048101879052600f60248201526e105b1c9958591e4818db185a5b5959608a1b6044820152606490fd5b60405162461bcd60e51b815260048101849052601060248201526f139bdd081c995cdbdb1d9959081e595d60821b6044820152606490fd5b60ff915060101c16846117cb565b5060085481106117a4565b346103ea5760003660031901126103ea576020600d54604051908152f35b346103ea5760003660031901126103ea576020601054604051908152f35b346103ea5760203660031901126103ea5760043580151580611a9b575b611a0e90612bce565b6000526001602052611a686040600020600781015460ff600883015460101c169160ff6009820154600a830154906007602052611a5360036040600020549501612968565b9560405197889760e0895260e0890190612a0e565b956020880152151560408701526060860152818160a01c161515608086015260b01c16151560a084015260c08301520390f35b506008548110611a05565b346103ea57611ab436612aeb565b9080151580611c36575b611ac790612bce565b336000526020916006835260ff604060002054168015611c22575b611aeb90612cec565b8160005260018352611b0860ff6008604060002001541615612c12565b8160005260018352611b2860ff60086040600020015460101c1615612c51565b816000526001835260086040600020611b4a60ff600a83015460b01c16612d2a565b019283549360ff8560101c16611bdd57620100007f16df958f95890327bd2b2e188d052875769d43607523bdbf47c3c18c5dc4df26949562ff00001916179055604051818152847f40d1392b263858d7a92eb40d3fa8e5cfc2cf5a89c5270f4115e360f40f0e618d339280611bc186820188612a0e565b0390a3611bd8604051928284938452830190612a0e565b0390a2005b60405162461bcd60e51b815260048101839052601c60248201527f50726564696374696f6e20616c72656164792063616e63656c6c6564000000006044820152606490fd5b506000546001600160a01b03163314611ae2565b506008548110611abe565b346103ea5760203660031901126103ea57600435611c6a60018060a01b03600054163314612c94565b610e1081101580611cc5575b15611c8057600d55005b60405162461bcd60e51b815260206004820152601760248201527f496e76616c6964207265736f6c7574696f6e2074696d650000000000000000006044820152606490fd5b5062278d00811115611c76565b346103ea5760203660031901126103ea5760043580151580611d5e575b611cf890612bce565b60005260016020526020604060002060088101549060ff8216159182611d4f575b5081611d40575b81611d31575b506040519015158152f35b60079150015442111582611d26565b60068101544210159150611d20565b60101c60ff1615915083611d19565b506008548110611cef565b346103ea5760003660031901126103ea576020600c54604051908152f35b346103ea5760003660031901126103ea576000546040516001600160a01b039091168152602090f35b346103ea57611dbe36612b1d565b90611dd460018060a01b03600054163314612c94565b80151580611e20575b15611dea57600a55600b55005b60405162461bcd60e51b815260206004820152600e60248201526d496e76616c6964206c696d69747360901b6044820152606490fd5b50818110611ddd565b346103ea5760003660031901126103ea57611e4f60018060a01b03600054163314612c94565b6011805460ff19166001179055005b346103ea57611e6c36612b1d565b906000526003602052604060002080548210156103ea57602091611e8f91612b33565b905460405160039290921b1c6001600160a01b03168152f35b346103ea5760403660031901126103ea57600435611ec4612a7a565b90611eda60018060a01b03600054163314612c94565b801515806120ca575b611eec90612bce565b806000526001602092818452600660406000200154421061208e5782600052818452611f2360ff6008604060002001541615612c12565b82600052818452611f4260ff60086040600020015460101c1615612c51565b826000528184526007604060002001544211612049578183947fd41740bbee5129a7f04fb56cf4e432d7814689974266d8cba4ed40579ed96f029460005252611fb181604060002093600885019060ff198254161781559061ff00825491151560081b169061ff001916179055565b801561203b57611bd86004830154925b821561203257600501545b60009080151580612029575b612002575b6040519485948590949392606092608083019615158352602083015260408201520152565b905061271061201360095483612bbb565b049061202182600c54612b9f565b600c55611fdd565b50841515611fd8565b60040154611fcc565b611bd8600583015492611fc1565b60405162461bcd60e51b815260048101859052601a60248201527f5265736f6c7574696f6e20646561646c696e65207061737365640000000000006044820152606490fd5b60405162461bcd60e51b815260048101859052601460248201527342657474696e67207374696c6c2061637469766560601b6044820152606490fd5b506008548110611ee3565b346103ea5760403660031901126103ea576100196120f1612a4e565b6120f9612a7a565b60005490916001600160a01b03916121149083163314612c94565b16600052600460205260406000209060ff801983541691151516179055565b346103ea5760403660031901126103ea5761214c612a64565b600435600052600560205260406000209060018060a01b0316600052602052602060ff604060002054166040519015158152f35b346103ea576020806003193601126103ea57600435600060806040516121a5816128da565b82815282858201528260408201528260608201520152801515806122c9575b6121cd90612bce565b8060005260018252604060002091600483015460058401546121ef8183612b9f565b9360005260038352604060002054926000916000938661227c575b5050600660a09601548042101560001461226b57506000935b6080604051612231816128da565b8781528381019283526040810194855260608101958652019485526040519586525190850152516040840152516060830152516080820152f35b612276904290612e0a565b93612223565b60649197945080929350029080820460641490151715610c6157846122a091612ccc565b90606486029580870460641490151715610c615760066122c28660a098612ccc565b939661220a565b5060085481106121c4565b346103ea57611bd87f16df958f95890327bd2b2e188d052875769d43607523bdbf47c3c18c5dc4df2661230636612aeb565b61231e60018060a09694961b03600054163314612c94565b831515806123a3575b61233090612bce565b83600052600160205261234e60ff6008604060002001541615612c12565b83600052600160205261236f60ff60086040600020015460101c1615612c51565b83600052600160205260086040600020016201000062ff000019825416179055604051918291602083526020830190612a0e565b506008548410612327565b346103ea5760203660031901126103ea576001600160a01b036123cf612a4e565b166000526004602052602060ff604060002054166040519015158152f35b346103ea5760403660031901126103ea5761001960043561240c612a7a565b9061242260018060a01b03600054163314612c94565b80151580612462575b61243490612bce565b6000908152600160205260409020600a01805460ff60a01b191691151560a01b60ff60a01b16919091179055565b50600854811061242b565b346103ea5760003660031901126103ea576000546001600160a01b0316612495338214612c94565b600c5480156124b6576000808080936100199582600c555af1610fd5612d75565b60405162461bcd60e51b81526020600482015260136024820152724e6f206665657320746f20776974686472617760681b6044820152606490fd5b346103ea5760203660031901126103ea5760043560005260076020526020604060002054604051908152f35b346103ea5760003660031901126103ea5761254360018060a01b03600054163314612c94565b6011805460ff19169055005b346103ea5760403660031901126103ea5760a06004356125be612570612a64565b821515806125f5575b61258290612bce565b8260005260026020526040600020600180861b038216600052602052604060002092600060206040516125b48161292c565b8281520152612de3565b9080549160ff6002600184015493015416602082519201519260405194855260208501521515604084015260608301526080820152f35b506008548310612579565b346103ea5760203660031901126103ea5760043561262960018060a01b03600054163314612c94565b8015158061267a575b1561263c57601055005b60405162461bcd60e51b8152602060048201526016602482015275125b9d985b1a5908185c1c1c9bdd985b0818dbdd5b9d60521b6044820152606490fd5b50600a811115612632565b346103ea5760203660031901126103ea576004356126ae60018060a01b03600054163314612c94565b6103e881116126bc57600955005b60405162461bcd60e51b81526020600482015260156024820152744665652063616e6e6f74206578636565642031302560581b6044820152606490fd5b346103ea5760203660031901126103ea576001600160a01b0361271a612a4e565b166000526006602052602060ff604060002054166040519015158152f35b346103ea5760003660031901126103ea57602060ff600f54166040519015158152f35b346103ea5760203660031901126103ea57600435600052600160205260406000206127f761278882612968565b9161279560018201612968565b926127a260028301612968565b906127af60038401612968565b926004810154936005820154600683015490612821600785015493612813600887015498612805600a60098a0154990154996040519e8f9e8f92610200808552840190612a0e565b916020818403910152612a0e565b8c810360408e015290612a0e565b908a820360608c0152612a0e565b96608089015260a088015260c087015260e086015260ff83818095161515610100880152818160081c16151561012088015260101c16151561014086015261016085015260018060a01b038116610180850152818160a01c1615156101a0850152818160a81c1615156101c085015260b01c1615156101e08301520390f35b90600182811c921680156128d0575b60208310146128ba57565b634e487b7160e01b600052602260045260246000fd5b91607f16916128af565b60a081019081106001600160401b038211176109bf57604052565b61014081019081106001600160401b038211176109bf57604052565b60c081019081106001600160401b038211176109bf57604052565b604081019081106001600160401b038211176109bf57604052565b90601f801991011681019081106001600160401b038211176109bf57604052565b906040519182600082549261297c846128a0565b9081845260019485811690816000146129eb57506001146129a8575b50506129a692500383612947565b565b9093915060005260209081600020936000915b8183106129d35750506129a693508201013880612998565b855488840185015294850194879450918301916129bb565b9150506129a694506020925060ff191682840152151560051b8201013880612998565b919082519283825260005b848110612a3a575050826000602080949584010152601f8019910116010190565b602081830181015184830182015201612a19565b600435906001600160a01b03821682036103ea57565b602435906001600160a01b03821682036103ea57565b6024359081151582036103ea57565b6001600160401b0381116109bf57601f01601f191660200190565b81601f820112156103ea57803590612abb82612a89565b92612ac96040519485612947565b828452602083830101116103ea57816000926020809301838601378301015290565b9060406003198301126103ea5760043591602435906001600160401b0382116103ea57612b1a91600401612aa4565b90565b60409060031901126103ea576004359060243590565b8054821015612b4b5760005260206000200190600090565b634e487b7160e01b600052603260045260246000fd5b15612b6857565b60405162461bcd60e51b815260206004820152600f60248201526e10dbdb9d1c9858dd081c185d5cd959608a1b6044820152606490fd5b91908201809211610c6157565b6000198114610c615760010190565b81810292918115918404141715610c6157565b15612bd557565b60405162461bcd60e51b8152602060048201526015602482015274125b9d985b1a59081c1c99591a58dd1a5bdb881251605a1b6044820152606490fd5b15612c1957565b60405162461bcd60e51b815260206004820152601060248201526f105b1c9958591e481c995cdbdb1d995960821b6044820152606490fd5b15612c5857565b60405162461bcd60e51b8152602060048201526014602482015273141c99591a58dd1a5bdb8818d85b98d95b1b195960621b6044820152606490fd5b15612c9b57565b60405162461bcd60e51b81526020600482015260096024820152682737ba1037bbb732b960b91b6044820152606490fd5b8115612cd6570490565b634e487b7160e01b600052601260045260246000fd5b15612cf357565b60405162461bcd60e51b815260206004820152600f60248201526e2737ba1030b71030b8383937bb32b960891b6044820152606490fd5b15612d3157565b606460405162461bcd60e51b815260206004820152602060248201527f50726564696374696f6e20646f65736e2774206e65656420617070726f76616c6044820152fd5b3d15612da0573d90612d8682612a89565b91612d946040519384612947565b82523d6000602084013e565b606090565b15612dac57565b60405162461bcd60e51b815260206004820152600f60248201526e151c985b9cd9995c8819985a5b1959608a1b6044820152606490fd5b90612b1a9180151580612dff575b612dfa90612bce565b612e17565b506008548110612df1565b91908203918211610c6157565b90600090828252602090600182526040938484209160088301549160ff8316158015612f30575b612f20578552600284528585206001600160a01b039091168552835284842060089190911c60ff16908115612f15576004830154925b8215612f0b5760050154915b15612f015754935b84158015612ef9575b612ee05750612ecc91612ec0612eba612ec593612710612eb360095483612bbb565b0490612e0a565b86612bbb565b612ccc565b8093612b9f565b925192612ed88461292c565b835282015290565b93505050915191612ef08361292c565b81835282015290565b508215612e91565b6001015493612e88565b6004015491612e80565b600583015492612e74565b50505050915191612ef08361292c565b5060ff8360101c16612e3e56fea2646970667358221220a038e0907eece5c544c28fc0a9b83ca8ba22374ec447a1aae5e0de01ff768c5a64736f6c63430008130033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

@@ -1,0 +1,161 @@
+/* Admin Panel Styles */
+.admin-panel {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.admin-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.admin-header h1 {
+  font-size: 2.5em;
+  color: rgba(0, 0, 0, 0.8);
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+
+.admin-header p {
+  font-size: 1.1em;
+  color: rgba(0, 0, 0, 0.6);
+  margin: 0;
+}
+
+.admin-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 30px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.admin-tab {
+  padding: 12px 24px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  color: rgba(0, 0, 0, 0.8);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9em;
+}
+
+.admin-tab:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.admin-tab.active {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.tab-icon {
+  font-size: 1.1em;
+}
+
+.admin-badge {
+  background: rgba(239, 68, 68, 0.2);
+  color: #dc2626;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-size: 0.7em;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.admin-content {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 30px;
+  min-height: 400px;
+}
+
+.access-denied {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.access-denied h2 {
+  font-size: 2em;
+  color: rgba(239, 68, 68, 0.8);
+  margin-bottom: 15px;
+}
+
+.access-denied p {
+  font-size: 1.1em;
+  color: rgba(0, 0, 0, 0.6);
+  line-height: 1.5;
+  margin: 10px 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .admin-panel {
+    padding: 15px;
+  }
+
+  .admin-header h1 {
+    font-size: 2em;
+  }
+
+  .admin-tabs {
+    gap: 8px;
+  }
+
+  .admin-tab {
+    padding: 10px 18px;
+    font-size: 0.85em;
+  }
+
+  .admin-content {
+    padding: 20px;
+  }
+
+  .admin-tabs {
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 10px;
+  }
+
+  .admin-tabs::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .admin-tabs::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+  }
+
+  .admin-tabs::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-header h1 {
+    font-size: 1.8em;
+  }
+
+  .admin-tab {
+    padding: 8px 14px;
+    font-size: 0.8em;
+  }
+
+  .admin-content {
+    padding: 15px;
+  }
+}
