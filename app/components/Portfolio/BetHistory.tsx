@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 
 interface HistoricalBet {
-  id: number;
+  id: string;
   question: string;
   category: string;
   stakeAmount: number;
@@ -26,142 +26,67 @@ export function BetHistory() {
   const [filter, setFilter] = useState<'all' | 'won' | 'lost'>('all');
   const [sortBy, setSortBy] = useState<'date' | 'profit' | 'stake'>('date');
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock historical bets data
   useEffect(() => {
-    const mockData: HistoricalBet[] = [
-      {
-        id: 1,
-        question: "Will Bitcoin reach $100,000 by end of 2024?",
-        category: "Crypto",
-        stakeAmount: 1.0,
-        choice: 'YES',
-        outcome: 'YES',
-        status: 'won',
-        payout: 1.33,
-        profit: 0.33,
-        createdAt: Date.now() - 7 * 24 * 60 * 60 * 1000, // 7 days ago
-        resolvedAt: Date.now() - 6 * 24 * 60 * 60 * 1000, // 6 days ago
-        imageUrl: "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=400&h=300&fit=crop",
-        poolSize: 15.5,
-        yourPercentage: 6.5
-      },
-      {
-        id: 2,
-        question: "Manchester United wins Premier League 2024?",
-        category: "Sports",
-        stakeAmount: 1.5,
-        choice: 'NO',
-        outcome: 'NO',
-        status: 'won',
-        payout: 2.25,
-        profit: 0.75,
-        createdAt: Date.now() - 14 * 24 * 60 * 60 * 1000, // 14 days ago
-        resolvedAt: Date.now() - 12 * 24 * 60 * 60 * 1000, // 12 days ago
-        imageUrl: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400&h=300&fit=crop",
-        poolSize: 22.0,
-        yourPercentage: 6.8
-      },
-      {
-        id: 3,
-        question: "Will Tesla stock reach $300 by Q4 2024?",
-        category: "Finance",
-        stakeAmount: 0.8,
-        choice: 'YES',
-        outcome: 'NO',
-        status: 'lost',
-        payout: 0,
-        profit: -0.8,
-        createdAt: Date.now() - 21 * 24 * 60 * 60 * 1000, // 21 days ago
-        resolvedAt: Date.now() - 18 * 24 * 60 * 60 * 1000, // 18 days ago
-        imageUrl: "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=400&h=300&fit=crop",
-        poolSize: 12.3,
-        yourPercentage: 6.5
-      },
-      {
-        id: 4,
-        question: "Will Ethereum 2.0 launch successfully in 2024?",
-        category: "Crypto",
-        stakeAmount: 0.6,
-        choice: 'YES',
-        outcome: 'YES',
-        status: 'won',
-        payout: 0.84,
-        profit: 0.24,
-        createdAt: Date.now() - 28 * 24 * 60 * 60 * 1000, // 28 days ago
-        resolvedAt: Date.now() - 25 * 24 * 60 * 60 * 1000, // 25 days ago
-        imageUrl: "https://images.unsplash.com/photo-1640839198195-2f8c8f4c8f7a?w=400&h=300&fit=crop",
-        poolSize: 18.7,
-        yourPercentage: 3.2
-      },
-      {
-        id: 5,
-        question: "Will Solana reach $200 by end of 2024?",
-        category: "Crypto",
-        stakeAmount: 1.2,
-        choice: 'YES',
-        outcome: 'NO',
-        status: 'lost',
-        payout: 0,
-        profit: -1.2,
-        createdAt: Date.now() - 35 * 24 * 60 * 60 * 1000, // 35 days ago
-        resolvedAt: Date.now() - 30 * 24 * 60 * 60 * 1000, // 30 days ago
-        imageUrl: "https://images.unsplash.com/photo-1639762681057-408e52192e55?w=400&h=300&fit=crop",
-        poolSize: 25.8,
-        yourPercentage: 4.7
-      },
-      {
-        id: 6,
-        question: "Will Apple release AR glasses in 2024?",
-        category: "Technology",
-        stakeAmount: 0.4,
-        choice: 'YES',
-        outcome: 'YES',
-        status: 'won',
-        payout: 0.52,
-        profit: 0.12,
-        createdAt: Date.now() - 42 * 24 * 60 * 60 * 1000, // 42 days ago
-        resolvedAt: Date.now() - 38 * 24 * 60 * 60 * 1000, // 38 days ago
-        imageUrl: "https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=400&h=300&fit=crop",
-        poolSize: 8.9,
-        yourPercentage: 4.5
-      },
-      {
-        id: 7,
-        question: "Will US inflation drop below 3% by Q4?",
-        category: "Finance",
-        stakeAmount: 0.9,
-        choice: 'NO',
-        outcome: 'YES',
-        status: 'lost',
-        payout: 0,
-        profit: -0.9,
-        createdAt: Date.now() - 49 * 24 * 60 * 60 * 1000, // 49 days ago
-        resolvedAt: Date.now() - 45 * 24 * 60 * 60 * 1000, // 45 days ago
-        imageUrl: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&h=300&fit=crop",
-        poolSize: 14.2,
-        yourPercentage: 6.3
-      },
-      {
-        id: 8,
-        question: "Will Netflix subscriber growth return in 2024?",
-        category: "Entertainment",
-        stakeAmount: 0.7,
-        choice: 'YES',
-        outcome: 'YES',
-        status: 'won',
-        payout: 0.91,
-        profit: 0.21,
-        createdAt: Date.now() - 56 * 24 * 60 * 60 * 1000, // 56 days ago
-        resolvedAt: Date.now() - 52 * 24 * 60 * 60 * 1000, // 52 days ago
-        imageUrl: "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=400&h=300&fit=crop",
-        poolSize: 11.6,
-        yourPercentage: 6.0
+    const fetchBetHistory = async () => {
+      if (!address) {
+        setLoading(false);
+        return;
       }
-    ];
 
-    setBets(mockData);
-  }, []);
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await fetch(`/api/portfolio?userAddress=${address}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        if (result.success) {
+          const { portfolio } = result.data;
+
+          // Filter for only resolved bets (won/lost) and transform to HistoricalBet format
+          const historicalBetsData = portfolio
+            .filter((item: any) => item.status === 'won' || item.status === 'lost')
+            .map((item: any) => ({
+              id: item.id,
+              question: item.question,
+              category: item.category,
+              stakeAmount: item.stakeAmount,
+              choice: item.choice,
+              outcome: item.choice === 'YES' ? 'YES' : 'NO', // Mock outcome - in real app would come from prediction
+              status: item.status,
+              payout: item.potentialPayout,
+              profit: item.profit,
+              createdAt: item.createdAt,
+              resolvedAt: item.createdAt + (24 * 60 * 60 * 1000), // Mock resolved time - 1 day after creation
+              imageUrl: item.imageUrl,
+              poolSize: item.stakeAmount * 3, // Mock pool size
+              yourPercentage: Math.floor(Math.random() * 10) + 1 // Mock percentage
+            }));
+
+          setBets(historicalBetsData);
+        } else {
+          throw new Error(result.error || 'Failed to fetch bet history');
+        }
+      } catch (err) {
+        console.error('❌ Failed to fetch bet history:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch bet history data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBetHistory();
+
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(fetchBetHistory, 30000);
+    return () => clearInterval(interval);
+  }, [address]);
 
   const getTimeRangeFilter = (bet: HistoricalBet) => {
     const now = Date.now();
@@ -222,6 +147,35 @@ export function BetHistory() {
         <div className="connect-wallet-notice">
           <h2>🔒 Connect Wallet</h2>
           <p>Please connect your wallet to view your bet history.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="bet-history">
+        <div className="history-header">
+          <h1>📚 Bet History</h1>
+          <p>Loading bet history data...</p>
+        </div>
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          <div>Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bet-history">
+        <div className="history-header">
+          <h1>📚 Bet History</h1>
+          <p>Your completed prediction bets</p>
+        </div>
+        <div style={{ textAlign: 'center', padding: '40px', color: 'red' }}>
+          <div>❌ Failed to load bet history</div>
+          <div style={{ fontSize: '14px', marginTop: '10px' }}>{error}</div>
         </div>
       </div>
     );

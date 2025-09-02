@@ -14,7 +14,7 @@ interface PortfolioStats {
 }
 
 interface PortfolioItem {
-  id: number;
+  id: string;
   question: string;
   category: string;
   stakeAmount: number;
@@ -39,80 +39,47 @@ export function MyPortfolio() {
     lostBets: 0,
     winRate: 0
   });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock portfolio data - in real app this would come from contract
   useEffect(() => {
-    const mockData: PortfolioItem[] = [
-      {
-        id: 1,
-        question: "Will Bitcoin reach $100,000 by end of 2024?",
-        category: "Crypto",
-        stakeAmount: 0.5,
-        choice: 'YES',
-        status: 'active',
-        potentialPayout: 0.73,
-        profit: 0.23,
-        createdAt: Date.now() - 2 * 60 * 60 * 1000, // 2 hours ago
-        imageUrl: "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=400&h=300&fit=crop"
-      },
-      {
-        id: 2,
-        question: "Manchester United wins Premier League 2024?",
-        category: "Sports",
-        stakeAmount: 1.0,
-        choice: 'NO',
-        status: 'won',
-        potentialPayout: 1.33,
-        profit: 0.33,
-        createdAt: Date.now() - 5 * 60 * 60 * 1000, // 5 hours ago
-        imageUrl: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400&h=300&fit=crop"
-      },
-      {
-        id: 3,
-        question: "Will Ethereum 2.0 launch successfully in 2024?",
-        category: "Crypto",
-        stakeAmount: 0.25,
-        choice: 'YES',
-        status: 'lost',
-        potentialPayout: 0,
-        profit: -0.25,
-        createdAt: Date.now() - 24 * 60 * 60 * 1000, // 1 day ago
-        imageUrl: "https://images.unsplash.com/photo-1640839198195-2f8c8f4c8f7a?w=400&h=300&fit=crop"
-      },
-      {
-        id: 4,
-        question: "Will Tesla stock reach $300 by Q4 2024?",
-        category: "Finance",
-        stakeAmount: 0.8,
-        choice: 'YES',
-        status: 'pending',
-        potentialPayout: 1.1,
-        profit: 0.3,
-        createdAt: Date.now() - 30 * 60 * 1000, // 30 minutes ago
-        imageUrl: "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=400&h=300&fit=crop"
+    const fetchPortfolio = async () => {
+      if (!address) {
+        setLoading(false);
+        return;
       }
-    ];
 
-    setPortfolioItems(mockData);
+      try {
+        setLoading(true);
+        setError(null);
 
-    // Calculate stats
-    const active = mockData.filter(item => item.status === 'active').length;
-    const won = mockData.filter(item => item.status === 'won').length;
-    const lost = mockData.filter(item => item.status === 'lost').length;
-    const totalInvested = mockData.reduce((sum, item) => sum + item.stakeAmount, 0);
-    const totalPayout = mockData.reduce((sum, item) => sum + (item.status === 'won' ? item.potentialPayout : 0), 0);
-    const totalProfit = mockData.reduce((sum, item) => sum + item.profit, 0);
+        const response = await fetch(`/api/portfolio?userAddress=${address}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-    setStats({
-      totalInvested,
-      totalPayout,
-      totalProfit,
-      activeBets: active,
-      wonBets: won,
-      lostBets: lost,
-      winRate: won + lost > 0 ? (won / (won + lost)) * 100 : 0
-    });
-  }, []);
+        const result = await response.json();
+        if (result.success) {
+          const { portfolio, stats: portfolioStats } = result.data;
+          setPortfolioItems(portfolio);
+          setStats(portfolioStats);
+        } else {
+          throw new Error(result.error || 'Failed to fetch portfolio');
+        }
+      } catch (err) {
+        console.error('❌ Failed to fetch portfolio:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch portfolio data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPortfolio();
+
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(fetchPortfolio, 30000);
+    return () => clearInterval(interval);
+  }, [address]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -149,6 +116,35 @@ export function MyPortfolio() {
         <div className="connect-wallet-notice">
           <h2>🔒 Connect Wallet</h2>
           <p>Please connect your wallet to view your portfolio.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="my-portfolio">
+        <div className="portfolio-header">
+          <h1>💼 My Portfolio</h1>
+          <p>Loading portfolio data...</p>
+        </div>
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          <div>Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="my-portfolio">
+        <div className="portfolio-header">
+          <h1>💼 My Portfolio</h1>
+          <p>Your prediction investments and performance</p>
+        </div>
+        <div style={{ textAlign: 'center', padding: '40px', color: 'red' }}>
+          <div>❌ Failed to load portfolio</div>
+          <div style={{ fontSize: '14px', marginTop: '10px' }}>{error}</div>
         </div>
       </div>
     );

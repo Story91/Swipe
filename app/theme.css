@@ -5,7 +5,7 @@
 @tailwind utilities;
 
 :root {
-  --app-background: #ffffff;
+  --app-background: #d4ff00;
   --app-foreground: #111111;
   --app-foreground-muted: #58585c;
   --app-accent: #0052ff;
@@ -20,17 +20,17 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --app-background: #111111;
-    --app-foreground: #ffffff;
-    --app-foreground-muted: #c8c8d1;
+    --app-background: #d4ff00;
+    --app-foreground: #111111;
+    --app-foreground-muted: #58585c;
     --app-accent: #0052ff;
     --app-accent-hover: #0047e1;
     --app-accent-active: #003db8;
-    --app-accent-light: #1e293b;
-    --app-gray: #1e1e1e;
-    --app-gray-dark: #2e2e2e;
-    --app-card-bg: rgba(17, 17, 17, 0.4);
-    --app-card-border: rgba(115, 115, 115, 0.5);
+    --app-accent-light: #e6edff;
+    --app-gray: #f5f5f5;
+    --app-gray-dark: #e0e0e0;
+    --app-card-bg: rgba(255, 255, 255, 0.4);
+    --app-card-border: rgba(0, 0, 0, 0.1);
   }
 }
 
@@ -95,10 +95,35 @@
 body {
   color: var(--app-foreground);
   background: var(--app-background);
+  background-image: url('/hero.png');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
   font-family: var(--font-geist-sans), sans-serif;
   font-optical-sizing: auto;
   font-weight: 400;
   font-style: normal;
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--app-background);
+  opacity: 0.85;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.app-container {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
 }
 
 @layer utilities {

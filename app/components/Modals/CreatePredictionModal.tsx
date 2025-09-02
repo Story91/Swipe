@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useWriteContract, useAccount, useReadContract } from 'wagmi';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../../../lib/contract';
+import './CreatePredictionModal.css';
 
 interface CreatePredictionModalProps {
   isOpen: boolean;
@@ -19,8 +20,8 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
     description: '',
     category: '',
     imageUrl: '',
-    durationInHours: 24,
-    customDuration: false,
+    endDate: '',
+    endTime: '',
     includeChart: false,
     selectedCrypto: ''
   });
@@ -56,21 +57,24 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
     functionName: 'publicCreationEnabled'
   });
 
-  const isOwner = address === contractOwner;
+  const isOwner = address && contractOwner && address.toLowerCase() === contractOwner.toLowerCase();
 
-  // Debug logging - tylko gdy wartości się zmieniają
+  // Set default end date and time (24 hours from now)
   useEffect(() => {
-    // Log tylko gdy wszystkie wartości są dostępne (nie undefined)
-    if (address && contractOwner !== undefined && isApprovedCreator !== undefined && creationFee !== undefined) {
-      console.log('Debug info:', {
-        address,
-        contractOwner,
-        isOwner,
-        isApprovedCreator,
-        creationFee: creationFee?.toString()
-      });
-    }
-  }, [address, contractOwner, isOwner, isApprovedCreator, creationFee]);
+    const now = new Date();
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    
+    const endDate = tomorrow.toISOString().split('T')[0];
+    const endTime = tomorrow.toTimeString().slice(0, 5);
+    
+    setFormData(prev => ({
+      ...prev,
+      endDate,
+      endTime
+    }));
+  }, []);
+
+
 
   const categories = [
     'Crypto', 'Sports', 'Politics', 'Entertainment', 'Technology',
@@ -85,16 +89,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
     { symbol: 'BNB', name: 'Binance Coin', icon: '🟡', color: '#f3ba2f' }
   ];
 
-  const durationOptions = [
-    { value: 6, label: '6 Hours' },
-    { value: 12, label: '12 Hours' },
-    { value: 24, label: '1 Day' },
-    { value: 72, label: '3 Days' },
-    { value: 168, label: '1 Week' },
-    { value: 720, label: '1 Month' }
-  ];
-
-  const handleInputChange = (field: string, value: string | number) => {
+  const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     // Clear error when user starts typing
     if (errors[field]) {
@@ -123,8 +118,24 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
       newErrors.imageUrl = 'Image URL is required when not using chart';
     }
 
-    if (formData.durationInHours < 1 || formData.durationInHours > 8760) {
-      newErrors.durationInHours = 'Duration must be between 1 hour and 1 year';
+    // Validate end date and time
+    if (!formData.endDate || !formData.endTime) {
+      newErrors.endDate = 'End date and time are required';
+    } else {
+      const now = new Date();
+      const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
+      
+      if (endDateTime <= now) {
+        newErrors.endDate = 'End date and time must be in the future';
+      }
+      
+      // Check if duration is at least 1 hour and at most 1 year
+      const durationInHours = (endDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+      if (durationInHours < 1) {
+        newErrors.endDate = 'Prediction must last at least 1 hour';
+      } else if (durationInHours > 8760) {
+        newErrors.endDate = 'Prediction cannot last more than 1 year';
+      }
     }
 
     if (formData.includeChart && !formData.selectedCrypto) {
@@ -143,9 +154,15 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
     try {
       const value = isOwner || isApprovedCreator ? BigInt(0) : (creationFee || BigInt(0));
 
-      console.log('Transaction value:', value.toString(), 'isOwner:', isOwner, 'isApprovedCreator:', isApprovedCreator);
 
-      await writeContract({
+
+      // Calculate duration in hours from end date/time
+      const now = new Date();
+      const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
+      const durationInHours = Math.ceil((endDateTime.getTime() - now.getTime()) / (1000 * 60 * 60));
+
+      // Execute transaction with callbacks
+      writeContract({
         address: CONTRACT_ADDRESS as `0x${string}`,
         abi: CONTRACT_ABI,
         functionName: 'createPrediction',
@@ -154,26 +171,40 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
           formData.description.trim(),
           formData.category.trim(),
           formData.imageUrl.trim(),
-          BigInt(formData.durationInHours)
+          BigInt(durationInHours)
         ],
         value
-      });
+      }, {
+        onSuccess: async (txHash) => {
+          // Show success alert with Basescan link
+          alert(`🎉 Prediction created successfully!\n\nTransaction Hash: ${txHash}\n\nView on Basescan: https://basescan.org/tx/${txHash}`);
+          
+          // Sync new prediction to Redis after successful transaction
+          try {
+            const syncResponse = await fetch('/api/sync');
+          } catch (syncError) {
+            // Silent fail for sync
+          }
 
-      onSuccess?.();
-      onClose();
-      // Reset form
-      setFormData({
-        question: '',
-        description: '',
-        category: '',
-        imageUrl: '',
-        durationInHours: 24,
-        customDuration: false,
-        includeChart: false,
-        selectedCrypto: ''
+          // Close modal and reset form
+          onSuccess?.();
+          onClose();
+          setFormData({
+            question: '',
+            description: '',
+            category: '',
+            imageUrl: '',
+            endDate: '',
+            endTime: '',
+            includeChart: false,
+            selectedCrypto: ''
+          });
+        },
+        onError: (error) => {
+          setErrors({ submit: 'Failed to create prediction. Please try again.' });
+        }
       });
     } catch (error) {
-      console.error('Failed to create prediction:', error);
       setErrors({ submit: 'Failed to create prediction. Please try again.' });
     }
   };
@@ -181,72 +212,75 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Create New Prediction</h2>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 text-2xl"
-            >
-              ×
-            </button>
+    <div className="modern-create-modal-overlay">
+      <div className="modern-create-modal">
+        <div className="modern-create-modal-header">
+          <div className="modern-modal-title">
+            <span className="create-title">Create Prediction</span>
+            <span className="create-subtitle">Prediction Market</span>
           </div>
+          <button className="modern-create-close-btn" onClick={onClose}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="modern-create-modal-content">
+          <form onSubmit={handleSubmit} className="modern-form">
             {/* Question */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="modern-form-group">
+              <label className="modern-form-label">
                 Question *
               </label>
               <textarea
                 value={formData.question}
                 onChange={(e) => handleInputChange('question', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.question ? 'border-red-500' : 'border-gray-300'
+                className={`modern-form-textarea ${
+                  errors.question ? 'error' : ''
                 }`}
                 rows={3}
                 placeholder="Will Bitcoin reach $100,000 by end of 2024?"
                 maxLength={200}
               />
               {errors.question && (
-                <p className="mt-1 text-sm text-red-600">{errors.question}</p>
+                <p className="modern-form-error">{errors.question}</p>
               )}
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="modern-form-counter">
                 {formData.question.length}/200 characters
               </p>
             </div>
 
             {/* Description */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="modern-form-group">
+              <label className="modern-form-label">
                 Description *
               </label>
               <textarea
                 value={formData.description}
                 onChange={(e) => handleInputChange('description', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.description ? 'border-red-500' : 'border-gray-300'
+                className={`modern-form-textarea ${
+                  errors.description ? 'error' : ''
                 }`}
                 rows={4}
                 placeholder="Provide context, analysis, and reasoning for your prediction..."
               />
               {errors.description && (
-                <p className="mt-1 text-sm text-red-600">{errors.description}</p>
+                <p className="modern-form-error">{errors.description}</p>
               )}
             </div>
 
             {/* Category */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="modern-form-group">
+              <label className="modern-form-label">
                 Category *
               </label>
               <select
                 value={formData.category}
                 onChange={(e) => handleInputChange('category', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.category ? 'border-red-500' : 'border-gray-300'
+                className={`modern-form-select ${
+                  errors.category ? 'error' : ''
                 }`}
               >
                 <option value="">Select a category</option>
@@ -255,17 +289,17 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
                 ))}
               </select>
               {errors.category && (
-                <p className="mt-1 text-sm text-red-600">{errors.category}</p>
+                <p className="modern-form-error">{errors.category}</p>
               )}
             </div>
 
             {/* Chart Selection */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="modern-form-group">
+              <label className="modern-form-label">
                 Crypto Chart (Optional)
               </label>
-              <div className="space-y-3">
-                <div className="flex items-center space-x-2">
+              <div className="modern-chart-section">
+                <div className="modern-checkbox-group">
                   <input
                     type="checkbox"
                     id="includeChart"
@@ -275,45 +309,43 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
                       includeChart: e.target.checked,
                       imageUrl: e.target.checked ? '' : prev.imageUrl // Clear image when chart is enabled
                     }))}
-                    className="rounded"
+                    className="modern-checkbox"
                   />
-                  <label htmlFor="includeChart" className="text-sm text-gray-700">
+                  <label htmlFor="includeChart" className="modern-checkbox-label">
                     Include live crypto chart in prediction
                   </label>
                 </div>
 
                 {formData.includeChart && (
-                  <div className="ml-6">
-                    <label className="block text-sm text-gray-600 mb-2">
+                  <div className="modern-crypto-selection">
+                    <label className="modern-crypto-label">
                       Select Cryptocurrency *
                     </label>
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                    <div className="modern-crypto-grid">
                       {cryptoOptions.map(crypto => (
                         <button
                           key={crypto.symbol}
                           type="button"
                           onClick={() => setFormData(prev => ({ ...prev, selectedCrypto: crypto.symbol }))}
-                          className={`flex items-center space-x-2 px-3 py-2 border rounded-md text-sm font-medium transition-colors ${
-                            formData.selectedCrypto === crypto.symbol
-                              ? 'bg-blue-100 border-blue-500 text-blue-700'
-                              : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                          className={`modern-crypto-btn ${
+                            formData.selectedCrypto === crypto.symbol ? 'selected' : ''
                           }`}
                           style={{ borderColor: formData.selectedCrypto === crypto.symbol ? crypto.color : undefined }}
                         >
-                          <span>{crypto.icon}</span>
-                          <span>{crypto.symbol}</span>
+                          <span className="crypto-icon">{crypto.icon}</span>
+                          <span className="crypto-symbol">{crypto.symbol}</span>
                         </button>
                       ))}
                     </div>
                     {errors.selectedCrypto && (
-                      <p className="mt-1 text-sm text-red-600">{errors.selectedCrypto}</p>
+                      <p className="modern-form-error">{errors.selectedCrypto}</p>
                     )}
                     {formData.selectedCrypto && (
-                      <div className="mt-2 p-3 bg-gray-50 rounded-md">
-                        <p className="text-sm text-gray-600">
+                      <div className="modern-crypto-info">
+                        <p className="crypto-info-text">
                           Selected: <strong>{cryptoOptions.find(c => c.symbol === formData.selectedCrypto)?.name}</strong>
                         </p>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="crypto-info-subtext">
                           Live chart will be embedded in your prediction
                         </p>
                       </div>
@@ -324,8 +356,8 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
             </div>
 
             {/* Image URL */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="modern-form-group">
+              <label className="modern-form-label">
                 Image URL {formData.includeChart ? '(Disabled when chart is selected)' : '*'}
               </label>
               <input
@@ -333,19 +365,19 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
                 value={formData.imageUrl}
                 onChange={(e) => handleInputChange('imageUrl', e.target.value)}
                 disabled={formData.includeChart}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                className={`modern-form-input ${
                   formData.includeChart
-                    ? 'bg-gray-100 border-gray-200 cursor-not-allowed'
+                    ? 'disabled'
                     : errors.imageUrl
-                    ? 'border-red-500'
-                    : 'border-gray-300'
+                    ? 'error'
+                    : ''
                 }`}
                 placeholder={formData.includeChart ? 'Chart will be used as image' : 'https://example.com/image.jpg'}
               />
               {errors.imageUrl && !formData.includeChart && (
-                <p className="mt-1 text-sm text-red-600">{errors.imageUrl}</p>
+                <p className="modern-form-error">{errors.imageUrl}</p>
               )}
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="modern-form-help">
                 {formData.includeChart
                   ? 'Chart image will be automatically generated and used'
                   : 'Provide a URL to an image that represents your prediction'
@@ -353,118 +385,112 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
               </p>
             </div>
 
-            {/* Duration */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Prediction Duration *
+            {/* End Date and Time */}
+            <div className="modern-form-group">
+              <label className="modern-form-label">
+                Prediction End Date and Time *
               </label>
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {durationOptions.map(option => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => handleInputChange('durationInHours', option.value)}
-                      className={`px-3 py-2 border rounded-md text-sm font-medium transition-colors ${
-                        formData.durationInHours === option.value
-                          ? 'bg-blue-100 border-blue-500 text-blue-700'
-                          : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="flex items-center space-x-2">
+              <div className="modern-datetime-grid">
+                <div className="modern-datetime-field">
+                  <label className="modern-datetime-label">End Date</label>
                   <input
-                    type="checkbox"
-                    id="customDuration"
-                    checked={formData.customDuration}
-                    onChange={(e) => setFormData(prev => ({ ...prev, customDuration: e.target.checked }))}
-                    className="rounded"
+                    type="date"
+                    value={formData.endDate}
+                    onChange={(e) => handleInputChange('endDate', e.target.value)}
+                    className={`modern-form-input ${
+                      errors.endDate ? 'error' : ''
+                    }`}
+                    min={new Date().toISOString().split('T')[0]}
                   />
-                  <label htmlFor="customDuration" className="text-sm text-gray-700">
-                    Custom duration
-                  </label>
                 </div>
-
-                {formData.customDuration && (
-                  <div>
-                    <input
-                      type="number"
-                      value={formData.durationInHours}
-                      onChange={(e) => handleInputChange('durationInHours', parseInt(e.target.value) || 0)}
-                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                        errors.durationInHours ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      placeholder="Hours"
-                      min="1"
-                      max="8760"
-                    />
-                    <p className="mt-1 text-sm text-gray-500">
-                      Enter duration in hours (1-8760, max 1 year)
-                    </p>
-                  </div>
-                )}
+                <div className="modern-datetime-field">
+                  <label className="modern-datetime-label">End Time</label>
+                  <input
+                    type="time"
+                    value={formData.endTime}
+                    onChange={(e) => handleInputChange('endTime', e.target.value)}
+                    className={`modern-form-input ${
+                      errors.endDate ? 'error' : ''
+                    }`}
+                    step="60"
+                  />
+                </div>
               </div>
-              {errors.durationInHours && (
-                <p className="mt-1 text-sm text-red-600">{errors.durationInHours}</p>
+              
+              {errors.endDate && (
+                <p className="modern-form-error">{errors.endDate}</p>
               )}
+              
+              {formData.endDate && formData.endTime && (
+                <div className="modern-datetime-info">
+                  <p className="datetime-info-text">
+                    <strong>Prediction will end:</strong> {new Date(`${formData.endDate}T${formData.endTime}`).toLocaleString('pl-PL')}
+                  </p>
+                  <p className="datetime-duration-text">
+                    Duration: {(() => {
+                      const now = new Date();
+                      const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
+                      const durationInHours = Math.ceil((endDateTime.getTime() - now.getTime()) / (1000 * 60 * 60));
+                      const days = Math.floor(durationInHours / 24);
+                      const hours = durationInHours % 24;
+                      if (days > 0) {
+                        return `${days} day${days > 1 ? 's' : ''} ${hours > 0 ? `and ${hours} hour${hours > 1 ? 's' : ''}` : ''}`;
+                      }
+                      return `${hours} hour${hours > 1 ? 's' : ''}`;
+                    })()}
+                  </p>
+                </div>
+              )}
+              
+              <p className="modern-form-help">
+                Select the exact date and time when your prediction should end. Must be at least 1 hour from now.
+              </p>
             </div>
-
-
 
             {/* Fee Information */}
             {address && !isOwner && !isApprovedCreator && creationFee && publicCreationEnabled && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-                <div className="flex">
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-yellow-800">
-                      Creation Fee Required
-                    </h3>
-                    <p className="mt-1 text-sm text-yellow-700">
-                      You need to pay {(Number(creationFee) / 1e18).toFixed(4)} ETH to create this prediction.
-                      Approved creators don&apos;t need to pay this fee.
-                    </p>
-                  </div>
-                </div>
+              <div className="modern-info-box fee-info">
+                <h3 className="info-box-title">
+                  Creation Fee Required
+                </h3>
+                <p className="info-box-text">
+                  You need to pay {(Number(creationFee) / 1e18).toFixed(4)} ETH to create this prediction.
+                  Approved creators don&apos;t need to pay this fee.
+                </p>
               </div>
             )}
 
             {/* Public Creation Disabled Warning */}
-            {address && !isOwner && !isApprovedCreator && !publicCreationEnabled && (
-              <div className="bg-red-50 border border-red-200 rounded-md p-4">
-                <div className="flex">
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-red-800">
-                      ⚠️ Cannot Create Prediction
-                    </h3>
-                    <p className="mt-1 text-sm text-red-700">
-                      <strong>Public creation is currently disabled.</strong> Only approved creators can create predictions.
-                      <br />
-                      <span className="text-xs text-red-600 mt-1 block">
-                        Contact the contract owner to enable public creation or request approved creator status.
-                      </span>
-                    </p>
-                  </div>
-                </div>
+            {address && !isOwner && !isApprovedCreator && publicCreationEnabled === false && (
+              <div className="modern-info-box error-info">
+                <h3 className="info-box-title">
+                  ⚠️ Cannot Create Prediction
+                </h3>
+                <p className="info-box-text">
+                  <strong>Public creation is currently disabled.</strong> Only approved creators can create predictions.
+                  <br />
+                  <span className="info-box-subtext">
+                    Contact the contract owner to enable public creation or request approved creator status.
+                  </span>
+                </p>
               </div>
             )}
 
+
+
             {/* Submit Error */}
             {errors.submit && (
-              <div className="bg-red-50 border border-red-200 rounded-md p-4">
-                <p className="text-sm text-red-600">{errors.submit}</p>
+              <div className="modern-info-box error-info">
+                <p className="info-box-text">{errors.submit}</p>
               </div>
             )}
 
             {/* Buttons */}
-            <div className="flex justify-end space-x-3 pt-4">
+            <div className="modern-form-actions">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                className="modern-cancel-btn"
                 disabled={isPending}
               >
                 Cancel
@@ -472,13 +498,16 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
               <button
                 type="submit"
                 disabled={isPending || (!isOwner && !isApprovedCreator && !publicCreationEnabled)}
-                className={`px-6 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed ${
-                  isPending || (!isOwner && !isApprovedCreator && !publicCreationEnabled)
-                    ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                }`}
+                className={`modern-submit-btn ${isPending ? 'loading' : ''}`}
               >
-                {isPending ? 'Creating...' : 'Create Prediction'}
+                {isPending ? (
+                  <>
+                    <div className="modern-spinner"></div>
+                    Creating...
+                  </>
+                ) : (
+                  'Create Prediction'
+                )}
               </button>
             </div>
           </form>

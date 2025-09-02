@@ -19,109 +19,48 @@ export function AuditLogs() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [filter, setFilter] = useState<'all' | 'admin' | 'approver' | 'user' | 'system'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Check permissions
   const isAdmin = address && process.env.NEXT_PUBLIC_ADMIN_1?.toLowerCase() === address.toLowerCase();
   const isApprover = address && (process.env.NEXT_PUBLIC_APPROVER_1?.toLowerCase() === address.toLowerCase() ||
                                process.env.NEXT_PUBLIC_ADMIN_1?.toLowerCase() === address.toLowerCase());
 
-  // Mock audit logs data
+  // Real audit logs data from API
   useEffect(() => {
-    const mockLogs: AuditLog[] = [
-      {
-        id: '1',
-        timestamp: Date.now() - 1000 * 60 * 5, // 5 minutes ago
-        action: 'Prediction Created',
-        user: '0x742d...a9E2',
-        details: 'Created prediction: "Bitcoin hits $100,000 by end of 2024"',
-        type: 'user',
-        status: 'success'
-      },
-      {
-        id: '2',
-        timestamp: Date.now() - 1000 * 60 * 10, // 10 minutes ago
-        action: 'Prediction Approved',
-        user: '0x987c...d3F4',
-        details: 'Approved prediction ID: 1 by approver',
-        type: 'approver',
-        status: 'success'
-      },
-      {
-        id: '3',
-        timestamp: Date.now() - 1000 * 60 * 15, // 15 minutes ago
-        action: 'Stake Placed',
-        user: '0x1111...aaaa',
-        details: 'Placed 0.5 ETH YES stake on prediction ID: 1',
-        type: 'user',
-        status: 'success'
-      },
-      {
-        id: '4',
-        timestamp: Date.now() - 1000 * 60 * 20, // 20 minutes ago
-        action: 'Platform Fee Updated',
-        user: '0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd',
-        details: 'Updated platform fee from 1% to 1.5%',
-        type: 'admin',
-        status: 'success'
-      },
-      {
-        id: '5',
-        timestamp: Date.now() - 1000 * 60 * 30, // 30 minutes ago
-        action: 'Prediction Rejected',
-        user: '0x987c...d3F4',
-        details: 'Rejected prediction ID: 2 - Low quality content',
-        type: 'approver',
-        status: 'warning'
-      },
-      {
-        id: '6',
-        timestamp: Date.now() - 1000 * 60 * 45, // 45 minutes ago
-        action: 'Contract Emergency Pause',
-        user: '0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd',
-        details: 'Emergency pause activated due to high gas prices',
-        type: 'admin',
-        status: 'warning'
-      },
-      {
-        id: '7',
-        timestamp: Date.now() - 1000 * 60 * 60, // 1 hour ago
-        action: 'Reward Claimed',
-        user: '0x1111...aaaa',
-        details: 'Claimed 0.75 ETH reward from prediction ID: 1',
-        type: 'user',
-        status: 'success'
-      },
-      {
-        id: '8',
-        timestamp: Date.now() - 1000 * 60 * 90, // 1.5 hours ago
-        action: 'System Error',
-        user: 'SYSTEM',
-        details: 'Failed to resolve prediction ID: 3 - Network timeout',
-        type: 'system',
-        status: 'error'
-      },
-      {
-        id: '9',
-        timestamp: Date.now() - 1000 * 60 * 120, // 2 hours ago
-        action: 'Approver Added',
-        user: '0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd',
-        details: 'Added new approver: 0x987c...d3F4',
-        type: 'admin',
-        status: 'info'
-      },
-      {
-        id: '10',
-        timestamp: Date.now() - 1000 * 60 * 180, // 3 hours ago
-        action: 'Prediction Resolved',
-        user: '0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd',
-        details: 'Resolved prediction ID: 1 as YES. Winners: 234 participants',
-        type: 'admin',
-        status: 'success'
-      }
-    ];
+    const fetchLogs = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-    setLogs(mockLogs);
-  }, []);
+        const typeParam = filter === 'all' ? '' : `&type=${filter}`;
+        const response = await fetch(`/api/audit?limit=50${typeParam}`);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        if (result.success) {
+          setLogs(result.data);
+        } else {
+          throw new Error(result.error || 'Failed to fetch audit logs');
+        }
+      } catch (err) {
+        console.error('❌ Failed to fetch audit logs:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch audit logs');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLogs();
+
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(fetchLogs, 30000);
+    return () => clearInterval(interval);
+  }, [filter]);
 
   if (!isAdmin && !isApprover) {
     return (
@@ -142,6 +81,35 @@ export function AuditLogs() {
       log.user.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesFilter && matchesSearch;
   });
+
+  if (loading) {
+    return (
+      <div className="audit-logs">
+        <div className="logs-header">
+          <h2>🔍 Audit Logs</h2>
+          <p>Loading audit logs...</p>
+        </div>
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          <div>Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="audit-logs">
+        <div className="logs-header">
+          <h2>🔍 Audit Logs</h2>
+          <p>Complete system activity and transaction history</p>
+        </div>
+        <div style={{ textAlign: 'center', padding: '40px', color: 'red' }}>
+          <div>❌ Failed to load audit logs</div>
+          <div style={{ fontSize: '14px', marginTop: '10px' }}>{error}</div>
+        </div>
+      </div>
+    );
+  }
 
   const getTypeIcon = (type: string) => {
     switch (type) {

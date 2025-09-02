@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { useReadContract } from 'wagmi';
+import { useReadContract, usePublicClient } from 'wagmi';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../../../lib/contract';
 
 interface Prediction {
@@ -38,6 +38,8 @@ export function AdminDashboard({
   onPauseContract
 }: AdminDashboardProps) {
 
+  const publicClient = usePublicClient();
+
   // Get contract stats
   const { data: contractStats } = useReadContract({
     address: CONTRACT_ADDRESS as `0x${string}`,
@@ -52,6 +54,100 @@ export function AdminDashboard({
     functionName: 'nextPredictionId',
   });
 
+  // Fetch real predictions data
+  const [realPredictions, setRealPredictions] = React.useState<Prediction[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    const fetchPredictions = async () => {
+      if (!totalPredictions || totalPredictions <= 1) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        const predictions: Prediction[] = [];
+
+        for (let i = 1; i < totalPredictions; i++) {
+          try {
+            // Pobierz podstawowe informacje o predykcji
+            const basicResult = await publicClient.readContract({
+              address: CONTRACT_ADDRESS as `0x${string}`,
+              abi: CONTRACT_ABI,
+              functionName: 'getPredictionBasic',
+              args: [BigInt(i)],
+            }) as {
+              question: string;
+              description: string;
+              category: string;
+              yesTotalAmount: bigint;
+              noTotalAmount: bigint;
+              deadline: bigint;
+              resolved: boolean;
+              outcome: boolean;
+              approved: boolean;
+              creator: string;
+            };
+
+            // Pobierz rozszerzone informacje
+            const extendedResult = await publicClient.readContract({
+              address: CONTRACT_ADDRESS as `0x${string}`,
+              abi: CONTRACT_ABI,
+              functionName: 'getPredictionExtended',
+              args: [BigInt(i)],
+            }) as [string, bigint, boolean, bigint, boolean, boolean, bigint];
+
+            // Pobierz statystyki rynku
+            const marketStats = await publicClient.readContract({
+              address: CONTRACT_ADDRESS as `0x${string}`,
+              abi: CONTRACT_ABI,
+              functionName: 'getMarketStats',
+              args: [BigInt(i)],
+            }) as {
+              totalPool: bigint;
+              participantsCount: bigint;
+              yesPercentage: bigint;
+              noPercentage: bigint;
+              timeLeft: bigint;
+            };
+
+            const prediction: Prediction = {
+              id: i,
+              question: basicResult.question,
+              description: basicResult.description,
+              category: basicResult.category,
+              yesTotalAmount: Number(basicResult.yesTotalAmount) / 1e18,
+              noTotalAmount: Number(basicResult.noTotalAmount) / 1e18,
+              deadline: Number(basicResult.deadline),
+              resolved: basicResult.resolved,
+              outcome: basicResult.outcome,
+              cancelled: extendedResult[2],
+              participants: Number(marketStats.participantsCount),
+              resolutionDeadline: Number(basicResult.deadline) + (10 * 24 * 60 * 60), // 10 days after deadline
+            };
+
+            predictions.push(prediction);
+          } catch (error) {
+            console.error(`Error fetching prediction ${i}:`, error);
+          }
+        }
+
+        setRealPredictions(predictions);
+      } catch (err) {
+        console.error('❌ Failed to fetch predictions:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch predictions');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPredictions();
+  }, [totalPredictions]);
+
   // Helper function to check if prediction needs resolution
   const needsResolution = (prediction: Prediction) => {
     if (prediction.resolved || prediction.cancelled) return false;
@@ -59,10 +155,13 @@ export function AdminDashboard({
     return Date.now() / 1000 > prediction.resolutionDeadline;
   };
 
+  // Use real data if available, fallback to props
+  const displayPredictions = realPredictions.length > 0 ? realPredictions : predictions;
+
   // Calculate real stats
   const stats = {
-    totalPredictions: totalPredictions ? Number(totalPredictions) - 1 : predictions.length,
-    needsResolution: predictions.filter(p => needsResolution(p)).length,
+    totalPredictions: totalPredictions ? Number(totalPredictions) - 1 : displayPredictions.length,
+    needsResolution: displayPredictions.filter(p => needsResolution(p)).length,
     collectedFees: contractStats && (contractStats as any)[2] ? Number((contractStats as any)[2]) / 1e18 : 0, // Convert from wei to ETH
     activeApprovers: 5, // TODO: Add function to get active approvers count
     contractBalance: contractStats && (contractStats as any)[5] ? Number((contractStats as any)[5]) / 1e18 : 0,
@@ -103,9 +202,30 @@ export function AdminDashboard({
     return `${hours} hours`;
   };
 
-  const predictionsNeedingResolution = predictions.filter(p => needsResolution(p));
-  const livePredictions = predictions.filter(p => !p.resolved && !p.cancelled && !needsResolution(p));
-  const resolvedPredictions = predictions.filter(p => p.resolved);
+  const predictionsNeedingResolution = displayPredictions.filter(p => needsResolution(p));
+  const livePredictions = displayPredictions.filter(p => !p.resolved && !p.cancelled && !needsResolution(p));
+  const resolvedPredictions = displayPredictions.filter(p => p.resolved);
+
+  if (loading) {
+    return (
+      <div className="admin-dashboard">
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          <div>Loading admin data...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="admin-dashboard">
+        <div style={{ textAlign: 'center', padding: '40px', color: 'red' }}>
+          <div>❌ Failed to load admin data</div>
+          <div style={{ fontSize: '14px', marginTop: '10px' }}>{error}</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="admin-dashboard">

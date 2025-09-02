@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 
 interface ActiveBet {
-  id: number;
+  id: string;
   question: string;
   category: string;
   stakeAmount: number;
@@ -24,74 +24,81 @@ export function ActiveBets() {
   const [activeBets, setActiveBets] = useState<ActiveBet[]>([]);
   const [filter, setFilter] = useState<'all' | 'yes' | 'no'>('all');
   const [sortBy, setSortBy] = useState<'time' | 'stake' | 'profit'>('time');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock active bets data
   useEffect(() => {
-    const mockData: ActiveBet[] = [
-      {
-        id: 1,
-        question: "Will Bitcoin reach $100,000 by end of 2024?",
-        category: "Crypto",
-        stakeAmount: 0.5,
-        choice: 'YES',
-        potentialPayout: 0.73,
-        profit: 0.23,
-        timeLeft: "2d 14h",
-        createdAt: Date.now() - 2 * 60 * 60 * 1000,
-        imageUrl: "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=400&h=300&fit=crop",
-        yesPercentage: 65,
-        noPercentage: 35,
-        totalPool: 5.2
-      },
-      {
-        id: 2,
-        question: "Will Tesla stock reach $300 by Q4 2024?",
-        category: "Finance",
-        stakeAmount: 0.8,
-        choice: 'YES',
-        potentialPayout: 1.1,
-        profit: 0.3,
-        timeLeft: "1d 8h",
-        createdAt: Date.now() - 30 * 60 * 1000,
-        imageUrl: "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=400&h=300&fit=crop",
-        yesPercentage: 58,
-        noPercentage: 42,
-        totalPool: 3.8
-      },
-      {
-        id: 3,
-        question: "Will Ethereum 2.0 launch successfully in 2024?",
-        category: "Crypto",
-        stakeAmount: 0.25,
-        choice: 'NO',
-        potentialPayout: 0.45,
-        profit: 0.2,
-        timeLeft: "5d 22h",
-        createdAt: Date.now() - 4 * 60 * 60 * 1000,
-        imageUrl: "https://images.unsplash.com/photo-1640839198195-2f8c8f4c8f7a?w=400&h=300&fit=crop",
-        yesPercentage: 45,
-        noPercentage: 55,
-        totalPool: 7.1
-      },
-      {
-        id: 4,
-        question: "Will Manchester United win Premier League 2024?",
-        category: "Sports",
-        stakeAmount: 1.2,
-        choice: 'NO',
-        potentialPayout: 1.8,
-        profit: 0.6,
-        timeLeft: "12h 30m",
-        createdAt: Date.now() - 6 * 60 * 60 * 1000,
-        imageUrl: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400&h=300&fit=crop",
-        yesPercentage: 72,
-        noPercentage: 28,
-        totalPool: 12.5
+    const fetchActiveBets = async () => {
+      if (!address) {
+        setLoading(false);
+        return;
       }
-    ];
 
-    setActiveBets(mockData);
-  }, []);
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await fetch(`/api/portfolio?userAddress=${address}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        if (result.success) {
+          const { portfolio } = result.data;
+
+          // Filter for only active bets and transform to ActiveBet format
+          const activeBetsData = portfolio
+            .filter((item: any) => item.status === 'active')
+            .map((item: any) => ({
+              id: item.id,
+              question: item.question,
+              category: item.category,
+              stakeAmount: item.stakeAmount,
+              choice: item.choice,
+              potentialPayout: item.potentialPayout,
+              profit: item.profit,
+              timeLeft: calculateTimeLeft(item.createdAt), // Will need to calculate this
+              createdAt: item.createdAt,
+              imageUrl: item.imageUrl,
+              yesPercentage: 50, // Mock for now - would need to calculate from prediction data
+              noPercentage: 50,  // Mock for now - would need to calculate from prediction data
+              totalPool: item.stakeAmount * 2 // Mock for now
+            }));
+
+          setActiveBets(activeBetsData);
+        } else {
+          throw new Error(result.error || 'Failed to fetch active bets');
+        }
+      } catch (err) {
+        console.error('❌ Failed to fetch active bets:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch active bets data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchActiveBets();
+
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(fetchActiveBets, 30000);
+    return () => clearInterval(interval);
+  }, [address]);
+
+  const calculateTimeLeft = (createdAt: number) => {
+    // Mock calculation - in real app would get deadline from prediction
+    const mockDeadline = createdAt + (7 * 24 * 60 * 60 * 1000); // 7 days from creation
+    const now = Date.now();
+    const diff = mockDeadline - now;
+
+    if (diff <= 0) return "Ended";
+
+    const days = Math.floor(diff / (24 * 60 * 60 * 1000));
+    const hours = Math.floor((diff % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+
+    if (days > 0) return `${days}d ${hours}h`;
+    return `${hours}h`;
+  };
 
   const filteredBets = activeBets.filter(bet => {
     if (filter === 'all') return true;
@@ -133,6 +140,35 @@ export function ActiveBets() {
         <div className="connect-wallet-notice">
           <h2>🔒 Connect Wallet</h2>
           <p>Please connect your wallet to view your active bets.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="active-bets">
+        <div className="bets-header">
+          <h1>⚡ Active Bets</h1>
+          <p>Loading active bets data...</p>
+        </div>
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          <div>Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="active-bets">
+        <div className="bets-header">
+          <h1>⚡ Active Bets</h1>
+          <p>Your ongoing prediction investments</p>
+        </div>
+        <div style={{ textAlign: 'center', padding: '40px', color: 'red' }}>
+          <div>❌ Failed to load active bets</div>
+          <div style={{ fontSize: '14px', marginTop: '10px' }}>{error}</div>
         </div>
       </div>
     );

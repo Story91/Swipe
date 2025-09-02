@@ -1,60 +1,162 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './MarketStats.css';
+
+interface MarketStatsData {
+  totalPredictions: number;
+  activePredictions: number;
+  totalVolume: number;
+  predictionsToday: number;
+  volumeToday: number;
+  topCategory: string;
+  trendingPredictions: Array<{
+    id: number;
+    question: string;
+    volume: number;
+    participants: number;
+    change: string;
+    isPositive: boolean;
+  }>;
+}
 
 export function MarketStats() {
   const [selectedTimeframe, setSelectedTimeframe] = useState<'1H' | '24H' | '7D' | '30D'>('24H');
-  const [marketData] = useState({
-    totalPredictions: 1247,
-    activePredictions: 89,
-    totalVolume: 456.78,
-    predictionsToday: 23,
-    volumeToday: 12.34,
-    topCategory: 'Crypto',
-    trendingPredictions: [
-      {
-        id: 1,
-        question: "Bitcoin hits $100,000 by end of 2024?",
-        volume: 45.67,
-        participants: 234,
-        change: '+12.5%',
-        isPositive: true
-      },
-      {
-        id: 2,
-        question: "Ethereum hits $5,000 by Q1 2024?",
-        volume: 32.18,
-        participants: 189,
-        change: '+8.3%',
-        isPositive: true
-      },
-      {
-        id: 3,
-        question: "Solana flips Ethereum in market cap by 2025?",
-        volume: 28.91,
-        participants: 156,
-        change: '+15.2%',
-        isPositive: true
-      },
-      {
-        id: 4,
-        question: "Manchester United wins Premier League 2024?",
-        volume: 18.45,
-        participants: 98,
-        change: '-5.7%',
-        isPositive: false
-      },
-      {
-        id: 5,
-        question: "Will I get rich quick from this prediction?",
-        volume: 15.23,
-        participants: 67,
-        change: '+22.1%',
-        isPositive: true
+  const [marketData, setMarketData] = useState<MarketStatsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchMarketStats = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await fetch('/api/market/stats');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        if (result.success) {
+          // Transform API data to match component format
+          const stats = result.data;
+
+          // Get all predictions for total volume calculation
+          const allPredictionsResponse = await fetch('/api/predictions');
+          const allPredictionsResult = await allPredictionsResponse.json();
+
+          // Get active predictions for trending data
+          const activePredictionsResponse = await fetch('/api/predictions?status=active');
+          const activePredictionsResult = await activePredictionsResponse.json();
+
+          if (allPredictionsResult.success && activePredictionsResult.success) {
+            const allPredictions = allPredictionsResult.data;
+            const allActivePredictions = activePredictionsResult.data; // All active predictions
+            const activePredictions = activePredictionsResult.data.slice(0, 5); // Top 5 for trending
+
+            // Calculate total volume from ALL predictions
+            const totalVolumeFromPredictions = allPredictions.reduce((total: number, pred: any) => {
+              const yesAmount = pred.yesTotalAmount ? Number(pred.yesTotalAmount) / 1e18 : 0;
+              const noAmount = pred.noTotalAmount ? Number(pred.noTotalAmount) / 1e18 : 0;
+              return total + yesAmount + noAmount;
+            }, 0);
+
+            // Calculate today's volume from active predictions (last 7 days)
+            const todayVolumeFromPredictions = activePredictions.reduce((total: number, pred: any) => {
+              const yesAmount = pred.yesTotalAmount ? Number(pred.yesTotalAmount) / 1e18 : 0;
+              const noAmount = pred.noTotalAmount ? Number(pred.noTotalAmount) / 1e18 : 0;
+              return total + yesAmount + noAmount;
+            }, 0);
+
+            // Count active predictions from Redis
+            const activePredictionsCount = allActivePredictions.length;
+
+            const transformedData: MarketStatsData = {
+              totalPredictions: stats.totalPredictions || 0,
+              activePredictions: activePredictionsCount,
+              totalVolume: totalVolumeFromPredictions,
+              predictionsToday: stats.recentActivity?.predictionsLast7Days || 0,
+              volumeToday: todayVolumeFromPredictions,
+              topCategory: stats.performance?.mostActiveCategory || 'Crypto',
+              trendingPredictions: activePredictions.map((pred: any) => {
+                // Convert BigInt hex values to decimal ETH
+                const yesAmount = pred.yesTotalAmount ? Number(pred.yesTotalAmount) / 1e18 : 0;
+                const noAmount = pred.noTotalAmount ? Number(pred.noTotalAmount) / 1e18 : 0;
+                const totalVolume = yesAmount + noAmount;
+                
+
+                
+                return {
+                  id: pred.id,
+                  question: pred.question,
+                  volume: totalVolume,
+                  participants: pred.participants?.length || 0,
+                  change: '0%', // No mock data - only real data
+                  isPositive: true // Neutral for now
+                };
+              })
+            };
+
+            setMarketData(transformedData);
+          }
+        } else {
+          throw new Error(result.error || 'Failed to fetch market stats');
+        }
+      } catch (err) {
+        console.error('❌ Failed to fetch market stats:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch market statistics');
+      } finally {
+        setLoading(false);
       }
-    ]
-  });
+    };
+
+    fetchMarketStats();
+
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(fetchMarketStats, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="market-stats">
+        <div className="stats-header">
+          <h1>📊 Market Statistics</h1>
+          <p>Loading market data...</p>
+        </div>
+        <div className="loading-spinner" style={{ textAlign: 'center', padding: '40px' }}>
+          <div>Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="market-stats">
+        <div className="stats-header">
+          <h1>📊 Market Statistics</h1>
+          <p>Real-time market data and trending predictions</p>
+        </div>
+        <div className="error-message" style={{ textAlign: 'center', padding: '40px', color: 'red' }}>
+          <div>❌ Failed to load market statistics</div>
+          <div style={{ fontSize: '14px', marginTop: '10px' }}>{error}</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!marketData) {
+    return (
+      <div className="market-stats">
+        <div className="stats-header">
+          <h1>📊 Market Statistics</h1>
+          <p>No market data available</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="market-stats">
@@ -83,16 +185,14 @@ export function MarketStats() {
           <div className="metric-content">
             <div className="metric-value">{marketData.totalPredictions.toLocaleString()}</div>
             <div className="metric-label">Total Predictions</div>
-            <div className="metric-change positive">+8.2%</div>
           </div>
         </div>
 
         <div className="metric-card">
           <div className="metric-icon">💰</div>
           <div className="metric-content">
-            <div className="metric-value">{marketData.totalVolume.toFixed(2)} ETH</div>
+            <div className="metric-value">{marketData.totalVolume.toFixed(4)} ETH</div>
             <div className="metric-label">Total Volume</div>
-            <div className="metric-change positive">+15.7%</div>
           </div>
         </div>
 
@@ -101,7 +201,6 @@ export function MarketStats() {
           <div className="metric-content">
             <div className="metric-value">{marketData.activePredictions}</div>
             <div className="metric-label">Active Predictions</div>
-            <div className="metric-change positive">+3.1%</div>
           </div>
         </div>
 
@@ -110,7 +209,6 @@ export function MarketStats() {
           <div className="metric-content">
             <div className="metric-value">{marketData.topCategory}</div>
             <div className="metric-label">Top Category</div>
-            <div className="metric-change neutral">Trending</div>
           </div>
         </div>
       </div>
@@ -130,7 +228,7 @@ export function MarketStats() {
           <div className="activity-item">
             <div className="activity-icon">💰</div>
             <div className="activity-content">
-              <div className="activity-value">{marketData.volumeToday.toFixed(2)} ETH</div>
+              <div className="activity-value">{marketData.volumeToday.toFixed(4)} ETH</div>
               <div className="activity-label">Volume</div>
             </div>
           </div>
@@ -159,13 +257,10 @@ export function MarketStats() {
                 <h3 className="prediction-question">{prediction.question}</h3>
                 <div className="prediction-stats">
                   <span className="stat">
-                    💰 {prediction.volume.toFixed(2)} ETH
+                    💰 {prediction.volume.toFixed(4)} ETH
                   </span>
                   <span className="stat">
                     👥 {prediction.participants}
-                  </span>
-                  <span className={`stat change ${prediction.isPositive ? 'positive' : 'negative'}`}>
-                    {prediction.change}
                   </span>
                 </div>
               </div>
@@ -183,72 +278,7 @@ export function MarketStats() {
         </div>
       </div>
 
-      {/* Market Overview */}
-      <div className="market-overview">
-        <h2>📈 Market Overview</h2>
-        <div className="overview-grid">
-          <div className="overview-card">
-            <h3>Volume Distribution</h3>
-            <div className="distribution-chart">
-              <div className="distribution-item">
-                <span className="category">Crypto</span>
-                <div className="bar">
-                  <div className="fill" style={{ width: '45%' }}></div>
-                </div>
-                <span className="percentage">45%</span>
-              </div>
-              <div className="distribution-item">
-                <span className="category">Sports</span>
-                <div className="bar">
-                  <div className="fill" style={{ width: '28%' }}></div>
-                </div>
-                <span className="percentage">28%</span>
-              </div>
-              <div className="distribution-item">
-                <span className="category">Politics</span>
-                <div className="bar">
-                  <div className="fill" style={{ width: '15%' }}></div>
-                </div>
-                <span className="percentage">15%</span>
-              </div>
-              <div className="distribution-item">
-                <span className="category">Other</span>
-                <div className="bar">
-                  <div className="fill" style={{ width: '12%' }}></div>
-                </div>
-                <span className="percentage">12%</span>
-              </div>
-            </div>
-          </div>
 
-          <div className="overview-card">
-            <h3>Prediction Status</h3>
-            <div className="status-chart">
-              <div className="status-item">
-                <span className="status-label">Active</span>
-                <span className="status-value">89</span>
-                <div className="status-bar">
-                  <div className="status-fill active" style={{ width: '71%' }}></div>
-                </div>
-              </div>
-              <div className="status-item">
-                <span className="status-label">Resolved</span>
-                <span className="status-value">1,089</span>
-                <div className="status-bar">
-                  <div className="status-fill resolved" style={{ width: '87%' }}></div>
-                </div>
-              </div>
-              <div className="status-item">
-                <span className="status-label">Pending Approval</span>
-                <span className="status-value">69</span>
-                <div className="status-bar">
-                  <div className="status-fill pending" style={{ width: '5.5%' }}></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

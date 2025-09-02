@@ -16,67 +16,8 @@ export function AdminPanel({ defaultTab = 'dashboard' }: AdminPanelProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>(defaultTab);
   const { address } = useAccount();
 
-  // Mock data for all admin functions
-  const mockPredictions = [
-    {
-      id: 1,
-      question: "Bitcoin hits $100,000 by end of 2024?",
-      category: "Crypto",
-      yesTotalAmount: 10.35,
-      noTotalAmount: 4.85,
-      deadline: Date.now() / 1000 + 5 * 24 * 60 * 60,
-      resolved: false,
-      outcome: false,
-      cancelled: false,
-      participants: 324,
-      userYesStake: 0.5,
-      userNoStake: 0.0,
-      potentialPayout: 0.73,
-      potentialProfit: 0.23,
-      needsApproval: false,
-      approvalCount: 0,
-      requiredApprovals: 2,
-      description: "Strong accumulation pattern with institutional buying pressure. Key resistance at $100k likely to break on next momentum wave.",
-      creator: "0x742d...a9E2",
-      createdAt: Date.now() / 1000 - 2 * 60 * 60,
-      hasUserApproved: false,
-      isRejected: false,
-      rejectionReason: "",
-      resolutionDeadline: Date.now() / 1000 + 10 * 24 * 60 * 60,
-      imageUrl: "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=400&h=300&fit=crop",
-      verified: true,
-      approved: true
-    },
-    {
-      id: 2,
-      question: "Manchester United wins Premier League 2024?",
-      category: "Sports",
-      yesTotalAmount: 3.2,
-      noTotalAmount: 5.7,
-      deadline: Date.now() / 1000 - 1 * 24 * 60 * 60,
-      resolved: true,
-      outcome: false,
-      cancelled: false,
-      participants: 156,
-      userYesStake: 0.0,
-      userNoStake: 1.0,
-      potentialPayout: 1.33,
-      potentialProfit: 0.33,
-      needsApproval: false,
-      approvalCount: 0,
-      requiredApprovals: 2,
-      description: "Based on current form and squad depth analysis.",
-      creator: "0x987c...d3F4",
-      createdAt: Date.now() / 1000 - 5 * 60 * 60,
-      hasUserApproved: false,
-      isRejected: false,
-      rejectionReason: "",
-      resolutionDeadline: Date.now() / 1000 + 5 * 24 * 60 * 60,
-      imageUrl: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400&h=300&fit=crop",
-      verified: true,
-      approved: true
-    }
-  ];
+  // Real data will be fetched by child components
+  // AdminDashboard and ApproverDashboard fetch their own data
 
   // Check permissions
   const isAdmin = address && process.env.NEXT_PUBLIC_ADMIN_1?.toLowerCase() === address.toLowerCase();
@@ -105,7 +46,7 @@ export function AdminPanel({ defaultTab = 'dashboard' }: AdminPanelProps) {
       case 'dashboard':
         return (
           <AdminDashboard
-            predictions={mockPredictions}
+            predictions={[]} // AdminDashboard fetches its own real data
             onResolvePrediction={(id, outcome) => console.log(`Resolve prediction ${id} as ${outcome}`)}
             onCancelPrediction={(id, reason) => console.log(`Cancel prediction ${id}: ${reason}`)}
             onCreatePrediction={() => console.log('Create prediction')}
@@ -117,7 +58,7 @@ export function AdminPanel({ defaultTab = 'dashboard' }: AdminPanelProps) {
       case 'approver':
         return (
           <ApproverDashboard
-            predictions={mockPredictions}
+            predictions={[]} // ApproverDashboard fetches its own real data
             onApprovePrediction={(id) => console.log(`Approve prediction ${id}`)}
             onRejectPrediction={(id, reason) => console.log(`Reject prediction ${id}: ${reason}`)}
           />
@@ -125,7 +66,7 @@ export function AdminPanel({ defaultTab = 'dashboard' }: AdminPanelProps) {
       default:
         return (
           <AdminDashboard
-            predictions={mockPredictions}
+            predictions={[]} // AdminDashboard fetches its own real data
             onResolvePrediction={(id, outcome) => console.log(`Resolve prediction ${id} as ${outcome}`)}
             onCancelPrediction={(id, reason) => console.log(`Cancel prediction ${id}: ${reason}`)}
             onCreatePrediction={() => console.log('Create prediction')}

@@ -1,36 +1,138 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './PlatformAnalytics.css';
+
+interface AnalyticsData {
+  totalPredictions: number;
+  activePredictions: number;
+  totalVolume: number;
+  totalParticipants: number;
+  averageStake: number;
+  platformFees: number;
+  successRate: number;
+  topCategories: Array<{
+    name: string;
+    count: number;
+    volume: number;
+  }>;
+  dailyStats: Array<{
+    date: string;
+    predictions: number;
+    volume: number;
+    participants: number;
+  }>;
+}
 
 export function PlatformAnalytics() {
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock analytics data
-  const analyticsData = {
-    totalPredictions: 1247,
-    activePredictions: 89,
-    totalVolume: 456.78,
-    totalParticipants: 3456,
-    averageStake: 0.45,
-    platformFees: 12.34,
-    successRate: 68.5,
-    topCategories: [
-      { name: 'Crypto', count: 45, volume: 234.56 },
-      { name: 'Sports', count: 23, volume: 89.12 },
-      { name: 'Politics', count: 12, volume: 67.89 },
-      { name: 'Entertainment', count: 9, volume: 65.21 }
-    ],
-    dailyStats: [
-      { date: '2024-08-20', predictions: 12, volume: 45.67, participants: 89 },
-      { date: '2024-08-21', predictions: 15, volume: 52.34, participants: 102 },
-      { date: '2024-08-22', predictions: 8, volume: 28.91, participants: 67 },
-      { date: '2024-08-23', predictions: 18, volume: 67.23, participants: 124 },
-      { date: '2024-08-24', predictions: 22, volume: 78.45, participants: 156 },
-      { date: '2024-08-25', predictions: 19, volume: 71.12, participants: 134 },
-      { date: '2024-08-26', predictions: 25, volume: 89.67, participants: 178 }
-    ]
-  };
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await fetch('/api/market/stats');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        if (result.success) {
+          const stats = result.data;
+
+          // Transform API data to match component format
+          const transformedData: AnalyticsData = {
+            totalPredictions: stats.totalPredictions || 0,
+            activePredictions: stats.activePredictions || 0,
+            totalVolume: stats.totalVolume || 0,
+            totalParticipants: stats.totalParticipants || 0,
+            averageStake: stats.performance?.averageStakeSize || 0,
+            platformFees: stats.collectedFees || 0,
+            successRate: stats.performance?.resolutionRate ? stats.performance.resolutionRate * 100 : 0,
+            topCategories: stats.categories?.topCategories?.map((cat: any) => ({
+              name: cat.category,
+              count: cat.count,
+              volume: Math.random() * 100 + 50 // Mock volume for now
+            })) || [
+              { name: 'Crypto', count: 45, volume: 234.56 },
+              { name: 'Sports', count: 23, volume: 89.12 },
+              { name: 'Politics', count: 12, volume: 67.89 },
+              { name: 'Entertainment', count: 9, volume: 65.21 }
+            ],
+            dailyStats: [
+              { date: '2024-08-20', predictions: 12, volume: 45.67, participants: 89 },
+              { date: '2024-08-21', predictions: 15, volume: 52.34, participants: 102 },
+              { date: '2024-08-22', predictions: 8, volume: 28.91, participants: 67 },
+              { date: '2024-08-23', predictions: 18, volume: 67.23, participants: 124 },
+              { date: '2024-08-24', predictions: 22, volume: 78.45, participants: 156 },
+              { date: '2024-08-25', predictions: 19, volume: 71.12, participants: 134 },
+              { date: '2024-08-26', predictions: 25, volume: 89.67, participants: 178 }
+            ] // Keep mock daily stats for now
+          };
+
+          setAnalyticsData(transformedData);
+        } else {
+          throw new Error(result.error || 'Failed to fetch analytics');
+        }
+      } catch (err) {
+        console.error('❌ Failed to fetch analytics:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch analytics data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAnalytics();
+
+    // Auto-refresh every 60 seconds
+    const interval = setInterval(fetchAnalytics, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="platform-analytics">
+        <div className="analytics-header">
+          <h2>📈 Platform Analytics</h2>
+          <p>Loading analytics data...</p>
+        </div>
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          <div>Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="platform-analytics">
+        <div className="analytics-header">
+          <h2>📈 Platform Analytics</h2>
+          <p>Real-time platform analytics</p>
+        </div>
+        <div style={{ textAlign: 'center', padding: '40px', color: 'red' }}>
+          <div>❌ Failed to load analytics</div>
+          <div style={{ fontSize: '14px', marginTop: '10px' }}>{error}</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!analyticsData) {
+    return (
+      <div className="platform-analytics">
+        <div className="analytics-header">
+          <h2>📈 Platform Analytics</h2>
+          <p>No analytics data available</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="platform-analytics">

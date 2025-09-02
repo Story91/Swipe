@@ -21,131 +21,77 @@ export function Leaderboard() {
   const [timeframe, setTimeframe] = useState<'7d' | '30d' | 'all'>('30d');
   const [sortBy, setSortBy] = useState<'profit' | 'winRate' | 'bets'>('profit');
   const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock leaderboard data
   useEffect(() => {
-    const mockData: LeaderboardUser[] = [
-      {
-        rank: 1,
-        address: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
-        displayName: 'CryptoWhale',
-        avatar: '🐋',
-        totalProfit: 15.67,
-        totalBets: 45,
-        winRate: 78.5,
-        totalStaked: 28.3,
-        predictionsCreated: 12
-      },
-      {
-        rank: 2,
-        address: '0x987Fcba5213D9085c453C3B5eE5D1d9f8c7b2A1f',
-        displayName: 'PredictionMaster',
-        avatar: '🎯',
-        totalProfit: 12.34,
-        totalBets: 38,
-        winRate: 82.1,
-        totalStaked: 22.1,
-        predictionsCreated: 8
-      },
-      {
-        rank: 3,
-        address: '0x456Def789Abc1234567890Abcdef123456789012',
-        displayName: 'OracleSeer',
-        avatar: '🔮',
-        totalProfit: 9.87,
-        totalBets: 52,
-        winRate: 71.2,
-        totalStaked: 31.5,
-        predictionsCreated: 15
-      },
-      {
-        rank: 4,
-        address: '0x123Abc456Def78901234567890Abcdef12345678',
-        displayName: 'BettingBull',
-        avatar: '🐂',
-        totalProfit: 8.92,
-        totalBets: 29,
-        winRate: 86.2,
-        totalStaked: 18.7,
-        predictionsCreated: 5
-      },
-      {
-        rank: 5,
-        address: '0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd',
-        displayName: 'DexterAdmin',
-        avatar: '👑',
-        totalProfit: 7.45,
-        totalBets: 67,
-        winRate: 65.7,
-        totalStaked: 42.1,
-        predictionsCreated: 25
-      },
-      {
-        rank: 6,
-        address: '0x1111222233334444555566667777888899990000',
-        displayName: 'LuckyTrader',
-        avatar: '🍀',
-        totalProfit: 6.78,
-        totalBets: 33,
-        winRate: 69.7,
-        totalStaked: 19.8,
-        predictionsCreated: 3
-      },
-      {
-        rank: 7,
-        address: '0xAAAA1111BBBB2222CCCC3333DDDD4444EEEE5555',
-        displayName: 'MarketMaverick',
-        avatar: '📈',
-        totalProfit: 5.43,
-        totalBets: 41,
-        winRate: 73.2,
-        totalStaked: 24.6,
-        predictionsCreated: 7
-      },
-      {
-        rank: 8,
-        address: '0x9999888877776666555544443333222211110000',
-        displayName: 'ProphetAI',
-        avatar: '🤖',
-        totalProfit: 4.56,
-        totalBets: 28,
-        winRate: 75.0,
-        totalStaked: 16.2,
-        predictionsCreated: 2
-      },
-      {
-        rank: 9,
-        address: '0x77776666555544443333222211110000AAAA9999',
-        displayName: 'SportsSage',
-        avatar: '⚽',
-        totalProfit: 3.21,
-        totalBets: 35,
-        winRate: 68.6,
-        totalStaked: 21.3,
-        predictionsCreated: 4
-      },
-      {
-        rank: 10,
-        address: '0x44443333222211110000AAAA9999888877776666',
-        displayName: 'TechPredictor',
-        avatar: '💻',
-        totalProfit: 2.89,
-        totalBets: 22,
-        winRate: 77.3,
-        totalStaked: 13.4,
-        predictionsCreated: 6
+    const fetchLeaderboard = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await fetch(`/api/leaderboard?timeframe=${timeframe}&limit=20`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        if (result.success) {
+          // Mark current user if they're in the leaderboard
+          const updatedData = result.data.map((user: LeaderboardUser) => ({
+            ...user,
+            isCurrentUser: user.address.toLowerCase() === address?.toLowerCase()
+          }));
+
+          setLeaderboard(updatedData);
+        } else {
+          throw new Error(result.error || 'Failed to fetch leaderboard');
+        }
+      } catch (err) {
+        console.error('❌ Failed to fetch leaderboard:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch leaderboard data');
+      } finally {
+        setLoading(false);
       }
-    ];
+    };
 
-    // Mark current user if they're in the leaderboard
-    const updatedData = mockData.map(user => ({
-      ...user,
-      isCurrentUser: user.address.toLowerCase() === address?.toLowerCase()
-    }));
+    fetchLeaderboard();
 
-    setLeaderboard(updatedData);
-  }, [address]);
+    // Auto-refresh every 60 seconds
+    const interval = setInterval(fetchLeaderboard, 60000);
+    return () => clearInterval(interval);
+  }, [address, timeframe]);
 
+  if (loading) {
+    return (
+      <div className="leaderboard">
+        <div className="leaderboard-header">
+          <h1>🏆 Leaderboard</h1>
+          <p>Loading leaderboard data...</p>
+        </div>
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          <div>Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="leaderboard">
+        <div className="leaderboard-header">
+          <h1>🏆 Leaderboard</h1>
+          <p>Top performers on Dexter</p>
+        </div>
+        <div style={{ textAlign: 'center', padding: '40px', color: 'red' }}>
+          <div>❌ Failed to load leaderboard</div>
+          <div style={{ fontSize: '14px', marginTop: '10px' }}>{error}</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Sort leaderboard based on selected criteria
   const sortedLeaderboard = [...leaderboard].sort((a, b) => {
     switch (sortBy) {
       case 'profit':

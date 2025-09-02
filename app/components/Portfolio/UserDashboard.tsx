@@ -162,128 +162,21 @@ export function UserDashboard({ predictions, onClaimReward }: UserDashboardProps
     }
   };
 
-  // Funkcja do pobierania predykcji z kontraktu
-  const fetchPredictions = useCallback(async () => {
-    if (!nextPredictionId || nextPredictionId <= 1 || !publicClient) return;
-
-    setLoading(true);
-    try {
-      const predictions: Prediction[] = [];
-
-      for (let i = 1; i < nextPredictionId; i++) {
-        try {
-          // Pobierz podstawowe informacje o predykcji
-          const basicResult = await publicClient.readContract({
-            address: CONTRACT_ADDRESS as `0x${string}`,
-            abi: CONTRACT_ABI,
-            functionName: 'getPredictionBasic',
-            args: [BigInt(i)],
-          }) as {
-            question: string;
-            description: string;
-            category: string;
-            yesTotalAmount: bigint;
-            noTotalAmount: bigint;
-            deadline: bigint;
-            resolved: boolean;
-            outcome: boolean;
-            approved: boolean;
-            creator: string;
-          };
-
-          // Pobierz rozszerzone informacje
-          const extendedResult = await publicClient.readContract({
-            address: CONTRACT_ADDRESS as `0x${string}`,
-            abi: CONTRACT_ABI,
-            functionName: 'getPredictionExtended',
-            args: [BigInt(i)],
-          }) as [string, bigint, boolean, bigint, boolean, boolean, bigint];
-
-          // Pobierz statystyki rynku
-          const marketStats = await publicClient.readContract({
-            address: CONTRACT_ADDRESS as `0x${string}`,
-            abi: CONTRACT_ABI,
-            functionName: 'getMarketStats',
-            args: [BigInt(i)],
-          }) as {
-            totalPool: bigint;
-            participantsCount: bigint;
-            yesPercentage: bigint;
-            noPercentage: bigint;
-            timeLeft: bigint;
-          };
-
-          // Pobierz informacje o zakładzie użytkownika
-          let userYesStake = 0;
-          let userNoStake = 0;
-          let potentialPayout = 0;
-          let potentialProfit = 0;
-
-          if (address) {
-            const userStake = await publicClient.readContract({
-              address: CONTRACT_ADDRESS as `0x${string}`,
-              abi: CONTRACT_ABI,
-              functionName: 'getUserStakeInfo',
-              args: [BigInt(i), address as `0x${string}`],
-            }) as [bigint, bigint, boolean, bigint, bigint];
-
-            userYesStake = Number(userStake[0]);
-            userNoStake = Number(userStake[1]);
-            potentialPayout = Number(userStake[3]);
-            potentialProfit = Number(userStake[4]);
-          }
-
-          const prediction: Prediction = {
-            id: i,
-            question: basicResult.question,
-            description: basicResult.description,
-            category: basicResult.category,
-            yesTotalAmount: Number(basicResult.yesTotalAmount) / 1e18, // Convert from wei to ETH
-            noTotalAmount: Number(basicResult.noTotalAmount) / 1e18, // Convert from wei to ETH
-            deadline: Number(basicResult.deadline),
-            resolved: basicResult.resolved,
-            outcome: basicResult.outcome,
-            approved: basicResult.approved,
-            creator: basicResult.creator,
-            imageUrl: extendedResult[0],
-            resolutionDeadline: Number(extendedResult[1]),
-            cancelled: extendedResult[2],
-            createdAt: Number(extendedResult[3]),
-            verified: extendedResult[4],
-            needsApproval: extendedResult[5],
-            approvalCount: Number(extendedResult[6]),
-            requiredApprovals: 3, // Default required approvals (can be configurable)
-            participants: Number(marketStats.participantsCount),
-            userYesStake: userYesStake / 1e18, // Convert from wei to ETH
-            userNoStake: userNoStake / 1e18, // Convert from wei to ETH
-            potentialPayout: potentialPayout / 1e18, // Convert from wei to ETH
-            potentialProfit: potentialProfit / 1e18, // Convert from wei to ETH
-          };
-
-          predictions.push(prediction);
-        } catch (error) {
-          console.error(`Error fetching prediction ${i}:`, error);
-        }
-      }
-
+  // Use predictions from Redis props instead of fetching from RPC
+  useEffect(() => {
+    if (predictions && predictions.length > 0) {
       setRealPredictions(predictions);
-    } catch (error) {
-      console.error('Error fetching predictions:', error);
-    } finally {
       setLoading(false);
     }
-  }, [nextPredictionId, publicClient, address]);
+  }, [predictions]);
 
-  // Hook do czytania z kontraktu
-  const { refetch: refetchData } = useReadContract({
-    address: CONTRACT_ADDRESS as `0x${string}`,
-    abi: CONTRACT_ABI,
-    functionName: 'getContractStats',
-  });
+  // Legacy function - now just uses props from Redis
+  const fetchPredictions = useCallback(async () => {
+    // No longer needed - using props from Redis
+    return;
+  }, []);
 
-  useEffect(() => {
-    fetchPredictions();
-  }, [nextPredictionId, address, fetchPredictions]);
+  // No longer need RPC calls - using Redis data
 
   // Load transaction history on mount
   useEffect(() => {
@@ -346,8 +239,8 @@ export function UserDashboard({ predictions, onClaimReward }: UserDashboardProps
 
         // Auto-refresh data after successful transaction
         setTimeout(() => {
-          fetchPredictions();
-          refetchData();
+          // Data will be refreshed via props from Redis
+          window.location.reload();
         }, 2000); // Wait 2 seconds for transaction to be mined
       },
       onError: (error) => {

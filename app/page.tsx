@@ -24,7 +24,7 @@ import {
   MenubarTrigger,
 } from "@/components/ui/menubar";
 import { useAccount } from "wagmi";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import TinderCardComponent from "./components/Main/TinderCard";
 import { AdminPanel } from "./components/Admin/AdminPanel";
 import { MarketStats } from "./components/Market/MarketStats";
@@ -39,6 +39,7 @@ import { HelpAndFaq } from "./components/Support/HelpAndFaq";
 import { Leaderboard } from "./components/Support/Leaderboard";
 import { RecentActivity } from "./components/Support/RecentActivity";
 import { CreatePredictionModal } from "./components/Modals/CreatePredictionModal";
+import AIAssistant from "./components/AIAssistant/AIAssistant";
 
 type DashboardType = 'tinder' | 'user' | 'admin' | 'approver' | 'market-stats' | 'analytics' | 'settings' | 'audit-logs' | 'my-portfolio' | 'active-bets' | 'bet-history' | 'help-faq' | 'leaderboard' | 'recent-activity';
 
@@ -47,6 +48,7 @@ export default function App() {
   const [activeDashboard, setActiveDashboard] = useState<DashboardType>('tinder');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { address } = useAccount();
+  const tinderCardRef = useRef<{ refresh: () => void } | null>(null);
 
   useEffect(() => {
     if (!isFrameReady) {
@@ -58,6 +60,13 @@ export default function App() {
   const isAdmin = address && process.env.NEXT_PUBLIC_ADMIN_1?.toLowerCase() === address.toLowerCase();
   const isApprover = address && (process.env.NEXT_PUBLIC_APPROVER_1?.toLowerCase() === address.toLowerCase() ||
                                process.env.NEXT_PUBLIC_ADMIN_1?.toLowerCase() === address.toLowerCase());
+
+  // Function to refresh predictions data
+  const refreshPredictions = () => {
+    if (tinderCardRef.current?.refresh) {
+      tinderCardRef.current.refresh();
+    }
+  };
 
   return (
     <div className="flex flex-col min-h-screen font-sans text-[var(--app-foreground)] mini-app-theme from-[var(--app-background)] to-[var(--app-gray)]">
@@ -84,84 +93,35 @@ export default function App() {
         <div className="mb-4">
           <Menubar>
             <MenubarMenu>
-              <MenubarTrigger>Dexter</MenubarTrigger>
+              <MenubarTrigger onClick={() => setActiveDashboard('tinder')}>
+                Swipe
+              </MenubarTrigger>
+            </MenubarMenu>
+            <MenubarMenu>
+              <MenubarTrigger onClick={() => setActiveDashboard('market-stats')}>
+                Stats
+              </MenubarTrigger>
+            </MenubarMenu>
+            <MenubarMenu>
+              <MenubarTrigger>
+                Create
+              </MenubarTrigger>
               <MenubarContent>
-                <MenubarItem onClick={() => setActiveDashboard('tinder')}>
-                  🔥 Tinder Mode
-                </MenubarItem>
-                <MenubarItem onClick={() => setActiveDashboard('market-stats')}>
-                  📊 Market Stats
-                </MenubarItem>
-                <MenubarItem onClick={() => setActiveDashboard('leaderboard')}>
-                  🏆 Leaderboard
-                </MenubarItem>
-                <MenubarItem onClick={() => setActiveDashboard('recent-activity')}>
-                  🔔 Recent Activity
+                <MenubarItem onSelect={() => setIsCreateModalOpen(true)}>
+                  Create Prediction
                 </MenubarItem>
               </MenubarContent>
             </MenubarMenu>
             <MenubarMenu>
-              <MenubarTrigger>Portfolio</MenubarTrigger>
-              <MenubarContent>
-                <MenubarItem onClick={() => setActiveDashboard('user')}>
-                  👤 My Dashboard
-                </MenubarItem>
-                <MenubarItem onClick={() => setActiveDashboard('my-portfolio')}>
-                  💼 My Portfolio
-                </MenubarItem>
-                <MenubarItem onClick={() => setActiveDashboard('active-bets')}>
-                  💰 Active Bets
-                </MenubarItem>
-                <MenubarItem onClick={() => setActiveDashboard('bet-history')}>
-                  🏆 Bet History
-                </MenubarItem>
-              </MenubarContent>
-            </MenubarMenu>
-            <MenubarMenu>
-              <MenubarTrigger>Actions</MenubarTrigger>
-              <MenubarContent>
-                <MenubarItem onClick={() => setIsCreateModalOpen(true)}>
-                  ➕ Create Prediction
-                </MenubarItem>
-                {isAdmin && (
-                  <MenubarItem onClick={() => setActiveDashboard('admin')}>
-                    ⚙️ Admin Panel
-                  </MenubarItem>
-                )}
-                {isApprover && (
-                  <MenubarItem onClick={() => setActiveDashboard('approver')}>
-                    ✅ Approver Panel
-                  </MenubarItem>
-                )}
-                <MenubarItem onClick={() => setActiveDashboard('help-faq')}>
-                  ❓ Help & FAQ
-                </MenubarItem>
-                {!address && (
-                  <>
-                    <MenubarItem disabled>
-                      ⚙️ Admin Panel (Connect Wallet)
-                    </MenubarItem>
-                    <MenubarItem disabled>
-                      ✅ Approver Panel (Connect Wallet)
-                    </MenubarItem>
-                  </>
-                )}
-              </MenubarContent>
+              <MenubarTrigger onClick={() => setActiveDashboard('help-faq')}>
+                Help
+              </MenubarTrigger>
             </MenubarMenu>
             {isAdmin && (
               <MenubarMenu>
-                <MenubarTrigger>🔧 Admin</MenubarTrigger>
-                <MenubarContent>
-                  <MenubarItem onClick={() => setActiveDashboard('analytics')}>
-                    📈 Platform Analytics
-                  </MenubarItem>
-                  <MenubarItem onClick={() => setActiveDashboard('settings')}>
-                    ⚙️ System Settings
-                  </MenubarItem>
-                  <MenubarItem onClick={() => setActiveDashboard('audit-logs')}>
-                    🔍 Audit Logs
-                  </MenubarItem>
-                </MenubarContent>
+                <MenubarTrigger onClick={() => setActiveDashboard('admin')}>
+                  Admin
+                </MenubarTrigger>
               </MenubarMenu>
             )}
           </Menubar>
@@ -171,6 +131,7 @@ export default function App() {
         <main className="flex-1">
           {activeDashboard === 'tinder' && (
             <TinderCardComponent
+              ref={tinderCardRef}
               activeDashboard={activeDashboard}
               onDashboardChange={setActiveDashboard}
             />
@@ -179,37 +140,7 @@ export default function App() {
           {activeDashboard === 'user' && (
             <div>
               <UserDashboard
-                predictions={[
-                  {
-                    id: 1,
-                    question: "Bitcoin hits $100,000 by end of 2024?",
-                    category: "Crypto",
-                    yesTotalAmount: 10.35,
-                    noTotalAmount: 4.85,
-                    deadline: Date.now() / 1000 + 5 * 24 * 60 * 60,
-                    resolved: false,
-                    outcome: false,
-                    cancelled: false,
-                    participants: 324,
-                    userYesStake: 0.5,
-                    userNoStake: 0.0,
-                    potentialPayout: 0.73,
-                    potentialProfit: 0.23,
-                    needsApproval: false,
-                    approvalCount: 0,
-                    requiredApprovals: 2,
-                    description: "Strong accumulation pattern with institutional buying pressure. Key resistance at $100k likely to break on next momentum wave.",
-                    creator: "0x742d...a9E2",
-                    createdAt: Date.now() / 1000 - 2 * 60 * 60,
-                    hasUserApproved: false,
-                    isRejected: false,
-                    rejectionReason: "",
-                    resolutionDeadline: Date.now() / 1000 + 10 * 24 * 60 * 60,
-                    imageUrl: "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=400&h=300&fit=crop",
-                    verified: true,
-                    approved: true
-                  }
-                ]}
+                predictions={[]} // UserDashboard fetches its own real data from blockchain
                 onClaimReward={(id) => console.log(`Claim reward for ${id}`)}
               />
             </div>
@@ -251,9 +182,15 @@ export default function App() {
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={() => {
           console.log('Prediction created successfully!');
-          // Optionally navigate to a specific dashboard or refresh data
+          // Refresh predictions data after successful creation
+          setTimeout(() => {
+            refreshPredictions();
+          }, 2000); // Wait 2 seconds for transaction to be mined
         }}
       />
+
+      {/* AI Assistant */}
+      <AIAssistant />
     </div>
   );
 }

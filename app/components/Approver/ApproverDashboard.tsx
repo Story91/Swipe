@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { useReadContract } from 'wagmi';
+import { useReadContract, usePublicClient, useAccount } from 'wagmi';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../../../lib/contract';
 
 interface Prediction {
@@ -30,6 +30,9 @@ export function ApproverDashboard({
   onRejectPrediction
 }: ApproverDashboardProps) {
 
+  const publicClient = usePublicClient();
+  const { address } = useAccount();
+
   // Get required approvals from contract
   const { data: requiredApprovals } = useReadContract({
     address: CONTRACT_ADDRESS as `0x${string}`,
@@ -37,10 +40,149 @@ export function ApproverDashboard({
     functionName: 'requiredApprovals',
   });
 
+  // Get total predictions count
+  const { data: totalPredictions } = useReadContract({
+    address: CONTRACT_ADDRESS as `0x${string}`,
+    abi: CONTRACT_ABI,
+    functionName: 'nextPredictionId',
+  });
+
+  // Fetch real predictions data
+  const [realPredictions, setRealPredictions] = React.useState<Prediction[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    const fetchPredictions = async () => {
+      if (!totalPredictions || totalPredictions <= 1) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        const predictions: Prediction[] = [];
+
+        for (let i = 1; i < totalPredictions; i++) {
+          try {
+            // Get basic prediction info
+            const basicResult = await publicClient.readContract({
+              address: CONTRACT_ADDRESS as `0x${string}`,
+              abi: CONTRACT_ABI,
+              functionName: 'getPredictionBasic',
+              args: [BigInt(i)],
+            }) as {
+              question: string;
+              description: string;
+              category: string;
+              yesTotalAmount: bigint;
+              noTotalAmount: bigint;
+              deadline: bigint;
+              resolved: boolean;
+              outcome: boolean;
+              approved: boolean;
+              creator: string;
+            };
+
+            // Get extended info
+            const extendedResult = await publicClient.readContract({
+              address: CONTRACT_ADDRESS as `0x${string}`,
+              abi: CONTRACT_ABI,
+              functionName: 'getPredictionExtended',
+              args: [BigInt(i)],
+            }) as [string, bigint, boolean, bigint, boolean, boolean, bigint];
+
+            // Get approval info
+            let approvalCount = 0;
+            let hasUserApproved = false;
+            let isRejected = false;
+            let rejectionReason = '';
+
+            try {
+              // Get approval count
+              const approvalCountResult = await publicClient.readContract({
+                address: CONTRACT_ADDRESS as `0x${string}`,
+                abi: CONTRACT_ABI,
+                functionName: 'getApprovalCount',
+                args: [BigInt(i)],
+              }) as bigint;
+              approvalCount = Number(approvalCountResult);
+
+              // Check if user has approved (if address is available)
+              if (address) {
+                const userApprovalResult = await publicClient.readContract({
+                  address: CONTRACT_ADDRESS as `0x${string}`,
+                  abi: CONTRACT_ABI,
+                  functionName: 'hasUserApproved',
+                  args: [BigInt(i), address as `0x${string}`],
+                }) as boolean;
+                hasUserApproved = userApprovalResult;
+              }
+
+              // Check if rejected
+              const rejectedResult = await publicClient.readContract({
+                address: CONTRACT_ADDRESS as `0x${string}`,
+                abi: CONTRACT_ABI,
+                functionName: 'isPredictionRejected',
+                args: [BigInt(i)],
+              }) as boolean;
+              isRejected = rejectedResult;
+
+              if (isRejected) {
+                // Get rejection reason
+                const reasonResult = await publicClient.readContract({
+                  address: CONTRACT_ADDRESS as `0x${string}`,
+                  abi: CONTRACT_ABI,
+                  functionName: 'getRejectionReason',
+                  args: [BigInt(i)],
+                }) as string;
+                rejectionReason = reasonResult;
+              }
+            } catch (approvalError) {
+              console.warn(`Could not fetch approval data for prediction ${i}:`, approvalError);
+            }
+
+            const prediction: Prediction = {
+              id: i,
+              question: basicResult.question,
+              description: basicResult.description,
+              category: basicResult.category,
+              creator: basicResult.creator,
+              createdAt: Number(extendedResult[3]),
+              approvalCount,
+              requiredApprovals: requiredApprovals ? Number(requiredApprovals) : 3,
+              hasUserApproved,
+              isRejected,
+              rejectionReason
+            };
+
+            predictions.push(prediction);
+          } catch (error) {
+            console.error(`Error fetching prediction ${i}:`, error);
+          }
+        }
+
+        setRealPredictions(predictions);
+      } catch (err) {
+        console.error('❌ Failed to fetch predictions:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch predictions');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPredictions();
+  }, [totalPredictions, requiredApprovals, address, publicClient]);
+
+  // Use real data if available, fallback to props
+  const displayPredictions = realPredictions.length > 0 ? realPredictions : predictions;
+
   const stats = {
-    pendingApproval: predictions.filter(p => !p.isRejected && p.approvalCount < p.requiredApprovals).length,
-    userApproved: predictions.filter(p => p.hasUserApproved).length,
-    userRejected: predictions.filter(p => p.isRejected).length,
+    pendingApproval: displayPredictions.filter(p => !p.isRejected && p.approvalCount < p.requiredApprovals).length,
+    userApproved: displayPredictions.filter(p => p.hasUserApproved).length,
+    userRejected: displayPredictions.filter(p => p.isRejected).length,
     requiredApprovals: requiredApprovals ? Number(requiredApprovals) : 3 // Default to 3 if not loaded
   };
 
@@ -76,9 +218,30 @@ export function ApproverDashboard({
     return 'Just now';
   };
 
-  const pendingPredictions = predictions.filter(p => !p.isRejected && p.approvalCount < p.requiredApprovals);
-  const approvedByUser = predictions.filter(p => p.hasUserApproved);
-  const rejectedPredictions = predictions.filter(p => p.isRejected);
+  const pendingPredictions = displayPredictions.filter(p => !p.isRejected && p.approvalCount < p.requiredApprovals);
+  const approvedByUser = displayPredictions.filter(p => p.hasUserApproved);
+  const rejectedPredictions = displayPredictions.filter(p => p.isRejected);
+
+  if (loading) {
+    return (
+      <div className="approver-dashboard">
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          <div>Loading approver data...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="approver-dashboard">
+        <div style={{ textAlign: 'center', padding: '40px', color: 'red' }}>
+          <div>❌ Failed to load approver data</div>
+          <div style={{ fontSize: '14px', marginTop: '10px' }}>{error}</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="approver-dashboard">

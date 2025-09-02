@@ -32,8 +32,9 @@ export function RecentActivity() {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [filter, setFilter] = useState<'all' | 'me' | 'predictions' | 'bets'>('all');
   const [timeRange, setTimeRange] = useState<'1h' | '24h' | '7d' | '30d'>('24h');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock activity data
   useEffect(() => {
     const mockActivities: ActivityItem[] = [
       {
@@ -264,37 +265,42 @@ export function RecentActivity() {
     return 'Just now';
   };
 
-  const filteredActivities = activities.filter(activity => {
-    // Time filter
-    const now = Date.now();
-    const timeLimit = (() => {
-      switch (timeRange) {
-        case '1h': return 60 * 60 * 1000;
-        case '24h': return 24 * 60 * 60 * 1000;
-        case '7d': return 7 * 24 * 60 * 60 * 1000;
-        case '30d': return 30 * 24 * 60 * 60 * 1000;
-        default: return 24 * 60 * 60 * 1000;
-      }
-    })();
-
-    if (now - activity.timestamp > timeLimit) return false;
-
-    // Type filter
-    switch (filter) {
-      case 'me':
-        return activity.isCurrentUser;
-      case 'predictions':
-        return ['prediction_created', 'prediction_resolved', 'prediction_approved'].includes(activity.type);
-      case 'bets':
-        return ['bet_placed', 'payout_claimed'].includes(activity.type);
-      default:
-        return true;
-    }
-  });
+  // For now, return activities as-is since filtering is done in API
+  // TODO: Implement client-side filtering if needed
+  const filteredActivities = activities;
 
   const handleFilterChange = (newFilter: 'all' | 'me' | 'predictions' | 'bets') => {
     setFilter(newFilter);
   };
+
+  if (loading) {
+    return (
+      <div className="recent-activity">
+        <div className="activity-header">
+          <h1>🔔 Recent Activity</h1>
+          <p>Loading activity data...</p>
+        </div>
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          <div>Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="recent-activity">
+        <div className="activity-header">
+          <h1>🔔 Recent Activity</h1>
+          <p>Latest happenings on Dexter</p>
+        </div>
+        <div style={{ textAlign: 'center', padding: '40px', color: 'red' }}>
+          <div>❌ Failed to load activity</div>
+          <div style={{ fontSize: '14px', marginTop: '10px' }}>{error}</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="recent-activity">

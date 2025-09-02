@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import './HelpAndFaq.css';
 
 interface FAQItem {
   id: number;
@@ -138,41 +139,49 @@ export function HelpAndFaq() {
   };
 
   return (
-    <div className="help-faq">
-      <div className="help-header">
-        <h1>❓ Help & FAQ</h1>
-        <p>Find answers to common questions about Dexter</p>
+    <div className="modern-help-faq">
+      <div className="modern-help-header">
+        <div className="help-title-section">
+          <span className="help-main-title">Help & FAQ</span>
+          <span className="help-subtitle">Prediction Market</span>
+        </div>
+        <p className="help-description">Find answers to common questions about Dexter</p>
       </div>
 
       {/* Search Bar */}
-      <div className="search-section">
-        <div className="search-container">
+      <div className="modern-search-section">
+        <div className="modern-search-container">
           <input
             type="text"
             placeholder="Search for help..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="search-input"
+            className="modern-search-input"
           />
-          <div className="search-icon">🔍</div>
+          <div className="modern-search-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <path d="m21 21-4.35-4.35"></path>
+            </svg>
+          </div>
         </div>
       </div>
 
       {/* Category Filters */}
-      <div className="categories-section">
-        <h3>Choose a category:</h3>
-        <div className="category-buttons">
+      <div className="modern-categories-section">
+        <h3 className="categories-title">Choose a category</h3>
+        <div className="modern-category-buttons">
           {categories.map(category => (
             <button
               key={category.id}
-              className={`category-button ${activeCategory === category.id ? 'active' : ''}`}
+              className={`modern-category-button ${activeCategory === category.id ? 'active' : ''}`}
               onClick={() => setActiveCategory(category.id)}
             >
-              <span className="category-icon">{category.icon}</span>
-              <span className="category-label">{category.label}</span>
+              <span className="modern-category-icon">{category.icon}</span>
+              <span className="modern-category-label">{category.label}</span>
               {category.id !== 'all' && (
-                <span className="category-count">
-                  ({faqData.filter(faq => faq.category === category.id).length})
+                <span className="modern-category-count">
+                  {faqData.filter(faq => faq.category === category.id).length}
                 </span>
               )}
             </button>
@@ -181,36 +190,45 @@ export function HelpAndFaq() {
       </div>
 
       {/* FAQ List */}
-      <div className="faq-section">
-        <h3>
+      <div className="modern-faq-section">
+        <h3 className="faq-section-title">
           {activeCategory === 'all' ? 'All Questions' :
            categories.find(cat => cat.id === activeCategory)?.label}
           {searchTerm && ` - Search results for "${searchTerm}"`}
         </h3>
 
         {filteredFAQs.length === 0 ? (
-          <div className="no-results">
-            <div className="no-results-icon">🤔</div>
-            <h4>No questions found</h4>
-            <p>Try adjusting your search or category filter.</p>
+          <div className="modern-no-results">
+            <div className="modern-no-results-icon">🤔</div>
+            <h4 className="no-results-title">No questions found</h4>
+            <p className="no-results-text">Try adjusting your search or category filter.</p>
           </div>
         ) : (
-          <div className="faq-list">
+          <div className="modern-faq-list">
             {filteredFAQs.map(faq => (
-              <div key={faq.id} className="faq-item">
+              <div key={faq.id} className="modern-faq-item">
                 <button
-                  className="faq-question"
+                  className="modern-faq-question"
                   onClick={() => toggleExpanded(faq.id)}
                 >
-                  <span className="question-text">{faq.question}</span>
-                  <span className="expand-icon">
-                    {expandedItems.has(faq.id) ? '−' : '+'}
+                  <span className="modern-question-text">{faq.question}</span>
+                  <span className="modern-expand-icon">
+                    {expandedItems.has(faq.id) ? (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                      </svg>
+                    ) : (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                      </svg>
+                    )}
                   </span>
                 </button>
 
                 {expandedItems.has(faq.id) && (
-                  <div className="faq-answer">
-                    <p>{faq.answer}</p>
+                  <div className="modern-faq-answer">
+                    <p className="answer-text">{faq.answer}</p>
                   </div>
                 )}
               </div>
@@ -220,21 +238,37 @@ export function HelpAndFaq() {
       </div>
 
       {/* Contact Support */}
-      <div className="support-section">
-        <div className="support-card">
-          <div className="support-icon">💬</div>
-          <div className="support-content">
-            <h3>Still need help?</h3>
-            <p>Can&apos;t find what you&apos;re looking for? Our community and support team are here to help.</p>
-            <div className="support-links">
-              <a href="#" className="support-link">
-                📧 Contact Support
+      <div className="modern-support-section">
+        <div className="modern-support-card">
+          <div className="modern-support-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+          </div>
+          <div className="modern-support-content">
+            <h3 className="support-title">Still need help?</h3>
+            <p className="support-description">Can&apos;t find what you&apos;re looking for? Our community and support team are here to help.</p>
+            <div className="modern-support-links">
+              <a href="#" className="modern-support-link">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                  <polyline points="22,6 12,13 2,6"></polyline>
+                </svg>
+                Contact Support
               </a>
-              <a href="#" className="support-link">
-                💡 Feature Requests
+              <a href="#" className="modern-support-link">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 11H5a2 2 0 0 0-2 2v3c0 1.1.9 2 2 2h4m0-7v7m0-7h10a2 2 0 0 1 2 2v3c0 1.1-.9 2-2 2H9m0-7V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                Feature Requests
               </a>
-              <a href="#" className="support-link">
-                🐛 Report Bug
+              <a href="#" className="modern-support-link">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                  <path d="M2 17l10 5 10-5"></path>
+                  <path d="M2 12l10 5 10-5"></path>
+                </svg>
+                Report Bug
               </a>
             </div>
           </div>
@@ -242,24 +276,48 @@ export function HelpAndFaq() {
       </div>
 
       {/* Quick Links */}
-      <div className="quick-links">
-        <h3>Quick Links</h3>
-        <div className="links-grid">
-          <a href="#" className="quick-link">
-            <span className="link-icon">📖</span>
-            <span className="link-text">User Guide</span>
+      <div className="modern-quick-links">
+        <h3 className="quick-links-title">Quick Links</h3>
+        <div className="modern-links-grid">
+          <a href="#" className="modern-quick-link">
+            <span className="modern-link-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+              </svg>
+            </span>
+            <span className="modern-link-text">User Guide</span>
           </a>
-          <a href="#" className="quick-link">
-            <span className="link-icon">🎥</span>
-            <span className="link-text">Video Tutorials</span>
+          <a href="#" className="modern-quick-link">
+            <span className="modern-link-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+              </svg>
+            </span>
+            <span className="modern-link-text">Video Tutorials</span>
           </a>
-          <a href="#" className="quick-link">
-            <span className="link-icon">💡</span>
-            <span className="link-text">Tips & Tricks</span>
+          <a href="#" className="modern-quick-link">
+            <span className="modern-link-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9 12l2 2 4-4"></path>
+                <path d="M21 12c-1 0-3-1-3-3s2-3 3-3 3 1 3 3-2 3-3 3"></path>
+                <path d="M3 12c1 0 3-1 3-3s-2-3-3-3-3 1-3 3 2 3 3 3"></path>
+                <path d="M12 3c0 1-1 3-3 3s-3-2-3-3 1-3 3-3 3 2 3 3"></path>
+                <path d="M12 21c0-1 1-3 3-3s3 2 3 3-1 3-3 3-3-2-3-3"></path>
+              </svg>
+            </span>
+            <span className="modern-link-text">Tips & Tricks</span>
           </a>
-          <a href="#" className="quick-link">
-            <span className="link-icon">🔒</span>
-            <span className="link-text">Security Guide</span>
+          <a href="#" className="modern-quick-link">
+            <span className="modern-link-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <circle cx="12" cy="16" r="1"></circle>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+            </span>
+            <span className="modern-link-text">Security Guide</span>
           </a>
         </div>
       </div>

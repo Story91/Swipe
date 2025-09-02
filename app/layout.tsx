@@ -26,8 +26,7 @@ export async function generateMetadata(): Promise<Metadata> {
             name: process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME,
             url: URL,
             splashImageUrl: process.env.NEXT_PUBLIC_SPLASH_IMAGE,
-            splashBackgroundColor:
-              process.env.NEXT_PUBLIC_SPLASH_BACKGROUND_COLOR,
+            splashBackgroundColor: "#d4ff00",
           },
         },
       }),
@@ -42,8 +41,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="bg-background">
-        <Providers>{children}</Providers>
+      <body className="bg-background" style={{ backgroundColor: '#d4ff00' }}>
+        <div className="app-container">
+          <Providers>{children}</Providers>
+        </div>
       </body>
     </html>
   );
