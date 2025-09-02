@@ -8,6 +8,7 @@ interface Prediction {
   id: number;
   question: string;
   category: string;
+  description?: string;
   yesTotalAmount: number;
   noTotalAmount: number;
   deadline: number;
@@ -74,6 +75,10 @@ export function AdminDashboard({
 
         for (let i = 1; i < totalPredictions; i++) {
           try {
+            if (!publicClient) {
+              throw new Error('Public client not available');
+            }
+
             // Pobierz podstawowe informacje o predykcji
             const basicResult = await publicClient.readContract({
               address: CONTRACT_ADDRESS as `0x${string}`,

@@ -16,8 +16,6 @@ export function Providers(props: { children: ReactNode }) {
           name: process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME,
           logo: process.env.NEXT_PUBLIC_ICON_URL,
         },
-        // Add RPC configuration if needed
-        rpcUrl: process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org',
       }}
     >
       {props.children}

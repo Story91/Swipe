@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
 
             if (prediction.resolved && !prediction.cancelled) {
               // Prediction is resolved
-              if (prediction.outcome === choice) {
+              if (prediction.outcome === (choice === 'YES')) {
                 // User won
                 status = 'won';
                 wonBets++;

@@ -63,14 +63,14 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
   
   // Transform hybrid predictions to match the expected format
   const transformedPredictions = hybridPredictions.map((pred) => ({
-    id: parseInt(pred.id) || Date.now(),
+    id: Number(pred.id),
     question: pred.question,
     category: pred.category,
     yesTotalAmount: pred.yesTotalAmount,
     noTotalAmount: pred.noTotalAmount,
     deadline: pred.deadline,
     resolved: pred.resolved,
-    outcome: pred.outcome,
+    outcome: pred.outcome ?? false,
     cancelled: pred.cancelled,
     participants: pred.participants.length,
     userYesStake: 0, // Will be updated when user stakes are fetched
@@ -98,22 +98,28 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
   const predictions = transformedPredictions;
   
   // Transform predictions to TinderCard format
-  const defaultItems: PredictionData[] = predictions.map(pred => ({
-    id: parseInt(pred.id) || Date.now(),
+  const defaultItems: PredictionData[] = predictions.map(pred => {
+    const totalPool = pred.yesTotalAmount + pred.noTotalAmount;
+    const yesPercentage = totalPool > 0 ? (pred.yesTotalAmount / totalPool) * 100 : 0;
+    const noPercentage = totalPool > 0 ? (pred.noTotalAmount / totalPool) * 100 : 0;
+
+    return {
+    id: pred.id,
     title: pred.question,
     image: pred.includeChart && pred.selectedCrypto 
       ? `https://www.geckoterminal.com/eth/pools/${pred.selectedCrypto.toLowerCase()}?embed=1&info=0&swaps=0&light_chart=1&chart_type=price&resolution=1d&bg_color=f1f5f9`
       : pred.imageUrl,
     prediction: pred.question,
     timeframe: new Date(pred.deadline * 1000).toLocaleDateString(),
-    confidence: Math.round(pred.yesPercentage || 0),
+    confidence: Math.round(yesPercentage),
     category: pred.category,
     price: `$${(pred.yesTotalAmount + pred.noTotalAmount).toFixed(2)}`,
-    change: (pred.yesPercentage || 0) > (pred.noPercentage || 0) ? `+${(pred.yesPercentage || 0).toFixed(1)}%` : `-${(pred.noPercentage || 0).toFixed(1)}%`,
+    change: yesPercentage > noPercentage ? `+${yesPercentage.toFixed(1)}%` : `-${noPercentage.toFixed(1)}%`,
     description: pred.description,
     isChart: pred.includeChart || false,
-    votingYes: Math.round(pred.yesPercentage || 0)
-  }));
+    votingYes: Math.round(yesPercentage)
+    };
+  });
 
   const cardItems = items && items.length ? items : defaultItems;
 
@@ -140,11 +146,11 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
         value: ethers.parseEther(amount.toString()),
       });
 
-      showNotification('✅ Stake placed successfully!', 'success');
+      showNotification('success', '✅ Stake placed successfully!', '');
       setStakeModal({ ...stakeModal, isOpen: false });
     } catch (error) {
       console.error('Failed to place stake:', error);
-      showNotification('❌ Failed to place stake', 'error');
+      showNotification('error', '❌ Failed to place stake', '');
     } finally {
       setIsTransactionLoading(false);
     }
@@ -166,10 +172,10 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
         args: [BigInt(predictionId)],
       });
 
-      showNotification('✅ Reward claimed successfully!', 'success');
+      showNotification('success', '✅ Reward claimed successfully!', '');
     } catch (error) {
       console.error('Failed to claim reward:', error);
-      showNotification('❌ Failed to claim reward', 'error');
+      showNotification('error', '❌ Failed to claim reward', '');
     } finally {
       setIsTransactionLoading(false);
     }
@@ -191,10 +197,10 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
         args: [BigInt(predictionId), outcome],
       });
 
-      showNotification('✅ Prediction resolved successfully!', 'success');
+      showNotification('success', '✅ Prediction resolved successfully!', '');
     } catch (error) {
       console.error('Failed to resolve prediction:', error);
-      showNotification('❌ Failed to resolve prediction', 'error');
+      showNotification('error', '❌ Failed to resolve prediction', '');
     } finally {
       setIsTransactionLoading(false);
     }
@@ -216,10 +222,10 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
         args: [BigInt(predictionId), reason],
       });
 
-      showNotification('✅ Prediction cancelled successfully!', 'success');
+      showNotification('success', '✅ Prediction cancelled successfully!', '');
     } catch (error) {
       console.error('Failed to cancel prediction:', error);
-      showNotification('❌ Failed to cancel prediction', 'error');
+      showNotification('error', '❌ Failed to cancel prediction', '');
     } finally {
       setIsTransactionLoading(false);
     }
@@ -248,10 +254,10 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
         value: ethers.parseEther('0.01'), // Creation fee
       });
 
-      showNotification('✅ Prediction created successfully!', 'success');
+      showNotification('success', '✅ Prediction created successfully!', '');
     } catch (error) {
       console.error('Failed to create prediction:', error);
-      showNotification('❌ Failed to create prediction', 'error');
+      showNotification('error', '❌ Failed to create prediction', '');
     } finally {
       setIsTransactionLoading(false);
     }
@@ -273,10 +279,10 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
         args: [approverAddress as `0x${string}`, isApproved],
       });
 
-      showNotification(`✅ Approver ${isApproved ? 'added' : 'removed'} successfully!`, 'success');
+      showNotification('success', `✅ Approver ${isApproved ? 'added' : 'removed'} successfully!`, '');
     } catch (error) {
       console.error('Failed to manage approvers:', error);
-      showNotification('❌ Failed to manage approvers', 'error');
+      showNotification('error', '❌ Failed to manage approvers', '');
     } finally {
       setIsTransactionLoading(false);
     }
@@ -297,10 +303,10 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
         functionName: 'withdrawFees',
       });
 
-      showNotification('✅ Fees withdrawn successfully!', 'success');
+      showNotification('success', '✅ Fees withdrawn successfully!', '');
     } catch (error) {
       console.error('Failed to withdraw fees:', error);
-      showNotification('❌ Failed to withdraw fees', 'error');
+      showNotification('error', '❌ Failed to withdraw fees', '');
     } finally {
       setIsTransactionLoading(false);
     }
@@ -321,10 +327,10 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
         functionName: pause ? 'pause' : 'unpause',
       });
 
-      showNotification(`✅ Contract ${pause ? 'paused' : 'unpaused'} successfully!`, 'success');
+      showNotification('success', `✅ Contract ${pause ? 'paused' : 'unpaused'} successfully!`, '');
     } catch (error) {
       console.error('Failed to pause/unpause contract:', error);
-      showNotification('❌ Failed to pause/unpause contract', 'error');
+      showNotification('error', '❌ Failed to pause/unpause contract', '');
     } finally {
       setIsTransactionLoading(false);
     }
@@ -346,10 +352,10 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
         args: [BigInt(predictionId)],
       });
 
-      showNotification('✅ Prediction approved successfully!', 'success');
+      showNotification('success', '✅ Prediction approved successfully!', '');
     } catch (error) {
       console.error('Failed to approve prediction:', error);
-      showNotification('❌ Failed to approve prediction', 'error');
+      showNotification('error', '❌ Failed to approve prediction', '');
     } finally {
       setIsTransactionLoading(false);
     }
@@ -371,10 +377,10 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
         args: [BigInt(predictionId), reason],
       });
 
-      showNotification('✅ Prediction rejected successfully!', 'success');
+      showNotification('success', '✅ Prediction rejected successfully!', '');
     } catch (error) {
       console.error('Failed to reject prediction:', error);
-      showNotification('❌ Failed to reject prediction', 'error');
+      showNotification('error', '❌ Failed to reject prediction', '');
     } finally {
       setIsTransactionLoading(false);
     }
@@ -494,10 +500,10 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
           predictions={predictions}
           onResolvePrediction={handleResolvePrediction}
           onCancelPrediction={handleCancelPrediction}
-          onCreatePrediction={handleCreatePrediction}
-          onManageApprovers={handleManageApprovers}
+          onCreatePrediction={() => handleCreatePrediction({} as any)}
+          onManageApprovers={() => handleManageApprovers('' as any, false)}
           onWithdrawFees={handleWithdrawFees}
-          onPauseContract={handlePauseContract}
+          onPauseContract={() => handlePauseContract(false)}
         />
       </div>
     );

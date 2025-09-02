@@ -67,6 +67,10 @@ export function ApproverDashboard({
 
         for (let i = 1; i < totalPredictions; i++) {
           try {
+            if (!publicClient) {
+              throw new Error('Public client not available');
+            }
+
             // Get basic prediction info
             const basicResult = await publicClient.readContract({
               address: CONTRACT_ADDRESS as `0x${string}`,
@@ -94,55 +98,31 @@ export function ApproverDashboard({
               args: [BigInt(i)],
             }) as [string, bigint, boolean, bigint, boolean, boolean, bigint];
 
-            // Get approval info
-            let approvalCount = 0;
+            // Get approval info from extended result
+            const approvalCount = Number(extendedResult[6]); // approvalCount from getPredictionExtended
             let hasUserApproved = false;
             let isRejected = false;
             let rejectionReason = '';
 
-            try {
-              // Get approval count
-              const approvalCountResult = await publicClient.readContract({
-                address: CONTRACT_ADDRESS as `0x${string}`,
-                abi: CONTRACT_ABI,
-                functionName: 'getApprovalCount',
-                args: [BigInt(i)],
-              }) as bigint;
-              approvalCount = Number(approvalCountResult);
-
-              // Check if user has approved (if address is available)
-              if (address) {
-                const userApprovalResult = await publicClient.readContract({
+            // Check if user has approved (read from public mapping)
+            if (address) {
+              try {
+                const approvalMappingResult = await publicClient.readContract({
                   address: CONTRACT_ADDRESS as `0x${string}`,
                   abi: CONTRACT_ABI,
-                  functionName: 'hasUserApproved',
+                  functionName: 'predictionApprovals',
                   args: [BigInt(i), address as `0x${string}`],
                 }) as boolean;
-                hasUserApproved = userApprovalResult;
+                hasUserApproved = approvalMappingResult;
+              } catch (error) {
+                console.warn(`Could not check user approval for prediction ${i}:`, error);
               }
-
-              // Check if rejected
-              const rejectedResult = await publicClient.readContract({
-                address: CONTRACT_ADDRESS as `0x${string}`,
-                abi: CONTRACT_ABI,
-                functionName: 'isPredictionRejected',
-                args: [BigInt(i)],
-              }) as boolean;
-              isRejected = rejectedResult;
-
-              if (isRejected) {
-                // Get rejection reason
-                const reasonResult = await publicClient.readContract({
-                  address: CONTRACT_ADDRESS as `0x${string}`,
-                  abi: CONTRACT_ABI,
-                  functionName: 'getRejectionReason',
-                  args: [BigInt(i)],
-                }) as string;
-                rejectionReason = reasonResult;
-              }
-            } catch (approvalError) {
-              console.warn(`Could not fetch approval data for prediction ${i}:`, approvalError);
             }
+
+            // For now, we don't have a rejection mechanism in the contract
+            // This would need to be added to the contract if rejection is required
+            isRejected = false;
+            rejectionReason = '';
 
             const prediction: Prediction = {
               id: i,
