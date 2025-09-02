@@ -18,10 +18,11 @@ const PREDICTION_ABI = [
 // GET /api/blockchain/prediction/[id] - Get prediction data from blockchain
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const predictionId = params.id;
+    const resolvedParams = await params;
+    const predictionId = resolvedParams.id;
     const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
     
     if (!contractAddress) {
@@ -65,7 +66,9 @@ export async function GET(
       yesTotalAmount,
       noTotalAmount,
       totalStakes
-    ] = predictionData;
+    ] = predictionData as [
+      string, string, string, string, bigint, string, boolean, boolean, boolean, boolean, boolean, bigint, bigint, bigint
+    ];
     
     const prediction = {
       id: predictionId,
@@ -102,14 +105,15 @@ export async function GET(
     });
     
   } catch (error) {
-    console.error(`❌ Failed to fetch prediction ${params.id} from blockchain:`, error);
+    const resolvedParams = await params;
+    console.error(`❌ Failed to fetch prediction ${resolvedParams.id} from blockchain:`, error);
     
     return NextResponse.json(
       { 
         success: false, 
         error: 'Failed to fetch prediction from blockchain',
         details: error instanceof Error ? error.message : 'Unknown error',
-        predictionId: params.id,
+        predictionId: resolvedParams.id,
         timestamp: new Date().toISOString()
       },
       { status: 500 }
