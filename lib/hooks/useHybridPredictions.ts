@@ -124,20 +124,20 @@ export function useHybridPredictions() {
     }
   }, [redisPredictions, transformPredictions]);
   
-  // Auto-refresh every 60 seconds (production-friendly)
+  // Auto-refresh every 60 seconds for live updates (reduced frequency to prevent flickering)
   useEffect(() => {
     fetchAllPredictions();
 
     const interval = setInterval(fetchAllPredictions, 60000);
     return () => clearInterval(interval);
-  }, [fetchAllPredictions]); // Include dependency for proper cleanup
+  }, []); // Remove dependency to prevent infinite loops
   
   // Refresh when user connects/disconnects wallet
   useEffect(() => {
     if (address) {
       fetchAllPredictions();
     }
-  }, [address, fetchAllPredictions]); // Include all dependencies
+  }, [address]); // Remove fetchAllPredictions dependency to prevent infinite loops
   
   return {
     predictions,

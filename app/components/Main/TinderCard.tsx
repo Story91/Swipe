@@ -74,7 +74,7 @@ function getTimeUrgencyClass(deadline: number): string {
   }
 }
 
-const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>(({ items, activeDashboard: propActiveDashboard, onDashboardChange, onRefresh }, ref) => {
+const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>(({ items, activeDashboard: propActiveDashboard, onDashboardChange }, ref) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
   const [swipeProgress, setSwipeProgress] = useState(0);
@@ -128,7 +128,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   // Expose refresh function to parent component via ref
   useImperativeHandle(ref, () => ({
     refresh: refreshPredictions
-  }), [refreshPredictions]);
+  }), []); // Remove dependency to prevent re-creation
   
   // Open stake modal after swipe
   const openStakeModal = useCallback((direction: string, predictionId: number) => {
@@ -210,7 +210,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     selectedCrypto: pred.selectedCrypto
   })), [hybridPredictions]);
   
-  // Transform real predictions to match TinderCard format (memoized)
+  // Transform real predictions to match TinderCard format (memoized for performance)
   const realCardItems: PredictionData[] = useMemo(() => transformedPredictions.map((pred) => {
     const totalPool = (pred.yesTotalAmount || 0) + (pred.noTotalAmount || 0);
     const votingYes = totalPool > 0 ? Math.floor(((pred.yesTotalAmount || 0) / totalPool) * 100) : 50;
@@ -395,7 +395,9 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
         
         // Trigger data refresh as fallback
         setTimeout(() => {
-          window.location.reload();
+          if (refreshPredictions) {
+            refreshPredictions();
+          }
         }, 3000);
       },
       onError: (error) => {
@@ -430,8 +432,9 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
         // Reward claimed successfully
         // Auto-refresh data after successful transaction
         setTimeout(() => {
-          // Trigger data refresh
-          window.location.reload(); // Simple refresh for now
+          if (refreshPredictions) {
+            refreshPredictions();
+          }
         }, 3000);
       },
       onError: (error) => {
@@ -441,46 +444,121 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     });
   };
 
-  const handleResolvePrediction = (predictionId: number, outcome: boolean) => {
+  const handleResolvePrediction = (predictionId: string | number, outcome: boolean) => {
     // Resolving prediction
 
-    // Execute real resolve prediction transaction
-    writeContract({
-      address: CONTRACT_ADDRESS as `0x${string}`,
-      abi: CONTRACT_ABI,
-      functionName: 'resolvePrediction',
-      args: [BigInt(predictionId), outcome],
-    }, {
-      onSuccess: () => {
-        console.log(`✅ Prediction ${predictionId} resolved successfully`);
-        setTimeout(() => window.location.reload(), 3000);
-      },
-      onError: (error) => {
-        console.error('❌ Resolve prediction failed:', error);
+    // Check if this is a Redis-based prediction (string ID) or on-chain prediction (number ID)
+    if (typeof predictionId === 'string') {
+      // Handle Redis-based prediction via API
+      fetch('/api/predictions/resolve', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          predictionId: predictionId,
+          outcome: outcome,
+          reason: `Admin resolved as ${outcome ? 'YES' : 'NO'}`
+        }),
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          console.log(`✅ Redis prediction ${predictionId} resolved successfully`);
+          setTimeout(() => {
+            if (refreshPredictions) {
+              refreshPredictions();
+            }
+          }, 1000);
+        } else {
+          console.error('❌ Failed to resolve Redis prediction:', data.error);
+          alert(`❌ Resolution failed: ${data.error}`);
+        }
+      })
+      .catch(error => {
+        console.error('❌ Error resolving Redis prediction:', error);
         alert('❌ Resolution failed. Please try again.');
-      }
-    });
+      });
+    } else {
+      // Handle on-chain prediction
+      writeContract({
+        address: CONTRACT_ADDRESS as `0x${string}`,
+        abi: CONTRACT_ABI,
+        functionName: 'resolvePrediction',
+        args: [BigInt(predictionId), outcome],
+      }, {
+        onSuccess: () => {
+          console.log(`✅ Prediction ${predictionId} resolved successfully`);
+          setTimeout(() => {
+            if (refreshPredictions) {
+              refreshPredictions();
+            }
+          }, 3000);
+        },
+        onError: (error) => {
+          console.error('❌ Resolve prediction failed:', error);
+          alert('❌ Resolution failed. Please try again.');
+        }
+      });
+    }
   };
 
-  const handleCancelPrediction = (predictionId: number, reason: string) => {
+  const handleCancelPrediction = (predictionId: string | number, reason: string) => {
     console.log(`🚫 Cancelling prediction ${predictionId} with reason: ${reason}`);
 
-    // Execute real cancel prediction transaction
-    writeContract({
-      address: CONTRACT_ADDRESS as `0x${string}`,
-      abi: CONTRACT_ABI,
-      functionName: 'cancelPrediction',
-      args: [BigInt(predictionId), reason],
-    }, {
-      onSuccess: () => {
-        console.log(`✅ Prediction ${predictionId} cancelled successfully`);
-        setTimeout(() => window.location.reload(), 3000);
-      },
-      onError: (error) => {
-        console.error('❌ Cancel prediction failed:', error);
+    // Check if this is a Redis-based prediction (string ID) or on-chain prediction (number ID)
+    if (typeof predictionId === 'string') {
+      // Handle Redis-based prediction via API
+      fetch('/api/predictions/resolve', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          predictionId: predictionId,
+          reason: reason
+        }),
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          console.log(`✅ Redis prediction ${predictionId} cancelled successfully`);
+          setTimeout(() => {
+            if (refreshPredictions) {
+              refreshPredictions();
+            }
+          }, 1000);
+        } else {
+          console.error('❌ Failed to cancel Redis prediction:', data.error);
+          alert(`❌ Cancellation failed: ${data.error}`);
+        }
+      })
+      .catch(error => {
+        console.error('❌ Error cancelling Redis prediction:', error);
         alert('❌ Cancellation failed. Please try again.');
-      }
-    });
+      });
+    } else {
+      // Handle on-chain prediction
+      writeContract({
+        address: CONTRACT_ADDRESS as `0x${string}`,
+        abi: CONTRACT_ABI,
+        functionName: 'cancelPrediction',
+        args: [BigInt(predictionId), reason],
+      }, {
+        onSuccess: () => {
+          console.log(`✅ Prediction ${predictionId} cancelled successfully`);
+          setTimeout(() => {
+            if (refreshPredictions) {
+              refreshPredictions();
+            }
+          }, 3000);
+        },
+        onError: (error) => {
+          console.error('❌ Cancel prediction failed:', error);
+          alert('❌ Cancellation failed. Please try again.');
+        }
+      });
+    }
   };
 
   const handleApprovePrediction = (predictionId: number) => {
@@ -509,7 +587,11 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
           console.warn('⚠️ Sync request failed:', syncError);
         }
 
-        setTimeout(() => window.location.reload(), 3000);
+        setTimeout(() => {
+          if (refreshPredictions) {
+            refreshPredictions();
+          }
+        }, 3000);
       },
       onError: (error) => {
         console.error('❌ Approve prediction failed:', error);
@@ -530,7 +612,11 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     }, {
       onSuccess: () => {
         console.log(`✅ Prediction ${predictionId} rejected successfully`);
-        setTimeout(() => window.location.reload(), 3000);
+        setTimeout(() => {
+          if (refreshPredictions) {
+            refreshPredictions();
+          }
+        }, 3000);
       },
       onError: (error) => {
         console.error('❌ Reject prediction failed:', error);
@@ -767,7 +853,11 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
               borderRadius: '4px',
               cursor: 'pointer'
             }}
-            onClick={() => window.location.reload()}
+            onClick={() => {
+              if (refreshPredictions) {
+                refreshPredictions();
+              }
+            }}
           >
             Retry
           </button>
@@ -1097,21 +1187,43 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
              <div className="chart-value">
                {transformedPredictions[currentIndex]?.participants || 0}
              </div>
-             <div className="mini-chart">
-               <div className="chart-line"></div>
-               <div className="chart-dots">
-                 {[10, 30, 50, 70, 90].map((pos, i) => (
-                   <div 
-                     key={i}
-                     className="chart-dot"
-                     style={{ 
-                       left: `${pos}%`, 
-                       top: `${[25, 45, 35, 65, 55][i]}%`,
-                       opacity: [0.7, 0.8, 0.6, 0.9, 0.75][i]
-                     }}
-                   ></div>
-                 ))}
-               </div>
+             <div className="swipers-visualization">
+               {(() => {
+                 const participantCount = transformedPredictions[currentIndex]?.participants || 0;
+                 
+                 if (participantCount === 0) {
+                   return (
+                     <div className="no-swipers">
+                       <div className="no-swipers-text">No swipers yet</div>
+                       <div className="no-swipers-bar">
+                         <div className="no-swipers-fill"></div>
+                       </div>
+                     </div>
+                   );
+                 }
+                 
+                 // Show actual swiper dots based on real count
+                 const maxDots = 5; // Maximum dots to show
+                 const dotsToShow = Math.min(participantCount, maxDots);
+                 
+                 return (
+                   <div className="swipers-dots">
+                     {Array.from({ length: maxDots }, (_, i) => (
+                       <div 
+                         key={i}
+                         className={`swiper-dot ${i < dotsToShow ? 'active' : 'inactive'}`}
+                         style={{ 
+                           left: `${(i / (maxDots - 1)) * 80 + 10}%`,
+                           animationDelay: `${i * 0.1}s`
+                         }}
+                       ></div>
+                     ))}
+                     {participantCount > maxDots && (
+                       <div className="more-swipers">+{participantCount - maxDots}</div>
+                     )}
+                   </div>
+                 );
+               })()}
              </div>
              <div className="chart-subtitle">Active Swipers</div>
            </div>
@@ -1171,26 +1283,66 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
            {/* YES/NO Breakdown */}
            <div className="chart-item">
              <div className="chart-title">YES/NO Split</div>
-             <div className="chart-value">
-               YES: {((transformedPredictions[currentIndex]?.yesTotalAmount || 0) / 1e18).toFixed(4)} ETH
-             </div>
-             <div className="mini-chart">
-               <div className="chart-line"></div>
-               <div className="chart-dots">
-                 {[15, 35, 55, 75, 95].map((pos, i) => (
-                   <div 
-                     key={i}
-                     className="chart-dot"
-                     style={{ 
-                       left: `${pos}%`, 
-                       top: `${[40, 30, 50, 25, 45][i]}%`,
-                       opacity: [0.6, 0.8, 0.7, 0.9, 0.65][i]
-                     }}
-                   ></div>
-                 ))}
+             
+             {/* Real-time YES/NO amounts with equal styling */}
+             <div className="yes-no-amounts">
+               <div className="amount-item yes-amount">
+                 <span className="amount-label">YES</span>
+                 <span className="amount-value">
+                   {((transformedPredictions[currentIndex]?.yesTotalAmount || 0) / 1e18).toFixed(4)} ETH
+                 </span>
+               </div>
+               <div className="amount-item no-amount">
+                 <span className="amount-label">NO</span>
+                 <span className="amount-value">
+                   {((transformedPredictions[currentIndex]?.noTotalAmount || 0) / 1e18).toFixed(4)} ETH
+                 </span>
                </div>
              </div>
-             <div className="chart-subtitle">NO: {((transformedPredictions[currentIndex]?.noTotalAmount || 0) / 1e18).toFixed(4)} ETH</div>
+             
+             {/* Real proportional visualization */}
+             <div className="proportional-chart">
+               {(() => {
+                 const yesAmount = transformedPredictions[currentIndex]?.yesTotalAmount || 0;
+                 const noAmount = transformedPredictions[currentIndex]?.noTotalAmount || 0;
+                 const totalAmount = yesAmount + noAmount;
+                 
+                 if (totalAmount === 0) {
+                   return (
+                     <div className="no-stakes">
+                       <div className="no-stakes-text">No stakes yet</div>
+                       <div className="no-stakes-bar">
+                         <div className="no-stakes-fill"></div>
+                       </div>
+                     </div>
+                   );
+                 }
+                 
+                 const yesPercentage = (yesAmount / totalAmount) * 100;
+                 const noPercentage = (noAmount / totalAmount) * 100;
+                 
+                 return (
+                   <div className="split-visualization">
+                     <div className="split-bar">
+                       <div 
+                         className="split-yes" 
+                         style={{ width: `${yesPercentage}%` }}
+                         title={`YES: ${yesPercentage.toFixed(1)}%`}
+                       ></div>
+                       <div 
+                         className="split-no" 
+                         style={{ width: `${noPercentage}%` }}
+                         title={`NO: ${noPercentage.toFixed(1)}%`}
+                       ></div>
+                     </div>
+                     <div className="split-percentages">
+                       <span className="yes-percentage">{yesPercentage.toFixed(1)}%</span>
+                       <span className="no-percentage">{noPercentage.toFixed(1)}%</span>
+                     </div>
+                   </div>
+                 );
+               })()}
+             </div>
            </div>
                              </div>
         </div>

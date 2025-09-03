@@ -94,19 +94,20 @@
 
 .predictions-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-  gap: 25px;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 20px;
   margin-top: 30px;
 }
 
 .prediction-card {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   border-radius: 15px;
   padding: 20px;
   margin-bottom: 20px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   transition: all 0.3s ease;
+  color: #1a202c;
 }
 
 .prediction-card:hover {
@@ -139,12 +140,14 @@
 .status-pending { background: rgba(255, 193, 7, 0.8); }
 .status-resolved { background: rgba(96, 125, 139, 0.8); }
 .status-cancelled { background: rgba(244, 67, 54, 0.8); }
+.status-expired { background: rgba(255, 152, 0, 0.8); }
 
 .prediction-question {
   font-size: 1.3em;
   font-weight: bold;
   margin-bottom: 15px;
   line-height: 1.3;
+  color: #1a202c !important;
 }
 
 .prediction-stats {
@@ -455,32 +458,70 @@
 @media (max-width: 768px) {
   .predictions-grid {
     grid-template-columns: 1fr;
+    gap: 15px;
   }
-
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
+  
+  .prediction-card {
+    padding: 15px;
+    margin-bottom: 15px;
   }
-
-  .dashboard-tabs {
-    flex-wrap: wrap;
+  
+  .prediction-question {
+    font-size: 14px;
+    line-height: 1.4;
   }
-
+  
+  .odds-labels {
+    font-size: 12px;
+  }
+  
   .action-buttons {
     flex-direction: column;
+    gap: 8px;
   }
+  
+  .action-buttons button {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+}
 
-  .stake-input-group {
-    flex-direction: column;
+/* Mini App Responsiveness */
+@media (max-width: 480px) {
+  .dashboard {
+    padding: 15px;
+  }
+  
+  .predictions-grid {
     gap: 10px;
   }
-
-  .quick-amounts {
-    justify-content: center;
+  
+  .prediction-card {
+    padding: 12px;
+    border-radius: 10px;
   }
-
-  .preview-line {
-    flex-direction: column;
-    gap: 5px;
+  
+  .prediction-question {
+    font-size: 13px;
+    line-height: 1.3;
+  }
+  
+  .odds-labels {
+    font-size: 11px;
+  }
+  
+  .action-buttons button {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+  
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  
+  .stat-card {
+    padding: 10px;
   }
 }
 

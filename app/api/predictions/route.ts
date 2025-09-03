@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
       endDate: body.endDate,
       endTime: body.endTime,
       deadline: deadline,
+      resolutionDeadline: deadline + (7 * 24 * 60 * 60), // 7 days after deadline for admin to resolve
       yesTotalAmount: 0,
       noTotalAmount: 0,
       resolved: false,

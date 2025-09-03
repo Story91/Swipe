@@ -1371,3 +1371,255 @@ html, body {
     transform: translateY(0) scale(1);
   }
 }
+
+/* YES/NO Split Chart Styles */
+.yes-no-amounts {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.amount-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.amount-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  margin-bottom: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.yes-amount .amount-label {
+  color: #10b981;
+}
+
+.no-amount .amount-label {
+  color: #ef4444;
+}
+
+.amount-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2937;
+  line-height: 1.2;
+}
+
+.proportional-chart {
+  margin-top: 8px;
+}
+
+.no-stakes {
+  text-align: center;
+}
+
+.no-stakes-text {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-bottom: 4px;
+}
+
+.no-stakes-bar {
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.no-stakes-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #e5e7eb 0%, #d1d5db 50%, #e5e7eb 100%);
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+.split-visualization {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.split-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.split-yes {
+  background: linear-gradient(90deg, #10b981, #34d399);
+  transition: width 0.3s ease;
+  position: relative;
+}
+
+.split-yes::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 1px;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.split-no {
+  background: linear-gradient(90deg, #ef4444, #f87171);
+  transition: width 0.3s ease;
+}
+
+.split-percentages {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.yes-percentage {
+  color: #10b981;
+}
+
+.no-percentage {
+  color: #ef4444;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Mobile Responsive Charts */
+@media (max-width: 768px) {
+  .charts-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .chart-item {
+    min-height: 60px;
+    padding: 6px;
+  }
+  
+  .chart-title {
+    font-size: 11px;
+    margin-bottom: 4px;
+  }
+  
+  .chart-value {
+    font-size: 16px;
+    margin-bottom: 4px;
+  }
+  
+  .chart-subtitle {
+    font-size: 9px;
+  }
+  
+  .amount-value {
+    font-size: 12px;
+  }
+  
+  .amount-label {
+    font-size: 10px;
+  }
+  
+  .split-bar {
+    height: 6px;
+  }
+  
+  .split-percentages {
+    font-size: 9px;
+  }
+}
+
+/* Swipers Visualization Styles */
+.swipers-visualization {
+  margin-top: 8px;
+}
+
+.no-swipers {
+  text-align: center;
+}
+
+.no-swipers-text {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-bottom: 4px;
+}
+
+.no-swipers-bar {
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.no-swipers-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #e5e7eb 0%, #d1d5db 50%, #e5e7eb 100%);
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+.swipers-dots {
+  position: relative;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.swiper-dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.swiper-dot.active {
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+  transform: scale(1.2);
+}
+
+.swiper-dot.inactive {
+  background: #e5e7eb;
+  opacity: 0.3;
+}
+
+.more-swipers {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: #6b7280;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 2px 6px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}

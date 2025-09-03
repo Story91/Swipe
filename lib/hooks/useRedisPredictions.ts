@@ -296,16 +296,16 @@ export function useRedisPredictions() {
     ]);
   }, [fetchPredictions, fetchMarketStats]);
 
-  // Auto-refresh data every 2 minutes (production-friendly)
+  // Auto-refresh data every 2 minutes for live updates (reduced frequency to prevent flickering)
   useEffect(() => {
     const interval = setInterval(refreshData, 120000);
     return () => clearInterval(interval);
-  }, [refreshData]);
+  }, []); // Remove dependency to prevent infinite loops
 
   // Initial data fetch
   useEffect(() => {
     refreshData();
-  }, [refreshData]);
+  }, []); // Remove dependency to prevent infinite loops
 
   return {
     // State

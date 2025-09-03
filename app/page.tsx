@@ -29,6 +29,7 @@ import TinderCardComponent from "./components/Main/TinderCard";
 import { AdminPanel } from "./components/Admin/AdminPanel";
 import { MarketStats } from "./components/Market/MarketStats";
 import { UserDashboard } from "./components/Portfolio/UserDashboard";
+import { EnhancedUserDashboard } from "./components/Portfolio/EnhancedUserDashboard";
 import { MyPortfolio } from "./components/Portfolio/MyPortfolio";
 import { ActiveBets } from "./components/Portfolio/ActiveBets";
 import { BetHistory } from "./components/Portfolio/BetHistory";
@@ -103,6 +104,11 @@ export default function App() {
               </MenubarTrigger>
             </MenubarMenu>
             <MenubarMenu>
+              <MenubarTrigger onClick={() => setActiveDashboard('user')}>
+                Dashboard
+              </MenubarTrigger>
+            </MenubarMenu>
+            <MenubarMenu>
               <MenubarTrigger>
                 Create
               </MenubarTrigger>
@@ -139,10 +145,7 @@ export default function App() {
 
           {activeDashboard === 'user' && (
             <div>
-              <UserDashboard
-                predictions={[]} // UserDashboard fetches its own real data from blockchain
-                onClaimReward={(id) => console.log(`Claim reward for ${id}`)}
-              />
+              <EnhancedUserDashboard />
             </div>
           )}
 

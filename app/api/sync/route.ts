@@ -10,6 +10,36 @@ const publicClient = createPublicClient({
   transport: http(process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org'),
 });
 
+// Retry function with exponential backoff
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      // Check if it's a rate limit error
+      if (error?.message?.includes('rate limit') || error?.message?.includes('429')) {
+        if (attempt === maxRetries) {
+          throw error;
+        }
+        
+        const delay = baseDelay * Math.pow(2, attempt);
+        console.log(`⚠️ Rate limit hit, retrying in ${delay}ms... (attempt ${attempt + 1}/${maxRetries + 1})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      
+      // For other errors, don't retry
+      throw error;
+    }
+  }
+  
+  throw new Error('Max retries exceeded');
+}
+
 // DELETE /api/sync - Clear all predictions from Redis  
 export async function DELETE(request: NextRequest) {
   try {
@@ -61,17 +91,24 @@ export async function GET(request: NextRequest) {
     let errorsCount = 0;
     let totalStakesSynced = 0;
 
-    // Sync each prediction
+    // Sync each prediction with delay to avoid rate limits
     for (let i = 1; i <= totalPredictions; i++) {
       try {
         console.log(`🔄 Syncing prediction ${i}/${totalPredictions}...`);
+        
+        // Add delay between requests to avoid rate limits
+        if (i > 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+        }
 
-        // Get prediction data using the correct function
-        const predictionData = await publicClient.readContract({
-          address: CONTRACT_ADDRESS as `0x${string}`,
-          abi: CONTRACT_ABI,
-          functionName: 'predictions',
-          args: [BigInt(i)],
+        // Get prediction data using the correct function with retry logic
+        const predictionData = await retryWithBackoff(async () => {
+          return await publicClient.readContract({
+            address: CONTRACT_ADDRESS as `0x${string}`,
+            abi: CONTRACT_ABI,
+            functionName: 'predictions',
+            args: [BigInt(i)],
+          });
         }) as [
           string, // question
           string, // description  
@@ -91,12 +128,14 @@ export async function GET(request: NextRequest) {
           boolean  // needsApproval
         ];
 
-        // Get participants
-        const participants = await publicClient.readContract({
-          address: CONTRACT_ADDRESS as `0x${string}`,
-          abi: CONTRACT_ABI,
-          functionName: 'getParticipants',
-          args: [BigInt(i)],
+        // Get participants with retry logic
+        const participants = await retryWithBackoff(async () => {
+          return await publicClient.readContract({
+            address: CONTRACT_ADDRESS as `0x${string}`,
+            abi: CONTRACT_ABI,
+            functionName: 'getParticipants',
+            args: [BigInt(i)],
+          });
         }) as readonly `0x${string}`[];
 
         // Parse data
@@ -125,6 +164,9 @@ export async function GET(request: NextRequest) {
         const noPercentage = totalPool > BigInt(0) ? (noTotalAmount * BigInt(100)) / totalPool : BigInt(0);
         const timeLeft = deadline > BigInt(Math.floor(Date.now() / 1000)) ? deadline - BigInt(Math.floor(Date.now() / 1000)) : BigInt(0);
 
+        // Get existing prediction from Redis to preserve chart data
+        const existingPrediction = await redisHelpers.getPrediction(`pred_${i}`);
+        
         // Create Redis prediction object
         const redisPrediction = {
           id: `pred_${i}`,
@@ -132,14 +174,16 @@ export async function GET(request: NextRequest) {
           description,
           category,
           imageUrl,
-          includeChart: imageUrl.includes('geckoterminal.com'), // Check if it's a GeckoTerminal chart
-          selectedCrypto: imageUrl.includes('geckoterminal.com') ? imageUrl.split('/pools/')[1]?.split('?')[0] || '' : '',
+          // Preserve existing chart data or detect from imageUrl
+          includeChart: existingPrediction?.includeChart || imageUrl.includes('geckoterminal.com'),
+          selectedCrypto: existingPrediction?.selectedCrypto || (imageUrl.includes('geckoterminal.com') ? imageUrl.split('/pools/')[1]?.split('?')[0] || '' : ''),
           endDate: new Date(Number(deadline)).toISOString().split('T')[0],
           endTime: new Date(Number(deadline)).toTimeString().slice(0, 5),
           deadline: Number(deadline),
           yesTotalAmount: Number(yesTotalAmount),
           noTotalAmount: Number(noTotalAmount),
           resolved,
+          outcome: resolved ? outcome : undefined, // Only set outcome if resolved
           cancelled,
           createdAt: Number(createdAt),
           creator,
@@ -163,12 +207,14 @@ export async function GET(request: NextRequest) {
         let stakesSynced = 0;
         for (const participant of participants) {
           try {
-            // Get user's stake from blockchain
-            const userStakeData = await publicClient.readContract({
-              address: CONTRACT_ADDRESS as `0x${string}`,
-              abi: CONTRACT_ABI,
-              functionName: 'userStakes',
-              args: [BigInt(i), participant],
+            // Get user's stake from blockchain with retry logic
+            const userStakeData = await retryWithBackoff(async () => {
+              return await publicClient.readContract({
+                address: CONTRACT_ADDRESS as `0x${string}`,
+                abi: CONTRACT_ABI,
+                functionName: 'userStakes',
+                args: [BigInt(i), participant],
+              });
             }) as [bigint, bigint, boolean]; // [yesAmount, noAmount, claimed]
 
             const [yesAmount, noAmount, claimed] = userStakeData;
@@ -194,7 +240,7 @@ export async function GET(request: NextRequest) {
         
         syncedCount++;
         totalStakesSynced += stakesSynced;
-        console.log(`✅ Synced prediction ${i}: ${question.substring(0, 50)}... (${stakesSynced} stakes)`);
+        console.log(`✅ Synced prediction ${i}: ${question.substring(0, 50)}... (${stakesSynced} stakes, resolved: ${resolved}, outcome: ${outcome}, participants: ${participants.length})`);
 
       } catch (error) {
         console.error(`❌ Failed to sync prediction ${i}:`, error);

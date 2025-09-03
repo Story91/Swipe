@@ -17,6 +17,7 @@ export const REDIS_KEYS = {
   PREDICTIONS_PENDING_APPROVAL: 'predictions:pending_approval',
   PREDICTIONS_COUNT: 'predictions:count',
   USER_STAKES: (userId: string, predictionId: string) => `user_stakes:${userId}:${predictionId}`,
+  USER_TRANSACTIONS: (userId: string) => `user_transactions:${userId}`,
   MARKET_STATS: 'market:stats',
   USER_PORTFOLIO: (userId: string) => `user:portfolio:${userId}`,
 } as const;
@@ -33,6 +34,7 @@ export interface RedisPrediction {
   endDate: string;
   endTime: string;
   deadline: number; // Unix timestamp
+  resolutionDeadline?: number; // Unix timestamp - when admin must resolve by
   yesTotalAmount: number;
   noTotalAmount: number;
   resolved: boolean;
@@ -60,6 +62,21 @@ export interface RedisUserStake {
   noAmount: number;
   claimed: boolean;
   stakedAt: number;
+}
+
+// User transaction interface
+export interface UserTransaction {
+  id: string;
+  type: 'claim' | 'stake' | 'resolve' | 'cancel';
+  predictionId: string;
+  predictionQuestion: string;
+  amount?: number;
+  txHash: string;
+  basescanUrl: string;
+  timestamp: number;
+  status: 'pending' | 'success' | 'failed';
+  blockNumber?: number;
+  gasUsed?: number;
 }
 
 export interface RedisMarketStats {
@@ -329,7 +346,96 @@ export const redisHelpers = {
       console.error(`❌ Failed to delete prediction ${id} from Redis:`, error);
       throw error;
     }
+  },
+
+  // Save user transaction
+  async saveUserTransaction(userId: string, transaction: UserTransaction): Promise<void> {
+    try {
+      const transactionsKey = REDIS_KEYS.USER_TRANSACTIONS(userId);
+      const existingData = await redis.get(transactionsKey);
+      let transactions: UserTransaction[] = [];
+      
+      if (existingData) {
+        const parsed = typeof existingData === 'string' ? JSON.parse(existingData) : existingData;
+        if (Array.isArray(parsed)) {
+          transactions = parsed;
+        }
+      }
+      
+      // Add new transaction at the beginning
+      transactions.unshift(transaction);
+      
+      // Keep only last 50 transactions
+      if (transactions.length > 50) {
+        transactions = transactions.slice(0, 50);
+      }
+      
+      await redis.set(transactionsKey, JSON.stringify(transactions));
+      console.log(`✅ User transaction saved: ${userId} - ${transaction.type} - ${transaction.txHash}`);
+    } catch (error) {
+      console.error('❌ Failed to save user transaction to Redis:', error);
+      throw error;
+    }
+  },
+
+  // Get user transactions
+  async getUserTransactions(userId: string): Promise<UserTransaction[]> {
+    try {
+      const transactionsKey = REDIS_KEYS.USER_TRANSACTIONS(userId);
+      const data = await redis.get(transactionsKey);
+      
+      if (!data) return [];
+      
+      const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+      
+      if (Array.isArray(parsed)) {
+        return parsed as UserTransaction[];
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('❌ Failed to get user transactions from Redis:', error);
+      return [];
+    }
+  },
+
+  // Update transaction status
+  async updateTransactionStatus(userId: string, txHash: string, status: 'pending' | 'success' | 'failed', blockNumber?: number, gasUsed?: number): Promise<void> {
+    try {
+      const transactionsKey = REDIS_KEYS.USER_TRANSACTIONS(userId);
+      const data = await redis.get(transactionsKey);
+      
+      if (!data) return;
+      
+      const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+      
+      if (Array.isArray(parsed)) {
+        const transactions = parsed as UserTransaction[];
+        const transaction = transactions.find(t => t.txHash === txHash);
+        
+        if (transaction) {
+          transaction.status = status;
+          if (blockNumber) transaction.blockNumber = blockNumber;
+          if (gasUsed) transaction.gasUsed = gasUsed;
+          
+          await redis.set(transactionsKey, JSON.stringify(transactions));
+          console.log(`✅ Transaction status updated: ${txHash} - ${status}`);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Failed to update transaction status in Redis:', error);
+    }
   }
+};
+
+// Helper function to generate Basescan URL
+export const generateBasescanUrl = (txHash: string): string => {
+  return `https://basescan.org/tx/${txHash}`;
+};
+
+// Helper function to create transaction ID
+export const generateTransactionId = (): string => {
+  return `tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 };
 
 // Export default redis instance for backward compatibility

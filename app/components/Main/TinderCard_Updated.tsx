@@ -59,7 +59,7 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
   const dashboardChangeHandler = onDashboardChange || setInternalActiveDashboard;
   
   // Use hybrid predictions hook instead of mock data
-  const { predictions: hybridPredictions, loading: predictionsLoading, error: predictionsError } = useHybridPredictions();
+  const { predictions: hybridPredictions, loading: predictionsLoading, error: predictionsError, refresh: refreshPredictions } = useHybridPredictions();
   
   // Transform hybrid predictions to match the expected format
   const transformedPredictions = hybridPredictions.map((pred) => ({
@@ -144,10 +144,34 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
         functionName: 'placeStake',
         args: [BigInt(predictionId), isYes],
         value: ethers.parseEther(amount.toString()),
+      }, {
+        onSuccess: async (hash) => {
+          console.log('✅ Stake transaction successful:', hash);
+          showNotification('success', '✅ Stake placed successfully!', '');
+          setStakeModal({ ...stakeModal, isOpen: false });
+          
+          // Force sync with blockchain to update Redis immediately
+          try {
+            console.log('🔄 Syncing blockchain to Redis after stake...');
+            const syncResponse = await fetch('/api/sync');
+            if (syncResponse.ok) {
+              console.log('✅ Redis sync successful after stake');
+              // Trigger immediate refresh of predictions
+              if (refreshPredictions) {
+                refreshPredictions();
+              }
+            } else {
+              console.warn('⚠️ Redis sync failed after stake');
+            }
+          } catch (syncError) {
+            console.error('❌ Failed to sync after stake:', syncError);
+          }
+        },
+        onError: (error) => {
+          console.error('Failed to place stake:', error);
+          showNotification('error', '❌ Failed to place stake', '');
+        }
       });
-
-      showNotification('success', '✅ Stake placed successfully!', '');
-      setStakeModal({ ...stakeModal, isOpen: false });
     } catch (error) {
       console.error('Failed to place stake:', error);
       showNotification('error', '❌ Failed to place stake', '');
@@ -466,7 +490,7 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
     return (
       <div className="error-container">
         <p>❌ Error loading predictions: {predictionsError}</p>
-        <button onClick={() => window.location.reload()}>Retry</button>
+        <button onClick={refreshPredictions}>Retry</button>
       </div>
     );
   }
@@ -547,6 +571,25 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
   // Default: Tinder Mode
   return (
     <div className="tinder-container">
+      {/* Refresh Button */}
+      <div className="refresh-controls" style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 1000 }}>
+        <button 
+          onClick={refreshPredictions}
+          className="refresh-btn"
+          style={{
+            background: '#4CAF50',
+            color: 'white',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '14px'
+          }}
+        >
+          🔄 Refresh
+        </button>
+      </div>
+      
       {/* Tinder Card */}
       <div className="card-container">
         <TinderCard
