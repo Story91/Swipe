@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { redisHelpers, RedisPrediction } from '../../../lib/redis';
+import { redisHelpers } from '../../../lib/redis';
+import { RedisPrediction } from '../../../lib/types/redis';
 
 // GET /api/predictions - Get all predictions
 export async function GET(request: NextRequest) {

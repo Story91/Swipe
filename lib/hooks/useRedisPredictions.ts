@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RedisPrediction, RedisUserStake } from '../redis';
+import { RedisPrediction, RedisUserStake } from '../types/redis';
 
 // API endpoints
 const API_ENDPOINTS = {

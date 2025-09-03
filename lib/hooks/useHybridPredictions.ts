@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAccount } from 'wagmi';
 import { useRedisPredictions } from './useRedisPredictions';
-import { RedisPrediction } from '../redis';
+import { RedisPrediction } from '../types/redis';
 
 export interface HybridPrediction {
   // Core data

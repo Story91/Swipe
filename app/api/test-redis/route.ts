@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { redis, redisHelpers, RedisPrediction } from '../../../lib/redis';
+import { redis, redisHelpers } from '../../../lib/redis';
+import { RedisPrediction } from '../../../lib/types/redis';
 
 // GET /api/test-redis - Test Redis connectivity and basic operations
 export async function GET(request: NextRequest) {

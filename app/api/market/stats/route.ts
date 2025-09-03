@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { redisHelpers, RedisMarketStats } from '../../../../lib/redis';
+import { redisHelpers } from '../../../../lib/redis';
+import { RedisMarketStats } from '../../../../lib/types/redis';
 
 // GET /api/market/stats - Get market statistics
 export async function GET(request: NextRequest) {

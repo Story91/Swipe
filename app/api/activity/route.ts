@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { redisHelpers, redis, RedisPrediction, RedisUserStake } from '../../../lib/redis';
+import { redisHelpers, redis } from '../../../lib/redis';
+import { RedisPrediction, RedisUserStake } from '../../../lib/types/redis';
 
 interface ActivityItem {
   id: string;

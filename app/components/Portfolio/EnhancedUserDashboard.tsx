@@ -5,7 +5,8 @@ import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagm
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../../../lib/contract';
 import { ethers } from 'ethers';
 import { useRedisPredictions } from '../../../lib/hooks/useRedisPredictions';
-import { RedisPrediction, RedisUserStake, UserTransaction, redisHelpers, generateBasescanUrl, generateTransactionId } from '../../../lib/redis';
+import { RedisPrediction, RedisUserStake, UserTransaction } from '../../../lib/types/redis';
+import { generateBasescanUrl, generateTransactionId } from '../../../lib/utils/redis-utils';
 import './EnhancedUserDashboard.css';
 
 interface PredictionWithStakes extends RedisPrediction {
@@ -100,7 +101,9 @@ export function EnhancedUserDashboard() {
     
     setLoadingTransactions(true);
     try {
-      const transactions = await redisHelpers.getUserTransactions(address.toLowerCase());
+      const response = await fetch(`/api/user-transactions?userId=${address.toLowerCase()}`);
+      const result = await response.json();
+      const transactions = result.success ? result.data : [];
       setUserTransactions(transactions);
       console.log(`📊 Loaded ${transactions.length} user transactions`);
     } catch (error) {
@@ -314,7 +317,14 @@ export function EnhancedUserDashboard() {
               status: 'pending'
             };
 
-            await redisHelpers.saveUserTransaction(address.toLowerCase(), transaction);
+            await fetch('/api/user-transactions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: address.toLowerCase(),
+                transaction
+              })
+            });
             
             // Immediately refresh transaction history to show the new transaction
             fetchUserTransactions();
@@ -367,7 +377,17 @@ export function EnhancedUserDashboard() {
 
             if ((receipt as any).status === 'success') {
               // Update transaction status in Redis
-              await redisHelpers.updateTransactionStatus(address.toLowerCase(), txHash, 'success');
+              await fetch('/api/user-transactions', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId: address.toLowerCase(),
+                  txHash,
+                  status: 'success',
+                  blockNumber: (receipt as any).blockNumber,
+                  gasUsed: (receipt as any).gasUsed
+                })
+              });
               
               // Mark stake as claimed in Redis
               try {
@@ -411,7 +431,15 @@ export function EnhancedUserDashboard() {
               }, 2000);
             } else {
               // Update transaction status in Redis
-              await redisHelpers.updateTransactionStatus(address.toLowerCase(), txHash, 'failed');
+              await fetch('/api/user-transactions', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId: address.toLowerCase(),
+                  txHash,
+                  status: 'failed'
+                })
+              });
               showErrorModal('Claim transaction failed');
             }
           },

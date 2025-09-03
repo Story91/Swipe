@@ -1,9 +1,24 @@
 import { Redis } from "@upstash/redis";
+import type { 
+  RedisPrediction, 
+  RedisUserStake, 
+  UserTransaction, 
+  RedisMarketStats 
+} from './types/redis';
 
-// Initialize Redis with user's credentials
+// Initialize Redis with environment variables
+const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
+const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+if (!redisUrl || !redisToken) {
+  throw new Error(
+    'Missing Redis credentials. Please set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN environment variables.'
+  );
+}
+
 export const redis = new Redis({
-  url: 'https://immortal-reptile-46683.upstash.io',
-  token: 'AbZbAAIncDE4Mzc0NzlmMWM3YzE0OWNlYmM4MzA1MDBkYTE0NWUwYXAxNDY2ODM',
+  url: redisUrl,
+  token: redisToken,
 });
 
 // Redis key patterns for predictions
@@ -22,71 +37,13 @@ export const REDIS_KEYS = {
   USER_PORTFOLIO: (userId: string) => `user:portfolio:${userId}`,
 } as const;
 
-// Types for Redis data
-export interface RedisPrediction {
-  id: string;
-  question: string;
-  description: string;
-  category: string;
-  imageUrl: string;
-  includeChart: boolean;
-  selectedCrypto?: string;
-  endDate: string;
-  endTime: string;
-  deadline: number; // Unix timestamp
-  resolutionDeadline?: number; // Unix timestamp - when admin must resolve by
-  yesTotalAmount: number;
-  noTotalAmount: number;
-  resolved: boolean;
-  outcome?: boolean;
-  cancelled: boolean;
-  createdAt: number; // Unix timestamp
-  creator: string;
-  verified: boolean;
-  approved: boolean;
-  needsApproval: boolean;
-  participants: string[];
-  totalStakes: number;
-  marketStats?: {
-    yesPercentage: number;
-    noPercentage: number;
-    timeLeft: number;
-    totalPool: number;
-  };
-}
-
-export interface RedisUserStake {
-  userId: string;
-  predictionId: string;
-  yesAmount: number;
-  noAmount: number;
-  claimed: boolean;
-  stakedAt: number;
-}
-
-// User transaction interface
-export interface UserTransaction {
-  id: string;
-  type: 'claim' | 'stake' | 'resolve' | 'cancel';
-  predictionId: string;
-  predictionQuestion: string;
-  amount?: number;
-  txHash: string;
-  basescanUrl: string;
-  timestamp: number;
-  status: 'pending' | 'success' | 'failed';
-  blockNumber?: number;
-  gasUsed?: number;
-}
-
-export interface RedisMarketStats {
-  totalPredictions: number;
-  totalStakes: number;
-  activePredictions: number;
-  resolvedPredictions: number;
-  totalParticipants: number;
-  lastUpdated: number;
-}
+// Import types from separate file
+export type { 
+  RedisPrediction, 
+  RedisUserStake, 
+  UserTransaction, 
+  RedisMarketStats 
+} from './types/redis';
 
 // Helper functions for Redis operations
 export const redisHelpers = {
@@ -428,15 +385,7 @@ export const redisHelpers = {
   }
 };
 
-// Helper function to generate Basescan URL
-export const generateBasescanUrl = (txHash: string): string => {
-  return `https://basescan.org/tx/${txHash}`;
-};
 
-// Helper function to create transaction ID
-export const generateTransactionId = (): string => {
-  return `tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-};
 
 // Export default redis instance for backward compatibility
 export default redis;

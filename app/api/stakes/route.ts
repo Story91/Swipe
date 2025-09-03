@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { redis, redisHelpers, RedisUserStake } from '../../../lib/redis';
+import { redis, redisHelpers } from '../../../lib/redis';
+import { RedisUserStake } from '../../../lib/types/redis';
 
 // GET /api/stakes - Get stakes for a specific prediction
 export async function GET(request: NextRequest) {

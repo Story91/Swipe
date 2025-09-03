@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { redis, redisHelpers, RedisUserStake, RedisPrediction } from '../../../lib/redis';
+import { redis, redisHelpers } from '../../../lib/redis';
+import { RedisUserStake, RedisPrediction } from '../../../lib/types/redis';
 
 interface LeaderboardEntry {
   rank: number;

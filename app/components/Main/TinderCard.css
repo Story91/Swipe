@@ -1270,14 +1270,14 @@ html, body {
   margin-bottom: 8px;
 }
 
-.amount-value {
-  font-size: 36px;
+.modern-modal .amount-value {
+  font-size: 48px;
   font-weight: 800;
   color: #d4ff00;
   letter-spacing: -1px;
 }
 
-.amount-currency {
+.modern-modal .amount-currency {
   font-size: 18px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.8);
