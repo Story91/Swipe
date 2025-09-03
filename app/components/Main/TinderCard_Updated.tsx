@@ -205,7 +205,7 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
     }
   };
 
-  const handleResolvePrediction = (predictionId: number, outcome: boolean) => {
+  const handleResolvePrediction = (predictionId: string | number, outcome: boolean) => {
     if (!address) {
       alert('❌ Please connect your wallet first');
       return;
@@ -230,7 +230,7 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
     }
   };
 
-  const handleCancelPrediction = (predictionId: number, reason: string) => {
+  const handleCancelPrediction = (predictionId: string | number, reason: string) => {
     if (!address) {
       alert('❌ Please connect your wallet first');
       return;

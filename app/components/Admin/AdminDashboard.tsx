@@ -18,6 +18,10 @@ interface Prediction {
   cancelled?: boolean;
   participants: number;
   resolutionDeadline?: number;
+  needsApproval?: boolean;
+  approved?: boolean;
+  verified?: boolean;
+  creator?: string;
 }
 
 interface AdminDashboardProps {
@@ -89,7 +93,7 @@ export function AdminDashboard({
   const expiredPredictions = displayPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline <= Date.now() / 1000);
   const resolvedPredictions = displayPredictions.filter(p => p.resolved);
   const cancelledPredictions = displayPredictions.filter(p => p.cancelled);
-  const pendingApprovalPredictions = displayPredictions.filter(p => p.needsApproval && !p.approved);
+  const pendingApprovalPredictions = displayPredictions.filter(p => (p as any).needsApproval && !(p as any).approved);
 
   // Refresh data function
   const handleRefresh = useCallback(() => {
@@ -169,6 +173,10 @@ export function AdminDashboard({
               cancelled: extendedResult[2],
               participants: Number(marketStats.participantsCount),
               resolutionDeadline: Number(basicResult.deadline) + (10 * 24 * 60 * 60), // 10 days after deadline
+              needsApproval: false, // Default to false for blockchain data
+              approved: basicResult.approved,
+              verified: false, // Default to false for blockchain data
+              creator: basicResult.creator,
             };
 
             predictions.push(prediction);
@@ -1023,7 +1031,7 @@ export function AdminDashboard({
                 </button>
                 <button 
                   className="btn btn-warning"
-                  onClick={() => handleCancel(prediction.id, 'Expired without resolution')}
+                  onClick={() => handleCancel(prediction.id)}
                 >
                   🚫 Cancel
                 </button>
@@ -1054,7 +1062,7 @@ export function AdminDashboard({
                   </button>
                   <button 
                     className="btn btn-danger"
-                    onClick={() => handleDirectCancel(prediction.id, 'Force cancelled - expired')}
+                    onClick={() => handleDirectCancel(prediction.id)}
                     style={{ fontSize: '11px', padding: '4px 8px' }}
                   >
                     🔥 FORCE CANCEL

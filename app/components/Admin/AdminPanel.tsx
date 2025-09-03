@@ -156,7 +156,7 @@ export function AdminPanel({ defaultTab = 'dashboard' }: AdminPanelProps) {
             onCreatePrediction={() => console.log('Create prediction')}
             onManageApprovers={() => console.log('Manage approvers')}
             onWithdrawFees={handleWithdrawFees}
-            onPauseContract={handlePauseContract}
+            onPauseContract={() => handlePauseContract(true)}
           />
         );
       case 'approver':
@@ -176,7 +176,7 @@ export function AdminPanel({ defaultTab = 'dashboard' }: AdminPanelProps) {
             onCreatePrediction={() => console.log('Create prediction')}
             onManageApprovers={() => console.log('Manage approvers')}
             onWithdrawFees={handleWithdrawFees}
-            onPauseContract={handlePauseContract}
+            onPauseContract={() => handlePauseContract(true)}
           />
         );
     }

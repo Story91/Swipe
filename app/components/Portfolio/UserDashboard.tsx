@@ -240,10 +240,7 @@ export function UserDashboard({ predictions, onClaimReward }: UserDashboardProps
         // Auto-refresh data after successful transaction
         setTimeout(() => {
           // Data will be refreshed via props from Redis
-          if (onClaimReward) {
-            // Trigger a refresh by calling the parent's refresh function
-            console.log('🔄 Refreshing data after successful stake');
-          }
+          console.log('🔄 Data should refresh automatically from parent component');
         }, 2000); // Wait 2 seconds for transaction to be mined
       },
       onError: (error) => {
