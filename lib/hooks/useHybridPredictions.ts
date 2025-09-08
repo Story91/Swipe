@@ -124,26 +124,37 @@ export function useHybridPredictions() {
     }
   }, [redisPredictions, transformPredictions]);
   
-  // Auto-refresh every 60 seconds for live updates (reduced frequency to prevent flickering)
+  // Fetch predictions only on mount and when wallet connects
   useEffect(() => {
     fetchAllPredictions();
-
-    const interval = setInterval(fetchAllPredictions, 60000);
-    return () => clearInterval(interval);
-  }, []); // Remove dependency to prevent infinite loops
+  }, []); // Only on mount
   
-  // Refresh when user connects/disconnects wallet
+  // Refresh when user connects wallet (but not on disconnect)
   useEffect(() => {
     if (address) {
-      fetchAllPredictions();
+      // Small delay to avoid rapid refreshes
+      const timeoutId = setTimeout(() => {
+        fetchAllPredictions();
+      }, 1000);
+      
+      return () => clearTimeout(timeoutId);
     }
-  }, [address]); // Remove fetchAllPredictions dependency to prevent infinite loops
+  }, [address]);
   
   return {
     predictions,
     loading: loading || redisLoading,
     error: error || redisError,
     fetchPredictions: fetchAllPredictions,
-    refresh: fetchAllPredictions
+    refresh: fetchAllPredictions,
+    // Manual refresh functions for specific actions
+    refreshAfterStake: () => {
+      // Refresh after stake is placed
+      setTimeout(() => fetchAllPredictions(), 2000);
+    },
+    refreshAfterCreate: () => {
+      // Refresh after new prediction is created
+      setTimeout(() => fetchAllPredictions(), 1000);
+    }
   };
 }

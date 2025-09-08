@@ -337,9 +337,12 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       return isNotExpired && isNotResolved && isNotCancelled && isApproved;
     });
     
-    console.log(`📊 Total predictions: ${allItems.length}, Active predictions: ${activeItems.length}`);
+    // Log only when the actual data changes, not every second
+    if (timeUpdate === 0) { // Log only on first load
+      console.log(`📊 Total predictions: ${allItems.length}, Active predictions: ${activeItems.length}`);
+    }
     return activeItems;
-  }, [realCardItems, items, transformedPredictions]);
+  }, [realCardItems, items, transformedPredictions, timeUpdate]);
 
 
 

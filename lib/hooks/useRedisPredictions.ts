@@ -296,16 +296,10 @@ export function useRedisPredictions() {
     ]);
   }, [fetchPredictions, fetchMarketStats]);
 
-  // Auto-refresh data every 2 minutes for live updates (reduced frequency to prevent flickering)
-  useEffect(() => {
-    const interval = setInterval(refreshData, 120000);
-    return () => clearInterval(interval);
-  }, []); // Remove dependency to prevent infinite loops
-
-  // Initial data fetch
+  // Initial data fetch only on mount
   useEffect(() => {
     refreshData();
-  }, []); // Remove dependency to prevent infinite loops
+  }, []); // Only on mount - no auto-refresh
 
   return {
     // State
@@ -451,17 +445,7 @@ export function useRedisPrediction(predictionId: string) {
     }
   }, [predictionId, fetchPrediction, fetchUserStakes]);
 
-  // Auto-refresh every 2 minutes (production-friendly)
-  useEffect(() => {
-    if (!predictionId) return;
-
-    const interval = setInterval(() => {
-      fetchPrediction();
-      fetchUserStakes();
-    }, 120000);
-
-    return () => clearInterval(interval);
-  }, [predictionId, fetchPrediction, fetchUserStakes]);
+  // No auto-refresh - only manual refresh when needed
 
   return {
     // State
