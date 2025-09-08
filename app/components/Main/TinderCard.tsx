@@ -48,13 +48,16 @@ function formatTimeLeft(deadline: number): string {
   const days = Math.floor(timeLeft / (24 * 60 * 60));
   const hours = Math.floor((timeLeft % (24 * 60 * 60)) / (60 * 60));
   const minutes = Math.floor((timeLeft % (60 * 60)) / 60);
+  const seconds = Math.floor(timeLeft % 60);
   
   if (days > 0) {
-    return `${days}d ${hours}h`;
+    return `${days}d ${hours}h ${minutes}m`;
   } else if (hours > 0) {
-    return `${hours}h ${minutes}m`;
+    return `${hours}h ${minutes}m ${seconds}s`;
+  } else if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
   } else {
-    return `${minutes}m`;
+    return `${seconds}s`;
   }
 }
 
@@ -116,11 +119,11 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   // State for forcing re-render of time display
   const [timeUpdate, setTimeUpdate] = useState(0);
   
-  // Update time display every minute
+  // Update time display every second for real-time countdown
   useEffect(() => {
     const interval = setInterval(() => {
       setTimeUpdate(prev => prev + 1);
-    }, 60000); // Update every minute
+    }, 1000); // Update every second
     
     return () => clearInterval(interval);
   }, []);
@@ -1090,10 +1093,17 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
                  </div>
                )}
              </div>
-                         <div className="card-content">
-               <h3 className="card-title">{currentCard.title}</h3>
-               <p className="prediction-text">{currentCard.prediction}</p>
-             </div>
+            <div className="card-content">
+              <h3 className="card-title">{currentCard.prediction}</h3>
+              
+              {/* Simple Countdown Line */}
+              <div className="countdown-line">
+                <span className="countdown-icon">⏰</span>
+                <span className={`countdown-text ${getTimeUrgencyClass(transformedPredictions[currentIndex]?.deadline || 0)}`}>
+                  {currentCard.timeframe || 'Loading...'}
+                </span>
+              </div>
+            </div>
              
              {/* Voting Bar - Fixed at bottom */}
              <div className="voting-section-fixed">

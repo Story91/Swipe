@@ -250,6 +250,80 @@ html, body {
   line-height: 1.5;
 }
 
+/* Simple Countdown Line */
+.countdown-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.countdown-icon {
+  font-size: 16px;
+  animation: clockTick 1s ease-in-out infinite;
+}
+
+.countdown-text {
+  font-size: 14px;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.countdown-text.text-red-500 {
+  color: #ef4444;
+  animation: urgentPulse 0.5s ease-in-out infinite;
+}
+
+.countdown-text.text-orange-500 {
+  color: #f59e0b;
+  animation: warningPulse 1s ease-in-out infinite;
+}
+
+.countdown-text.text-green-500 {
+  color: #10b981;
+}
+
+@keyframes clockTick {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-3deg);
+  }
+  75% {
+    transform: rotate(3deg);
+  }
+}
+
+@keyframes urgentPulse {
+  0%, 100% {
+    transform: scale(1);
+    color: #ef4444;
+  }
+  50% {
+    transform: scale(1.05);
+    color: #dc2626;
+  }
+}
+
+@keyframes warningPulse {
+  0%, 100% {
+    transform: scale(1);
+    color: #f59e0b;
+  }
+  50% {
+    transform: scale(1.02);
+    color: #d97706;
+  }
+}
+
 .prediction-meta {
   display: flex;
   justify-content: space-between;
@@ -734,6 +808,21 @@ html, body {
   .voting-text {
     font-size: 8px;
     font-weight: 600;
+  }
+
+  /* Countdown Line Mobile */
+  .countdown-line {
+    margin: 8px 0;
+    padding: 6px 10px;
+    border-radius: 10px;
+  }
+
+  .countdown-icon {
+    font-size: 14px;
+  }
+
+  .countdown-text {
+    font-size: 12px;
   }
 
   /* Better touch targets for small screens */
