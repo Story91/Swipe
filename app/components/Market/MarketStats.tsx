@@ -121,12 +121,11 @@ export function MarketStats() {
   if (loading) {
     return (
       <div className="market-stats">
-        <div className="stats-header">
-          <h1>📊 Market Statistics</h1>
+        <div className="loading-container">
+          <div className="loading-logo">
+            <img src="/splash.png" alt="Loading..." className="spinning-logo" />
+          </div>
           <p>Loading market data...</p>
-        </div>
-        <div className="loading-spinner" style={{ textAlign: 'center', padding: '40px' }}>
-          <div>Loading...</div>
         </div>
       </div>
     );
@@ -135,10 +134,6 @@ export function MarketStats() {
   if (error) {
     return (
       <div className="market-stats">
-        <div className="stats-header">
-          <h1>📊 Market Statistics</h1>
-          <p>Real-time market data and trending predictions</p>
-        </div>
         <div className="error-message" style={{ textAlign: 'center', padding: '40px', color: 'red' }}>
           <div>❌ Failed to load market statistics</div>
           <div style={{ fontSize: '14px', marginTop: '10px' }}>{error}</div>
@@ -150,9 +145,8 @@ export function MarketStats() {
   if (!marketData) {
     return (
       <div className="market-stats">
-        <div className="stats-header">
-          <h1>📊 Market Statistics</h1>
-          <p>No market data available</p>
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          <div>No market data available</div>
         </div>
       </div>
     );
@@ -160,23 +154,6 @@ export function MarketStats() {
 
   return (
     <div className="market-stats">
-      <div className="stats-header">
-        <h1>📊 Market Statistics</h1>
-        <p>Real-time market data and trending predictions</p>
-      </div>
-
-      {/* Time Frame Selector */}
-      <div className="timeframe-selector">
-        {(['1H', '24H', '7D', '30D'] as const).map((timeframe) => (
-          <button
-            key={timeframe}
-            className={selectedTimeframe === timeframe ? 'active' : ''}
-            onClick={() => setSelectedTimeframe(timeframe)}
-          >
-            {timeframe}
-          </button>
-        ))}
-      </div>
 
       {/* Key Metrics */}
       <div className="key-metrics">

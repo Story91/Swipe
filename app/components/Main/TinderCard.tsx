@@ -832,8 +832,10 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   if (predictionsLoading) {
     return (
       <div className="tinder-container">
-        <div style={{ textAlign: 'center', padding: '60px', color: '#666' }}>
-          <div style={{ fontSize: '24px', marginBottom: '16px' }}>🔄</div>
+        <div className="loading-container">
+          <div className="loading-logo">
+            <img src="/splash.png" alt="Loading..." className="spinning-logo" />
+          </div>
           <div style={{ fontSize: '18px', marginBottom: '8px' }}>Loading Predictions</div>
           <div style={{ fontSize: '14px' }}>Fetching real data from blockchain...</div>
         </div>

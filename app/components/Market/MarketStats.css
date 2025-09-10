@@ -7,6 +7,32 @@
   min-height: 100vh;
 }
 
+/* Loading Styles */
+.loading-container {
+  text-align: center;
+  padding: 60px 20px;
+  color: #d4ff00;
+}
+
+.loading-logo {
+  margin: 0 auto 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.spinning-logo {
+  width: 80px;
+  height: 80px;
+  animation: spin 2s linear infinite;
+  filter: drop-shadow(0 4px 8px rgba(212, 255, 0, 0.3));
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 .stats-header {
   text-align: center;
   margin-bottom: 32px;

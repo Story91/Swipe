@@ -252,11 +252,7 @@ export function EnhancedUserDashboard() {
     }
   }, [address, allPredictions, predictionsLoading]);
 
-  // Auto-refresh every 60 seconds (less frequent to avoid spam)
-  useEffect(() => {
-    const interval = setInterval(fetchUserStakes, 60000);
-    return () => clearInterval(interval);
-  }, [fetchUserStakes]);
+  // No auto-refresh - data loads once on page load
 
   // Initial fetch - only fetch transactions initially
   useEffect(() => {
@@ -269,7 +265,7 @@ export function EnhancedUserDashboard() {
       console.log('🔄 Predictions loaded, fetching user stakes...');
       fetchUserStakes();
     }
-  }, [allPredictions, address, fetchUserStakes]);
+  }, [allPredictions, address]);
 
   // Handle claim reward
   const handleClaimReward = async (predictionId: string) => {
@@ -550,9 +546,10 @@ export function EnhancedUserDashboard() {
     return (
       <div className="enhanced-user-dashboard">
         <div className="loading-container">
-          <div className="loading-spinner"></div>
+          <div className="loading-logo">
+            <img src="/splash.png" alt="Loading..." className="spinning-logo" />
+          </div>
           <p>Loading your predictions...</p>
-          <p>Connected wallet: {address}</p>
         </div>
       </div>
     );
