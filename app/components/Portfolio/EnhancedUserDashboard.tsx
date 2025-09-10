@@ -252,11 +252,10 @@ export function EnhancedUserDashboard() {
     return () => clearInterval(interval);
   }, [fetchUserStakes]);
 
-  // Initial fetch
+  // Initial fetch - only fetch transactions initially
   useEffect(() => {
-    fetchUserStakes();
     fetchUserTransactions();
-  }, [fetchUserStakes, fetchUserTransactions]);
+  }, [fetchUserTransactions]);
 
   // Fetch user stakes when predictions are loaded
   useEffect(() => {
@@ -538,14 +537,6 @@ export function EnhancedUserDashboard() {
 
   return (
     <div className="enhanced-user-dashboard">
-      <div className="dashboard-header">
-        <h2>📊 My Prediction Dashboard</h2>
-        <div className="refresh-controls">
-          <button onClick={fetchUserStakes} className="refresh-btn">
-            🔄 Refresh
-          </button>
-        </div>
-      </div>
 
       {/* Summary Stats */}
       <div className="summary-stats">
