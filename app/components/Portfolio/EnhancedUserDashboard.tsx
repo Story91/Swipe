@@ -7,6 +7,7 @@ import { ethers } from 'ethers';
 import { useRedisPredictions } from '../../../lib/hooks/useRedisPredictions';
 import { RedisPrediction, RedisUserStake, UserTransaction } from '../../../lib/types/redis';
 import { generateBasescanUrl, generateTransactionId } from '../../../lib/utils/redis-utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import './EnhancedUserDashboard.css';
 
 interface PredictionWithStakes extends RedisPrediction {
@@ -31,6 +32,9 @@ export function EnhancedUserDashboard() {
   const [isTransactionLoading, setIsTransactionLoading] = useState(false);
   const [userTransactions, setUserTransactions] = useState<UserTransaction[]>([]);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
+  
+  // Filter state
+  const [selectedFilter, setSelectedFilter] = useState<string>('ready-to-claim');
   
   // Modal states
   const [showModal, setShowModal] = useState(false);
@@ -497,6 +501,32 @@ export function EnhancedUserDashboard() {
   // Group all user predictions by win/loss (including claimed ones)
   const wonPredictions = userPredictions.filter(p => p.userStake?.isWinner && p.status === 'resolved');
   const lostPredictions = userPredictions.filter(p => !p.userStake?.isWinner && (p.userStake?.potentialProfit || 0) < 0 && p.status === 'resolved');
+  
+  // Filter predictions based on selected filter
+  const getFilteredPredictions = () => {
+    switch (selectedFilter) {
+      case 'ready-to-claim':
+        return userPredictions.filter(p => p.userStake?.canClaim && !p.userStake?.claimed);
+      case 'active':
+        return activePredictions;
+      case 'won':
+        return wonPredictions;
+      case 'lost':
+        return lostPredictions;
+      case 'expired':
+        return expiredPredictions;
+      case 'cancelled':
+        return cancelledPredictions;
+      case 'claimed':
+        return resolvedPredictions.filter(p => p.userStake?.claimed);
+      case 'all':
+        return userPredictions;
+      default:
+        return userPredictions.filter(p => p.userStake?.canClaim && !p.userStake?.claimed);
+    }
+  };
+  
+  const filteredPredictions = getFilteredPredictions();
 
   // Calculate totals
   const totalStaked = userPredictions.reduce((sum, p) => sum + (p.userStake?.yesAmount || 0) + (p.userStake?.noAmount || 0), 0);
@@ -566,224 +596,148 @@ export function EnhancedUserDashboard() {
         </div>
       </div>
 
-      {/* Ready to Claim Section */}
-      {userPredictions.filter(p => p.userStake?.canClaim && !p.userStake?.claimed).length > 0 && (
+      {/* Filter */}
+      <div className="filter-section">
+        <div className="filter-container">
+          <label htmlFor="prediction-filter" className="filter-label">
+            Filter Predictions:
+          </label>
+          <Select value={selectedFilter} onValueChange={setSelectedFilter}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Select filter" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ready-to-claim">🎉 Ready to Claim</SelectItem>
+              <SelectItem value="active">⏳ Active</SelectItem>
+              <SelectItem value="won">🏆 Won</SelectItem>
+              <SelectItem value="lost">💔 Lost</SelectItem>
+              <SelectItem value="expired">⏰ Expired</SelectItem>
+              <SelectItem value="cancelled">❌ Cancelled</SelectItem>
+              <SelectItem value="claimed">✅ Claimed</SelectItem>
+              <SelectItem value="all">📊 All Predictions</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Filtered Predictions Section */}
+      {filteredPredictions.length > 0 && (
         <div className="section">
-          <h3>🎉 Ready to Claim</h3>
+          <h3>
+            {selectedFilter === 'ready-to-claim' && '🎉 Ready to Claim'}
+            {selectedFilter === 'active' && '⏳ Active Predictions'}
+            {selectedFilter === 'won' && '🏆 Won Predictions'}
+            {selectedFilter === 'lost' && '💔 Lost Predictions'}
+            {selectedFilter === 'expired' && '⏰ Expired Predictions (Waiting for Resolution)'}
+            {selectedFilter === 'cancelled' && '❌ Cancelled Predictions'}
+            {selectedFilter === 'claimed' && '✅ Claimed Predictions'}
+            {selectedFilter === 'all' && '📊 All Predictions'}
+          </h3>
           <div className="predictions-grid">
-            {userPredictions
-              .filter(p => p.userStake?.canClaim && !p.userStake?.claimed)
-              .map((prediction) => (
-                <div key={prediction.id} className="prediction-card claimable">
+            {filteredPredictions.map((prediction) => {
+              // Determine card class and status badge based on prediction status
+              let cardClass = 'prediction-card';
+              let statusBadge = '';
+              let statusText = '';
+              
+              if (prediction.userStake?.canClaim && !prediction.userStake?.claimed) {
+                cardClass += ' claimable';
+                statusBadge = prediction.cancelled ? 'cancelled' : 'resolved';
+                statusText = prediction.cancelled ? 'CANCELLED' : 'RESOLVED';
+              } else if (prediction.status === 'active') {
+                cardClass += ' active';
+                statusBadge = 'active';
+                statusText = 'ACTIVE';
+              } else if (prediction.userStake?.isWinner) {
+                cardClass += ' won';
+                statusBadge = 'won';
+                statusText = 'WON';
+              } else if (!prediction.userStake?.isWinner && (prediction.userStake?.potentialProfit || 0) < 0) {
+                cardClass += ' lost';
+                statusBadge = 'lost';
+                statusText = 'LOST';
+              } else if (prediction.status === 'expired') {
+                cardClass += ' expired';
+                statusBadge = 'expired';
+                statusText = 'EXPIRED';
+              } else if (prediction.status === 'cancelled') {
+                cardClass += ' cancelled';
+                statusBadge = 'cancelled';
+                statusText = 'CANCELLED';
+              } else if (prediction.userStake?.claimed) {
+                cardClass += ' claimed';
+                statusBadge = 'claimed';
+                statusText = 'CLAIMED';
+              }
+
+              return (
+                <div key={prediction.id} className={cardClass}>
                   <div className="card-header">
                     <h4>{prediction.question}</h4>
-                    <span className="status-badge resolved">
-                      {prediction.cancelled ? 'CANCELLED' : 'RESOLVED'}
-                    </span>
+                    <span className={`status-badge ${statusBadge}`}>{statusText}</span>
                   </div>
                   <div className="card-content">
                     <p><strong>Your Stake:</strong> {formatEth((prediction.userStake?.yesAmount || 0) + (prediction.userStake?.noAmount || 0))} ETH</p>
-                    <p><strong>Payout:</strong> {formatEth(prediction.userStake?.potentialPayout || 0)} ETH</p>
-                    <p><strong>Profit:</strong> 
-                      <span className={(prediction.userStake?.potentialProfit || 0) >= 0 ? 'profit' : 'loss'}>
-                        {(prediction.userStake?.potentialProfit || 0) >= 0 ? '+' : ''}{formatEth(prediction.userStake?.potentialProfit || 0)} ETH
-                      </span>
-                    </p>
-                    <p><strong>Outcome:</strong> {prediction.outcome ? 'YES' : 'NO'}</p>
+                    
+                    {prediction.status === 'active' ? (
+                      <>
+                        <p><strong>Deadline:</strong> {new Date(prediction.deadline * 1000).toLocaleString()}</p>
+                        <p><strong>Time Left:</strong> {Math.max(0, Math.floor((prediction.deadline - Date.now() / 1000) / 3600))} hours</p>
+                      </>
+                    ) : prediction.status === 'expired' ? (
+                      <>
+                        <p><strong>Deadline:</strong> {new Date(prediction.deadline * 1000).toLocaleString()}</p>
+                        <p><strong>Status:</strong> Waiting for admin resolution</p>
+                      </>
+                    ) : prediction.status === 'cancelled' ? (
+                      <>
+                        <p><strong>Refund:</strong> {formatEth(prediction.userStake?.potentialPayout || 0)} ETH</p>
+                        <p><strong>Status:</strong> {prediction.userStake?.claimed ? 'Refunded' : 'Ready to claim refund'}</p>
+                      </>
+                    ) : (
+                      <>
+                        <p><strong>Payout:</strong> {formatEth(prediction.userStake?.potentialPayout || 0)} ETH</p>
+                        <p><strong>Profit:</strong> 
+                          <span className={(prediction.userStake?.potentialProfit || 0) >= 0 ? 'profit' : 'loss'}>
+                            {(prediction.userStake?.potentialProfit || 0) >= 0 ? '+' : ''}{formatEth(prediction.userStake?.potentialProfit || 0)} ETH
+                          </span>
+                        </p>
+                        <p><strong>Outcome:</strong> {prediction.outcome ? 'YES' : 'NO'}</p>
+                        {prediction.userStake?.claimed && <p><strong>Status:</strong> Claimed</p>}
+                        {!prediction.userStake?.claimed && prediction.userStake?.isWinner && <p><strong>Status:</strong> Ready to claim</p>}
+                        {!prediction.userStake?.isWinner && (prediction.userStake?.potentialProfit || 0) < 0 && <p><strong>Status:</strong> Lost - no payout</p>}
+                      </>
+                    )}
                   </div>
-                  <div className="card-actions">
-                    <button 
-                      onClick={() => handleClaimReward(prediction.id)}
-                      disabled={isTransactionLoading}
-                      className="claim-btn"
-                    >
-                      {isTransactionLoading ? 'Processing...' : '💰 Claim Reward'}
-                    </button>
-                  </div>
+                  
+                  {/* Show claim button only for claimable predictions */}
+                  {(prediction.userStake?.canClaim && !prediction.userStake?.claimed) && (
+                    <div className="card-actions">
+                      <button 
+                        onClick={() => handleClaimReward(prediction.id)}
+                        disabled={isTransactionLoading}
+                        className="claim-btn"
+                      >
+                        {isTransactionLoading ? 'Processing...' : '💰 Claim Reward'}
+                      </button>
+                    </div>
+                  )}
+                  
+                  {/* Show disabled button for active predictions */}
+                  {prediction.status === 'active' && (
+                    <div className="card-actions">
+                      <button 
+                        disabled
+                        className="claim-btn disabled"
+                        title="Prediction is still active - wait for resolution"
+                      >
+                        ⏳ Claim Reward (Active)
+                      </button>
+                    </div>
+                  )}
                 </div>
-              ))}
-          </div>
-        </div>
-      )}
-
-      {/* Active Predictions */}
-      {activePredictions.length > 0 && (
-        <div className="section">
-          <h3>⏳ Active Predictions</h3>
-          <div className="predictions-grid">
-            {activePredictions.map((prediction) => (
-              <div key={prediction.id} className="prediction-card active">
-                <div className="card-header">
-                  <h4>{prediction.question}</h4>
-                  <span className="status-badge active">ACTIVE</span>
-                </div>
-                <div className="card-content">
-                  <p><strong>Your Stake:</strong> {formatEth((prediction.userStake?.yesAmount || 0) + (prediction.userStake?.noAmount || 0))} ETH</p>
-                  <p><strong>Deadline:</strong> {new Date(prediction.deadline * 1000).toLocaleString()}</p>
-                  <p><strong>Time Left:</strong> {Math.max(0, Math.floor((prediction.deadline - Date.now() / 1000) / 3600))} hours</p>
-                </div>
-                <div className="card-actions">
-                  <button 
-                    disabled
-                    className="claim-btn disabled"
-                    title="Prediction is still active - wait for resolution"
-                  >
-                    ⏳ Claim Reward (Active)
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Won Predictions */}
-      {wonPredictions.length > 0 && (
-        <div className="section">
-          <h3>🏆 Won Predictions</h3>
-          <div className="predictions-grid">
-            {wonPredictions.map((prediction) => (
-              <div key={prediction.id} className="prediction-card won">
-                <div className="card-header">
-                  <h4>{prediction.question}</h4>
-                  <span className="status-badge won">WON</span>
-                </div>
-                <div className="card-content">
-                  <p><strong>Your Stake:</strong> {formatEth((prediction.userStake?.yesAmount || 0) + (prediction.userStake?.noAmount || 0))} ETH</p>
-                  <p><strong>Payout:</strong> {formatEth(prediction.userStake?.potentialPayout || 0)} ETH</p>
-                  <p><strong>Profit:</strong> 
-                    <span className="profit">
-                      +{formatEth(prediction.userStake?.potentialProfit || 0)} ETH
-                    </span>
-                  </p>
-                  <p><strong>Outcome:</strong> {prediction.outcome ? 'YES' : 'NO'}</p>
-                  <p><strong>Status:</strong> {prediction.userStake?.claimed ? 'Claimed' : 'Ready to claim'}</p>
-                </div>
-                {!prediction.userStake?.claimed && (
-                  <div className="card-actions">
-                    <button 
-                      onClick={() => handleClaimReward(prediction.id)}
-                      disabled={isTransactionLoading}
-                      className="claim-btn"
-                    >
-                      {isTransactionLoading ? 'Processing...' : '💰 Claim Reward'}
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Lost Predictions */}
-      {lostPredictions.length > 0 && (
-        <div className="section">
-          <h3>💔 Lost Predictions</h3>
-          <div className="predictions-grid">
-            {lostPredictions.map((prediction) => (
-              <div key={prediction.id} className="prediction-card lost">
-                <div className="card-header">
-                  <h4>{prediction.question}</h4>
-                  <span className="status-badge lost">LOST</span>
-                </div>
-                <div className="card-content">
-                  <p><strong>Your Stake:</strong> {formatEth((prediction.userStake?.yesAmount || 0) + (prediction.userStake?.noAmount || 0))} ETH</p>
-                  <p><strong>Payout:</strong> 0.000000 ETH</p>
-                  <p><strong>Loss:</strong> 
-                    <span className="loss">
-                      {formatEth(prediction.userStake?.potentialProfit || 0)} ETH
-                    </span>
-                  </p>
-                  <p><strong>Outcome:</strong> {prediction.outcome ? 'YES' : 'NO'}</p>
-                  <p><strong>Status:</strong> Lost - no payout</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Expired Predictions (waiting for resolution) */}
-      {expiredPredictions.length > 0 && (
-        <div className="section">
-          <h3>⏰ Expired Predictions (Waiting for Resolution)</h3>
-          <div className="predictions-grid">
-            {expiredPredictions.map((prediction) => (
-              <div key={prediction.id} className="prediction-card expired">
-                <div className="card-header">
-                  <h4>{prediction.question}</h4>
-                  <span className="status-badge expired">EXPIRED</span>
-                </div>
-                <div className="card-content">
-                  <p><strong>Your Stake:</strong> {formatEth((prediction.userStake?.yesAmount || 0) + (prediction.userStake?.noAmount || 0))} ETH</p>
-                  <p><strong>Deadline:</strong> {new Date(prediction.deadline * 1000).toLocaleString()}</p>
-                  <p><strong>Status:</strong> Waiting for admin resolution</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Resolved Predictions (already claimed) */}
-      {resolvedPredictions.filter(p => p.userStake?.claimed).length > 0 && (
-        <div className="section">
-          <h3>✅ Resolved Predictions (Claimed)</h3>
-          <div className="predictions-grid">
-            {resolvedPredictions
-              .filter(p => p.userStake?.claimed)
-              .map((prediction) => (
-                <div key={prediction.id} className="prediction-card claimed">
-                  <div className="card-header">
-                    <h4>{prediction.question}</h4>
-                    <span className="status-badge claimed">CLAIMED</span>
-                  </div>
-                  <div className="card-content">
-                    <p><strong>Your Stake:</strong> {formatEth((prediction.userStake?.yesAmount || 0) + (prediction.userStake?.noAmount || 0))} ETH</p>
-                    <p><strong>Payout:</strong> {formatEth(prediction.userStake?.potentialPayout || 0)} ETH</p>
-                    <p><strong>Profit:</strong> 
-                      <span className={(prediction.userStake?.potentialProfit || 0) >= 0 ? 'profit' : 'loss'}>
-                        {(prediction.userStake?.potentialProfit || 0) >= 0 ? '+' : ''}{formatEth(prediction.userStake?.potentialProfit || 0)} ETH
-                      </span>
-                    </p>
-                    <p><strong>Outcome:</strong> {prediction.outcome ? 'YES' : 'NO'}</p>
-                  </div>
-                </div>
-              ))}
-          </div>
-        </div>
-      )}
-
-      {/* Cancelled Predictions */}
-      {cancelledPredictions.length > 0 && (
-        <div className="section">
-          <h3>❌ Cancelled Predictions</h3>
-          <div className="predictions-grid">
-            {cancelledPredictions.map((prediction) => (
-              <div key={prediction.id} className="prediction-card cancelled">
-                <div className="card-header">
-                  <h4>{prediction.question}</h4>
-                  <span className="status-badge cancelled">CANCELLED</span>
-                </div>
-                <div className="card-content">
-                  <p><strong>Your Stake:</strong> {formatEth((prediction.userStake?.yesAmount || 0) + (prediction.userStake?.noAmount || 0))} ETH</p>
-                  <p><strong>Refund:</strong> {formatEth(prediction.userStake?.potentialPayout || 0)} ETH</p>
-                  <p><strong>Status:</strong> {prediction.userStake?.claimed ? 'Refunded' : 'Ready to claim refund'}</p>
-                </div>
-                {!prediction.userStake?.claimed && (
-                  <div className="card-actions">
-                    <button 
-                      onClick={() => handleClaimReward(prediction.id)}
-                      disabled={isTransactionLoading}
-                      className="claim-btn"
-                    >
-                      {isTransactionLoading ? 'Processing...' : '💰 Claim Refund'}
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
