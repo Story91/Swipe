@@ -62,6 +62,7 @@
   border-radius: 12px;
   text-align: center;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  border: 1px solid #000000 !important;
   transition: transform 0.2s ease;
 }
 
@@ -156,6 +157,16 @@
   opacity: 0.8;
 }
 
+.prediction-card.won {
+  border-color: #10b981;
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+}
+
+.prediction-card.lost {
+  border-color: #ef4444;
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
@@ -206,6 +217,16 @@
 .status-badge.claimed {
   background: #f3f4f6;
   color: #374151;
+}
+
+.status-badge.won {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-badge.lost {
+  background: #fee2e2;
+  color: #991b1b;
 }
 
 .card-content {

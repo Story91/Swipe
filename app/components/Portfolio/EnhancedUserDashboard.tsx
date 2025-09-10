@@ -178,6 +178,7 @@ export function EnhancedUserDashboard() {
                   canClaim = true;
                 } else {
                   // User lost
+                  isWinner = false;
                   potentialPayout = 0;
                   potentialProfit = -userStakeAmount;
                   canClaim = false;
@@ -208,6 +209,7 @@ export function EnhancedUserDashboard() {
                   canClaim = false; // Already claimed
                 } else {
                   // User lost
+                  isWinner = false;
                   potentialPayout = 0;
                   potentialProfit = -userStakeAmount;
                   canClaim = false;
@@ -491,6 +493,10 @@ export function EnhancedUserDashboard() {
   const resolvedPredictions = userPredictions.filter(p => p.status === 'resolved');
   const expiredPredictions = userPredictions.filter(p => p.status === 'expired');
   const cancelledPredictions = userPredictions.filter(p => p.status === 'cancelled');
+  
+  // Group all user predictions by win/loss (including claimed ones)
+  const wonPredictions = userPredictions.filter(p => p.userStake?.isWinner && p.status === 'resolved');
+  const lostPredictions = userPredictions.filter(p => !p.userStake?.isWinner && (p.userStake?.potentialProfit || 0) < 0 && p.status === 'resolved');
 
   // Calculate totals
   const totalStaked = userPredictions.reduce((sum, p) => sum + (p.userStake?.yesAmount || 0) + (p.userStake?.noAmount || 0), 0);
@@ -624,6 +630,73 @@ export function EnhancedUserDashboard() {
                   >
                     ⏳ Claim Reward (Active)
                   </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Won Predictions */}
+      {wonPredictions.length > 0 && (
+        <div className="section">
+          <h3>🏆 Won Predictions</h3>
+          <div className="predictions-grid">
+            {wonPredictions.map((prediction) => (
+              <div key={prediction.id} className="prediction-card won">
+                <div className="card-header">
+                  <h4>{prediction.question}</h4>
+                  <span className="status-badge won">WON</span>
+                </div>
+                <div className="card-content">
+                  <p><strong>Your Stake:</strong> {formatEth((prediction.userStake?.yesAmount || 0) + (prediction.userStake?.noAmount || 0))} ETH</p>
+                  <p><strong>Payout:</strong> {formatEth(prediction.userStake?.potentialPayout || 0)} ETH</p>
+                  <p><strong>Profit:</strong> 
+                    <span className="profit">
+                      +{formatEth(prediction.userStake?.potentialProfit || 0)} ETH
+                    </span>
+                  </p>
+                  <p><strong>Outcome:</strong> {prediction.outcome ? 'YES' : 'NO'}</p>
+                  <p><strong>Status:</strong> {prediction.userStake?.claimed ? 'Claimed' : 'Ready to claim'}</p>
+                </div>
+                {!prediction.userStake?.claimed && (
+                  <div className="card-actions">
+                    <button 
+                      onClick={() => handleClaimReward(prediction.id)}
+                      disabled={isTransactionLoading}
+                      className="claim-btn"
+                    >
+                      {isTransactionLoading ? 'Processing...' : '💰 Claim Reward'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Lost Predictions */}
+      {lostPredictions.length > 0 && (
+        <div className="section">
+          <h3>💔 Lost Predictions</h3>
+          <div className="predictions-grid">
+            {lostPredictions.map((prediction) => (
+              <div key={prediction.id} className="prediction-card lost">
+                <div className="card-header">
+                  <h4>{prediction.question}</h4>
+                  <span className="status-badge lost">LOST</span>
+                </div>
+                <div className="card-content">
+                  <p><strong>Your Stake:</strong> {formatEth((prediction.userStake?.yesAmount || 0) + (prediction.userStake?.noAmount || 0))} ETH</p>
+                  <p><strong>Payout:</strong> 0.000000 ETH</p>
+                  <p><strong>Loss:</strong> 
+                    <span className="loss">
+                      {formatEth(prediction.userStake?.potentialProfit || 0)} ETH
+                    </span>
+                  </p>
+                  <p><strong>Outcome:</strong> {prediction.outcome ? 'YES' : 'NO'}</p>
+                  <p><strong>Status:</strong> Lost - no payout</p>
                 </div>
               </div>
             ))}
