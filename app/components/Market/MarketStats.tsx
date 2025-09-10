@@ -113,9 +113,7 @@ export function MarketStats() {
 
     fetchMarketStats();
 
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchMarketStats, 30000);
-    return () => clearInterval(interval);
+    // No auto-refresh - data loads once on page load
   }, []);
 
   if (loading) {
