@@ -46,8 +46,7 @@ export function EnhancedUserDashboard() {
   const formatEth = (wei: number): string => {
     const eth = weiToEth(wei);
     if (eth === 0) return '0.0000';
-    if (eth < 0.0001) return eth.toExponential(4);
-    return eth.toFixed(4);
+    return eth.toFixed(6); // Always use decimal format with 6 decimal places
   };
 
   // Modal functions
