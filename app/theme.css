@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Exo+2:wght@100..900&family=Source+Code+Pro:wght@200..900&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -35,7 +35,7 @@
 }
 
 .mini-app-theme {
-  --ock-font-family: "Geist", sans-serif;
+  --ock-font-family: "Orbitron", sans-serif;
   --ock-border-radius: 0.75rem;
   --ock-border-radius-inner: 0.5rem;
 
@@ -100,7 +100,7 @@ body {
   background-position: center;
   background-attachment: fixed;
   background-repeat: no-repeat;
-  font-family: var(--font-geist-sans), sans-serif;
+  font-family: "Orbitron", sans-serif;
   font-optical-sizing: auto;
   font-weight: 400;
   font-style: normal;
@@ -130,6 +130,63 @@ body::before {
   .text-balance {
     text-wrap: balance;
   }
+}
+
+/* Custom Font Classes */
+.font-heading {
+  font-family: "Exo 2", sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.font-data {
+  font-family: "Source Code Pro", monospace;
+  font-weight: 400;
+  letter-spacing: 0.025em;
+}
+
+.font-main {
+  font-family: "Orbitron", sans-serif;
+  font-weight: 400;
+}
+
+/* Specific heading styles */
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Exo 2", sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+/* Data and numbers */
+.data-text, .number, .price, .amount {
+  font-family: "Source Code Pro", monospace;
+  font-weight: 500;
+  letter-spacing: 0.025em;
+}
+
+/* Buttons and interactive elements */
+button, .btn {
+  font-family: "Exo 2", sans-serif;
+  font-weight: 500;
+  letter-spacing: 0.025em;
+}
+
+/* Mini App Menu Styles */
+.mini-app-menu {
+  font-family: "Orbitron", sans-serif;
+  font-weight: 500;
+  font-size: 0.75rem;
+  letter-spacing: 0.025em;
+}
+
+.mini-app-menu .menubar-trigger {
+  font-family: "Orbitron", sans-serif;
+  font-weight: 500;
+  font-size: 0.75rem;
+  letter-spacing: 0.025em;
+  padding: 0.25rem 0.5rem;
+  min-width: auto;
+  white-space: nowrap;
 }
 
 .animate-fade-in {

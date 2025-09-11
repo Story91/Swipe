@@ -92,24 +92,24 @@ export default function App() {
 
         {/* Menu Bar - Right after Wallet */}
         <div className="mb-4">
-          <Menubar>
+          <Menubar className="mini-app-menu">
             <MenubarMenu>
-              <MenubarTrigger onClick={() => setActiveDashboard('tinder')}>
+              <MenubarTrigger className="menubar-trigger" onClick={() => setActiveDashboard('tinder')}>
                 Swipe
               </MenubarTrigger>
             </MenubarMenu>
             <MenubarMenu>
-              <MenubarTrigger onClick={() => setActiveDashboard('market-stats')}>
+              <MenubarTrigger className="menubar-trigger" onClick={() => setActiveDashboard('market-stats')}>
                 Stats
               </MenubarTrigger>
             </MenubarMenu>
             <MenubarMenu>
-              <MenubarTrigger onClick={() => setActiveDashboard('user')}>
+              <MenubarTrigger className="menubar-trigger" onClick={() => setActiveDashboard('user')}>
                 Dashboard
               </MenubarTrigger>
             </MenubarMenu>
             <MenubarMenu>
-              <MenubarTrigger>
+              <MenubarTrigger className="menubar-trigger">
                 Create
               </MenubarTrigger>
               <MenubarContent>
@@ -119,13 +119,13 @@ export default function App() {
               </MenubarContent>
             </MenubarMenu>
             <MenubarMenu>
-              <MenubarTrigger onClick={() => setActiveDashboard('help-faq')}>
+              <MenubarTrigger className="menubar-trigger" onClick={() => setActiveDashboard('help-faq')}>
                 Help
               </MenubarTrigger>
             </MenubarMenu>
             {isAdmin && (
               <MenubarMenu>
-                <MenubarTrigger onClick={() => setActiveDashboard('admin')}>
+                <MenubarTrigger className="menubar-trigger" onClick={() => setActiveDashboard('admin')}>
                   Admin
                 </MenubarTrigger>
               </MenubarMenu>

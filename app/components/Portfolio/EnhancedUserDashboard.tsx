@@ -574,22 +574,22 @@ export function EnhancedUserDashboard() {
       {/* Summary Stats */}
       <div className="summary-stats">
         <div className="stat-card">
-          <h3>Total Staked</h3>
-          <p>{formatEth(totalStaked)} ETH</p>
+          <h3>Total<br/>Staked</h3>
+          <p className="stat-value-total">{formatEth(totalStaked)} ETH</p>
         </div>
         <div className="stat-card">
-          <h3>Potential Payout</h3>
-          <p>{formatEth(totalPotentialPayout)} ETH</p>
+          <h3>Potential<br/>Payout</h3>
+          <p className="stat-value-payout">{formatEth(totalPotentialPayout)} ETH</p>
         </div>
         <div className="stat-card">
-          <h3>Potential Profit</h3>
-          <p className={totalPotentialProfit >= 0 ? 'profit' : 'loss'}>
+          <h3>Potential<br/>Profit</h3>
+          <p className={`stat-value-profit ${totalPotentialProfit >= 0 ? 'profit' : 'loss'}`}>
             {totalPotentialProfit >= 0 ? '+' : ''}{formatEth(totalPotentialProfit)} ETH
           </p>
         </div>
         <div className="stat-card">
-          <h3>Ready to Claim</h3>
-          <p>{canClaimCount} predictions</p>
+          <h3>Ready to<br/>Claim</h3>
+          <p className="stat-value-claim">{canClaimCount} predictions</p>
         </div>
       </div>
 

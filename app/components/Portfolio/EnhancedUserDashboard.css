@@ -94,18 +94,82 @@
   transform: translateY(-2px);
 }
 
+.stat-card:hover h3 {
+  background: linear-gradient(135deg, #b8e600, #9ccc00);
+  box-shadow: 
+    0 3px 6px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transform: scale(1.02);
+}
+
 .stat-card h3 {
   margin: 0 0 10px 0;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   opacity: 0.9;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  text-align: center;
+  line-height: 1.2;
+  color: #000;
+  background: linear-gradient(135deg, #d4ff00, #b8e600);
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #000;
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  font-family: "Orbitron", sans-serif;
+  font-weight: 700;
+  transition: all 0.3s ease;
 }
 
 .stat-card p {
   margin: 0;
-  font-size: 24px;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-line;
+  text-align: center;
+  font-family: "Exo 2", sans-serif;
+}
+
+/* Different colors for different value types */
+.stat-value-total {
+  color: #3b82f6 !important;
+  text-shadow: 1px 1px 0px #000;
+  font-family: "Exo 2", sans-serif !important;
+  font-weight: 700;
+}
+
+.stat-value-payout {
+  color: #10b981 !important;
+  text-shadow: 1px 1px 0px #000;
+  font-family: "Exo 2", sans-serif !important;
+  font-weight: 700;
+}
+
+.stat-value-profit.profit {
+  color: #10b981 !important;
+  text-shadow: 1px 1px 0px #000;
+  font-family: "Exo 2", sans-serif !important;
+  font-weight: 700;
+}
+
+.stat-value-profit.loss {
+  color: #ef4444 !important;
+  text-shadow: 1px 1px 0px #000;
+  font-family: "Exo 2", sans-serif !important;
+  font-weight: 700;
+}
+
+.stat-value-claim {
+  color: #8b5cf6 !important;
+  text-shadow: 1px 1px 0px #000;
+  font-family: "Exo 2", sans-serif !important;
   font-weight: 700;
 }
 
@@ -115,6 +179,19 @@
 
 .stat-card .loss {
   color: #ef4444;
+}
+
+/* Profit and loss values in prediction cards */
+.card-content .profit {
+  color: #10b981 !important;
+  font-family: "Exo 2", sans-serif !important;
+  font-weight: 700 !important;
+}
+
+.card-content .loss {
+  color: #ef4444 !important;
+  font-family: "Exo 2", sans-serif !important;
+  font-weight: 700 !important;
 }
 
 /* Sections */
@@ -269,6 +346,16 @@
   font-weight: 600;
 }
 
+/* Numbers in prediction cards - use Exo 2 for better readability */
+.card-content p {
+  font-family: "Exo 2", sans-serif;
+}
+
+.card-content strong {
+  font-family: "Exo 2", sans-serif;
+  font-weight: 700;
+}
+
 .card-actions {
   display: flex;
   gap: 10px;
@@ -360,6 +447,32 @@
 .no-predictions p {
   margin: 0 0 10px 0;
   font-size: 16px;
+}
+
+/* Desktop specific styles for square cards */
+@media (min-width: 769px) {
+  .summary-stats {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  
+  .stat-card p {
+    font-size: 16px;
+    line-height: 1.1;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-line;
+    text-align: center;
+    font-family: "Exo 2", sans-serif;
+  }
+  
+  .stat-card h3 {
+    font-size: 10px;
+    margin-bottom: 8px;
+    text-align: center;
+    line-height: 1.1;
+    padding: 3px 6px;
+    border-radius: 4px;
+  }
 }
 
 /* Responsive Design */

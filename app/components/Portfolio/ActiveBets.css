@@ -44,10 +44,14 @@
 }
 
 .stat-content .stat-value {
-  font-size: 1.5rem;
+  font-size: 1.2rem;
   font-weight: bold;
   color: #1f2937;
   margin-bottom: 0.25rem;
+  line-height: 1.2;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-line;
 }
 
 .stat-content .stat-label {
@@ -251,6 +255,8 @@
 
 .detail-item .value.profit {
   color: #059669;
+  font-family: "Exo 2", sans-serif;
+  font-weight: 700;
 }
 
 .bet-footer {
@@ -326,6 +332,25 @@
 
 .empty-state p {
   color: #6b7280;
+}
+
+/* Desktop specific styles for square cards */
+@media (min-width: 769px) {
+  .bets-stats {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .stat-content .stat-value {
+    font-size: 1rem;
+    line-height: 1.1;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-line;
+  }
+  
+  .stat-content .stat-label {
+    font-size: 0.75rem;
+  }
 }
 
 @media (max-width: 768px) {
