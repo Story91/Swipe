@@ -249,7 +249,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       prediction: pred.question || 'Unknown prediction',
       timeframe: pred.deadline ? formatTimeLeft(pred.deadline) : 'Unknown',
       confidence: (() => {
-        // Calculate confidence based on real data
+        // Calculate confidence based on real stake distribution
         const yesAmount = pred.yesTotalAmount || 0;
         const noAmount = pred.noTotalAmount || 0;
         const totalAmount = yesAmount + noAmount;
@@ -258,29 +258,11 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
           return 50; // Neutral confidence when no stakes
         }
         
-        // Confidence based on stake distribution
+        // Confidence = percentage of YES stakes
         const yesPercentage = (yesAmount / totalAmount) * 100;
         
-        // Factor in time remaining (more time = more uncertainty)
-        const now = Date.now() / 1000;
-        const timeLeft = pred.deadline - now;
-        const timeFactor = Math.min(timeLeft / (24 * 60 * 60), 1); // Max 1 day factor
-        
-                 // Factor in number of participants (more participants = more confidence)
-         const participantCount = pred.participants || 0;
-         const participantFactor = Math.min(participantCount / 10, 1); // Max 10 participants factor
-        
-        // Calculate final confidence
-        let confidence = yesPercentage;
-        
-        // Adjust based on time (less time = more confidence in current trend)
-        confidence += (1 - timeFactor) * 10;
-        
-        // Adjust based on participants (more participants = more confidence)
-        confidence += participantFactor * 5;
-        
-        // Ensure confidence is between 20-90%
-        return Math.max(20, Math.min(90, Math.round(confidence)));
+        // Return the actual percentage (0-100%)
+        return Math.round(yesPercentage);
       })(),
       category: pred.category || 'Unknown',
       price: totalPool > 0 ? `${(totalPool / 1e18).toFixed(4)} ETH` : "0.0000 ETH", // Convert wei to ETH
