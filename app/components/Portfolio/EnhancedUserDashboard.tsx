@@ -192,6 +192,29 @@ export function EnhancedUserDashboard() {
                 potentialPayout = userStakeAmount;
                 potentialProfit = 0;
                 canClaim = true;
+              } else if (!prediction.resolved && !prediction.cancelled && prediction.deadline > Date.now() / 1000) {
+                // Active prediction - calculate potential payout based on current pool
+                const yesPool = prediction.yesTotalAmount || 0;
+                const noPool = prediction.noTotalAmount || 0;
+                
+                if (userStake.yesAmount > 0) {
+                  // User bet YES - calculate potential payout if YES wins
+                  if (yesPool > 0) {
+                    const platformFee = noPool * 0.01; // 1% platform fee from losers
+                    const netNoPool = noPool - platformFee;
+                    potentialPayout = userStakeAmount + (userStake.yesAmount / yesPool) * netNoPool;
+                    potentialProfit = potentialPayout - userStakeAmount;
+                  }
+                } else if (userStake.noAmount > 0) {
+                  // User bet NO - calculate potential payout if NO wins
+                  if (noPool > 0) {
+                    const platformFee = yesPool * 0.01; // 1% platform fee from losers
+                    const netYesPool = yesPool - platformFee;
+                    potentialPayout = userStakeAmount + (userStake.noAmount / noPool) * netYesPool;
+                    potentialProfit = potentialPayout - userStakeAmount;
+                  }
+                }
+                canClaim = false; // Can't claim until resolved
               } else if (prediction.resolved && userStake.claimed) {
                 // Already claimed - show as claimed with calculated payout
                 const winnersPool = prediction.outcome ? prediction.yesTotalAmount : prediction.noTotalAmount;
@@ -678,6 +701,13 @@ export function EnhancedUserDashboard() {
                     
                     {prediction.status === 'active' ? (
                       <>
+                        <p><strong>Your Choice:</strong> {(prediction.userStake?.yesAmount || 0) > 0 ? 'YES' : 'NO'}</p>
+                        <p><strong>Potential Payout:</strong> {formatEth(prediction.userStake?.potentialPayout || 0)} ETH</p>
+                        <p><strong>Potential Profit:</strong> 
+                          <span className={(prediction.userStake?.potentialProfit || 0) >= 0 ? 'profit' : 'loss'}>
+                            {(prediction.userStake?.potentialProfit || 0) >= 0 ? '+' : ''}{formatEth(prediction.userStake?.potentialProfit || 0)} ETH
+                          </span>
+                        </p>
                         <p><strong>Deadline:</strong> {new Date(prediction.deadline * 1000).toLocaleString()}</p>
                         <p><strong>Time Left:</strong> {Math.max(0, Math.floor((prediction.deadline - Date.now() / 1000) / 3600))} hours</p>
                       </>
