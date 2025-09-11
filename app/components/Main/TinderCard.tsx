@@ -3,6 +3,7 @@ import TinderCard from 'react-tinder-card';
 import { useAccount, useWriteContract } from "wagmi";
 import { ethers } from 'ethers';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../../../lib/contract';
+import { useViewProfile } from '@coinbase/onchainkit/minikit';
 import './TinderCard.css';
 import './Dashboards.css';
 import { NotificationSystem, showNotification, UserDashboard } from '../Portfolio/UserDashboard';
@@ -10,6 +11,8 @@ import { AdminDashboard } from '../Admin/AdminDashboard';
 import { ApproverDashboard } from '../Approver/ApproverDashboard';
 import { useHybridPredictions } from '../../../lib/hooks/useHybridPredictions';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useFarcasterProfiles } from '../../../lib/hooks/useFarcasterProfiles';
 
 interface PredictionData {
   id: number;
@@ -109,6 +112,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   const { address } = useAccount();
   const { writeContract } = useWriteContract();
   const [isTransactionLoading, setIsTransactionLoading] = useState(false);
+  const viewProfile = useViewProfile();
 
   // Użyj props jeśli są dostępne, inaczej wewnętrzny state
   const activeDashboard = propActiveDashboard !== undefined ? propActiveDashboard : internalActiveDashboard;
@@ -782,6 +786,21 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
 
   const currentCard = cardItems[currentIndex];
   
+  // Get participants for current card to use with Farcaster profiles hook
+  const currentCardParticipants = useMemo(() => {
+    if (!currentCard || !hybridPredictions) return [];
+    
+    const currentPrediction = hybridPredictions.find(hp => {
+      const hpId = typeof hp.id === 'string' ? parseInt(hp.id.replace('pred_', ''), 10) || Date.now() : (hp.id || Date.now());
+      return hpId === currentCard.id;
+    });
+    
+    return currentPrediction?.participants || [];
+  }, [currentCard, hybridPredictions]);
+  
+  // Use Farcaster profiles hook at top level to avoid conditional hook calls
+  const { profiles, loading: profilesLoading } = useFarcasterProfiles(currentCardParticipants);
+  
   // Show logo before wallet connection
   if (!address) {
     return (
@@ -1179,53 +1198,6 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
              <div className="chart-subtitle">Success Probability</div>
            </div>
            
-           {/* Voters Count */}
-           <div className="chart-item">
-             <div className="chart-title">Swipers</div>
-             <div className="chart-value">
-               {transformedPredictions[currentIndex]?.participants || 0}
-             </div>
-             <div className="swipers-visualization">
-               {(() => {
-                 const participantCount = transformedPredictions[currentIndex]?.participants || 0;
-                 
-                 if (participantCount === 0) {
-                   return (
-                     <div className="no-swipers">
-                       <div className="no-swipers-text">No swipers yet</div>
-                       <div className="no-swipers-bar">
-                         <div className="no-swipers-fill"></div>
-                       </div>
-                     </div>
-                   );
-                 }
-                 
-                 // Show actual swiper dots based on real count
-                 const maxDots = 5; // Maximum dots to show
-                 const dotsToShow = Math.min(participantCount, maxDots);
-                 
-                 return (
-                   <div className="swipers-dots">
-                     {Array.from({ length: maxDots }, (_, i) => (
-                       <div 
-                         key={i}
-                         className={`swiper-dot ${i < dotsToShow ? 'active' : 'inactive'}`}
-                         style={{ 
-                           left: `${(i / (maxDots - 1)) * 80 + 10}%`,
-                           animationDelay: `${i * 0.1}s`
-                         }}
-                       ></div>
-                     ))}
-                     {participantCount > maxDots && (
-                       <div className="more-swipers">+{participantCount - maxDots}</div>
-                     )}
-                   </div>
-                 );
-               })()}
-             </div>
-             <div className="chart-subtitle">Active Swipers</div>
-           </div>
-           
            {/* Risk Assessment */}
            <div className="chart-item">
              <div className="chart-title">Risk Level</div>
@@ -1233,33 +1205,53 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
                {(() => {
                  const confidence = currentCard.confidence;
                  const totalStaked = ((transformedPredictions[currentIndex]?.yesTotalAmount || 0) + (transformedPredictions[currentIndex]?.noTotalAmount || 0)) / 1e18;
-                                   const participantCount = transformedPredictions[currentIndex]?.participants || 0;
+                 const participantCount = transformedPredictions[currentIndex]?.participants || 0;
                  
                  // Calculate risk based on multiple factors
                  let riskScore = 0;
+                 let factors = [];
                  
                  // Confidence factor (lower confidence = higher risk)
-                 riskScore += (100 - confidence) * 0.4;
+                 const confidenceRisk = (100 - confidence) * 0.4;
+                 riskScore += confidenceRisk;
+                 factors.push(`Conf: ${confidenceRisk.toFixed(1)}`);
                  
                  // Liquidity factor (less staked = higher risk)
-                 if (totalStaked < 0.1) riskScore += 30;
-                 else if (totalStaked < 1) riskScore += 15;
-                 else if (totalStaked < 5) riskScore += 5;
+                 let liquidityRisk = 0;
+                 if (totalStaked < 0.1) liquidityRisk = 30;
+                 else if (totalStaked < 1) liquidityRisk = 15;
+                 else if (totalStaked < 5) liquidityRisk = 5;
+                 riskScore += liquidityRisk;
+                 factors.push(`Liq: ${liquidityRisk}`);
                  
                  // Participation factor (fewer participants = higher risk)
-                 if (participantCount < 3) riskScore += 20;
-                 else if (participantCount < 10) riskScore += 10;
+                 let participationRisk = 0;
+                 if (participantCount < 3) participationRisk = 20;
+                 else if (participantCount < 10) participationRisk = 10;
+                 riskScore += participationRisk;
+                 factors.push(`Part: ${participationRisk}`);
                  
                  // Time factor (less time = higher risk due to volatility)
                  const now = Date.now() / 1000;
                  const timeLeft = (transformedPredictions[currentIndex]?.deadline || 0) - now;
-                 if (timeLeft < 3600) riskScore += 25; // Less than 1 hour
-                 else if (timeLeft < 86400) riskScore += 15; // Less than 1 day
+                 let timeRisk = 0;
+                 if (timeLeft < 3600) timeRisk = 25; // Less than 1 hour
+                 else if (timeLeft < 86400) timeRisk = 15; // Less than 1 day
+                 riskScore += timeRisk;
+                 factors.push(`Time: ${timeRisk}`);
                  
                  // Determine risk level
-                 if (riskScore < 30) return 'Low';
-                 else if (riskScore < 60) return 'Medium';
-                 else return 'High';
+                 let riskLevel = 'Low';
+                 if (riskScore >= 60) riskLevel = 'High';
+                 else if (riskScore >= 30) riskLevel = 'Medium';
+                 
+                 return (
+                   <div className="risk-details">
+                     <div className="risk-level">{riskLevel}</div>
+                     <div className="risk-score">{Math.round(riskScore)} pts</div>
+                     <div className="risk-breakdown">{factors.join(' | ')}</div>
+                   </div>
+                 );
                })()}
              </div>
              <div className="progress-bar">
@@ -1342,7 +1334,123 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
                })()}
              </div>
            </div>
+           
+           {/* Swipers */}
+           <div className="chart-item">
+             <div className="chart-title">Active Swipers</div>
+             {(() => {
+               const participantCount = currentCardParticipants.length;
+               
+               return (
+                 <>
+                   <div className="chart-value">
+                     {participantCount}
+                   </div>
+                   <div className="swipers-visualization">
+                     {participantCount === 0 ? (
+                       <div className="no-swipers">
+                         <div className="no-swipers-text">No swipers yet</div>
+                         <div className="no-swipers-bar">
+                           <div className="no-swipers-fill"></div>
+                         </div>
+                       </div>
+                     ) : (
+                       <>
+                         {/* Show actual swiper avatars based on real participants */}
+                         <div className="swipers-avatars-horizontal">
+                           {profilesLoading ? (
+                             <div className="loading-swipers">
+                               <div className="loading-logo-container">
+                                 <div className="loading-logo-spin"></div>
+                               </div>
+                               <div className="loading-text">Loading profiles...</div>
                              </div>
+                           ) : (
+                             Array.from({ length: participantCount }, (_, i) => {
+                               const participantAddress = currentCardParticipants[i] || '0x0000000000000000000000000000000000000000';
+                               const profile = profiles.find(p => p.address === participantAddress);
+                               
+                               // Get initials from profile or address
+                               const getInitials = () => {
+                                 if (profile?.display_name) {
+                                   return profile.display_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                                 }
+                                 return participantAddress.slice(2, 4).toUpperCase();
+                               };
+
+                               // Get avatar color based on address
+                               const getAvatarColor = (addr: string) => {
+                                 const colors = [
+                                   'bg-blue-500',
+                                   'bg-green-500', 
+                                   'bg-purple-500',
+                                   'bg-pink-500',
+                                   'bg-yellow-500',
+                                   'bg-red-500',
+                                   'bg-indigo-500',
+                                   'bg-teal-500'
+                                 ];
+                                 const hash = addr.split('').reduce((a, b) => {
+                                   a = ((a << 5) - a) + b.charCodeAt(0);
+                                   return a & a;
+                                 }, 0);
+                                 return colors[Math.abs(hash) % colors.length];
+                               };
+                               
+                               return (
+                                 <div key={participantAddress} className="relative">
+                                   <Avatar
+                                     className="cursor-pointer hover:scale-110 transition-all duration-300 shadow-lg hover:shadow-xl border-2 border-white/20 hover:border-blue-400/60 ring-2 ring-blue-500/20 hover:ring-blue-400/40"
+                                     onClick={() => {
+                                       console.log(`Clicked on swiper: ${participantAddress}`);
+                                       if (profile) {
+                                         console.log(`Profile: ${profile.display_name} (@${profile.username})`);
+                                         
+                                         // Open Farcaster profile using OnchainKit
+                                         try {
+                                           if (profile.fid) {
+                                             const fidNumber = parseInt(profile.fid, 10);
+                                             console.log(`Opening Farcaster profile with FID: ${fidNumber}`);
+                                             viewProfile(fidNumber);
+                                           } else {
+                                             console.log(`No FID available for profile`);
+                                           }
+                                         } catch (error) {
+                                           console.error('Error opening Farcaster profile:', error);
+                                         }
+                                       }
+                                     }}
+                                   >
+                                     <AvatarImage 
+                                       src={profile?.pfp_url} 
+                                       alt={profile?.display_name || `User ${participantAddress.slice(2, 6)}`}
+                                     />
+                                     <AvatarFallback className={getAvatarColor(participantAddress)}>
+                                       <span className="text-white text-xs font-semibold">
+                                         {getInitials()}
+                                       </span>
+                                     </AvatarFallback>
+                                   </Avatar>
+                                   {/* Base verification indicator */}
+                                   {profile?.isBaseVerified && (
+                                     <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 rounded-full border-2 border-white flex items-center justify-center">
+                                       <span className="text-white text-xs font-bold">B</span>
+                                     </div>
+                                   )}
+                                 </div>
+                               );
+                             })
+                           )}
+                         </div>
+                       </>
+                     )}
+                   </div>
+                   <div className="chart-subtitle">Click avatars to view profiles</div>
+                 </>
+               );
+             })()}
+           </div>
+         </div>
         </div>
 
       {/* Modern Prediction Modal */}

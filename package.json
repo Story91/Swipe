@@ -20,6 +20,8 @@
     "@coinbase/cdp-sdk": "^1.36.0",
     "@coinbase/onchainkit": "^0.38.19",
     "@farcaster/miniapp-sdk": "^0.1.9",
+    "@neynar/nodejs-sdk": "^3.34.0",
+    "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-menubar": "^1.1.16",
     "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-slot": "^1.2.3",
