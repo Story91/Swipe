@@ -798,6 +798,47 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     return currentPrediction?.participants || [];
   }, [currentCard, hybridPredictions]);
   
+  // State for user stakes/votes
+  const [userStakes, setUserStakes] = useState<{[userId: string]: 'YES' | 'NO' | 'BOTH' | 'NONE'}>({});
+  const [stakesLoading, setStakesLoading] = useState(false);
+  
+  // Fetch user stakes for current prediction
+  useEffect(() => {
+    const fetchUserStakes = async () => {
+      if (!currentCard || !currentCard.id) return;
+      
+      const predictionId = typeof currentCard.id === 'string' 
+        ? currentCard.id 
+        : `pred_${currentCard.id}`;
+      
+      setStakesLoading(true);
+      // Clear previous stakes when switching predictions
+      setUserStakes({});
+      
+      try {
+        console.log(`🔍 Fetching stakes for prediction: ${predictionId}`);
+        const response = await fetch(`/api/predictions/${predictionId}/stakes`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            const stakesMap: {[userId: string]: 'YES' | 'NO' | 'BOTH' | 'NONE'} = {};
+            data.data.stakes.forEach((stake: any) => {
+              stakesMap[stake.userId.toLowerCase()] = stake.vote;
+            });
+            setUserStakes(stakesMap);
+            console.log(`✅ Loaded stakes for prediction ${predictionId}:`, stakesMap);
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to fetch user stakes:', error);
+      } finally {
+        setStakesLoading(false);
+      }
+    };
+    
+    fetchUserStakes();
+  }, [currentCard?.id]); // Only depend on the ID, not the entire card object
+  
   // Use Farcaster profiles hook at top level to avoid conditional hook calls
   const { profiles, loading: profilesLoading } = useFarcasterProfiles(currentCardParticipants);
   
@@ -1397,40 +1438,78 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
                                  return colors[Math.abs(hash) % colors.length];
                                };
                                
+                               // Get user's vote from stakes
+                               const userVote = userStakes[participantAddress.toLowerCase()] || 'NONE';
+                               
+                               // Determine vote indicator styling
+                               const getVoteIndicatorClass = () => {
+                                 switch (userVote) {
+                                   case 'YES':
+                                     return 'vote-yes';
+                                   case 'NO':
+                                     return 'vote-no';
+                                   case 'BOTH':
+                                     return 'vote-both';
+                                   default:
+                                     return 'vote-none';
+                                 }
+                               };
+                               
+                               const getVoteIcon = () => {
+                                 switch (userVote) {
+                                   case 'YES':
+                                     return '✓';
+                                   case 'NO':
+                                     return '✗';
+                                   case 'BOTH':
+                                     return '±';
+                                   default:
+                                     return '';
+                                 }
+                               };
+                               
                                return (
                                  <div key={participantAddress} className="relative">
-                                   <Avatar
-                                     className="cursor-pointer hover:scale-110 transition-all duration-300 shadow-lg hover:shadow-xl border-2 border-white/20 hover:border-blue-400/60 ring-2 ring-blue-500/20 hover:ring-blue-400/40"
-                                     onClick={() => {
-                                       console.log(`Clicked on swiper: ${participantAddress}`);
-                                       if (profile) {
-                                         console.log(`Profile: ${profile.display_name} (@${profile.username})`);
-                                         
-                                         // Open Farcaster profile using OnchainKit
-                                         try {
-                                           if (profile.fid) {
-                                             const fidNumber = parseInt(profile.fid, 10);
-                                             console.log(`Opening Farcaster profile with FID: ${fidNumber}`);
-                                             viewProfile(fidNumber);
-                                           } else {
-                                             console.log(`No FID available for profile`);
+                                   <div className={`vote-indicator ${getVoteIndicatorClass()}`}>
+                                     <Avatar
+                                       className="cursor-pointer hover:scale-110 transition-all duration-300 shadow-lg hover:shadow-xl border-2 border-white/20 hover:border-blue-400/60 ring-2 ring-blue-500/20 hover:ring-blue-400/40"
+                                       onClick={() => {
+                                         console.log(`Clicked on swiper: ${participantAddress}`);
+                                         if (profile) {
+                                           console.log(`Profile: ${profile.display_name} (@${profile.username})`);
+                                           
+                                           // Open Farcaster profile using OnchainKit
+                                           try {
+                                             if (profile.fid) {
+                                               const fidNumber = parseInt(profile.fid, 10);
+                                               console.log(`Opening Farcaster profile with FID: ${fidNumber}`);
+                                               viewProfile(fidNumber);
+                                             } else {
+                                               console.log(`No FID available for profile`);
+                                             }
+                                           } catch (error) {
+                                             console.error('Error opening Farcaster profile:', error);
                                            }
-                                         } catch (error) {
-                                           console.error('Error opening Farcaster profile:', error);
                                          }
-                                       }
-                                     }}
-                                   >
-                                     <AvatarImage 
-                                       src={profile?.pfp_url} 
-                                       alt={profile?.display_name || `User ${participantAddress.slice(2, 6)}`}
-                                     />
-                                     <AvatarFallback className={getAvatarColor(participantAddress)}>
-                                       <span className="text-white text-xs font-semibold">
-                                         {getInitials()}
-                                       </span>
-                                     </AvatarFallback>
-                                   </Avatar>
+                                       }}
+                                     >
+                                       <AvatarImage 
+                                         src={profile?.pfp_url} 
+                                         alt={profile?.display_name || `User ${participantAddress.slice(2, 6)}`}
+                                       />
+                                       <AvatarFallback className={getAvatarColor(participantAddress)}>
+                                         <span className="text-white text-xs font-semibold">
+                                           {getInitials()}
+                                         </span>
+                                       </AvatarFallback>
+                                     </Avatar>
+                                     {/* Vote indicator */}
+                                     {userVote !== 'NONE' && (
+                                       <div className="vote-badge">
+                                         <span className="vote-icon">{getVoteIcon()}</span>
+                                       </div>
+                                     )}
+                                   </div>
                                    {/* Base verification indicator */}
                                    {profile?.isBaseVerified && (
                                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 rounded-full border-2 border-white flex items-center justify-center">
