@@ -5,10 +5,10 @@ import { RedisUserStake } from '../../../../../lib/types/redis';
 // GET /api/predictions/[id]/stakes - Get user stakes for a specific prediction
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const predictionId = params.id;
+    const { id: predictionId } = await params;
 
     if (!predictionId) {
       return NextResponse.json(
