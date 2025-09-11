@@ -9,6 +9,7 @@ import { NotificationSystem, showNotification, UserDashboard } from '../Portfoli
 import { AdminDashboard } from '../Admin/AdminDashboard';
 import { ApproverDashboard } from '../Approver/ApproverDashboard';
 import { useHybridPredictions } from '../../../lib/hooks/useHybridPredictions';
+import { Badge } from '@/components/ui/badge';
 
 interface PredictionData {
   id: number;
@@ -1165,18 +1166,18 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
          <p className="prediction-description">{currentCard.description}</p>
          <div className="prediction-stats">
            <div className="stat">
-             <span className="stat-label">Category</span>
-             <span className="stat-value">{currentCard.category}</span>
+             <Badge variant="outline" className="stat-label-badge">Category</Badge>
+             <Badge variant="secondary" className="stat-value-badge">{currentCard.category}</Badge>
            </div>
            <div className="stat">
-             <span className="stat-label">Time Left</span>
-             <span className={`stat-value font-semibold ${getTimeUrgencyClass(transformedPredictions[currentIndex]?.deadline || 0)}`}>
+             <Badge variant="outline" className="stat-label-badge">Time Left</Badge>
+             <Badge variant="secondary" className={`stat-value-badge font-semibold ${getTimeUrgencyClass(transformedPredictions[currentIndex]?.deadline || 0)}`}>
                {currentCard.timeframe}
-             </span>
+             </Badge>
            </div>
            <div className="stat">
-             <span className="stat-label">Total Staked</span>
-             <span className="stat-value">{(((transformedPredictions[currentIndex]?.yesTotalAmount || 0) + (transformedPredictions[currentIndex]?.noTotalAmount || 0)) / 1e18).toFixed(4)} ETH</span>
+             <Badge variant="outline" className="stat-label-badge">Total Staked</Badge>
+             <Badge variant="secondary" className="stat-value-badge">{(((transformedPredictions[currentIndex]?.yesTotalAmount || 0) + (transformedPredictions[currentIndex]?.noTotalAmount || 0)) / 1e18).toFixed(4)} ETH</Badge>
            </div>
 
          </div>

@@ -538,14 +538,18 @@ html, body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
 }
 
 .details-header h4 {
   margin: 0;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
   color: #1e293b;
+  font-family: "Exo 2", sans-serif;
+  letter-spacing: -0.025em;
 }
 
 .card-number {
@@ -558,48 +562,98 @@ html, body {
 }
 
 .prediction-description {
-  margin: 0 0 12px 0;
-  font-size: 12px;
-  line-height: 1.4;
-  color: #475569;
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #1e293b;
   text-align: left;
-  max-width: 200px;
+  font-weight: 600;
+  font-family: "Orbitron", sans-serif;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 
 .prediction-stats {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 12px;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .stat {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   text-align: center;
+  flex: 1;
+  min-width: 0;
 }
 
 .stat-label {
-  font-size: 8px;
-  font-weight: 500;
-  color: #64748b;
+  font-size: 6px;
+  font-weight: 600;
+  color: #6b7280;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
+  font-family: "Orbitron", sans-serif;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.6);
+  opacity: 0.8;
 }
 
 .stat-value {
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
   color: #1e293b;
-  padding: 2px 4px;
-  background: rgba(148, 163, 184, 0.1);
-  border-radius: 4px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
   backdrop-filter: blur(10px);
   font-family: "Exo 2", sans-serif;
-  font-weight: 700;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* Badge styles for prediction stats */
+.stat-label-badge {
+  font-size: 8px !important;
+  font-weight: 600 !important;
+  padding: 2px 6px !important;
+  height: auto !important;
+  font-family: "Orbitron", sans-serif !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.3px !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #6b7280 !important;
+}
+
+.stat-value-badge {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  padding: 4px 8px !important;
+  height: auto !important;
+  font-family: "Exo 2", sans-serif !important;
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: #1e293b !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 100% !important;
 }
 
 /* New Charts and Diagrams Section */
