@@ -72,8 +72,8 @@ export default function App() {
   return (
     <div className="flex flex-col min-h-screen font-sans text-[var(--app-foreground)] mini-app-theme from-[var(--app-background)] to-[var(--app-gray)]">
       <div className="w-full max-w-[424px] mx-auto px-4 py-3">
-        {/* Wallet Connection - Top Left */}
-        <div className="flex justify-start mb-3">
+        {/* Wallet Connection and Admin - Top */}
+        <div className="flex justify-between items-center mb-3">
           <Wallet className="z-10">
             <ConnectWallet>
               <Name className="text-inherit text-sm" />
@@ -88,6 +88,16 @@ export default function App() {
               <WalletDropdownDisconnect />
             </WalletDropdown>
           </Wallet>
+          
+          {/* Admin Button - Top Right */}
+          {isAdmin && (
+            <button
+              onClick={() => setActiveDashboard('admin')}
+              className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3 py-1 rounded-full font-medium transition-colors"
+            >
+              🔧 Admin
+            </button>
+          )}
         </div>
 
         {/* Menu Bar - Right after Wallet */}
@@ -123,13 +133,6 @@ export default function App() {
                 Help
               </MenubarTrigger>
             </MenubarMenu>
-            {isAdmin && (
-              <MenubarMenu>
-                <MenubarTrigger className="menubar-trigger" onClick={() => setActiveDashboard('admin')}>
-                  Admin
-                </MenubarTrigger>
-              </MenubarMenu>
-            )}
           </Menubar>
         </div>
 
