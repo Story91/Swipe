@@ -5,9 +5,10 @@ import { useAccount, useWriteContract } from 'wagmi';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../../../lib/contract';
 import { AdminDashboard } from './AdminDashboard';
 import { ApproverDashboard } from '../Approver/ApproverDashboard';
+import { ClaimsDashboard } from './ClaimsDashboard';
 import './AdminPanel.css';
 
-export type AdminTab = 'dashboard' | 'approver';
+export type AdminTab = 'dashboard' | 'approver' | 'claims';
 
 interface AdminPanelProps {
   defaultTab?: AdminTab;
@@ -142,7 +143,8 @@ export function AdminPanel({ defaultTab = 'dashboard' }: AdminPanelProps) {
 
   const tabs = [
     { id: 'dashboard' as AdminTab, label: 'Dashboard', icon: '📊', adminOnly: false },
-    { id: 'approver' as AdminTab, label: 'Approver', icon: '✅', adminOnly: false }
+    { id: 'approver' as AdminTab, label: 'Approver', icon: '✅', adminOnly: false },
+    { id: 'claims' as AdminTab, label: 'Claims', icon: '💰', adminOnly: true }
   ];
 
   const renderTabContent = () => {
@@ -167,6 +169,16 @@ export function AdminPanel({ defaultTab = 'dashboard' }: AdminPanelProps) {
             onRejectPrediction={handleRejectPrediction}
           />
         );
+      case 'claims':
+        if (!isAdmin) {
+          return (
+            <div className="access-denied">
+              <h2>🔒 Admin Only</h2>
+              <p>This feature is only available to administrators.</p>
+            </div>
+          );
+        }
+        return <ClaimsDashboard />;
       default:
         return (
           <AdminDashboard
@@ -190,17 +202,19 @@ export function AdminPanel({ defaultTab = 'dashboard' }: AdminPanelProps) {
       </div>
 
       <div className="admin-tabs">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            className={`admin-tab ${activeTab === tab.id ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            <span className="tab-icon">{tab.icon}</span>
-            <span className="tab-label">{tab.label}</span>
-            {tab.adminOnly && <span className="admin-badge">ADMIN</span>}
-          </button>
-        ))}
+        {tabs
+          .filter(tab => !tab.adminOnly || isAdmin)
+          .map((tab) => (
+            <button
+              key={tab.id}
+              className={`admin-tab ${activeTab === tab.id ? 'active' : ''}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              <span className="tab-icon">{tab.icon}</span>
+              <span className="tab-label">{tab.label}</span>
+              {tab.adminOnly && <span className="admin-badge">ADMIN</span>}
+            </button>
+          ))}
       </div>
 
       <div className="admin-content">
