@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 export interface FarcasterProfile {
   fid: string;
@@ -17,6 +17,7 @@ export function useFarcasterProfiles(addresses: string[]) {
   const [profiles, setProfiles] = useState<FarcasterProfile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const prevAddressesRef = useRef<string[]>([]);
 
   const fetchProfiles = useCallback(async (addressList: string[]) => {
     if (!addressList.length) {
@@ -53,7 +54,14 @@ export function useFarcasterProfiles(addresses: string[]) {
   }, []);
 
   useEffect(() => {
-    fetchProfiles(addresses);
+    // Compare addresses arrays to prevent unnecessary fetches
+    const addressesString = addresses.sort().join(',');
+    const prevAddressesString = prevAddressesRef.current.sort().join(',');
+    
+    if (addressesString !== prevAddressesString) {
+      prevAddressesRef.current = addresses;
+      fetchProfiles(addresses);
+    }
   }, [addresses, fetchProfiles]);
 
   return {

@@ -727,6 +727,12 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     setSwipeDirection(null);
     setSwipeProgress(0);
     
+    // Don't process swipes on fallback card
+    if (swipedId === 0 || cardItems.length === 0) {
+      console.log('Cannot swipe on fallback card');
+      return;
+    }
+    
     // Determine action type
     const actionType = 'bet';
 
@@ -784,11 +790,48 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     // Można tutaj dodać logikę fallback dla iframe'ów
   };
 
-  const currentCard = cardItems[currentIndex];
+  // Create a fallback card for when no predictions are available
+  const fallbackCard: PredictionData = {
+    id: 0,
+    title: "Under Construction",
+    prediction: "New predictions coming soon! Contract V2 on the way",
+    category: "Platform Status",
+    image: "/under.png",
+    isChart: false,
+    price: "---",
+    change: "+0%",
+    votingYes: 50,
+    timeframe: "Check back later • V2 soon",
+    description: `Our prediction platform is currently being updated with exciting new features!
+
+KEY USER-FACING CHANGES: V1 → V2
+
+1. Stake with $SWIPE or ETH
+• Choose your token when placing bets
+• Different minimum stakes: ETH (0.00001) vs SWIPE (10,000)
+
+2. Create Predictions with $SWIPE
+• Pay creation fee in ETH (0.0001) or SWIPE (200,000)
+• Get automatic refund if prediction rejected
+
+3. Two Separate Prize Pools
+• ETH stakers compete for ETH pool
+• SWIPE stakers compete for SWIPE pool
+• Claim rewards separately for each token
+
+4. Better Limits
+• Lower ETH minimum: 0.00001 ETH (was 0.001)
+• SWIPE unlimited maximum stake`,
+    confidence: 0,
+    creator: address || "0x0000000000000000000000000000000000000000",
+    participants: []
+  };
+
+  const currentCard = cardItems.length > 0 ? cardItems[currentIndex] : fallbackCard;
   
   // Get participants for current card to use with Farcaster profiles hook
   const currentCardParticipants = useMemo(() => {
-    if (!currentCard || !hybridPredictions) return [];
+    if (!currentCard || !hybridPredictions || currentCard.id === 0) return [];
     
     const currentPrediction = hybridPredictions.find(hp => {
       const hpId = typeof hp.id === 'string' ? parseInt(hp.id.replace('pred_', ''), 10) || Date.now() : (hp.id || Date.now());
@@ -1075,7 +1118,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
           onCardLeftScreen={() => onCardLeftScreen(currentCard.id)}
           onSwipeRequirementFulfilled={(dir) => onSwipeRequirementFulfilled(dir)}
           onSwipeRequirementUnfulfilled={onSwipeRequirementUnfulfilled}
-          preventSwipe={['up', 'down']}
+          preventSwipe={currentCard.id === 0 ? ['up', 'down', 'left', 'right'] : ['up', 'down']}
           className="tinder-card"
           swipeRequirementType="position"
           swipeThreshold={120} /* Increased for better mobile experience */
