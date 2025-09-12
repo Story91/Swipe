@@ -15,6 +15,7 @@ interface ClaimsResult {
   totalStakes: number;
   claimed: ClaimData[];
   unclaimed: ClaimData[];
+  lost: ClaimData[];
   claimRate: number;
 }
 
@@ -149,6 +150,10 @@ export function ClaimsDashboard() {
                 <span className="stat-value unclaimed">{result.unclaimed.length}</span>
               </div>
               <div className="stat">
+                <span className="stat-label">Lost:</span>
+                <span className="stat-value lost">{result.lost.length}</span>
+              </div>
+              <div className="stat">
                 <span className="stat-label">Claim Rate:</span>
                 <span className="stat-value">{result.claimRate.toFixed(1)}%</span>
               </div>
@@ -200,6 +205,29 @@ export function ClaimsDashboard() {
               </div>
             </div>
           )}
+          {result.lost.length > 0 && (
+            <div className="lost-section">
+              <h4>❌ Lost ({result.lost.length})</h4>
+              <div className="claims-list">
+                {result.lost.map((claim, index) => (
+                  <div key={index} className="claim-item lost">
+                    <div className="claim-address" onClick={() => copyAddress(claim.userId)}>
+                      {claim.userId}
+                    </div>
+                    <div className="claim-info">
+                      <div className="claim-amount">
+                        {formatEth(claim.stakeAmount)} ETH
+                      </div>
+                      <div className="claim-vote">
+                        {claim.yesAmount > 0 ? 'YES' : 'NO'}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
         </div>
       )}
     </div>

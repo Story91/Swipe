@@ -208,11 +208,15 @@
   color: #dc2626;
 }
 
-.claimed-section, .unclaimed-section {
+.stat-value.lost {
+  color: #6b7280;
+}
+
+.claimed-section, .unclaimed-section, .lost-section {
   margin-bottom: 15px;
 }
 
-.claimed-section h4, .unclaimed-section h4 {
+.claimed-section h4, .unclaimed-section h4, .lost-section h4 {
   margin: 0 0 8px 0;
   font-size: 14px;
   font-weight: 600;
@@ -241,6 +245,11 @@
 .claim-item.unclaimed {
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.claim-item.lost {
+  background: rgba(107, 114, 128, 0.1);
+  border: 1px solid rgba(107, 114, 128, 0.2);
 }
 
 .claim-item:hover {
@@ -293,6 +302,11 @@
 .claim-item.unclaimed .claim-vote {
   background: rgba(239, 68, 68, 0.2);
   color: #dc2626;
+}
+
+.claim-item.lost .claim-vote {
+  background: rgba(107, 114, 128, 0.2);
+  color: #6b7280;
 }
 
 @media (max-width: 768px) {

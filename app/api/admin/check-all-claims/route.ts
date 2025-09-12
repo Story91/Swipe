@@ -27,6 +27,13 @@ export async function GET(request: NextRequest) {
           const isClaimed = stake.claimed;
           const stakeAmount = stake.yesAmount + stake.noAmount;
           
+          // Check if stake is actually claimable
+          const isClaimable = (prediction.resolved || prediction.cancelled) && (
+            (prediction.outcome && stake.yesAmount > 0) || // YES won and user bet YES
+            (!prediction.outcome && stake.noAmount > 0) || // NO won and user bet NO
+            prediction.cancelled // Refund for cancelled predictions
+          );
+          
           const claimData = {
             userId,
             stakeAmount: stakeAmount / Math.pow(10, 18), // Convert to ETH
@@ -34,9 +41,11 @@ export async function GET(request: NextRequest) {
             noAmount: stake.noAmount / Math.pow(10, 18) // Convert to ETH
           };
           
-          if (isClaimed) {
+          if (isClaimed || !isClaimable) {
+            // If already claimed OR not claimable, it's "claimed" for this purpose
             claimed.push(claimData);
           } else {
+            // Only truly claimable stakes are "unclaimed"
             unclaimed.push(claimData);
           }
         }
