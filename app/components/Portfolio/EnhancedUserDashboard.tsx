@@ -132,6 +132,7 @@ export function EnhancedUserDashboard() {
     setLoadingStakes(true);
     try {
       console.log(`🔍 Fetching user stakes for ${address}`);
+      console.log(`🔍 Current userPredictions state:`, userPredictions);
       
       // Use the Redis predictions from the hook instead of fetching from API
       const predictions = allPredictions || [];
@@ -147,13 +148,17 @@ export function EnhancedUserDashboard() {
       
       for (const prediction of predictions) {
         try {
+          console.log(`🔍 Fetching stake for prediction ${prediction.id} and user ${address.toLowerCase()}`);
           const stakeInfo = await fetch(`/api/stakes?predictionId=${prediction.id}&userId=${address.toLowerCase()}`);
           const stakeData = await stakeInfo.json();
+          
+          console.log(`🔍 API response for prediction ${prediction.id}:`, stakeData);
           
           if (stakeData.success && stakeData.data.length > 0) {
             const userStake = stakeData.data[0];
             if (userStake.yesAmount > 0 || userStake.noAmount > 0) {
               console.log(`💰 Found stake for prediction ${prediction.id}:`, userStake);
+              console.log(`🔍 Stake claimed status: ${userStake.claimed}, Prediction resolved: ${prediction.resolved}`);
               
               let potentialPayout = 0;
               let potentialProfit = 0;
@@ -243,18 +248,22 @@ export function EnhancedUserDashboard() {
                 }
               }
 
+              const finalStake = {
+                predictionId: prediction.id,
+                yesAmount: userStake.yesAmount || 0,
+                noAmount: userStake.noAmount || 0,
+                claimed: userStake.claimed || false,
+                potentialPayout,
+                potentialProfit,
+                canClaim,
+                isWinner
+              };
+              
+              console.log(`📊 Final stake data for prediction ${prediction.id}:`, finalStake);
+              
               userPredictionsWithStakes.push({
                 ...prediction,
-                userStake: {
-                  predictionId: prediction.id,
-                  yesAmount: userStake.yesAmount || 0,
-                  noAmount: userStake.noAmount || 0,
-                  claimed: userStake.claimed || false,
-                  potentialPayout,
-                  potentialProfit,
-                  canClaim,
-                  isWinner
-                },
+                userStake: finalStake,
                 status: prediction.cancelled ? 'cancelled' :
                         prediction.resolved ? 'resolved' :
                         prediction.deadline < Date.now() / 1000 ? 'expired' : 'active'
@@ -267,6 +276,12 @@ export function EnhancedUserDashboard() {
       }
       
       console.log(`📊 Found ${userPredictionsWithStakes.length} predictions with stakes for user ${address}`);
+      console.log(`📊 User predictions data:`, userPredictionsWithStakes);
+      
+      // Check if any predictions have claimed status
+      const claimedPredictions = userPredictionsWithStakes.filter(p => p.userStake?.claimed);
+      console.log(`📊 Claimed predictions:`, claimedPredictions);
+      
       setUserPredictions(userPredictionsWithStakes);
     } catch (error) {
       console.error('Failed to fetch user stakes:', error);
@@ -365,15 +380,15 @@ export function EnhancedUserDashboard() {
                   attempts++;
                   console.log(`🔍 Checking transaction status (attempt ${attempts}/${maxAttempts}): ${txHash}`);
                   
-                  const response = await fetch(`https://api.basescan.org/api?module=transaction&action=gettxreceiptstatus&txhash=${txHash}`);
+                  const response = await fetch(`/api/check-transaction?txHash=${txHash}`);
                   const data = await response.json();
                   
                   console.log(`📊 Transaction status response:`, data);
                   
-                  if (data.status === '1') {
+                  if (data.success && data.data.status === 'success') {
                     console.log('✅ Transaction confirmed successfully');
                     resolve({ status: 'success' });
-                  } else if (data.status === '0' && attempts > 5) {
+                  } else if (data.success && data.data.status === 'failed' && attempts > 5) {
                     // Only fail after 5 attempts to give transaction time to be mined
                     console.log('❌ Transaction failed after multiple attempts');
                     reject(new Error('Transaction failed'));
@@ -414,6 +429,7 @@ export function EnhancedUserDashboard() {
               
               // Mark stake as claimed in Redis
               try {
+                console.log(`🔄 Marking stake as claimed for prediction ${predictionId}...`);
                 const updateStakeResponse = await fetch('/api/stakes', {
                   method: 'PUT',
                   headers: {
@@ -428,8 +444,12 @@ export function EnhancedUserDashboard() {
                 
                 if (updateStakeResponse.ok) {
                   console.log('✅ Stake marked as claimed in Redis');
+                  const responseData = await updateStakeResponse.json();
+                  console.log('✅ Redis update response:', responseData);
                 } else {
                   console.error('❌ Failed to mark stake as claimed');
+                  const errorData = await updateStakeResponse.json();
+                  console.error('❌ Error response:', errorData);
                 }
               } catch (stakeUpdateError) {
                 console.error('❌ Error updating stake as claimed:', stakeUpdateError);
@@ -446,12 +466,17 @@ export function EnhancedUserDashboard() {
                 console.error('❌ Failed to sync blockchain data:', syncError);
               }
               
-              // Refresh user data with delay to ensure sync is complete
+              // Refresh user data immediately after successful claim
+              console.log('🔄 Refreshing data after successful claim...');
+              console.log('🔄 About to call fetchUserStakes...');
+              
+              // Add a small delay to ensure Redis is updated
               setTimeout(() => {
+                console.log('🔄 Calling fetchUserStakes after delay...');
                 fetchUserStakes();
                 fetchUserTransactions();
-                console.log('🔄 User data refreshed after successful claim');
-              }, 2000);
+                console.log('🔄 fetchUserStakes called');
+              }, 1000);
             } else {
               // Update transaction status in Redis
               await fetch('/api/user-transactions', {
