@@ -37,7 +37,7 @@ export function SwiperAvatar({ address, profile, index, isActive, onClick }: Swi
   // Get initials from profile or address
   const getInitials = () => {
     if (profile?.display_name) {
-      return profile.display_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+      return profile.display_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
     }
     return address.slice(2, 4).toUpperCase();
   };
@@ -89,8 +89,8 @@ export function SwiperAvatar({ address, profile, index, isActive, onClick }: Swi
       {profile?.pfp_url ? (
         <div className="avatar-circle avatar-image">
           <img 
-            src={profile.pfp_url} 
-            alt={profile.display_name || profile.username}
+            src={profile.pfp_url || undefined} 
+            alt={profile.display_name || profile.username || 'Avatar'}
             className="avatar-img"
             onError={(e) => {
               // Fallback to initials if image fails to load

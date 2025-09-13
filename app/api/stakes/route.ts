@@ -24,8 +24,40 @@ export async function GET(request: NextRequest) {
       const data = await redis.get(stakeKey);
       if (data) {
         const stake = typeof data === 'string' ? JSON.parse(data) : data;
-        if (stake && typeof stake === 'object' && 'userId' in stake) {
-          stakes = [stake as RedisUserStake];
+        if (stake && typeof stake === 'object' && 'user' in stake) {
+          // Check if this is a multi-token stake (V2) or single stake (V1)
+          if (stake.ETH || stake.SWIPE) {
+            // Multi-token stake - convert to array format
+            const multiStakes: RedisUserStake[] = [];
+            if (stake.ETH) {
+              multiStakes.push({
+                user: stake.user,
+                predictionId: stake.predictionId,
+                yesAmount: stake.ETH.yesAmount,
+                noAmount: stake.ETH.noAmount,
+                claimed: stake.ETH.claimed,
+                stakedAt: stake.stakedAt,
+                contractVersion: stake.contractVersion,
+                tokenType: 'ETH'
+              });
+            }
+            if (stake.SWIPE) {
+              multiStakes.push({
+                user: stake.user,
+                predictionId: stake.predictionId,
+                yesAmount: stake.SWIPE.yesAmount,
+                noAmount: stake.SWIPE.noAmount,
+                claimed: stake.SWIPE.claimed,
+                stakedAt: stake.stakedAt,
+                contractVersion: stake.contractVersion,
+                tokenType: 'SWIPE'
+              });
+            }
+            stakes = multiStakes;
+          } else {
+            // Single stake (V1)
+            stakes = [stake as RedisUserStake];
+          }
         }
       }
     } else {
@@ -125,7 +157,7 @@ export async function POST(request: NextRequest) {
     
     // Create or update stake
     const stake: RedisUserStake = {
-      userId,
+      user: userId,
       predictionId,
       yesAmount: existingStake ? existingStake.yesAmount + (isYes ? amount : 0) : (isYes ? amount : 0),
       noAmount: existingStake ? existingStake.noAmount + (isYes ? 0 : amount) : (isYes ? 0 : amount),
@@ -249,80 +281,3 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// DELETE /api/stakes - Remove stake (for admin purposes)
-export async function DELETE(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
-    const predictionId = searchParams.get('predictionId');
-    
-    if (!userId || !predictionId) {
-      return NextResponse.json(
-        { success: false, error: 'User ID and Prediction ID are required' },
-        { status: 400 }
-      );
-    }
-    
-    // Get existing stake
-    const stakeKey = `user_stakes:${userId}:${predictionId}`;
-    const existingData = await redis.get(stakeKey);
-    
-    if (!existingData) {
-      return NextResponse.json(
-        { success: false, error: 'Stake not found' },
-        { status: 404 }
-      );
-    }
-    
-    const existingStake = typeof existingData === 'string' ? JSON.parse(existingData) : existingData;
-    
-    // Delete stake
-    await redis.del(stakeKey);
-    
-    // Update prediction totals (subtract the stake amounts)
-    const prediction = await redisHelpers.getPrediction(predictionId);
-    if (prediction) {
-      const updatedPrediction = { ...prediction };
-      updatedPrediction.yesTotalAmount = Math.max(0, updatedPrediction.yesTotalAmount - existingStake.yesAmount);
-      updatedPrediction.noTotalAmount = Math.max(0, updatedPrediction.noTotalAmount - existingStake.noAmount);
-      updatedPrediction.totalStakes = Math.max(0, updatedPrediction.totalStakes - existingStake.yesAmount - existingStake.noAmount);
-      
-      // Remove user from participants if they have no stakes left
-      if (existingStake.yesAmount === 0 && existingStake.noAmount === 0) {
-        updatedPrediction.participants = updatedPrediction.participants.filter(p => p !== userId);
-      }
-      
-      // Update market stats
-      const totalPool = updatedPrediction.yesTotalAmount + updatedPrediction.noTotalAmount;
-      updatedPrediction.marketStats = {
-        yesPercentage: totalPool > 0 ? (updatedPrediction.yesTotalAmount / totalPool) * 100 : 0,
-        noPercentage: totalPool > 0 ? (updatedPrediction.noTotalAmount / totalPool) * 100 : 0,
-        timeLeft: updatedPrediction.deadline - Math.floor(Date.now() / 1000),
-        totalPool
-      };
-      
-      // Save updated prediction
-      await redisHelpers.savePrediction(updatedPrediction);
-    }
-    
-    // Update global market stats
-    await redisHelpers.updateMarketStats();
-    
-    return NextResponse.json({
-      success: true,
-      message: 'Stake removed successfully',
-      timestamp: new Date().toISOString()
-    });
-    
-  } catch (error) {
-    console.error('❌ Failed to remove stake:', error);
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Failed to remove stake',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
-  }
-}

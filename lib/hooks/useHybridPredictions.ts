@@ -19,6 +19,8 @@ export interface HybridPrediction {
   cancelled: boolean;
   yesTotalAmount: number;
   noTotalAmount: number;
+  swipeYesTotalAmount: number;
+  swipeNoTotalAmount: number;
   totalStakes: number;
   
   // Enhanced data from Redis
@@ -35,8 +37,6 @@ export interface HybridPrediction {
   };
   
   // Computed fields
-  isActive: boolean;
-  timeLeft: number;
   totalPool: number;
   yesPercentage: number;
   noPercentage: number;
@@ -77,6 +77,8 @@ export function useHybridPredictions() {
         cancelled: pred.cancelled,
         yesTotalAmount: pred.yesTotalAmount,
         noTotalAmount: pred.noTotalAmount,
+        swipeYesTotalAmount: pred.swipeYesTotalAmount || 0,
+        swipeNoTotalAmount: pred.swipeNoTotalAmount || 0,
         totalStakes: pred.totalStakes,
         
         // Enhanced data
@@ -87,9 +89,7 @@ export function useHybridPredictions() {
         participants: pred.participants || [],
         marketStats: pred.marketStats,
         
-        // Computed fields
-        isActive: !pred.resolved && !pred.cancelled && pred.deadline > Date.now() / 1000,
-        timeLeft: Math.max(0, pred.deadline - Date.now() / 1000),
+        // Computed fields (moved to component to avoid Date.now() causing re-renders)
         totalPool,
         yesPercentage: totalPool > 0 ? (pred.yesTotalAmount / totalPool) * 100 : 0,
         noPercentage: totalPool > 0 ? (pred.noTotalAmount / totalPool) * 100 : 0

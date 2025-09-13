@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAccount, useReadContract, useWriteContract, usePublicClient } from 'wagmi';
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../../../lib/contract';
+import { CONTRACTS, getV2Contract } from '../../../lib/contract';
 import { ethers } from 'ethers';
 
 // Transaction history utilities
@@ -133,8 +133,8 @@ export function UserDashboard({ predictions, onClaimReward }: UserDashboardProps
 
   // Pobierz liczbę predykcji
   const { data: nextPredictionId } = useReadContract({
-    address: CONTRACT_ADDRESS as `0x${string}`,
-    abi: CONTRACT_ABI,
+    address: CONTRACTS.V2.address as `0x${string}`,
+    abi: CONTRACTS.V2.abi,
     functionName: 'nextPredictionId',
   });
 
@@ -216,8 +216,8 @@ export function UserDashboard({ predictions, onClaimReward }: UserDashboardProps
 
     // Użyj prawdziwej transakcji zamiast mock
     writeContract({
-      address: CONTRACT_ADDRESS as `0x${string}`,
-      abi: CONTRACT_ABI,
+      address: CONTRACTS.V2.address as `0x${string}`,
+      abi: CONTRACTS.V2.abi,
       functionName: 'placeStake',
       args: [BigInt(predictionId), isYes],
       value: ethers.parseEther(amount.toString()),
@@ -625,7 +625,10 @@ const NotificationItem: React.FC<{
         <div className="notification-title">{notification.title}</div>
         <div className="notification-message">{notification.message}</div>
       </div>
-      <button className="notification-close" onClick={() => setIsVisible(false)}>
+      <button className="notification-close" onClick={() => {
+        setIsVisible(false);
+        setTimeout(onRemove, 300); // Remove after animation
+      }}>
         ✕
       </button>
     </div>

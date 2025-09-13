@@ -2,16 +2,18 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../../../lib/contract';
+import { CONTRACTS, getV1Contract, getV2Contract, getContractForPrediction } from '../../../lib/contract';
 import { ethers } from 'ethers';
 import { useRedisPredictions } from '../../../lib/hooks/useRedisPredictions';
 import { RedisPrediction, RedisUserStake, UserTransaction } from '../../../lib/types/redis';
 import { generateBasescanUrl, generateTransactionId } from '../../../lib/utils/redis-utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { LegacyCard } from './LegacyCard';
 import './EnhancedUserDashboard.css';
 
 interface PredictionWithStakes extends RedisPrediction {
-  userStake?: {
+  userStakes?: {
+    ETH?: {
     predictionId: string;
     yesAmount: number;
     noAmount: number;
@@ -20,6 +22,17 @@ interface PredictionWithStakes extends RedisPrediction {
     potentialProfit: number;
     canClaim: boolean;
     isWinner: boolean;
+    };
+    SWIPE?: {
+      predictionId: string;
+      yesAmount: number;
+      noAmount: number;
+      claimed: boolean;
+      potentialPayout: number;
+      potentialProfit: number;
+      canClaim: boolean;
+      isWinner: boolean;
+    };
   };
   status: 'active' | 'resolved' | 'expired' | 'cancelled';
 }
@@ -148,17 +161,182 @@ export function EnhancedUserDashboard() {
       
       for (const prediction of predictions) {
         try {
-          console.log(`🔍 Fetching stake for prediction ${prediction.id} and user ${address.toLowerCase()}`);
+          console.log(`🔍 Processing prediction ${prediction.id}...`);
+          
+          // Check if this is a V1 prediction
+          const isV1 = prediction.id.startsWith('pred_v1_');
+          
+          // For V1 predictions, show all (even without user stakes)
+          // For V2 predictions, only show if user has stakes
+          if (isV1) {
+            console.log(`📋 V1 prediction - checking for user stakes: ${prediction.id}`);
+            
+            // Check if user has stakes in this V1 prediction
+            const stakeInfo = await fetch(`/api/stakes?predictionId=${prediction.id}&userId=${address.toLowerCase()}`);
+            const stakeData = await stakeInfo.json();
+            
+            let userStakes = {};
+            
+            if (stakeData.success && stakeData.data.length > 0) {
+              console.log(`💰 Found ${stakeData.data.length} V1 stakes for prediction ${prediction.id}:`, stakeData.data);
+              
+              // Process V1 stakes (they are always ETH)
+              for (const userStake of stakeData.data) {
+                if (userStake.yesAmount > 0 || userStake.noAmount > 0) {
+                  console.log(`💰 Processing V1 ETH stake:`, userStake);
+                  
+                  // In V1, user can only stake on one side, so determine which side
+                  const isYesStake = userStake.yesAmount > 0;
+                  const isNoStake = userStake.noAmount > 0;
+                  
+                  // This should never happen in V1, but just in case
+                  if (isYesStake && isNoStake) {
+                    console.warn(`⚠️ V1 user has stakes on both sides - this shouldn't happen!`, userStake);
+                    // Use the larger stake
+                    const useYes = userStake.yesAmount >= userStake.noAmount;
+                    console.log(`⚠️ Using ${useYes ? 'YES' : 'NO'} stake: ${useYes ? userStake.yesAmount : userStake.noAmount}`);
+                  }
+                  
+                  // Determine which side user staked on (should be only one in V1)
+                  const userStakedYes = userStake.yesAmount > 0;
+                  const userStakedNo = userStake.noAmount > 0;
+                  
+                  let potentialPayout = 0;
+                  let potentialProfit = 0;
+                  let canClaim = false;
+                  let isWinner = false;
+                  const userStakeAmount = userStake.yesAmount + userStake.noAmount;
+
+                  // Calculate payout for resolved predictions
+                  if (prediction.resolved && !userStake.claimed) {
+                    const winnersPool = prediction.outcome ? prediction.yesTotalAmount : prediction.noTotalAmount;
+                    const losersPool = prediction.outcome ? prediction.noTotalAmount : prediction.yesTotalAmount;
+                    const platformFee = losersPool * 0.01; // 1% platform fee
+                    const netLosersPool = losersPool - platformFee;
+                    
+                    if (prediction.outcome && userStakedYes) {
+                      // User bet YES and won
+                      isWinner = true;
+                      potentialPayout = userStake.yesAmount + (userStake.yesAmount / winnersPool) * netLosersPool;
+                      potentialProfit = potentialPayout - userStake.yesAmount;
+                      canClaim = true;
+                    } else if (!prediction.outcome && userStakedNo) {
+                      // User bet NO and won
+                      isWinner = true;
+                      potentialPayout = userStake.noAmount + (userStake.noAmount / winnersPool) * netLosersPool;
+                      potentialProfit = potentialPayout - userStake.noAmount;
+                      canClaim = true;
+                    } else {
+                      // User lost - they staked on the losing side
+                      isWinner = false;
+                      potentialPayout = 0;
+                      potentialProfit = -(userStakedYes ? userStake.yesAmount : userStake.noAmount);
+                      canClaim = false;
+                    }
+                  } else if (prediction.cancelled && !userStake.claimed) {
+                    // Full refund for cancelled predictions
+                    potentialPayout = userStakedYes ? userStake.yesAmount : userStake.noAmount;
+                    potentialProfit = 0;
+                    canClaim = true;
+                  } else if (!prediction.resolved && !prediction.cancelled && prediction.deadline > Date.now() / 1000) {
+                    // Active prediction - calculate potential payout based on current pool
+                    const yesPool = prediction.yesTotalAmount || 0;
+                    const noPool = prediction.noTotalAmount || 0;
+                    
+                    if (userStakedYes) {
+                      // User bet YES - calculate potential payout if YES wins
+                      if (yesPool > 0) {
+                        const platformFee = noPool * 0.01; // 1% platform fee from losers
+                        const netNoPool = noPool - platformFee;
+                        potentialPayout = userStake.yesAmount + (userStake.yesAmount / yesPool) * netNoPool;
+                        potentialProfit = potentialPayout - userStake.yesAmount;
+                      }
+                    } else if (userStakedNo) {
+                      // User bet NO - calculate potential payout if NO wins
+                      if (noPool > 0) {
+                        const platformFee = yesPool * 0.01; // 1% platform fee from losers
+                        const netYesPool = yesPool - platformFee;
+                        potentialPayout = userStake.noAmount + (userStake.noAmount / noPool) * netYesPool;
+                        potentialProfit = potentialPayout - userStake.noAmount;
+                      }
+                    }
+                    canClaim = false; // Can't claim until resolved
+                  } else if (prediction.resolved && userStake.claimed) {
+                    // Already claimed - show as claimed with calculated payout
+                    const winnersPool = prediction.outcome ? prediction.yesTotalAmount : prediction.noTotalAmount;
+                    const losersPool = prediction.outcome ? prediction.noTotalAmount : prediction.yesTotalAmount;
+                    const platformFee = losersPool * 0.01; // 1% platform fee
+                    const netLosersPool = losersPool - platformFee;
+
+                    if (prediction.outcome && userStakedYes) {
+                      // User bet YES and won
+                      isWinner = true;
+                      potentialPayout = userStake.yesAmount + (userStake.yesAmount / winnersPool) * netLosersPool;
+                      potentialProfit = potentialPayout - userStake.yesAmount;
+                      canClaim = false; // Already claimed
+                    } else if (!prediction.outcome && userStakedNo) {
+                      // User bet NO and won
+                      isWinner = true;
+                      potentialPayout = userStake.noAmount + (userStake.noAmount / winnersPool) * netLosersPool;
+                      potentialProfit = potentialPayout - userStake.noAmount;
+                      canClaim = false; // Already claimed
+                    } else {
+                      // User lost
+                      isWinner = false;
+                      potentialPayout = 0;
+                      potentialProfit = -(userStakedYes ? userStake.yesAmount : userStake.noAmount);
+                      canClaim = false;
+                    }
+                  }
+
+                  userStakes = {
+                    ETH: {
+                      predictionId: userStake.predictionId,
+                      yesAmount: userStakedYes ? userStake.yesAmount : 0,
+                      noAmount: userStakedNo ? userStake.noAmount : 0,
+                      claimed: userStake.claimed,
+                      potentialPayout,
+                      potentialProfit,
+                      canClaim,
+                      isWinner
+                    }
+                  };
+                }
+              }
+            }
+            
+            // Create V1 prediction with or without stakes
+            const predictionWithStakes: PredictionWithStakes = {
+              ...prediction,
+              userStakes,
+              status: prediction.resolved ? 'resolved' : 
+                     prediction.cancelled ? 'cancelled' :
+                     prediction.deadline <= Date.now() / 1000 ? 'expired' : 'active'
+            };
+
+            userPredictionsWithStakes.push(predictionWithStakes);
+            continue; // Skip V2 processing for V1 predictions
+          }
+          
+          // For V2 predictions, only show if user has stakes
+          console.log(`🔍 Fetching stake for V2 prediction ${prediction.id} and user ${address.toLowerCase()}`);
           const stakeInfo = await fetch(`/api/stakes?predictionId=${prediction.id}&userId=${address.toLowerCase()}`);
           const stakeData = await stakeInfo.json();
           
           console.log(`🔍 API response for prediction ${prediction.id}:`, stakeData);
           
+          // Only process V2 predictions if user has stakes
           if (stakeData.success && stakeData.data.length > 0) {
-            const userStake = stakeData.data[0];
+            console.log(`💰 Found ${stakeData.data.length} stakes for prediction ${prediction.id}:`, stakeData.data);
+            
+            // Group stakes by token type
+            const stakesByToken: { [key: string]: any } = {};
+            
+            for (const userStake of stakeData.data) {
             if (userStake.yesAmount > 0 || userStake.noAmount > 0) {
-              console.log(`💰 Found stake for prediction ${prediction.id}:`, userStake);
-              console.log(`🔍 Stake claimed status: ${userStake.claimed}, Prediction resolved: ${prediction.resolved}`);
+                const tokenType = userStake.tokenType || 'ETH'; // Default to ETH for V1 stakes
+                console.log(`💰 Processing ${tokenType} stake:`, userStake);
+                console.log(`💰 TokenType from API:`, userStake.tokenType);
               
               let potentialPayout = 0;
               let potentialProfit = 0;
@@ -166,10 +344,15 @@ export function EnhancedUserDashboard() {
               let isWinner = false;
               const userStakeAmount = userStake.yesAmount + userStake.noAmount;
 
+              // Get the correct pools based on token type
+              const isSwipeStake = tokenType === 'SWIPE';
+              const yesPool = isSwipeStake ? (prediction.swipeYesTotalAmount || 0) : (prediction.yesTotalAmount || 0);
+              const noPool = isSwipeStake ? (prediction.swipeNoTotalAmount || 0) : (prediction.noTotalAmount || 0);
+
               // Calculate payout for resolved predictions
               if (prediction.resolved && !userStake.claimed) {
-                const winnersPool = prediction.outcome ? prediction.yesTotalAmount : prediction.noTotalAmount;
-                const losersPool = prediction.outcome ? prediction.noTotalAmount : prediction.yesTotalAmount;
+                const winnersPool = prediction.outcome ? yesPool : noPool;
+                const losersPool = prediction.outcome ? noPool : yesPool;
                 const platformFee = losersPool * 0.01; // 1% platform fee
                 const netLosersPool = losersPool - platformFee;
 
@@ -199,8 +382,6 @@ export function EnhancedUserDashboard() {
                 canClaim = true;
               } else if (!prediction.resolved && !prediction.cancelled && prediction.deadline > Date.now() / 1000) {
                 // Active prediction - calculate potential payout based on current pool
-                const yesPool = prediction.yesTotalAmount || 0;
-                const noPool = prediction.noTotalAmount || 0;
                 
                 if (userStake.yesAmount > 0) {
                   // User bet YES - calculate potential payout if YES wins
@@ -222,8 +403,8 @@ export function EnhancedUserDashboard() {
                 canClaim = false; // Can't claim until resolved
               } else if (prediction.resolved && userStake.claimed) {
                 // Already claimed - show as claimed with calculated payout
-                const winnersPool = prediction.outcome ? prediction.yesTotalAmount : prediction.noTotalAmount;
-                const losersPool = prediction.outcome ? prediction.noTotalAmount : prediction.yesTotalAmount;
+                const winnersPool = prediction.outcome ? yesPool : noPool;
+                const losersPool = prediction.outcome ? noPool : yesPool;
                 const platformFee = losersPool * 0.01; // 1% platform fee
                 const netLosersPool = losersPool - platformFee;
 
@@ -248,26 +429,33 @@ export function EnhancedUserDashboard() {
                 }
               }
 
-              const finalStake = {
-                predictionId: prediction.id,
-                yesAmount: userStake.yesAmount || 0,
-                noAmount: userStake.noAmount || 0,
-                claimed: userStake.claimed || false,
+                stakesByToken[tokenType] = {
+                  predictionId: userStake.predictionId,
+                  yesAmount: userStake.yesAmount,
+                  noAmount: userStake.noAmount,
+                  claimed: userStake.claimed,
                 potentialPayout,
                 potentialProfit,
                 canClaim,
                 isWinner
               };
-              
-              console.log(`📊 Final stake data for prediction ${prediction.id}:`, finalStake);
-              
-              userPredictionsWithStakes.push({
+              console.log(`💰 Saved ${tokenType} stake to stakesByToken:`, stakesByToken[tokenType]);
+              }
+            }
+            
+            console.log(`💰 Final stakesByToken for prediction ${prediction.id}:`, stakesByToken);
+            
+            // Only add prediction if there are stakes
+            if (Object.keys(stakesByToken).length > 0) {
+              const predictionWithStakes: PredictionWithStakes = {
                 ...prediction,
-                userStake: finalStake,
-                status: prediction.cancelled ? 'cancelled' :
-                        prediction.resolved ? 'resolved' :
-                        prediction.deadline < Date.now() / 1000 ? 'expired' : 'active'
-              });
+                userStakes: stakesByToken,
+                status: prediction.resolved ? 'resolved' : 
+                       prediction.cancelled ? 'cancelled' :
+                       prediction.deadline <= Date.now() / 1000 ? 'expired' : 'active'
+              };
+
+              userPredictionsWithStakes.push(predictionWithStakes);
             }
           }
         } catch (error) {
@@ -279,7 +467,11 @@ export function EnhancedUserDashboard() {
       console.log(`📊 User predictions data:`, userPredictionsWithStakes);
       
       // Check if any predictions have claimed status
-      const claimedPredictions = userPredictionsWithStakes.filter(p => p.userStake?.claimed);
+      const claimedPredictions = userPredictionsWithStakes.filter(p => {
+        const ethStake = p.userStakes?.ETH;
+        const swipeStake = p.userStakes?.SWIPE;
+        return ethStake?.claimed || swipeStake?.claimed;
+      });
       console.log(`📊 Claimed predictions:`, claimedPredictions);
       
       setUserPredictions(userPredictionsWithStakes);
@@ -288,7 +480,7 @@ export function EnhancedUserDashboard() {
     } finally {
       setLoadingStakes(false);
     }
-  }, [address, allPredictions, predictionsLoading]);
+  }, [address, allPredictions, predictionsLoading, userPredictions]);
 
   // No auto-refresh - data loads once on page load
 
@@ -306,7 +498,7 @@ export function EnhancedUserDashboard() {
   }, [allPredictions, address]);
 
   // Handle claim reward
-  const handleClaimReward = async (predictionId: string) => {
+  const handleClaimReward = async (predictionId: string, tokenType?: 'ETH' | 'SWIPE') => {
     if (!address) {
       alert('❌ Please connect your wallet first');
       return;
@@ -317,7 +509,18 @@ export function EnhancedUserDashboard() {
       // Check if this is a blockchain prediction (starts with pred_)
       if (predictionId.startsWith('pred_')) {
         // Extract numeric ID for blockchain transaction
-        const numericId = parseInt(predictionId.replace('pred_', ''));
+        let numericId: number;
+        
+        if (predictionId.startsWith('pred_v1_')) {
+          // V1 prediction: pred_v1_9 -> 9
+          numericId = parseInt(predictionId.replace('pred_v1_', ''));
+        } else if (predictionId.startsWith('pred_v2_')) {
+          // V2 prediction: pred_v2_9 -> 9
+          numericId = parseInt(predictionId.replace('pred_v2_', ''));
+        } else {
+          // Legacy prediction: pred_9 -> 9
+          numericId = parseInt(predictionId.replace('pred_', ''));
+        }
         
         if (isNaN(numericId)) {
           alert('❌ Invalid prediction ID');
@@ -333,11 +536,21 @@ export function EnhancedUserDashboard() {
           return;
         }
 
+        // Determine which contract to use based on prediction ID
+        const isV1 = predictionId.startsWith('pred_v1_');
+        const contract = isV1 ? CONTRACTS.V1 : CONTRACTS.V2;
+        
+        console.log(`🎯 Using ${isV1 ? 'V1' : 'V2'} contract for claim`);
+
+        // Determine function name based on token type
+        const functionName = tokenType === 'SWIPE' ? 'claimRewardWithToken' : 'claimReward';
+        console.log(`🎯 Claiming ${tokenType || 'ETH'} reward using function: ${functionName}`);
+
         // Call blockchain claim transaction with callbacks
         writeContract({
-          address: CONTRACT_ADDRESS as `0x${string}`,
-          abi: CONTRACT_ABI,
-          functionName: 'claimReward',
+          address: contract.address as `0x${string}`,
+          abi: contract.abi,
+          functionName: functionName,
           args: [BigInt(numericId)],
         }, {
           onSuccess: async (txHash: string) => {
@@ -543,14 +756,28 @@ export function EnhancedUserDashboard() {
   const cancelledPredictions = userPredictions.filter(p => p.status === 'cancelled');
   
   // Group all user predictions by win/loss (including claimed ones)
-  const wonPredictions = userPredictions.filter(p => p.userStake?.isWinner && p.status === 'resolved');
-  const lostPredictions = userPredictions.filter(p => !p.userStake?.isWinner && (p.userStake?.potentialProfit || 0) < 0 && p.status === 'resolved');
+  const wonPredictions = userPredictions.filter(p => {
+    const ethStake = p.userStakes?.ETH;
+    const swipeStake = p.userStakes?.SWIPE;
+    return (ethStake?.isWinner || swipeStake?.isWinner) && p.status === 'resolved';
+  });
+  const lostPredictions = userPredictions.filter(p => {
+    const ethStake = p.userStakes?.ETH;
+    const swipeStake = p.userStakes?.SWIPE;
+    const ethLost = ethStake && !ethStake.isWinner && (ethStake.potentialProfit || 0) < 0;
+    const swipeLost = swipeStake && !swipeStake.isWinner && (swipeStake.potentialProfit || 0) < 0;
+    return (ethLost || swipeLost) && p.status === 'resolved';
+  });
   
   // Filter predictions based on selected filter
   const getFilteredPredictions = () => {
     switch (selectedFilter) {
       case 'ready-to-claim':
-        return userPredictions.filter(p => p.userStake?.canClaim && !p.userStake?.claimed);
+        return userPredictions.filter(p => {
+          const ethStake = p.userStakes?.ETH;
+          const swipeStake = p.userStakes?.SWIPE;
+          return (ethStake?.canClaim && !ethStake?.claimed) || (swipeStake?.canClaim && !swipeStake?.claimed);
+        });
       case 'active':
         return activePredictions;
       case 'won':
@@ -562,21 +789,62 @@ export function EnhancedUserDashboard() {
       case 'cancelled':
         return cancelledPredictions;
       case 'claimed':
-        return resolvedPredictions.filter(p => p.userStake?.claimed);
+        return resolvedPredictions.filter(p => {
+          const ethStake = p.userStakes?.ETH;
+          const swipeStake = p.userStakes?.SWIPE;
+          return ethStake?.claimed || swipeStake?.claimed;
+        });
       case 'all':
         return userPredictions;
       default:
-        return userPredictions.filter(p => p.userStake?.canClaim && !p.userStake?.claimed);
+        return userPredictions.filter(p => {
+          const ethStake = p.userStakes?.ETH;
+          const swipeStake = p.userStakes?.SWIPE;
+          return (ethStake?.canClaim && !ethStake?.claimed) || (swipeStake?.canClaim && !swipeStake?.claimed);
+        });
     }
   };
   
   const filteredPredictions = getFilteredPredictions();
 
-  // Calculate totals
-  const totalStaked = userPredictions.reduce((sum, p) => sum + (p.userStake?.yesAmount || 0) + (p.userStake?.noAmount || 0), 0);
-  const totalPotentialPayout = userPredictions.reduce((sum, p) => sum + (p.userStake?.potentialPayout || 0), 0);
-  const totalPotentialProfit = userPredictions.reduce((sum, p) => sum + (p.userStake?.potentialProfit || 0), 0);
-  const canClaimCount = userPredictions.filter(p => p.userStake?.canClaim && !p.userStake?.claimed).length;
+  // Calculate totals - separate ETH and SWIPE
+  const ethTotalStaked = userPredictions.reduce((sum, p) => {
+    const ethStake = p.userStakes?.ETH;
+    const ethAmount = (ethStake?.yesAmount || 0) + (ethStake?.noAmount || 0);
+    return sum + ethAmount;
+  }, 0);
+  
+  const swipeTotalStaked = userPredictions.reduce((sum, p) => {
+    const swipeStake = p.userStakes?.SWIPE;
+    const swipeAmount = (swipeStake?.yesAmount || 0) + (swipeStake?.noAmount || 0);
+    return sum + swipeAmount;
+  }, 0);
+  
+  const ethTotalPotentialPayout = userPredictions.reduce((sum, p) => {
+    const ethStake = p.userStakes?.ETH;
+    return sum + (ethStake?.potentialPayout || 0);
+  }, 0);
+  
+  const swipeTotalPotentialPayout = userPredictions.reduce((sum, p) => {
+    const swipeStake = p.userStakes?.SWIPE;
+    return sum + (swipeStake?.potentialPayout || 0);
+  }, 0);
+  
+  const ethTotalPotentialProfit = userPredictions.reduce((sum, p) => {
+    const ethStake = p.userStakes?.ETH;
+    return sum + (ethStake?.potentialProfit || 0);
+  }, 0);
+  
+  const swipeTotalPotentialProfit = userPredictions.reduce((sum, p) => {
+    const swipeStake = p.userStakes?.SWIPE;
+    return sum + (swipeStake?.potentialProfit || 0);
+  }, 0);
+  
+  const canClaimCount = userPredictions.filter(p => {
+    const ethStake = p.userStakes?.ETH;
+    const swipeStake = p.userStakes?.SWIPE;
+    return (ethStake?.canClaim && !ethStake?.claimed) || (swipeStake?.canClaim && !swipeStake?.claimed);
+  }).length;
 
   if (!address) {
     return (
@@ -621,21 +889,40 @@ export function EnhancedUserDashboard() {
 
       {/* Summary Stats */}
       <div className="summary-stats">
-        <div className="stat-card">
-          <h3>Total<br/>Staked</h3>
-          <p className="stat-value-total">{formatEth(totalStaked)} ETH</p>
+        {/* ETH Stats */}
+        <div className="stat-card eth-card">
+          <h3>ETH Total<br/>Staked</h3>
+          <p className="stat-value-total">{formatEth(ethTotalStaked)} ETH</p>
         </div>
-        <div className="stat-card">
-          <h3>Potential<br/>Payout</h3>
-          <p className="stat-value-payout">{formatEth(totalPotentialPayout)} ETH</p>
+        <div className="stat-card eth-card">
+          <h3>ETH Potential<br/>Payout</h3>
+          <p className="stat-value-payout">{formatEth(ethTotalPotentialPayout)} ETH</p>
         </div>
-        <div className="stat-card">
-          <h3>Potential<br/>Profit</h3>
-          <p className={`stat-value-profit ${totalPotentialProfit >= 0 ? 'profit' : 'loss'}`}>
-            {totalPotentialProfit >= 0 ? '+' : ''}{formatEth(totalPotentialProfit)} ETH
+        <div className="stat-card eth-card">
+          <h3>ETH Potential<br/>Profit</h3>
+          <p className={`stat-value-profit ${ethTotalPotentialProfit >= 0 ? 'profit' : 'loss'}`}>
+            {ethTotalPotentialProfit >= 0 ? '+' : ''}{formatEth(ethTotalPotentialProfit)} ETH
           </p>
         </div>
-        <div className="stat-card">
+        
+        {/* SWIPE Stats */}
+        <div className="stat-card swipe-card">
+          <h3>SWIPE Total<br/>Staked</h3>
+          <p className="stat-value-total">{formatEth(swipeTotalStaked)} SWIPE</p>
+        </div>
+        <div className="stat-card swipe-card">
+          <h3>SWIPE Potential<br/>Payout</h3>
+          <p className="stat-value-payout">{formatEth(swipeTotalPotentialPayout)} SWIPE</p>
+        </div>
+        <div className="stat-card swipe-card">
+          <h3>SWIPE Potential<br/>Profit</h3>
+          <p className={`stat-value-profit ${swipeTotalPotentialProfit >= 0 ? 'profit' : 'loss'}`}>
+            {swipeTotalPotentialProfit >= 0 ? '+' : ''}{formatEth(swipeTotalPotentialProfit)} SWIPE
+          </p>
+        </div>
+        
+        {/* General Stats */}
+        <div className="stat-card general-card">
           <h3>Ready to<br/>Claim</h3>
           <p className="stat-value-claim">{canClaimCount} predictions</p>
         </div>
@@ -680,115 +967,30 @@ export function EnhancedUserDashboard() {
           </h3>
           <div className="predictions-grid">
             {filteredPredictions.map((prediction) => {
-              // Determine card class and status badge based on prediction status
-              let cardClass = 'prediction-card';
-              let statusBadge = '';
-              let statusText = '';
+              // Check if this is a V1 prediction
+              const isV1 = prediction.id.startsWith('pred_v1_');
               
-              if (prediction.userStake?.canClaim && !prediction.userStake?.claimed) {
-                cardClass += ' claimable';
-                statusBadge = prediction.cancelled ? 'cancelled' : 'resolved';
-                statusText = prediction.cancelled ? 'CANCELLED' : 'RESOLVED';
-              } else if (prediction.status === 'active') {
-                cardClass += ' active';
-                statusBadge = 'active';
-                statusText = 'ACTIVE';
-              } else if (prediction.userStake?.isWinner) {
-                cardClass += ' won';
-                statusBadge = 'won';
-                statusText = 'WON';
-              } else if (!prediction.userStake?.isWinner && (prediction.userStake?.potentialProfit || 0) < 0) {
-                cardClass += ' lost';
-                statusBadge = 'lost';
-                statusText = 'LOST';
-              } else if (prediction.status === 'expired') {
-                cardClass += ' expired';
-                statusBadge = 'expired';
-                statusText = 'EXPIRED';
-              } else if (prediction.status === 'cancelled') {
-                cardClass += ' cancelled';
-                statusBadge = 'cancelled';
-                statusText = 'CANCELLED';
-              } else if (prediction.userStake?.claimed) {
-                cardClass += ' claimed';
-                statusBadge = 'claimed';
-                statusText = 'CLAIMED';
+              if (isV1) {
+                // Use LegacyCard for V1 predictions
+                return (
+                  <LegacyCard
+                    key={prediction.id}
+                    prediction={prediction}
+                    onClaimReward={handleClaimReward}
+                    isTransactionLoading={isTransactionLoading}
+                  />
+                );
+              } else {
+                // Use LegacyCard for all V2 predictions
+                return (
+                  <LegacyCard
+                    key={prediction.id}
+                    prediction={prediction}
+                    onClaimReward={handleClaimReward}
+                    isTransactionLoading={isTransactionLoading}
+                  />
+                );
               }
-
-              return (
-                <div key={prediction.id} className={cardClass}>
-                  <div className="card-header">
-                    <h4>{prediction.question}</h4>
-                    <span className={`status-badge ${statusBadge}`}>{statusText}</span>
-                  </div>
-                  <div className="card-content">
-                    <p><strong>Your Stake:</strong> {formatEth((prediction.userStake?.yesAmount || 0) + (prediction.userStake?.noAmount || 0))} ETH</p>
-                    
-                    {prediction.status === 'active' ? (
-                      <>
-                        <p><strong>Your Choice:</strong> {(prediction.userStake?.yesAmount || 0) > 0 ? 'YES' : 'NO'}</p>
-                        <p><strong>Potential Payout:</strong> {formatEth(prediction.userStake?.potentialPayout || 0)} ETH</p>
-                        <p><strong>Potential Profit:</strong> 
-                          <span className={(prediction.userStake?.potentialProfit || 0) >= 0 ? 'profit' : 'loss'}>
-                            {(prediction.userStake?.potentialProfit || 0) >= 0 ? '+' : ''}{formatEth(prediction.userStake?.potentialProfit || 0)} ETH
-                          </span>
-                        </p>
-                        <p><strong>Deadline:</strong> {new Date(prediction.deadline * 1000).toLocaleString()}</p>
-                        <p><strong>Time Left:</strong> {Math.max(0, Math.floor((prediction.deadline - Date.now() / 1000) / 3600))} hours</p>
-                      </>
-                    ) : prediction.status === 'expired' ? (
-                      <>
-                        <p><strong>Deadline:</strong> {new Date(prediction.deadline * 1000).toLocaleString()}</p>
-                        <p><strong>Status:</strong> Waiting for admin resolution</p>
-                      </>
-                    ) : prediction.status === 'cancelled' ? (
-                      <>
-                        <p><strong>Refund:</strong> {formatEth(prediction.userStake?.potentialPayout || 0)} ETH</p>
-                        <p><strong>Status:</strong> {prediction.userStake?.claimed ? 'Refunded' : 'Ready to claim refund'}</p>
-                      </>
-                    ) : (
-                      <>
-                        <p><strong>Payout:</strong> {formatEth(prediction.userStake?.potentialPayout || 0)} ETH</p>
-                        <p><strong>Profit:</strong> 
-                          <span className={(prediction.userStake?.potentialProfit || 0) >= 0 ? 'profit' : 'loss'}>
-                            {(prediction.userStake?.potentialProfit || 0) >= 0 ? '+' : ''}{formatEth(prediction.userStake?.potentialProfit || 0)} ETH
-                          </span>
-                        </p>
-                        <p><strong>Outcome:</strong> {prediction.outcome ? 'YES' : 'NO'}</p>
-                        {prediction.userStake?.claimed && <p><strong>Status:</strong> Claimed</p>}
-                        {!prediction.userStake?.claimed && prediction.userStake?.isWinner && <p><strong>Status:</strong> Ready to claim</p>}
-                        {!prediction.userStake?.isWinner && (prediction.userStake?.potentialProfit || 0) < 0 && <p><strong>Status:</strong> Lost - no payout</p>}
-                      </>
-                    )}
-                  </div>
-                  
-                  {/* Show claim button only for claimable predictions */}
-                  {(prediction.userStake?.canClaim && !prediction.userStake?.claimed) && (
-                    <div className="card-actions">
-                      <button 
-                        onClick={() => handleClaimReward(prediction.id)}
-                        disabled={isTransactionLoading}
-                        className="claim-btn"
-                      >
-                        {isTransactionLoading ? 'Processing...' : '💰 Claim Reward'}
-                      </button>
-                    </div>
-                  )}
-                  
-                  {/* Show disabled button for active predictions */}
-                  {prediction.status === 'active' && (
-                    <div className="card-actions">
-                      <button 
-                        disabled
-                        className="claim-btn disabled"
-                        title="Prediction is still active - wait for resolution"
-                      >
-                        ⏳ Claim Reward (Active)
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
             })}
           </div>
         </div>

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAccount, useWriteContract } from 'wagmi';
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../../../lib/contract';
+import { CONTRACTS, getV2Contract } from '../../../lib/contract';
 import './SystemSettings.css';
 
 export function SystemSettings() {
@@ -33,8 +33,8 @@ export function SystemSettings() {
     setIsLoading('platformFee');
     try {
       await writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI,
+        address: CONTRACTS.V2.address as `0x${string}`,
+        abi: CONTRACTS.V2.abi,
         functionName: 'setPlatformFee',
         args: [BigInt(settings.platformFee * 100)], // Convert to basis points
       });
@@ -51,8 +51,8 @@ export function SystemSettings() {
     setIsLoading('stakeLimits');
     try {
       await writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI,
+        address: CONTRACTS.V2.address as `0x${string}`,
+        abi: CONTRACTS.V2.abi,
         functionName: 'setStakeLimits',
         args: [
           BigInt(settings.minStake * 10**18), // Convert to wei
@@ -72,8 +72,8 @@ export function SystemSettings() {
     setIsLoading('approvals');
     try {
       await writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI,
+        address: CONTRACTS.V2.address as `0x${string}`,
+        abi: CONTRACTS.V2.abi,
         functionName: 'setRequiredApprovals',
         args: [BigInt(settings.requiredApprovals)],
       });
@@ -90,8 +90,8 @@ export function SystemSettings() {
     setIsLoading('publicCreation');
     try {
       await writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI,
+        address: CONTRACTS.V2.address as `0x${string}`,
+        abi: CONTRACTS.V2.abi,
         functionName: 'setPublicCreation',
         args: [!settings.publicCreation],
       });
@@ -110,9 +110,10 @@ export function SystemSettings() {
     try {
       const functionName = settings.paused ? 'unpause' : 'pause';
       await writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI,
+        address: CONTRACTS.V2.address as `0x${string}`,
+        abi: CONTRACTS.V2.abi,
         functionName,
+        args: []
       });
       setSettings(prev => ({ ...prev, paused: !prev.paused }));
       console.log(`✅ Contract ${settings.paused ? 'unpaused' : 'paused'} successfully`);

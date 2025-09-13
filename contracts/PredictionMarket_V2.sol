@@ -15,6 +15,8 @@ contract PredictionMarketV2 {
         string imageUrl;
         uint256 yesTotalAmount;
         uint256 noTotalAmount;
+        uint256 swipeYesTotalAmount;  // $SWIPE staking pool
+        uint256 swipeNoTotalAmount;   // $SWIPE staking pool
         uint256 deadline;
         uint256 resolutionDeadline;
         bool resolved;
@@ -49,6 +51,12 @@ contract PredictionMarketV2 {
         bool claimed;
     }
 
+    struct UserSwipeStake {
+        uint256 yesAmount;
+        uint256 noAmount;
+        bool claimed;
+    }
+
     struct PayoutInfo {
         uint256 payout;
         uint256 profit;
@@ -65,37 +73,45 @@ contract PredictionMarketV2 {
     struct ContractStats {
         uint256 totalPredictions;
         uint256 platformFee;
-        uint256 collectedFees;
-        uint256 minStake;
-        uint256 maxStake;
+        uint256 ethFees;
+        uint256 swipeFees;
+        uint256 ethMinStake;
+        uint256 ethMaxStake;
+        uint256 swipeMinStake;
+        uint256 swipeMaxStake;
         uint256 contractBalance;
     }
 
     // ============ STORAGE ============
     mapping(uint256 => Prediction) public predictions;
     mapping(uint256 => mapping(address => UserStake)) public userStakes;
+    mapping(uint256 => mapping(address => UserSwipeStake)) public userSwipeStakes;
     mapping(uint256 => address[]) public participants;
     mapping(address => bool) public approvedCreators;
     mapping(address => bool) public supportedTokens; // Supported ERC20 tokens
+    mapping(address => bool) public approvers; // Approvers who can approve predictions
 
     // APPROVAL SYSTEM
     mapping(uint256 => mapping(address => bool)) public predictionApprovals;
-    mapping(address => bool) public approvers;
     mapping(uint256 => uint256) public approvalCount;
 
     uint256 public nextPredictionId = 1;
     uint256 public platformFeePercentage = 100;    // 1% = 100 basis points
 
     // FLEXIBLE STAKE LIMITS
-    uint256 public minimumStake = 0.00001 ether;   // 0.00001 ETH minimum
-    uint256 public maximumStake = 100 ether;       // 100 ETH maximum
+    uint256 public ethMinimumStake = 0.00001 ether;   // 0.00001 ETH minimum
+    uint256 public ethMaximumStake = 100 ether;       // 100 ETH maximum
+    uint256 public swipeMinimumStake = 10000 * 10**18; // 10000 $SWIPE minimum
+    uint256 public swipeMaximumStake = type(uint256).max; // Unlimited $SWIPE maximum
 
-    uint256 public collectedFees;                  // Platform fees collected
+    uint256 public ethFees;                        // ETH fees collected
+    uint256 public swipeFees;                      // $SWIPE fees collected
     uint256 public maxResolutionTime = 7 days;     // Max time to resolve after deadline
 
     // DYNAMIC CREATION FEES - per token type
     mapping(address => uint256) public creationFees; // tokenAddress => feeAmount
     address public constant ETH_ADDRESS = address(0);
+    address public swipeTokenAddress;               // $SWIPE token address
 
     // FLEXIBLE APPROVAL SYSTEM
     uint256 public requiredApprovals = 0;          // Can be set to 0 for public creation
@@ -167,6 +183,7 @@ contract PredictionMarketV2 {
 
     event TokenSupported(address indexed token, bool supported);
     event CreationFeeUpdated(address indexed token, uint256 newFee);
+    event PlatformFeeUpdated(uint256 oldFee, uint256 newFee);
 
     // ============ MODIFIERS ============
     modifier onlyOwner() {
@@ -230,14 +247,19 @@ contract PredictionMarketV2 {
     }
 
     // ============ CONSTRUCTOR ============
-    constructor() {
+    constructor(address _swipeTokenAddress) {
         owner = msg.sender;
+        swipeTokenAddress = _swipeTokenAddress;
+        approvers[msg.sender] = true; // Owner is always an approver
 
         // Initialize default creation fee for ETH
-        creationFees[ETH_ADDRESS] = 0.01 ether;
+        creationFees[ETH_ADDRESS] = 0.0001 ether;
+        
+        // Initialize default creation fee for $SWIPE
+        creationFees[_swipeTokenAddress] = 200000 * 10**18; // 200,000 $SWIPE tokens
 
-        // Set default required approvals to 0 for public creation
-        requiredApprovals = 0;
+        // Set default required approvals to 1 (need 1 approver)
+        requiredApprovals = 1;
     }
 
     // ============ CORE FUNCTIONS ============
@@ -315,9 +337,9 @@ contract PredictionMarketV2 {
             require(_creationAmount >= requiredFee, "Pay creation fee");
 
             if (_creationToken == ETH_ADDRESS) {
-                collectedFees += _creationAmount;
+                ethFees += _creationAmount;
             } else {
-                collectedFees += _creationAmount; // For simplicity, track in ETH equivalent
+                swipeFees += _creationAmount;
             }
         }
 
@@ -333,6 +355,8 @@ contract PredictionMarketV2 {
             imageUrl: _imageUrl,
             yesTotalAmount: 0,
             noTotalAmount: 0,
+            swipeYesTotalAmount: 0,
+            swipeNoTotalAmount: 0,
             deadline: deadline,
             resolutionDeadline: deadline + maxResolutionTime,
             resolved: false,
@@ -380,14 +404,37 @@ contract PredictionMarketV2 {
         uint256 winnersPool = _outcome ? prediction.yesTotalAmount : prediction.noTotalAmount;
         uint256 losersPool = _outcome ? prediction.noTotalAmount : prediction.yesTotalAmount;
 
-        // Calculate platform fee: 1% from losers pool
-        uint256 platformFee = 0;
-        if (losersPool > 0 && winnersPool > 0) {
-            platformFee = (losersPool * platformFeePercentage) / 10000;
-            collectedFees += platformFee;
+        // Calculate platform fee: 1% from losers pool (ETH)
+        uint256 ethPlatformFee = 0;
+        if (losersPool > 0) {
+            if (winnersPool > 0) {
+                // Normal case: winners exist
+                ethPlatformFee = (losersPool * platformFeePercentage) / 10000;
+                ethFees += ethPlatformFee;
+            } else {
+                // Edge case: no winners, platform takes all
+                ethPlatformFee = losersPool;
+                ethFees += losersPool;
+            }
         }
 
-        emit PredictionResolved(_predictionId, _outcome, winnersPool, losersPool, platformFee);
+        // Calculate platform fee: 1% from $SWIPE losers pool
+        uint256 swipeLosersPool = prediction.outcome ? prediction.swipeNoTotalAmount : prediction.swipeYesTotalAmount;
+        uint256 swipeWinnersPool = prediction.outcome ? prediction.swipeYesTotalAmount : prediction.swipeNoTotalAmount;
+        uint256 swipePlatformFee = 0;
+        if (swipeLosersPool > 0) {
+            if (swipeWinnersPool > 0) {
+                // Normal case: winners exist
+                swipePlatformFee = (swipeLosersPool * platformFeePercentage) / 10000;
+                swipeFees += swipePlatformFee;
+            } else {
+                // Edge case: no winners, platform takes all
+                swipePlatformFee = swipeLosersPool;
+                swipeFees += swipeLosersPool;
+            }
+        }
+
+        emit PredictionResolved(_predictionId, _outcome, winnersPool, losersPool, ethPlatformFee);
     }
 
     /**
@@ -418,7 +465,7 @@ contract PredictionMarketV2 {
     }
 
     /**
-     * @dev Reject a prediction with reason
+     * @dev Reject a prediction with reason and refund creation fee
      */
     function rejectPrediction(uint256 _predictionId, string memory _reason)
         external
@@ -432,6 +479,22 @@ contract PredictionMarketV2 {
 
         // Cancel the prediction
         prediction.cancelled = true;
+
+        // Refund creation fee to creator
+        if (prediction.creationToken == ETH_ADDRESS) {
+            // Refund ETH
+            if (prediction.creationTokenAmount > 0) {
+                (bool success, ) = payable(prediction.creator).call{value: prediction.creationTokenAmount}("");
+                require(success, "ETH refund failed");
+                emit EmergencyRefund(_predictionId, prediction.creator, prediction.creationTokenAmount);
+            }
+        } else {
+            // Refund $SWIPE
+            if (prediction.creationTokenAmount > 0) {
+                IERC20(prediction.creationToken).transfer(prediction.creator, prediction.creationTokenAmount);
+                emit EmergencyRefund(_predictionId, prediction.creator, prediction.creationTokenAmount);
+            }
+        }
 
         emit PredictionRejected(_predictionId, msg.sender, _reason);
         emit PredictionCancelled(_predictionId, _reason);
@@ -451,7 +514,7 @@ contract PredictionMarketV2 {
     }
 
     /**
-     * @dev Users claim their rewards manually
+     * @dev Users claim their ETH rewards manually
      */
     function claimReward(uint256 _predictionId)
         external
@@ -464,9 +527,10 @@ contract PredictionMarketV2 {
         require(!userStake.claimed, "Already claimed");
         require(
             userStake.yesAmount > 0 || userStake.noAmount > 0,
-            "No stake found"
+            "No ETH stake found"
         );
 
+        // REENTRANCY GUARD: Set claimed BEFORE transfer
         userStake.claimed = true;
         uint256 payout = 0;
         uint256 originalStake = userStake.yesAmount + userStake.noAmount;
@@ -498,7 +562,87 @@ contract PredictionMarketV2 {
     }
 
     /**
-     * @dev Place stake on YES or NO
+     * @dev Users claim their $SWIPE rewards manually
+     */
+    function claimRewardWithToken(uint256 _predictionId)
+        external
+        validPrediction(_predictionId)
+    {
+        Prediction storage prediction = predictions[_predictionId];
+        require(prediction.resolved || prediction.cancelled, "Not resolved yet");
+
+        UserSwipeStake storage userSwipeStake = userSwipeStakes[_predictionId][msg.sender];
+        require(!userSwipeStake.claimed, "Already claimed");
+        require(
+            userSwipeStake.yesAmount > 0 || userSwipeStake.noAmount > 0,
+            "No $SWIPE stake found"
+        );
+
+        // REENTRANCY GUARD: Set claimed BEFORE transfer
+        userSwipeStake.claimed = true;
+        uint256 payout = 0;
+        uint256 originalStake = userSwipeStake.yesAmount + userSwipeStake.noAmount;
+        uint256 profit = 0;
+
+        if (prediction.cancelled) {
+            // Full refund if cancelled
+            payout = originalStake;
+            emit EmergencyRefund(_predictionId, msg.sender, payout);
+        } else {
+            // Calculate proportional winnings for $SWIPE
+            PayoutInfo memory payoutInfo = calculateSwipePayout(_predictionId, msg.sender);
+            payout = payoutInfo.payout;
+            profit = payoutInfo.profit;
+        }
+
+        if (payout > 0) {
+            IERC20(swipeTokenAddress).transfer(msg.sender, payout);
+
+            emit RewardClaimed(
+                _predictionId,
+                msg.sender,
+                payout,
+                originalStake,
+                profit
+            );
+        }
+    }
+
+    /**
+     * @dev Claim refund for cancelled prediction
+     */
+    function claimRefund(uint256 _predictionId)
+        external
+        validPrediction(_predictionId)
+    {
+        Prediction storage prediction = predictions[_predictionId];
+        require(prediction.cancelled, "Prediction not cancelled");
+
+        UserStake storage userStake = userStakes[_predictionId][msg.sender];
+        UserSwipeStake storage userSwipeStake = userSwipeStakes[_predictionId][msg.sender];
+        
+        uint256 ethRefund = userStake.yesAmount + userStake.noAmount;
+        uint256 swipeRefund = userSwipeStake.yesAmount + userSwipeStake.noAmount;
+        
+        require(ethRefund > 0 || swipeRefund > 0, "No stakes to refund");
+        require(!userStake.claimed || !userSwipeStake.claimed, "Already claimed");
+
+        if (ethRefund > 0 && !userStake.claimed) {
+            userStake.claimed = true;
+            (bool success, ) = payable(msg.sender).call{value: ethRefund}("");
+            require(success, "ETH refund failed");
+            emit EmergencyRefund(_predictionId, msg.sender, ethRefund);
+        }
+
+        if (swipeRefund > 0 && !userSwipeStake.claimed) {
+            userSwipeStake.claimed = true;
+            IERC20(swipeTokenAddress).transfer(msg.sender, swipeRefund);
+            emit EmergencyRefund(_predictionId, msg.sender, swipeRefund);
+        }
+    }
+
+    /**
+     * @dev Place stake on YES or NO with ETH
      */
     function placeStake(uint256 _predictionId, bool _isYes)
         external
@@ -509,8 +653,8 @@ contract PredictionMarketV2 {
         canBet(_predictionId)
         whenNotPaused
     {
-        require(msg.value >= minimumStake, "Stake too low");
-        require(msg.value <= maximumStake, "Stake too high");
+        require(msg.value >= ethMinimumStake, "ETH stake too low");
+        require(msg.value <= ethMaximumStake, "ETH stake too high");
 
         Prediction storage prediction = predictions[_predictionId];
         UserStake storage userStake = userStakes[_predictionId][msg.sender];
@@ -536,6 +680,51 @@ contract PredictionMarketV2 {
             msg.value,
             prediction.yesTotalAmount,
             prediction.noTotalAmount
+        );
+    }
+
+    /**
+     * @dev Place stake on YES or NO with $SWIPE token
+     */
+    function placeStakeWithToken(uint256 _predictionId, bool _isYes, uint256 _amount)
+        external
+        validPrediction(_predictionId)
+        beforeDeadline(_predictionId)
+        notResolved(_predictionId)
+        canBet(_predictionId)
+        whenNotPaused
+    {
+        require(_amount >= swipeMinimumStake, "$SWIPE stake too low");
+        require(_amount <= swipeMaximumStake, "$SWIPE stake too high");
+        require(supportedTokens[swipeTokenAddress], "Token not supported");
+
+        // Transfer tokens from user to contract
+        IERC20(swipeTokenAddress).transferFrom(msg.sender, address(this), _amount);
+
+        Prediction storage prediction = predictions[_predictionId];
+        UserSwipeStake storage userSwipeStake = userSwipeStakes[_predictionId][msg.sender];
+
+        // Add to participants list if first time betting
+        if (userSwipeStake.yesAmount == 0 && userSwipeStake.noAmount == 0) {
+            participants[_predictionId].push(msg.sender);
+        }
+
+        // Update user stake and total pools
+        if (_isYes) {
+            userSwipeStake.yesAmount += _amount;
+            prediction.swipeYesTotalAmount += _amount;
+        } else {
+            userSwipeStake.noAmount += _amount;
+            prediction.swipeNoTotalAmount += _amount;
+        }
+
+        emit StakePlaced(
+            _predictionId,
+            msg.sender,
+            _isYes,
+            _amount,
+            prediction.swipeYesTotalAmount,
+            prediction.swipeNoTotalAmount
         );
     }
 
@@ -575,10 +764,16 @@ contract PredictionMarketV2 {
     /**
      * @dev Set minimum and maximum stake limits
      */
-    function setStakeLimits(uint256 _minimum, uint256 _maximum) external onlyOwner {
-        require(_minimum > 0 && _minimum < _maximum, "Invalid limits");
-        minimumStake = _minimum;
-        maximumStake = _maximum;
+    function setEthStakeLimits(uint256 _minimum, uint256 _maximum) external onlyOwner {
+        require(_minimum > 0 && _minimum < _maximum, "Invalid ETH limits");
+        ethMinimumStake = _minimum;
+        ethMaximumStake = _maximum;
+    }
+
+    function setSwipeStakeLimits(uint256 _minimum, uint256 _maximum) external onlyOwner {
+        require(_minimum > 0 && _minimum < _maximum, "Invalid $SWIPE limits");
+        swipeMinimumStake = _minimum;
+        swipeMaximumStake = _maximum;
     }
 
     /**
@@ -601,16 +796,26 @@ contract PredictionMarketV2 {
     }
 
     /**
-     * @dev Emergency withdraw all funds
+     * @dev Emergency withdraw only fees (not staking pools)
      */
     function emergencyWithdraw() external onlyOwner {
         require(_paused, "Contract must be paused first");
 
-        uint256 balance = address(this).balance;
-        require(balance > 0, "No funds to withdraw");
+        uint256 ethAmount = ethFees;
+        uint256 swipeAmount = swipeFees;
+        
+        require(ethAmount > 0 || swipeAmount > 0, "No fees to withdraw");
 
-        (bool success, ) = payable(owner).call{value: balance}("");
-        require(success, "Transfer failed");
+        if (ethAmount > 0) {
+            ethFees = 0;
+            (bool success, ) = payable(owner).call{value: ethAmount}("");
+            require(success, "ETH transfer failed");
+        }
+
+        if (swipeAmount > 0) {
+            swipeFees = 0;
+            IERC20(swipeTokenAddress).transfer(owner, swipeAmount);
+        }
     }
 
     // ============ VIEW FUNCTIONS ============
@@ -645,7 +850,7 @@ contract PredictionMarketV2 {
     }
 
     /**
-     * @dev Calculate what user would receive if they claimed now
+     * @dev Calculate what user would receive if they claimed now (ETH)
      */
     function calculatePayout(uint256 _predictionId, address _user)
         public
@@ -665,6 +870,45 @@ contract PredictionMarketV2 {
         uint256 winnersPool = prediction.outcome ? prediction.yesTotalAmount : prediction.noTotalAmount;
         uint256 losersPool = prediction.outcome ? prediction.noTotalAmount : prediction.yesTotalAmount;
         uint256 userWinningStake = prediction.outcome ? userStake.yesAmount : userStake.noAmount;
+
+        // If user didn't bet on winning side or no winners, no payout
+        if (userWinningStake == 0 || winnersPool == 0) {
+            return PayoutInfo(0, 0);
+        }
+
+        // Platform takes 1% fee from losers pool
+        uint256 platformFee = (losersPool * platformFeePercentage) / 10000;
+        uint256 netLosersPool = losersPool - platformFee;
+
+        // User gets: their original winning stake + proportional share of net losers pool
+        uint256 userShareOfProfit = (userWinningStake * netLosersPool) / winnersPool;
+        uint256 payout = userWinningStake + userShareOfProfit;
+        uint256 profit = userShareOfProfit;
+
+        return PayoutInfo(payout, profit);
+    }
+
+    /**
+     * @dev Calculate what user would receive if they claimed now ($SWIPE)
+     */
+    function calculateSwipePayout(uint256 _predictionId, address _user)
+        public
+        view
+        validPrediction(_predictionId)
+        returns (PayoutInfo memory)
+    {
+        Prediction storage prediction = predictions[_predictionId];
+
+        // If not resolved or cancelled, no payout
+        if (!prediction.resolved || prediction.cancelled) {
+            return PayoutInfo(0, 0);
+        }
+
+        UserSwipeStake storage userSwipeStake = userSwipeStakes[_predictionId][_user];
+
+        uint256 winnersPool = prediction.outcome ? prediction.swipeYesTotalAmount : prediction.swipeNoTotalAmount;
+        uint256 losersPool = prediction.outcome ? prediction.swipeNoTotalAmount : prediction.swipeYesTotalAmount;
+        uint256 userWinningStake = prediction.outcome ? userSwipeStake.yesAmount : userSwipeStake.noAmount;
 
         // If user didn't bet on winning side or no winners, no payout
         if (userWinningStake == 0 || winnersPool == 0) {
@@ -804,9 +1048,12 @@ contract PredictionMarketV2 {
         return ContractStats({
             totalPredictions: nextPredictionId - 1,
             platformFee: platformFeePercentage,
-            collectedFees: collectedFees,
-            minStake: minimumStake,
-            maxStake: maximumStake,
+            ethFees: ethFees,
+            swipeFees: swipeFees,
+            ethMinStake: ethMinimumStake,
+            ethMaxStake: ethMaximumStake,
+            swipeMinStake: swipeMinimumStake,
+            swipeMaxStake: swipeMaximumStake,
             contractBalance: address(this).balance
         });
     }
@@ -817,9 +1064,19 @@ contract PredictionMarketV2 {
         approvers[_approver] = _approved;
     }
 
+    function setSwipeTokenAddress(address _swipeTokenAddress) external onlyOwner {
+        swipeTokenAddress = _swipeTokenAddress;
+    }
+
     function setPlatformFee(uint256 _feePercentage) external onlyOwner {
         require(_feePercentage <= 1000, "Fee cannot exceed 10%");
+        uint256 oldFee = platformFeePercentage;
         platformFeePercentage = _feePercentage;
+        emit PlatformFeeUpdated(oldFee, _feePercentage);
+    }
+
+    function getPlatformFee() external view returns (uint256) {
+        return platformFeePercentage;
     }
 
     function setMaxResolutionTime(uint256 _maxTime) external onlyOwner {
@@ -827,14 +1084,22 @@ contract PredictionMarketV2 {
         maxResolutionTime = _maxTime;
     }
 
-    function withdrawFees() external onlyOwner {
-        uint256 amount = collectedFees;
-        require(amount > 0, "No fees to withdraw");
+    function withdrawEthFees() external onlyOwner {
+        uint256 amount = ethFees;
+        require(amount > 0, "No ETH fees to withdraw");
 
-        collectedFees = 0;
+        ethFees = 0;
 
         (bool success, ) = payable(owner).call{value: amount}("");
         require(success, "Transfer failed");
+    }
+
+    function withdrawSwipeFees() external onlyOwner {
+        uint256 amount = swipeFees;
+        require(amount > 0, "No $SWIPE fees to withdraw");
+
+        swipeFees = 0;
+        IERC20(swipeTokenAddress).transfer(owner, amount);
     }
 
     function pause() external onlyOwner {

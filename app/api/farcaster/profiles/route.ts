@@ -1,11 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { NeynarAPIClient, Configuration } from '@neynar/nodejs-sdk';
-
-const config = new Configuration({
-  apiKey: process.env.NEYNAR_API_KEY || '',
-});
-
-const client = new NeynarAPIClient(config);
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,105 +22,61 @@ export async function POST(request: NextRequest) {
     try {
       const profiles = [];
       
+      // Use Neynar's bulk-by-address API to get real Farcaster profiles
+      const addressesParam = addresses.join(',');
+      const neynarUrl = `https://api.neynar.com/v2/farcaster/user/bulk-by-address?addresses=${addressesParam}`;
+      
+      console.log(`🔍 Fetching Farcaster profiles for addresses: ${addressesParam}`);
+      
+      const response = await fetch(neynarUrl, {
+        method: 'GET',
+        headers: {
+          'accept': 'application/json',
+          'api_key': process.env.NEYNAR_API_KEY
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Neynar API error: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log(`✅ Neynar API response:`, data);
+      
+      // Process each address
       for (const address of addresses) {
-        try {
-          // Generate a reasonable FID based on address hash
-          const addressHash = Math.abs(address.split('').reduce((a: number, b: string) => {
-            a = ((a << 5) - a) + b.charCodeAt(0);
-            return a & a;
-          }, 0));
-          
-          // Use a reasonable FID range for Farcaster users
-          const fid = (addressHash % 1000000) + 1; // FID range 1-1000000
-          
-          try {
-            const userResponse = await client.fetchBulkUsers({ fids: [fid] });
-            
-            if (userResponse && userResponse.users && userResponse.users.length > 0) {
-              const user = userResponse.users[0];
-              
-              // Check if user has verified addresses matching our address
-              const hasVerifiedAddress = user.verified_addresses?.eth_addresses?.some(addr => 
-                addr.toLowerCase() === address.toLowerCase()
-              );
-              
-              if (hasVerifiedAddress) {
-                // Real Farcaster profile with verified address
-                profiles.push({
-                  fid: user.fid.toString(),
-                  address: address,
-                  username: user.username,
-                  display_name: user.display_name,
-                  pfp_url: user.pfp_url,
-                  verified_addresses: user.verified_addresses,
-                  isBaseVerified: true
-                });
-              } else {
-                // User exists but address not verified - still use real profile
-                profiles.push({
-                  fid: user.fid.toString(),
-                  address: address,
-                  username: user.username,
-                  display_name: user.display_name,
-                  pfp_url: user.pfp_url,
-                  verified_addresses: {
-                    eth_addresses: [address],
-                    sol_addresses: []
-                  },
-                  isBaseVerified: false
-                });
-              }
-            } else {
-              // No Farcaster profile found - create mock with real FID
-              profiles.push({
-                fid: fid.toString(),
-                address: address,
-                username: `user_${address.slice(2, 6)}`,
-                display_name: `User ${address.slice(2, 6)}`,
-                pfp_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${address.slice(2, 6)}`,
-                verified_addresses: {
-                  eth_addresses: [address],
-                  sol_addresses: []
-                },
-                isBaseVerified: false
-              });
-            }
-          } catch (bulkUserError) {
-            // Fallback to mock profile with real FID
-            profiles.push({
-              fid: fid.toString(),
-              address: address,
-              username: `user_${address.slice(2, 6)}`,
-              display_name: `User ${address.slice(2, 6)}`,
-              pfp_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${address.slice(2, 6)}`,
-              verified_addresses: {
-                eth_addresses: [address],
-                sol_addresses: []
-              },
-              isBaseVerified: false
-            });
-          }
-        } catch (addressError) {
-          console.warn(`Failed to fetch profile for address ${address}:`, addressError);
-          // Final fallback to mock profile
-          const addressHash = Math.abs(address.split('').reduce((a: number, b: string) => {
-            a = ((a << 5) - a) + b.charCodeAt(0);
-            return a & a;
-          }, 0));
-          const fid = (addressHash % 1000000) + 1;
-          
+        const addressLower = address.toLowerCase();
+        const userData = data[addressLower];
+        
+        if (userData && userData.length > 0) {
+          // Found real Farcaster profile
+          const user = userData[0]; // Take the first user if multiple found
           profiles.push({
-            fid: fid.toString(),
+            fid: user.fid.toString(),
             address: address,
-            username: `user_${address.slice(2, 6)}`,
-            display_name: `User ${address.slice(2, 6)}`,
-            pfp_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${address.slice(2, 6)}`,
+            username: user.username,
+            display_name: user.display_name,
+            pfp_url: user.pfp_url,
+            verified_addresses: user.verified_addresses,
+            isBaseVerified: false
+          });
+          console.log(`✅ Found Farcaster profile for ${address}: ${user.display_name} (@${user.username}) - FID: ${user.fid}`);
+        } else {
+          // No Farcaster profile found - return wallet info with Base verification check
+          profiles.push({
+            fid: null,
+            address: address,
+            username: null,
+            display_name: null,
+            pfp_url: null,
             verified_addresses: {
               eth_addresses: [address],
               sol_addresses: []
             },
-            isBaseVerified: false
+            isBaseVerified: false, // We'll check this separately
+            isWalletOnly: true
           });
+          console.log(`⚠️ No Farcaster profile found for ${address}, will show wallet avatar`);
         }
       }
 
@@ -194,12 +143,27 @@ export async function GET(request: NextRequest) {
     const fidArray = fids.split(',').map(fid => parseInt(fid.trim()));
 
     try {
-      // Use real Neynar API to fetch user profiles
-      const response = await client.fetchBulkUsers({ fids: fidArray });
+      // Use real Neynar API to fetch user profiles by FIDs
+      const fidsParam = fidArray.join(',');
+      const neynarUrl = `https://api.neynar.com/v2/farcaster/user/bulk?fids=${fidsParam}`;
+      
+      const response = await fetch(neynarUrl, {
+        method: 'GET',
+        headers: {
+          'accept': 'application/json',
+          'api_key': process.env.NEYNAR_API_KEY
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Neynar API error: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
       
       return NextResponse.json({
         success: true,
-        profiles: response.users.map(user => ({
+        profiles: data.users.map((user: any) => ({
           fid: user.fid.toString(),
           username: user.username,
           display_name: user.display_name,

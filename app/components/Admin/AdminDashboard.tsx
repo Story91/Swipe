@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useReadContract, usePublicClient, useWriteContract } from 'wagmi';
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../../../lib/contract';
+import { CONTRACTS, getV2Contract } from '../../../lib/contract';
 import { useRedisPredictions } from '../../../lib/hooks/useRedisPredictions';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 
 interface Prediction {
   id: string | number;
@@ -26,8 +27,8 @@ interface Prediction {
 
 interface AdminDashboardProps {
   predictions: Prediction[];
-  onResolvePrediction: (predictionId: string | number, outcome: boolean) => void;
-  onCancelPrediction: (predictionId: string | number, reason: string) => void;
+  onResolvePrediction: (predictionId: string | number, outcome: boolean, contractVersion?: 'V1' | 'V2') => void;
+  onCancelPrediction: (predictionId: string | number, reason: string, contractVersion?: 'V1' | 'V2') => void;
   onCreatePrediction: () => void;
   onManageApprovers: () => void;
   onWithdrawFees: () => void;
@@ -47,11 +48,19 @@ export function AdminDashboard({
   const publicClient = usePublicClient();
   const { writeContract } = useWriteContract();
   
+  // Filter state
+  const [selectedFilter, setSelectedFilter] = useState<string>('all');
+  
   // Use Redis predictions hook to get all predictions
   const { predictions: redisPredictions, loading: predictionsLoading, error: predictionsError, refreshData } = useRedisPredictions();
   
-  // Use Redis predictions if available, otherwise fall back to props
-  const predictions = redisPredictions.length > 0 ? redisPredictions.map(p => ({
+  // Filter out duplicate predictions - only keep synced ones (pred_v1_, pred_v2_) and exclude pure Redis ones (pred_*)
+  const filteredRedisPredictions = redisPredictions.filter(p => 
+    p.id.startsWith('pred_v1_') || p.id.startsWith('pred_v2_')
+  );
+  
+  // Use filtered Redis predictions if available, otherwise fall back to props
+  const predictions = filteredRedisPredictions.length > 0 ? filteredRedisPredictions.map(p => ({
     id: p.id, // Keep as string for Redis predictions
     question: p.question,
     category: p.category,
@@ -68,15 +77,15 @@ export function AdminDashboard({
 
   // Get contract stats
   const { data: contractStats } = useReadContract({
-    address: CONTRACT_ADDRESS as `0x${string}`,
-    abi: CONTRACT_ABI,
+    address: CONTRACTS.V2.address as `0x${string}`,
+    abi: CONTRACTS.V2.abi,
     functionName: 'getContractStats',
   });
 
   // Get total predictions count
   const { data: totalPredictions } = useReadContract({
-    address: CONTRACT_ADDRESS as `0x${string}`,
-    abi: CONTRACT_ABI,
+    address: CONTRACTS.V2.address as `0x${string}`,
+    abi: CONTRACTS.V2.abi,
     functionName: 'nextPredictionId',
   });
 
@@ -89,6 +98,46 @@ export function AdminDashboard({
   // Use real data if available, fallback to props
   const displayPredictions = realPredictions.length > 0 ? realPredictions : predictions;
   
+  // Helper function to check if prediction needs resolution
+  const needsResolution = (prediction: Prediction) => {
+    if (prediction.resolved || prediction.cancelled) return false;
+    
+    // For Redis predictions, check if deadline has passed
+    if (typeof prediction.id === 'string') {
+      return Date.now() / 1000 > prediction.deadline;
+    }
+    
+    // For on-chain predictions, check resolution deadline
+    if (!prediction.resolutionDeadline) return false;
+    return Date.now() / 1000 > prediction.resolutionDeadline;
+  };
+  
+  // Filter predictions based on selected filter
+  const getFilteredPredictions = () => {
+    switch (selectedFilter) {
+      case 'active':
+        return displayPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline > Date.now() / 1000);
+      case 'expired':
+        return displayPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline <= Date.now() / 1000);
+      case 'resolved':
+        return displayPredictions.filter(p => p.resolved);
+      case 'cancelled':
+        return displayPredictions.filter(p => p.cancelled);
+      case 'needs-resolution':
+        return displayPredictions.filter(p => needsResolution(p));
+      case 'v1':
+        return displayPredictions.filter(p => typeof p.id === 'string' && p.id.startsWith('pred_v1_'));
+      case 'v2':
+        return displayPredictions.filter(p => typeof p.id === 'string' && p.id.startsWith('pred_v2_'));
+      case 'all':
+      default:
+        return displayPredictions;
+    }
+  };
+
+  const filteredPredictions = getFilteredPredictions();
+  
+  // Keep original categories for stats
   const activePredictions = displayPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline > Date.now() / 1000);
   const expiredPredictions = displayPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline <= Date.now() / 1000);
   const resolvedPredictions = displayPredictions.filter(p => p.resolved);
@@ -102,7 +151,7 @@ export function AdminDashboard({
 
   React.useEffect(() => {
     const fetchPredictions = async () => {
-      if (!totalPredictions || totalPredictions <= 1) {
+      if (!totalPredictions || Number(totalPredictions) <= 1) {
         setLoading(false);
         return;
       }
@@ -113,7 +162,7 @@ export function AdminDashboard({
 
         const predictions: Prediction[] = [];
 
-        for (let i = 1; i < totalPredictions; i++) {
+        for (let i = 1; i < Number(totalPredictions); i++) {
           try {
             if (!publicClient) {
               throw new Error('Public client not available');
@@ -121,8 +170,8 @@ export function AdminDashboard({
 
             // Pobierz podstawowe informacje o predykcji
             const basicResult = await publicClient.readContract({
-              address: CONTRACT_ADDRESS as `0x${string}`,
-              abi: CONTRACT_ABI,
+              address: CONTRACTS.V2.address as `0x${string}`,
+              abi: CONTRACTS.V2.abi,
               functionName: 'getPredictionBasic',
               args: [BigInt(i)],
             }) as {
@@ -140,16 +189,16 @@ export function AdminDashboard({
 
             // Pobierz rozszerzone informacje
             const extendedResult = await publicClient.readContract({
-              address: CONTRACT_ADDRESS as `0x${string}`,
-              abi: CONTRACT_ABI,
+              address: CONTRACTS.V2.address as `0x${string}`,
+              abi: CONTRACTS.V2.abi,
               functionName: 'getPredictionExtended',
               args: [BigInt(i)],
             }) as [string, bigint, boolean, bigint, boolean, boolean, bigint];
 
             // Pobierz statystyki rynku
             const marketStats = await publicClient.readContract({
-              address: CONTRACT_ADDRESS as `0x${string}`,
-              abi: CONTRACT_ABI,
+              address: CONTRACTS.V2.address as `0x${string}`,
+              abi: CONTRACTS.V2.abi,
               functionName: 'getMarketStats',
               args: [BigInt(i)],
             }) as {
@@ -197,21 +246,7 @@ export function AdminDashboard({
     fetchPredictions();
   }, [totalPredictions]);
 
-  // Helper function to check if prediction needs resolution
-  const needsResolution = (prediction: Prediction) => {
-    if (prediction.resolved || prediction.cancelled) return false;
-    
-    // For Redis predictions, check if deadline has passed
-    if (typeof prediction.id === 'string') {
-      return Date.now() / 1000 > prediction.deadline;
-    }
-    
-    // For on-chain predictions, check resolution deadline
-    if (!prediction.resolutionDeadline) return false;
-    return Date.now() / 1000 > prediction.resolutionDeadline;
-  };
-
-  // Calculate real stats
+  // Calculate real stats (use displayPredictions for total stats, filteredPredictions for current view)
   const stats = {
     totalPredictions: totalPredictions ? Number(totalPredictions) - 1 : displayPredictions.length,
     needsResolution: displayPredictions.filter(p => needsResolution(p)).length,
@@ -224,14 +259,20 @@ export function AdminDashboard({
   const handleResolve = async (predictionId: string | number, outcome: boolean) => {
     const side = outcome ? 'YES' : 'NO';
     if (confirm(`Are you sure you want to resolve this prediction as ${side}?`)) {
-      // Check if this is a Redis-based prediction (string ID starting with 'pred_') or on-chain prediction (number ID)
-      if (typeof predictionId === 'string' && predictionId.startsWith('pred_')) {
+      // Check if this is a synced on-chain prediction (string ID starting with 'pred_v1_' or 'pred_v2_') or on-chain prediction (number ID)
+      if (typeof predictionId === 'string' && (predictionId.startsWith('pred_v1_') || predictionId.startsWith('pred_v2_'))) {
         // This is a synced on-chain prediction - call the contract directly
-        const numericId = parseInt(predictionId.replace('pred_', ''));
-        console.log(`🔄 Resolving on-chain prediction ${predictionId} (numeric ID: ${numericId}) as ${side}`);
-        onResolvePrediction(numericId, outcome);
-      } else if (typeof predictionId === 'string') {
-        // Handle pure Redis-based prediction (not synced from blockchain)
+        const isV1 = predictionId.startsWith('pred_v1_');
+        const numericId = parseInt(predictionId.replace('pred_v1_', '').replace('pred_v2_', ''));
+        if (!isNaN(numericId)) {
+          console.log(`🔄 Resolving ${isV1 ? 'V1' : 'V2'} on-chain prediction ${predictionId} (numeric ID: ${numericId}) as ${side}`);
+          onResolvePrediction(numericId, outcome, isV1 ? 'V1' : 'V2');
+        } else {
+          alert(`❌ Invalid ${isV1 ? 'V1' : 'V2'} prediction ID format`);
+          return;
+        }
+      } else if (typeof predictionId === 'string' && predictionId.startsWith('pred_')) {
+        // This is a pure Redis prediction (not synced from blockchain) - handle via API
         try {
           const response = await fetch('/api/predictions/resolve', {
             method: 'POST',
@@ -268,14 +309,20 @@ export function AdminDashboard({
   const handleCancel = async (predictionId: string | number) => {
     const reason = prompt('Reason for emergency cancellation:');
     if (reason) {
-      // Check if this is a Redis-based prediction (string ID starting with 'pred_') or on-chain prediction (number ID)
-      if (typeof predictionId === 'string' && predictionId.startsWith('pred_')) {
+      // Check if this is a synced on-chain prediction (string ID starting with 'pred_v1_' or 'pred_v2_') or on-chain prediction (number ID)
+      if (typeof predictionId === 'string' && (predictionId.startsWith('pred_v1_') || predictionId.startsWith('pred_v2_'))) {
         // This is a synced on-chain prediction - call the contract directly
-        const numericId = parseInt(predictionId.replace('pred_', ''));
-        console.log(`🔄 Cancelling on-chain prediction ${predictionId} (numeric ID: ${numericId}): ${reason}`);
-        onCancelPrediction(numericId, reason);
-      } else if (typeof predictionId === 'string') {
-        // Handle pure Redis-based prediction (not synced from blockchain)
+        const isV1 = predictionId.startsWith('pred_v1_');
+        const numericId = parseInt(predictionId.replace('pred_v1_', '').replace('pred_v2_', ''));
+        if (!isNaN(numericId)) {
+          console.log(`🔄 Cancelling ${isV1 ? 'V1' : 'V2'} on-chain prediction ${predictionId} (numeric ID: ${numericId}): ${reason}`);
+          onCancelPrediction(numericId, reason, isV1 ? 'V1' : 'V2');
+        } else {
+          alert(`❌ Invalid ${isV1 ? 'V1' : 'V2'} prediction ID format`);
+          return;
+        }
+      } else if (typeof predictionId === 'string' && predictionId.startsWith('pred_')) {
+        // This is a pure Redis prediction (not synced from blockchain) - handle via API
         try {
           const response = await fetch('/api/predictions/resolve', {
             method: 'PUT',
@@ -331,26 +378,40 @@ export function AdminDashboard({
   // Direct contract transaction functions (bypass UI state)
   const handleDirectResolve = async (predictionId: string | number, outcome: boolean) => {
     const side = outcome ? 'YES' : 'NO';
-    const numericId = typeof predictionId === 'string' && predictionId.startsWith('pred_') 
-      ? parseInt(predictionId.replace('pred_', '')) 
-      : typeof predictionId === 'number' ? predictionId : null;
+    let numericId: number | null = null;
+    let contractVersion: 'V1' | 'V2' = 'V2'; // Default to V2
     
-    if (!numericId) {
+    if (typeof predictionId === 'string' && (predictionId.startsWith('pred_v1_') || predictionId.startsWith('pred_v2_'))) {
+      // V1 or V2 synced prediction
+      contractVersion = predictionId.startsWith('pred_v1_') ? 'V1' : 'V2';
+      numericId = parseInt(predictionId.replace('pred_v1_', '').replace('pred_v2_', ''));
+    } else if (typeof predictionId === 'string' && predictionId.startsWith('pred_')) {
+      // Pure Redis prediction - cannot do direct contract transaction
+      alert('❌ Cannot perform direct contract transaction on pure Redis prediction. Use regular resolve instead.');
+      return;
+    } else if (typeof predictionId === 'number') {
+      numericId = predictionId;
+      // For numeric IDs, we can't determine version, so default to V2
+    }
+    
+    if (!numericId || isNaN(numericId)) {
       alert('❌ Invalid prediction ID for contract transaction');
       return;
     }
 
-    if (confirm(`🚨 FORCE RESOLVE: Are you sure you want to resolve prediction ${numericId} as ${side} on the blockchain? This will execute a real transaction.`)) {
+    const contract = contractVersion === 'V1' ? CONTRACTS.V1 : CONTRACTS.V2;
+
+    if (confirm(`🚨 FORCE RESOLVE: Are you sure you want to resolve prediction ${numericId} as ${side} on the ${contractVersion} blockchain? This will execute a real transaction.`)) {
       try {
         writeContract({
-          address: CONTRACT_ADDRESS as `0x${string}`,
-          abi: CONTRACT_ABI,
+          address: contract.address as `0x${string}`,
+          abi: contract.abi,
           functionName: 'resolvePrediction',
           args: [BigInt(numericId), outcome],
         }, {
           onSuccess: async (tx) => {
-            console.log(`✅ FORCE RESOLVE: Prediction ${numericId} resolved successfully:`, tx);
-            alert(`✅ FORCE RESOLVE SUCCESS!\nPrediction ${numericId} resolved as ${side}\nTransaction: ${tx}\n\nSyncing with Redis...`);
+            console.log(`✅ FORCE RESOLVE: Prediction ${numericId} resolved successfully on ${contractVersion}:`, tx);
+            alert(`✅ FORCE RESOLVE SUCCESS!\nPrediction ${numericId} resolved as ${side} on ${contractVersion}\nTransaction: ${tx}\n\nSyncing with Redis...`);
             
             // Force sync with blockchain to update Redis immediately
             try {
@@ -388,26 +449,40 @@ export function AdminDashboard({
     const reason = prompt('🚨 FORCE CANCEL: Enter reason for emergency cancellation:');
     if (!reason) return;
 
-    const numericId = typeof predictionId === 'string' && predictionId.startsWith('pred_') 
-      ? parseInt(predictionId.replace('pred_', '')) 
-      : typeof predictionId === 'number' ? predictionId : null;
+    let numericId: number | null = null;
+    let contractVersion: 'V1' | 'V2' = 'V2'; // Default to V2
     
-    if (!numericId) {
+    if (typeof predictionId === 'string' && (predictionId.startsWith('pred_v1_') || predictionId.startsWith('pred_v2_'))) {
+      // V1 or V2 synced prediction
+      contractVersion = predictionId.startsWith('pred_v1_') ? 'V1' : 'V2';
+      numericId = parseInt(predictionId.replace('pred_v1_', '').replace('pred_v2_', ''));
+    } else if (typeof predictionId === 'string' && predictionId.startsWith('pred_')) {
+      // Pure Redis prediction - cannot do direct contract transaction
+      alert('❌ Cannot perform direct contract transaction on pure Redis prediction. Use regular cancel instead.');
+      return;
+    } else if (typeof predictionId === 'number') {
+      numericId = predictionId;
+      // For numeric IDs, we can't determine version, so default to V2
+    }
+    
+    if (!numericId || isNaN(numericId)) {
       alert('❌ Invalid prediction ID for contract transaction');
       return;
     }
 
-    if (confirm(`🚨 FORCE CANCEL: Are you sure you want to cancel prediction ${numericId} on the blockchain?\nReason: ${reason}\n\nThis will execute a real transaction.`)) {
+    const contract = contractVersion === 'V1' ? CONTRACTS.V1 : CONTRACTS.V2;
+
+    if (confirm(`🚨 FORCE CANCEL: Are you sure you want to cancel prediction ${numericId} on the ${contractVersion} blockchain?\nReason: ${reason}\n\nThis will execute a real transaction.`)) {
       try {
         writeContract({
-          address: CONTRACT_ADDRESS as `0x${string}`,
-          abi: CONTRACT_ABI,
+          address: contract.address as `0x${string}`,
+          abi: contract.abi,
           functionName: 'cancelPrediction',
           args: [BigInt(numericId), reason],
         }, {
           onSuccess: async (tx) => {
-            console.log(`✅ FORCE CANCEL: Prediction ${numericId} cancelled successfully:`, tx);
-            alert(`✅ FORCE CANCEL SUCCESS!\nPrediction ${numericId} cancelled\nReason: ${reason}\nTransaction: ${tx}\n\nSyncing with Redis...`);
+            console.log(`✅ FORCE CANCEL: Prediction ${numericId} cancelled successfully on ${contractVersion}:`, tx);
+            alert(`✅ FORCE CANCEL SUCCESS!\nPrediction ${numericId} cancelled on ${contractVersion}\nReason: ${reason}\nTransaction: ${tx}\n\nSyncing with Redis...`);
             
             // Force sync with blockchain to update Redis immediately
             try {
@@ -441,8 +516,8 @@ export function AdminDashboard({
     }
   };
 
-  const predictionsNeedingResolution = displayPredictions.filter(p => needsResolution(p));
-  const livePredictions = displayPredictions.filter(p => !p.resolved && !p.cancelled && !needsResolution(p));
+  const predictionsNeedingResolution = filteredPredictions.filter(p => needsResolution(p));
+  const livePredictions = filteredPredictions.filter(p => !p.resolved && !p.cancelled && !needsResolution(p));
 
   if (loading) {
     return (
@@ -467,10 +542,33 @@ export function AdminDashboard({
 
   return (
     <div className="admin-dashboard">
-      {/* Header with Refresh Button */}
-      <div className="admin-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2>📊 Admin Dashboard</h2>
-        <div className="refresh-controls" style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+      {/* Header with Filter and Refresh Button */}
+      <div className="admin-header" style={{ marginBottom: '20px' }}>
+        {/* Filter Row */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '15px' }}>
+          <div className="filter-section" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label htmlFor="prediction-filter" style={{ fontSize: '12px', fontWeight: '500', whiteSpace: 'nowrap' }}>
+              Filter:
+            </label>
+            <Select value={selectedFilter} onValueChange={setSelectedFilter}>
+              <SelectTrigger style={{ width: '150px', fontSize: '12px' }}>
+                <SelectValue placeholder="Select filter" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Predictions</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="expired">Expired</SelectItem>
+                <SelectItem value="resolved">Resolved</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+                <SelectItem value="needs-resolution">Needs Resolution</SelectItem>
+                <SelectItem value="v1">V1 Contract</SelectItem>
+                <SelectItem value="v2">V2 Contract</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        {/* Refresh Controls Row */}
+        <div className="refresh-controls" style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <button 
             onClick={handleRefresh}
             className="refresh-btn"
@@ -478,11 +576,12 @@ export function AdminDashboard({
               background: '#4CAF50',
               color: 'white',
               border: 'none',
-              padding: '4px 8px',
+              padding: '3px 6px',
               borderRadius: '4px',
               cursor: 'pointer',
-              fontSize: '11px',
-              margin: '2px'
+              fontSize: '10px',
+              margin: '1px',
+              whiteSpace: 'nowrap'
             }}
           >
             🔄 Refresh
@@ -511,160 +610,58 @@ export function AdminDashboard({
               background: '#2196F3',
               color: 'white',
               border: 'none',
-              padding: '4px 8px',
+              padding: '3px 6px',
               borderRadius: '4px',
               cursor: 'pointer',
-              fontSize: '11px',
-              margin: '2px'
+              fontSize: '10px',
+              margin: '1px',
+              whiteSpace: 'nowrap'
             }}
           >
             🔄 Sync
           </button>
-          <button 
-            onClick={async () => {
-              try {
-                console.log('🔍 Testing API endpoints...');
-                
-                // Test predictions API
-                const predictionsResponse = await fetch('/api/predictions');
-                const predictionsData = await predictionsResponse.json();
-                console.log('📊 Predictions API:', predictionsData);
-                
-                // Test stakes API for a specific prediction
-                const stakesResponse = await fetch('/api/stakes?predictionId=pred_5&userId=0x123');
-                const stakesData = await stakesResponse.json();
-                console.log('💰 Stakes API:', stakesData);
-                
-                alert(`🔍 API TEST RESULTS:\n\nPredictions: ${predictionsData.success ? '✅' : '❌'} (${predictionsData.data?.length || 0} items)\nStakes: ${stakesData.success ? '✅' : '❌'} (${stakesData.data?.length || 0} items)\n\nCheck console for details.`);
-              } catch (error) {
-                console.error('API test error:', error);
-                alert('❌ API test failed. Check console for details.');
-              }
-            }}
-            className="test-btn"
-            style={{
-              background: '#FF9800',
-              color: 'white',
-              border: 'none',
-              padding: '4px 8px',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '11px',
-              margin: '2px'
-            }}
-          >
-            🔍 Test
-          </button>
-          <button 
-            onClick={async () => {
-              if (confirm('🔄 RESET CLAIMED STATUS\n\nThis will reset all claimed statuses in Redis to match blockchain state.\n\nThis is needed if claims were marked in Redis but not actually executed on blockchain.\n\nContinue?')) {
-                try {
-                  alert('🔄 Resetting claimed statuses...');
-                  
-                  // Get all predictions
-                  const predictionsResponse = await fetch('/api/predictions');
-                  const predictionsData = await predictionsResponse.json();
-                  
-                  if (predictionsData.success) {
-                    let resetCount = 0;
-                    
-                    for (const prediction of predictionsData.data) {
-                      if (prediction.id.startsWith('pred_') && prediction.resolved) {
-                        // Get all stakes for this prediction
-                        const stakesResponse = await fetch(`/api/stakes?predictionId=${prediction.id}`);
-                        const stakesData = await stakesResponse.json();
-                        
-                        if (stakesData.success) {
-                          for (const stake of stakesData.data) {
-                            if (stake.claimed) {
-                              // Reset claimed status
-                              await fetch('/api/stakes', {
-                                method: 'PUT',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                  userId: stake.userId,
-                                  predictionId: stake.predictionId,
-                                  updates: { claimed: false }
-                                }),
-                              });
-                              resetCount++;
-                            }
-                          }
-                        }
-                      }
-                    }
-                    
-                    alert(`✅ RESET COMPLETE!\n\nReset ${resetCount} claimed statuses.\n\nNow sync blockchain to get correct state.`);
-                  }
-                } catch (error) {
-                  console.error('Reset error:', error);
-                  alert('❌ Reset failed. Check console for details.');
-                }
-              }
-            }}
-            className="reset-btn"
-            style={{
-              background: '#F44336',
-              color: 'white',
-              border: 'none',
-              padding: '4px 8px',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '11px',
-              margin: '2px'
-            }}
-          >
-            🔄 Reset
-          </button>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-number">{stats.totalPredictions}</div>
-          <div className="stat-label">Total Predictions</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-number">{stats.needsResolution}</div>
-          <div className="stat-label">Needs Resolution</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-number">{stats.collectedFees.toFixed(4)}</div>
-          <div className="stat-label">ETH Collected Fees</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-number">{stats.contractBalance.toFixed(4)}</div>
-          <div className="stat-label">ETH Contract Balance</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-number">{stats.platformFee}%</div>
-          <div className="stat-label">Platform Fee</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-number">{stats.activeApprovers}</div>
-          <div className="stat-label">Active Approvers</div>
+      {/* Stats Table - Vertical Layout for Miniapp */}
+      <div className="stats-table" style={{ 
+        background: 'rgba(255, 255, 255, 0.15)', 
+        backdropFilter: 'blur(10px)',
+        borderRadius: '12px', 
+        padding: '12px',
+        marginBottom: '20px',
+        border: '1px solid rgba(255, 255, 255, 0.2)',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+        maxWidth: '100%'
+      }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontWeight: '600', color: 'rgba(0, 0, 0, 0.8)', fontSize: '12px' }}>Total Predictions:</span>
+            <span style={{ fontFamily: 'monospace', color: '#2563eb', fontSize: '14px', fontWeight: '700' }}>{stats.totalPredictions}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontWeight: '600', color: 'rgba(0, 0, 0, 0.8)', fontSize: '12px' }}>Needs Resolution:</span>
+            <span style={{ fontFamily: 'monospace', color: '#dc2626', fontSize: '14px', fontWeight: '700' }}>{stats.needsResolution}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontWeight: '600', color: 'rgba(0, 0, 0, 0.8)', fontSize: '12px' }}>Platform Fee:</span>
+            <span style={{ fontFamily: 'monospace', color: '#059669', fontSize: '14px', fontWeight: '700' }}>{stats.platformFee}%</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontWeight: '600', color: 'rgba(0, 0, 0, 0.8)', fontSize: '12px' }}>ETH Collected Fees:</span>
+            <span style={{ fontFamily: 'monospace', color: '#059669', fontSize: '14px', fontWeight: '700' }}>{stats.collectedFees.toFixed(4)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontWeight: '600', color: 'rgba(0, 0, 0, 0.8)', fontSize: '12px' }}>ETH Contract Balance:</span>
+            <span style={{ fontFamily: 'monospace', color: '#059669', fontSize: '14px', fontWeight: '700' }}>{stats.contractBalance.toFixed(4)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontWeight: '600', color: 'rgba(0, 0, 0, 0.8)', fontSize: '12px' }}>Active Approvers:</span>
+            <span style={{ fontFamily: 'monospace', color: '#2563eb', fontSize: '14px', fontWeight: '700' }}>{stats.activeApprovers}</span>
+          </div>
         </div>
       </div>
 
-      {/* Admin Controls */}
-      <div className="admin-controls">
-        <h3 className="admin-title">🛠️ Global Controls</h3>
-        <div className="action-buttons">
-          <button className="btn btn-resolve" onClick={onCreatePrediction}>
-            ➕ Create Prediction
-          </button>
-          <button className="btn btn-approve" onClick={onManageApprovers}>
-            👥 Manage Approvers
-          </button>
-          <button className="btn btn-cancel" onClick={onWithdrawFees}>
-            💰 Withdraw Fees
-          </button>
-          <button className="btn btn-reject" onClick={onPauseContract}>
-            ⏸️ Pause Contract
-          </button>
-        </div>
-      </div>
 
       {/* Predictions Grid */}
       <div className="predictions-grid">
@@ -842,7 +839,7 @@ export function AdminDashboard({
         })}
 
         {/* Resolved Predictions */}
-        {resolvedPredictions.map((prediction) => {
+        {filteredPredictions.filter(p => p.resolved).map((prediction) => {
           const totalPool = prediction.yesTotalAmount + prediction.noTotalAmount;
           const yesPercentage = totalPool > 0 ? (prediction.yesTotalAmount / totalPool) * 100 : 0;
 
@@ -925,7 +922,7 @@ export function AdminDashboard({
         })}
 
         {/* Cancelled Predictions */}
-        {cancelledPredictions.map((prediction) => {
+        {filteredPredictions.filter(p => p.cancelled).map((prediction) => {
           const totalPool = prediction.yesTotalAmount + prediction.noTotalAmount;
           const yesPercentage = totalPool > 0 ? (prediction.yesTotalAmount / totalPool) * 100 : 0;
 
@@ -977,7 +974,7 @@ export function AdminDashboard({
         })}
 
         {/* Expired Predictions */}
-        {expiredPredictions.map((prediction) => {
+        {filteredPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline <= Date.now() / 1000).map((prediction) => {
           const totalPool = prediction.yesTotalAmount + prediction.noTotalAmount;
           const yesPercentage = totalPool > 0 ? (prediction.yesTotalAmount / totalPool) * 100 : 0;
 

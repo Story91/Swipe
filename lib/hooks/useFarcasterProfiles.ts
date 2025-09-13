@@ -1,23 +1,23 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 export interface FarcasterProfile {
-  fid: string;
-  username: string;
-  display_name: string;
-  pfp_url: string;
+  fid: string | null;
+  username: string | null;
+  display_name: string | null;
+  pfp_url: string | null;
   verified_addresses: {
     eth_addresses: string[];
     sol_addresses: string[];
   };
   address?: string; // For mapping purposes
   isBaseVerified?: boolean; // Base blockchain verification status
+  isWalletOnly?: boolean; // True if this is a wallet-only user without Farcaster profile
 }
 
 export function useFarcasterProfiles(addresses: string[]) {
   const [profiles, setProfiles] = useState<FarcasterProfile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const prevAddressesRef = useRef<string[]>([]);
 
   const fetchProfiles = useCallback(async (addressList: string[]) => {
     if (!addressList.length) {
@@ -54,14 +54,8 @@ export function useFarcasterProfiles(addresses: string[]) {
   }, []);
 
   useEffect(() => {
-    // Compare addresses arrays to prevent unnecessary fetches
-    const addressesString = addresses.sort().join(',');
-    const prevAddressesString = prevAddressesRef.current.sort().join(',');
-    
-    if (addressesString !== prevAddressesString) {
-      prevAddressesRef.current = addresses;
-      fetchProfiles(addresses);
-    }
+    // console.log('🔍 useFarcasterProfiles: addresses changed', addresses);
+    fetchProfiles(addresses);
   }, [addresses, fetchProfiles]);
 
   return {

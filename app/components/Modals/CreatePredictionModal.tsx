@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useWriteContract, useAccount, useReadContract } from 'wagmi';
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../../../lib/contract';
+import { useWriteContract, useAccount, useReadContract, useWaitForTransactionReceipt } from 'wagmi';
+import { parseEther, formatEther } from 'viem';
+import { CONTRACTS, SWIPE_TOKEN } from '../../../lib/contract';
 import './CreatePredictionModal.css';
 
 interface CreatePredictionModalProps {
@@ -11,94 +12,210 @@ interface CreatePredictionModalProps {
   onSuccess?: () => void;
 }
 
+interface FormData {
+  question: string;
+  description: string;
+  category: string;
+  imageUrl: string;
+  endDate: string;
+  endTime: string;
+  paymentToken: 'ETH' | 'SWIPE';
+  includeChart: boolean;
+  selectedCrypto: string;
+}
+
+const CATEGORIES = [
+  'Crypto', 'Sports', 'Politics', 'Entertainment', 'Technology',
+  'Finance', 'Weather', 'Science', 'Business', 'Other'
+];
+
+const CRYPTO_OPTIONS = [
+  { 
+    symbol: 'BTC', 
+    name: 'Bitcoin', 
+    icon: '₿', 
+    color: '#f7931a',
+    poolAddress: '0x2260fac5e5542a773aa44fbcfedf7c193bc2c599',
+    chain: 'eth'
+  },
+  { 
+    symbol: 'ETH', 
+    name: 'Ethereum', 
+    icon: 'Ξ', 
+    color: '#627eea',
+    poolAddress: '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2',
+    chain: 'eth'
+  },
+  { 
+    symbol: 'SOL', 
+    name: 'Solana', 
+    icon: '◎', 
+    color: '#9945ff',
+    poolAddress: 'So11111111111111111111111111111111111111112',
+    chain: 'solana'
+  },
+  { 
+    symbol: 'XRP', 
+    name: 'Ripple', 
+    icon: '✕', 
+    color: '#23292f',
+    poolAddress: '0x1a2e8705d5b42e15ce5f94b61a48b178b49c97d5',
+    chain: 'eth'
+  },
+  { 
+    symbol: 'BNB', 
+    name: 'Binance Coin', 
+    icon: '🟡', 
+    color: '#f3ba2f',
+    poolAddress: '0xb8c77482e45f1f44de1745f52c74426c631bdd52',
+    chain: 'eth'
+  }
+];
+
 export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePredictionModalProps) {
   const { address } = useAccount();
-  const { writeContract, isPending } = useWriteContract();
+  const { writeContract, data: hash, error: writeError, isPending } = useWriteContract();
+  
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     question: '',
     description: '',
     category: '',
     imageUrl: '',
     endDate: '',
     endTime: '',
+    paymentToken: 'ETH',
     includeChart: false,
     selectedCrypto: ''
   });
 
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [errors, setErrors] = useState<Partial<Record<keyof FormData | 'submit', string>>>({});
 
-  // Get contract settings
-  const { data: creationFee } = useReadContract({
-    address: CONTRACT_ADDRESS as `0x${string}`,
-    abi: CONTRACT_ABI,
-    functionName: 'creationFee'
+  // Contract reads
+  const { data: ethFee } = useReadContract({
+    address: CONTRACTS.V2.address as `0x${string}`,
+    abi: CONTRACTS.V2.abi,
+    functionName: 'creationFees',
+    args: ['0x0000000000000000000000000000000000000000' as `0x${string}`]
+  });
+
+  const { data: swipeFee } = useReadContract({
+    address: CONTRACTS.V2.address as `0x${string}`,
+    abi: CONTRACTS.V2.abi,
+    functionName: 'creationFees',
+    args: [SWIPE_TOKEN.address as `0x${string}`]
   });
 
   const { data: isApprovedCreator } = useReadContract({
-    address: CONTRACT_ADDRESS as `0x${string}`,
-    abi: CONTRACT_ABI,
+    address: CONTRACTS.V2.address as `0x${string}`,
+    abi: CONTRACTS.V2.abi,
     functionName: 'approvedCreators',
-    args: address ? [address as `0x${string}`] : undefined,
-    query: {
-      enabled: !!address // Nie wykonuj query gdy address jest undefined
-    }
+    args: address ? [address] : undefined,
   });
 
   const { data: contractOwner } = useReadContract({
-    address: CONTRACT_ADDRESS as `0x${string}`,
-    abi: CONTRACT_ABI,
+    address: CONTRACTS.V2.address as `0x${string}`,
+    abi: CONTRACTS.V2.abi,
     functionName: 'owner'
   });
 
   const { data: publicCreationEnabled } = useReadContract({
-    address: CONTRACT_ADDRESS as `0x${string}`,
-    abi: CONTRACT_ABI,
+    address: CONTRACTS.V2.address as `0x${string}`,
+    abi: CONTRACTS.V2.abi,
     functionName: 'publicCreationEnabled'
   });
 
-  const isOwner = address && contractOwner && address.toLowerCase() === contractOwner.toLowerCase();
+  const { data: swipeAllowance } = useReadContract({
+    address: SWIPE_TOKEN.address as `0x${string}`,
+    abi: [
+      {
+        inputs: [
+          { name: 'owner', type: 'address' },
+          { name: 'spender', type: 'address' }
+        ],
+        name: 'allowance',
+        outputs: [{ name: '', type: 'uint256' }],
+        stateMutability: 'view',
+        type: 'function'
+      }
+    ],
+    functionName: 'allowance',
+    args: address ? [address, CONTRACTS.V2.address as `0x${string}`] : undefined,
+  });
 
-  // Set default end date and time (24 hours from now)
+  const isOwner = address && contractOwner && address.toLowerCase() === (contractOwner as string).toLowerCase();
+  const canCreateFree = Boolean(isOwner || isApprovedCreator);
+  const canCreate = Boolean(publicCreationEnabled || canCreateFree);
+
+  // Set default end date/time on mount
   useEffect(() => {
-    const now = new Date();
-    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    
-    const endDate = tomorrow.toISOString().split('T')[0];
-    const endTime = tomorrow.toTimeString().slice(0, 5);
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
     
     setFormData(prev => ({
       ...prev,
-      endDate,
-      endTime
+      endDate: tomorrow.toISOString().split('T')[0],
+      endTime: tomorrow.toTimeString().slice(0, 5)
     }));
   }, []);
 
+  // Handle successful transaction
+  useEffect(() => {
+    if (isConfirmed && hash) {
+      const handleSuccess = async () => {
+        alert(`🎉 Prediction created successfully!\n\nTransaction: ${hash}\nView on Basescan: https://basescan.org/tx/${hash}`);
+        
+        // First sync to Redis and wait a bit for blockchain propagation
+        try {
+          console.log('🔄 Syncing new prediction to Redis...');
+          await fetch('/api/sync');
+          console.log('✅ Prediction synced to Redis');
+          
+          // Wait a moment for data to propagate
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (error) {
+          console.warn('⚠️ Sync failed, but continuing with refresh:', error);
+        }
+        
+        // Call onSuccess callback - it will handle modal closing and navigation
+        onSuccess?.();
+        resetForm();
+      };
+      
+      handleSuccess();
+    }
+  }, [isConfirmed, hash, onSuccess, onClose]);
 
+  const resetForm = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    setFormData({
+      question: '',
+      description: '',
+      category: '',
+      imageUrl: '',
+      endDate: tomorrow.toISOString().split('T')[0],
+      endTime: tomorrow.toTimeString().slice(0, 5),
+      paymentToken: 'ETH',
+      includeChart: false,
+      selectedCrypto: ''
+    });
+    setErrors({});
+  };
 
-  const categories = [
-    'Crypto', 'Sports', 'Politics', 'Entertainment', 'Technology',
-    'Finance', 'Weather', 'Science', 'Business', 'Other'
-  ];
-
-  const cryptoOptions = [
-    { symbol: 'BTC', name: 'Bitcoin', icon: '₿', color: '#f7931a' },
-    { symbol: 'ETH', name: 'Ethereum', icon: 'Ξ', color: '#627eea' },
-    { symbol: 'SOL', name: 'Solana', icon: '◎', color: '#9945ff' },
-    { symbol: 'XRP', name: 'Ripple', icon: '✕', color: '#23292f' },
-    { symbol: 'BNB', name: 'Binance Coin', icon: '🟡', color: '#f3ba2f' }
-  ];
-
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
   };
 
-  const validateForm = () => {
-    const newErrors: { [key: string]: string } = {};
+  const validateForm = (): boolean => {
+    const newErrors: typeof errors = {};
 
     if (!formData.question.trim()) {
       newErrors.question = 'Question is required';
@@ -110,408 +227,383 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
       newErrors.description = 'Description is required';
     }
 
-    if (!formData.category.trim()) {
-      newErrors.category = 'Category is required';
+    if (!formData.category) {
+      newErrors.category = 'Please select a category';
     }
 
     if (!formData.includeChart && !formData.imageUrl.trim()) {
       newErrors.imageUrl = 'Image URL is required when not using chart';
     }
-
-    // Validate end date and time
-    if (!formData.endDate || !formData.endTime) {
-      newErrors.endDate = 'End date and time are required';
-    } else {
-      const now = new Date();
-      const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
-      
-      if (endDateTime <= now) {
-        newErrors.endDate = 'End date and time must be in the future';
-      }
-      
-      // Check if duration is at least 1 hour and at most 1 year
-      const durationInHours = (endDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-      if (durationInHours < 1) {
-        newErrors.endDate = 'Prediction must last at least 1 hour';
-      } else if (durationInHours > 8760) {
-        newErrors.endDate = 'Prediction cannot last more than 1 year';
-      }
-    }
-
+    
     if (formData.includeChart && !formData.selectedCrypto) {
       newErrors.selectedCrypto = 'Please select a cryptocurrency for the chart';
+    }
+
+    // Validate end date/time
+    const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
+    const now = new Date();
+    const hoursDiff = (endDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+    if (hoursDiff < 1) {
+      newErrors.endDate = 'End time must be at least 1 hour from now';
+    } else if (hoursDiff > 8760) {
+      newErrors.endDate = 'End time cannot be more than 1 year from now';
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!validateForm()) return;
+  const handleApproveSwipe = async () => {
+    if (!address || !swipeFee) return;
 
     try {
-      const value = isOwner || isApprovedCreator ? BigInt(0) : (creationFee || BigInt(0));
-
-
-
-      // Calculate duration in hours from end date/time
-      const now = new Date();
-      const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
-      const durationInHours = Math.ceil((endDateTime.getTime() - now.getTime()) / (1000 * 60 * 60));
-
-      // Execute transaction with callbacks
-      writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI,
-        functionName: 'createPrediction',
-        args: [
-          formData.question.trim(),
-          formData.description.trim(),
-          formData.category.trim(),
-          formData.imageUrl.trim(),
-          BigInt(durationInHours)
-        ],
-        value
-      }, {
-        onSuccess: async (txHash) => {
-          // Show success alert with Basescan link
-          alert(`🎉 Prediction created successfully!\n\nTransaction Hash: ${txHash}\n\nView on Basescan: https://basescan.org/tx/${txHash}`);
-          
-          // Sync new prediction to Redis after successful transaction
-          try {
-            const syncResponse = await fetch('/api/sync');
-          } catch (syncError) {
-            // Silent fail for sync
+      await writeContract({
+        address: SWIPE_TOKEN.address as `0x${string}`,
+        abi: [
+          {
+            inputs: [
+              { name: 'spender', type: 'address' },
+              { name: 'amount', type: 'uint256' }
+            ],
+            name: 'approve',
+            outputs: [{ name: '', type: 'bool' }],
+            stateMutability: 'nonpayable',
+            type: 'function'
           }
-
-          // Close modal and reset form
-          onSuccess?.();
-          onClose();
-          setFormData({
-            question: '',
-            description: '',
-            category: '',
-            imageUrl: '',
-            endDate: '',
-            endTime: '',
-            includeChart: false,
-            selectedCrypto: ''
-          });
-        },
-        onError: (error) => {
-          setErrors({ submit: 'Failed to create prediction. Please try again.' });
-        }
+        ],
+        functionName: 'approve',
+        args: [CONTRACTS.V2.address as `0x${string}`, swipeFee as bigint],
       });
     } catch (error) {
+      console.error('Approval failed:', error);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateForm() || !canCreate) return;
+
+    try {
+      const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
+      const durationHours = Math.ceil((endDateTime.getTime() - Date.now()) / (1000 * 60 * 60));
+      
+      // Generate image URL - use chart URL if chart is selected
+      const selectedCryptoData = CRYPTO_OPTIONS.find(c => c.symbol === formData.selectedCrypto);
+      let finalImageUrl = formData.imageUrl.trim();
+      
+      if (formData.includeChart && selectedCryptoData) {
+        // Store the full GeckoTerminal URL
+        finalImageUrl = `https://www.geckoterminal.com/${selectedCryptoData.chain}/pools/${selectedCryptoData.poolAddress}?embed=1&info=0&swaps=0&light_chart=1&chart_type=price&resolution=1d&bg_color=f1f5f9`;
+      }
+
+      if (formData.paymentToken === 'ETH') {
+        // ETH payment
+        const value = canCreateFree ? BigInt(0) : (ethFee as bigint || BigInt(0));
+        
+        await writeContract({
+          address: CONTRACTS.V2.address as `0x${string}`,
+          abi: CONTRACTS.V2.abi,
+          functionName: 'createPrediction',
+          args: [
+            formData.question.trim(),
+            formData.description.trim(),
+            formData.category,
+            finalImageUrl,
+            BigInt(durationHours)
+          ],
+          value
+        });
+      } else {
+        // SWIPE payment
+        if (!canCreateFree && swipeFee) {
+          const currentAllowance = swipeAllowance as bigint || BigInt(0);
+          if (currentAllowance < (swipeFee as bigint)) {
+            alert('Please approve SWIPE tokens first');
+            await handleApproveSwipe();
+            return;
+          }
+        }
+
+        await writeContract({
+          address: CONTRACTS.V2.address as `0x${string}`,
+          abi: CONTRACTS.V2.abi,
+          functionName: 'createPredictionWithToken',
+          args: [
+            formData.question.trim(),
+            formData.description.trim(),
+            formData.category,
+            finalImageUrl,
+            BigInt(durationHours),
+            SWIPE_TOKEN.address as `0x${string}`
+          ]
+        });
+      }
+    } catch (error) {
+      console.error('Create prediction failed:', error);
       setErrors({ submit: 'Failed to create prediction. Please try again.' });
     }
   };
 
   if (!isOpen) return null;
 
+  const needsSwipeApproval: boolean = formData.paymentToken === 'SWIPE' && 
+    !canCreateFree && 
+    swipeFee !== undefined && 
+    swipeAllowance !== undefined &&
+    (swipeAllowance as bigint) < (swipeFee as bigint);
+
   return (
-    <div className="modern-create-modal-overlay">
-      <div className="modern-create-modal">
-        <div className="modern-create-modal-header">
-          <div className="modern-modal-title">
-            <span className="create-title">Create Prediction</span>
-            <span className="create-subtitle">Prediction Market</span>
-          </div>
-          <button className="modern-create-close-btn" onClick={onClose}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
+    <div className="modal-overlay">
+      <div className="modal-container">
+        <div className="modal-header">
+          <h2>Create Prediction</h2>
+          <button className="close-btn" onClick={onClose} disabled={isPending || isConfirming}>
+            ✕
           </button>
         </div>
 
-        <div className="modern-create-modal-content">
-          <form onSubmit={handleSubmit} className="modern-form">
-            {/* Question */}
-            <div className="modern-form-group">
-              <label className="modern-form-label">
-                Question *
-              </label>
-              <textarea
-                value={formData.question}
-                onChange={(e) => handleInputChange('question', e.target.value)}
-                className={`modern-form-textarea ${
-                  errors.question ? 'error' : ''
-                }`}
-                rows={3}
-                placeholder="Will Bitcoin reach $100,000 by end of 2024?"
-                maxLength={200}
-              />
-              {errors.question && (
-                <p className="modern-form-error">{errors.question}</p>
-              )}
-              <p className="modern-form-counter">
-                {formData.question.length}/200 characters
-              </p>
-            </div>
+        <form onSubmit={handleSubmit} className="modal-form">
+          {/* Question */}
+          <div className="form-group">
+            <label>Question *</label>
+            <textarea
+              value={formData.question}
+              onChange={(e) => handleInputChange('question', e.target.value)}
+              placeholder="Will Bitcoin reach $100,000 by end of 2024?"
+              maxLength={200}
+              rows={3}
+              className={errors.question ? 'error' : ''}
+            />
+            {errors.question && <span className="error-message">{errors.question}</span>}
+            <span className="char-count">{formData.question.length}/200</span>
+          </div>
 
-            {/* Description */}
-            <div className="modern-form-group">
-              <label className="modern-form-label">
-                Description *
-              </label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => handleInputChange('description', e.target.value)}
-                className={`modern-form-textarea ${
-                  errors.description ? 'error' : ''
-                }`}
-                rows={4}
-                placeholder="Provide context, analysis, and reasoning for your prediction..."
-              />
-              {errors.description && (
-                <p className="modern-form-error">{errors.description}</p>
-              )}
-            </div>
+          {/* Description */}
+          <div className="form-group">
+            <label>Description *</label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => handleInputChange('description', e.target.value)}
+              placeholder="Provide context and reasoning for your prediction..."
+              rows={4}
+              className={errors.description ? 'error' : ''}
+            />
+            {errors.description && <span className="error-message">{errors.description}</span>}
+          </div>
 
-            {/* Category */}
-            <div className="modern-form-group">
-              <label className="modern-form-label">
-                Category *
-              </label>
-              <select
-                value={formData.category}
-                onChange={(e) => handleInputChange('category', e.target.value)}
-                className={`modern-form-select ${
-                  errors.category ? 'error' : ''
-                }`}
-              >
-                <option value="">Select a category</option>
-                {categories.map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </select>
-              {errors.category && (
-                <p className="modern-form-error">{errors.category}</p>
-              )}
-            </div>
+          {/* Category */}
+          <div className="form-group">
+            <label>Category *</label>
+            <select
+              value={formData.category}
+              onChange={(e) => handleInputChange('category', e.target.value)}
+              className={errors.category ? 'error' : ''}
+            >
+              <option value="">Select a category</option>
+              {CATEGORIES.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+            {errors.category && <span className="error-message">{errors.category}</span>}
+          </div>
 
-            {/* Chart Selection */}
-            <div className="modern-form-group">
-              <label className="modern-form-label">
-                Crypto Chart (Optional)
-              </label>
-              <div className="modern-chart-section">
-                <div className="modern-checkbox-group">
-                  <input
-                    type="checkbox"
-                    id="includeChart"
-                    checked={formData.includeChart}
-                    onChange={(e) => setFormData(prev => ({
-                      ...prev,
-                      includeChart: e.target.checked,
-                      imageUrl: e.target.checked ? '' : prev.imageUrl // Clear image when chart is enabled
-                    }))}
-                    className="modern-checkbox"
-                  />
-                  <label htmlFor="includeChart" className="modern-checkbox-label">
-                    Include live crypto chart in prediction
-                  </label>
-                </div>
+          {/* Chart Selection */}
+          <div className="form-group">
+            <label>Crypto Chart (Optional)</label>
+            <div className="chart-section">
+              <div className="checkbox-group">
+                <input
+                  type="checkbox"
+                  id="includeChart"
+                  checked={formData.includeChart}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    includeChart: e.target.checked,
+                    imageUrl: e.target.checked ? '' : prev.imageUrl
+                  }))}
+                  className="checkbox"
+                />
+                <label htmlFor="includeChart" className="checkbox-label">
+                  Include live crypto chart in prediction
+                </label>
+              </div>
 
-                {formData.includeChart && (
-                  <div className="modern-crypto-selection">
-                    <label className="modern-crypto-label">
-                      Select Cryptocurrency *
-                    </label>
-                    <div className="modern-crypto-grid">
-                      {cryptoOptions.map(crypto => (
-                        <button
-                          key={crypto.symbol}
-                          type="button"
-                          onClick={() => setFormData(prev => ({ ...prev, selectedCrypto: crypto.symbol }))}
-                          className={`modern-crypto-btn ${
-                            formData.selectedCrypto === crypto.symbol ? 'selected' : ''
-                          }`}
-                          style={{ borderColor: formData.selectedCrypto === crypto.symbol ? crypto.color : undefined }}
-                        >
-                          <span className="crypto-icon">{crypto.icon}</span>
-                          <span className="crypto-symbol">{crypto.symbol}</span>
-                        </button>
-                      ))}
-                    </div>
-                    {errors.selectedCrypto && (
-                      <p className="modern-form-error">{errors.selectedCrypto}</p>
-                    )}
-                    {formData.selectedCrypto && (
-                      <div className="modern-crypto-info">
-                        <p className="crypto-info-text">
-                          Selected: <strong>{cryptoOptions.find(c => c.symbol === formData.selectedCrypto)?.name}</strong>
-                        </p>
-                        <p className="crypto-info-subtext">
-                          Live chart will be embedded in your prediction
-                        </p>
-                      </div>
-                    )}
+              {formData.includeChart && (
+                <div className="crypto-selection">
+                  <div className="crypto-header">
+                    <span className="crypto-header-text">Select Cryptocurrency</span>
                   </div>
+                  <div className="crypto-grid">
+                    {CRYPTO_OPTIONS.map(crypto => (
+                      <button
+                        key={crypto.symbol}
+                        type="button"
+                        onClick={() => handleInputChange('selectedCrypto', crypto.symbol)}
+                        className={`crypto-btn ${formData.selectedCrypto === crypto.symbol ? 'selected' : ''}`}
+                        style={{ borderColor: formData.selectedCrypto === crypto.symbol ? crypto.color : undefined }}
+                      >
+                        <span className="crypto-symbol">{crypto.symbol}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {errors.selectedCrypto && (
+                    <span className="error-message">{errors.selectedCrypto}</span>
+                  )}
+                  {formData.selectedCrypto && (
+                    <div className="crypto-info">
+                      <p className="crypto-info-text">
+                        Selected: <strong>{CRYPTO_OPTIONS.find(c => c.symbol === formData.selectedCrypto)?.name}</strong>
+                      </p>
+                      <p className="crypto-info-subtext">
+                        Live chart will be embedded in your prediction
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Image URL */}
+          <div className="form-group">
+            <label>Image URL {formData.includeChart ? '(Disabled when chart is selected)' : '*'}</label>
+            <input
+              type="url"
+              value={formData.imageUrl}
+              onChange={(e) => handleInputChange('imageUrl', e.target.value)}
+              disabled={formData.includeChart}
+              placeholder={formData.includeChart ? 'Chart will be used as image' : 'https://example.com/image.jpg'}
+              className={`${errors.imageUrl ? 'error' : ''} ${formData.includeChart ? 'disabled' : ''}`}
+            />
+            {errors.imageUrl && !formData.includeChart && <span className="error-message">{errors.imageUrl}</span>}
+            <p className="help-text">
+              {formData.includeChart
+                ? 'Chart image will be automatically generated and used'
+                : 'Provide a URL to an image that represents your prediction'
+              }
+            </p>
+          </div>
+
+          {/* End Date/Time */}
+          <div className="form-group">
+            <label>End Date & Time *</label>
+            <div className="datetime-inputs">
+              <input
+                type="date"
+                value={formData.endDate}
+                onChange={(e) => handleInputChange('endDate', e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
+                className={errors.endDate ? 'error' : ''}
+              />
+              <input
+                type="time"
+                value={formData.endTime}
+                onChange={(e) => handleInputChange('endTime', e.target.value)}
+                className={errors.endDate ? 'error' : ''}
+              />
+            </div>
+            {errors.endDate && <span className="error-message">{errors.endDate}</span>}
+          </div>
+
+          {/* User Status Info */}
+          {address && (
+            <div className="form-group">
+              <div className="user-status-box">
+                <h4>Your Status</h4>
+                {isOwner ? (
+                  <p className="status-info owner">👑 Contract Owner - Free creation</p>
+                ) : isApprovedCreator ? (
+                  <p className="status-info approved">✅ Approved Creator - Free creation</p>
+                ) : publicCreationEnabled ? (
+                  <p className="status-info public">👤 Public User - Creation fee required</p>
+                ) : (
+                  <p className="status-info restricted">🚫 Public creation is disabled</p>
                 )}
               </div>
             </div>
+          )}
 
-            {/* Image URL */}
-            <div className="modern-form-group">
-              <label className="modern-form-label">
-                Image URL {formData.includeChart ? '(Disabled when chart is selected)' : '*'}
-              </label>
-              <input
-                type="url"
-                value={formData.imageUrl}
-                onChange={(e) => handleInputChange('imageUrl', e.target.value)}
-                disabled={formData.includeChart}
-                className={`modern-form-input ${
-                  formData.includeChart
-                    ? 'disabled'
-                    : errors.imageUrl
-                    ? 'error'
-                    : ''
-                }`}
-                placeholder={formData.includeChart ? 'Chart will be used as image' : 'https://example.com/image.jpg'}
-              />
-              {errors.imageUrl && !formData.includeChart && (
-                <p className="modern-form-error">{errors.imageUrl}</p>
-              )}
-              <p className="modern-form-help">
-                {formData.includeChart
-                  ? 'Chart image will be automatically generated and used'
-                  : 'Provide a URL to an image that represents your prediction'
-                }
-              </p>
-            </div>
-
-            {/* End Date and Time */}
-            <div className="modern-form-group">
-              <label className="modern-form-label">
-                Prediction End Date and Time *
-              </label>
-              <div className="modern-datetime-grid">
-                <div className="modern-datetime-field">
-                  <label className="modern-datetime-label">End Date</label>
-                  <input
-                    type="date"
-                    value={formData.endDate}
-                    onChange={(e) => handleInputChange('endDate', e.target.value)}
-                    className={`modern-form-input ${
-                      errors.endDate ? 'error' : ''
-                    }`}
-                    min={new Date().toISOString().split('T')[0]}
-                  />
-                </div>
-                <div className="modern-datetime-field">
-                  <label className="modern-datetime-label">End Time</label>
-                  <input
-                    type="time"
-                    value={formData.endTime}
-                    onChange={(e) => handleInputChange('endTime', e.target.value)}
-                    className={`modern-form-input ${
-                      errors.endDate ? 'error' : ''
-                    }`}
-                    step="60"
-                  />
-                </div>
-              </div>
-              
-              {errors.endDate && (
-                <p className="modern-form-error">{errors.endDate}</p>
-              )}
-              
-              {formData.endDate && formData.endTime && (
-                <div className="modern-datetime-info">
-                  <p className="datetime-info-text">
-                    <strong>Prediction will end:</strong> {new Date(`${formData.endDate}T${formData.endTime}`).toLocaleString('pl-PL')}
-                  </p>
-                  <p className="datetime-duration-text">
-                    Duration: {(() => {
-                      const now = new Date();
-                      const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
-                      const durationInHours = Math.ceil((endDateTime.getTime() - now.getTime()) / (1000 * 60 * 60));
-                      const days = Math.floor(durationInHours / 24);
-                      const hours = durationInHours % 24;
-                      if (days > 0) {
-                        return `${days} day${days > 1 ? 's' : ''} ${hours > 0 ? `and ${hours} hour${hours > 1 ? 's' : ''}` : ''}`;
-                      }
-                      return `${hours} hour${hours > 1 ? 's' : ''}`;
-                    })()}
-                  </p>
-                </div>
-              )}
-              
-              <p className="modern-form-help">
-                Select the exact date and time when your prediction should end. Must be at least 1 hour from now.
-              </p>
-            </div>
-
-            {/* Fee Information */}
-            {address && !isOwner && !isApprovedCreator && creationFee && publicCreationEnabled && (
-              <div className="modern-info-box fee-info">
-                <h3 className="info-box-title">
-                  Creation Fee Required
-                </h3>
-                <p className="info-box-text">
-                  You need to pay {(Number(creationFee) / 1e18).toFixed(4)} ETH to create this prediction.
-                  Approved creators don&apos;t need to pay this fee.
-                </p>
-              </div>
-            )}
-
-            {/* Public Creation Disabled Warning */}
-            {address && !isOwner && !isApprovedCreator && publicCreationEnabled === false && (
-              <div className="modern-info-box error-info">
-                <h3 className="info-box-title">
-                  ⚠️ Cannot Create Prediction
-                </h3>
-                <p className="info-box-text">
-                  <strong>Public creation is currently disabled.</strong> Only approved creators can create predictions.
-                  <br />
-                  <span className="info-box-subtext">
-                    Contact the contract owner to enable public creation or request approved creator status.
-                  </span>
-                </p>
-              </div>
-            )}
-
-
-
-            {/* Submit Error */}
-            {errors.submit && (
-              <div className="modern-info-box error-info">
-                <p className="info-box-text">{errors.submit}</p>
-              </div>
-            )}
-
-            {/* Buttons */}
-            <div className="modern-form-actions">
+          {/* Payment Token Selection */}
+          <div className="form-group">
+            <label>Payment Token * {canCreateFree && <span className="free-badge">FREE FOR YOU</span>}</label>
+            <div className="token-selection">
               <button
                 type="button"
-                onClick={onClose}
-                className="modern-cancel-btn"
-                disabled={isPending}
+                className={`token-btn ${formData.paymentToken === 'ETH' ? 'active' : ''}`}
+                onClick={() => handleInputChange('paymentToken', 'ETH')}
               >
-                Cancel
+                <div className="token-logo-container">
+                  <img src="/eth.png" alt="ETH" className="token-logo" />
+                </div>
+                <span className="token-name">ETH</span>
+                <span className="token-fee">
+                  {canCreateFree ? 'Free' : ethFee ? `${formatEther(ethFee as bigint)} ETH` : '0.0001 ETH'}
+                </span>
               </button>
               <button
-                type="submit"
-                disabled={isPending || (!isOwner && !isApprovedCreator && !publicCreationEnabled)}
-                className={`modern-submit-btn ${isPending ? 'loading' : ''}`}
+                type="button"
+                className={`token-btn ${formData.paymentToken === 'SWIPE' ? 'active' : ''}`}
+                onClick={() => handleInputChange('paymentToken', 'SWIPE')}
               >
-                {isPending ? (
-                  <>
-                    <div className="modern-spinner"></div>
-                    Creating...
-                  </>
-                ) : (
-                  'Create Prediction'
-                )}
+                <div className="token-logo-container">
+                  <img src="/logo.png" alt="SWIPE" className="token-logo swipe-logo" />
+                </div>
+                <span className="token-name">$SWIPE</span>
+                <span className="token-fee">
+                  {canCreateFree ? 'Free' : swipeFee ? `${formatEther(swipeFee as bigint)} SWIPE` : '20,000 SWIPE'}
+                </span>
               </button>
             </div>
-          </form>
-        </div>
+
+            {needsSwipeApproval ? (
+              <div className="approval-notice">
+                <span>⚠️ SWIPE approval needed</span>
+                <button
+                  type="button"
+                  onClick={handleApproveSwipe}
+                  className="approve-btn"
+                  disabled={isPending}
+                >
+                  Approve SWIPE
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Status Messages */}
+          {!canCreate && (
+            <div className="warning-box">
+              <strong>⚠️ Cannot Create Prediction</strong>
+              <p>Public creation is disabled. Only approved creators can create predictions.</p>
+            </div>
+          )}
+
+          {writeError && (
+            <div className="error-box">
+              <strong>Error:</strong> {writeError.message}
+            </div>
+          )}
+
+          {errors.submit && (
+            <div className="error-box">{errors.submit}</div>
+          )}
+
+          {/* Submit Button */}
+          <div className="form-actions">
+            <button type="button" onClick={onClose} disabled={isPending || isConfirming}>
+              Cancel
+            </button>
+            <button 
+              type="submit" 
+              disabled={!canCreate || isPending || isConfirming}
+              className="submit-btn"
+            >
+              {isPending || isConfirming ? 'Creating...' : 'Create Prediction'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

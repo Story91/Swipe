@@ -13,6 +13,8 @@ export interface RedisPrediction {
   resolutionDeadline?: number; // Unix timestamp - when admin must resolve by
   yesTotalAmount: number;
   noTotalAmount: number;
+  swipeYesTotalAmount: number;
+  swipeNoTotalAmount: number;
   resolved: boolean;
   outcome?: boolean;
   cancelled: boolean;
@@ -29,15 +31,19 @@ export interface RedisPrediction {
     timeLeft: number;
     totalPool: number;
   };
+  contractVersion?: 'V1' | 'V2'; // Contract version for hybrid migration
 }
 
 export interface RedisUserStake {
-  userId: string;
+  user: string;
   predictionId: string;
   yesAmount: number;
   noAmount: number;
   claimed: boolean;
   stakedAt: number;
+  contractVersion?: 'V1' | 'V2'; // Contract version for hybrid migration
+  isWinner?: boolean; // V2 only
+  tokenType?: 'ETH' | 'SWIPE'; // Token type for V2 multi-token support
 }
 
 // User transaction interface

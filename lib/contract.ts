@@ -1,10 +1,39 @@
 import { ethers } from 'ethers';
 
-// Contract Configuration
-export const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0xdc21A340835C41a14Eb1C856Ce902464D04774E3';
+// V1 Contract Configuration (Legacy)
+export const V1_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_V1_CONTRACT_ADDRESS || '0xdc21A340835C41a14Eb1C856Ce902464D04774E3';
 
-// ABI generated from PredictionMarket_Optimized.sol
-export const CONTRACT_ABI = [
+// V2 Contract Configuration (New)
+export const V2_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_V2_CONTRACT_ADDRESS || '0x2bA339Df34B98099a9047d9442075F7B3a792f74';
+
+// SWIPE Token Configuration
+export const SWIPE_TOKEN = {
+  address: '0xd0187D77Af0ED6a44F0A631B406c78b30E160aA9',
+  symbol: 'SWIPE',
+  decimals: 18,
+  name: 'Swipe'
+};
+
+// Migration date - when V2 was deployed
+export const MIGRATION_DATE = new Date('2024-01-15'); // Will be updated after deploy
+
+// Helper functions
+export const getContractForPrediction = (createdAt: Date) => {
+  return createdAt < MIGRATION_DATE ? CONTRACTS.V1 : CONTRACTS.V2;
+};
+
+export const getContractForAction = (action: 'create' | 'stake' | 'claim', predictionId?: string) => {
+  if (action === 'create' || action === 'stake') {
+    return CONTRACTS.V2; // zawsze V2 dla nowych akcji
+  }
+  
+  // Dla claimów - sprawdzamy datę utworzenia prediction
+  // To będzie implementowane w komponentach
+  return CONTRACTS.V1; // fallback
+};
+
+// ABI generated from PredictionMarket_Optimized.sol (V1)
+export const V1_ABI = [
   {
     "inputs": [],
     "stateMutability": "nonpayable",
@@ -1280,12 +1309,46 @@ export const CONTRACT_ABI = [
   }
 ] as const;
 
-// Contract instance helper
-export function getContract(signer?: ethers.Signer) {
-  if (!signer) {
-    return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI);
+// ABI generated from PredictionMarket_V2.sol (V2)
+const V2_ABI_DATA = require('../artifacts/contracts/PredictionMarket_V2.sol/PredictionMarketV2.json');
+export const V2_ABI = V2_ABI_DATA.abi;
+
+// Dual Contract Configuration
+export const CONTRACTS = {
+  V1: {
+    address: V1_CONTRACT_ADDRESS,
+    abi: V1_ABI,
+    version: 'v1',
+    active: true, // w pełni aktywny
+    supportedTokens: ['ETH']
+  },
+  V2: {
+    address: V2_CONTRACT_ADDRESS,
+    abi: V2_ABI,
+    version: 'v2',
+    active: true, // dla nowych predictions
+    supportedTokens: ['ETH', 'SWIPE']
   }
-  return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+};
+
+// Contract instance helpers
+export function getV1Contract(signer?: ethers.Signer) {
+  if (!signer) {
+    return new ethers.Contract(V1_CONTRACT_ADDRESS, V1_ABI);
+  }
+  return new ethers.Contract(V1_CONTRACT_ADDRESS, V1_ABI, signer);
+}
+
+export function getV2Contract(signer?: ethers.Signer) {
+  if (!signer) {
+    return new ethers.Contract(V2_CONTRACT_ADDRESS, V2_ABI);
+  }
+  return new ethers.Contract(V2_CONTRACT_ADDRESS, V2_ABI, signer);
+}
+
+// Legacy function for backward compatibility
+export function getContract(signer?: ethers.Signer) {
+  return getV2Contract(signer); // Default to V2
 }
 
 // Type definitions for TypeScript

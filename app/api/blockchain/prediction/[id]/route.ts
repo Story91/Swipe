@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createPublicClient, http, parseAbiItem } from 'viem';
 import { base } from 'viem/chains';
+import { CONTRACTS, getContractForPrediction } from '../../../../../lib/contract';
 
 // Initialize public client for Base network
 const publicClient = createPublicClient({
@@ -8,12 +9,12 @@ const publicClient = createPublicClient({
   transport: http(process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org'),
 });
 
-// Contract ABI for single prediction
-const PREDICTION_ABI = [
-  'function getPrediction(uint256 _predictionId) external view returns (string question, string description, string category, string imageUrl, uint256 deadline, address creator, bool verified, bool needsApproval, bool resolved, bool outcome, bool cancelled, uint256 yesTotalAmount, uint256 noTotalAmount, uint256 totalStakes)',
-  'function getStakeAmount(uint256 _predictionId, address _user, bool _isYes) external view returns (uint256)',
-  'function getParticipantCount(uint256 _predictionId) external view returns (uint256)',
-];
+// Helper function to determine which contract to use based on prediction ID
+function getContractForPredictionId(predictionId: string) {
+  // For now, use V2 for all new predictions
+  // In the future, this could be based on prediction ID ranges or timestamps
+  return CONTRACTS.V2;
+}
 
 // GET /api/blockchain/prediction/[id] - Get prediction data from blockchain
 export async function GET(
@@ -23,79 +24,79 @@ export async function GET(
   try {
     const resolvedParams = await params;
     const predictionId = resolvedParams.id;
-    const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
+    const contract = getContractForPredictionId(predictionId);
     
-    if (!contractAddress) {
-      return NextResponse.json(
-        { success: false, error: 'Contract address not configured' },
-        { status: 500 }
-      );
-    }
+    console.log(`🔍 Fetching prediction ${predictionId} from ${contract.version} contract...`);
     
-    console.log(`🔍 Fetching prediction ${predictionId} from blockchain...`);
-    
-    // Fetch prediction data from contract
+    // Fetch prediction data from contract using V2 ABI
     const predictionData = await publicClient.readContract({
-      address: contractAddress as `0x${string}`,
-      abi: PREDICTION_ABI,
-      functionName: 'getPrediction',
+      address: contract.address as `0x${string}`,
+      abi: contract.abi,
+      functionName: 'getPredictionBasic',
       args: [BigInt(predictionId)],
     });
     
     // Fetch additional data
     const participantCount = await publicClient.readContract({
-      address: contractAddress as `0x${string}`,
-      abi: PREDICTION_ABI,
-      functionName: 'getParticipantCount',
+      address: contract.address as `0x${string}`,
+      abi: contract.abi,
+      functionName: 'getParticipants',
       args: [BigInt(predictionId)],
     });
     
-    // Parse the prediction data
-    const [
+    // Parse the prediction data (V2 getPredictionBasic returns different structure)
+    const {
       question,
       description,
       category,
-      imageUrl,
-      deadline,
-      creator,
-      verified,
-      needsApproval,
-      resolved,
-      outcome,
-      cancelled,
       yesTotalAmount,
       noTotalAmount,
-      totalStakes
-    ] = predictionData as [
-      string, string, string, string, bigint, string, boolean, boolean, boolean, boolean, boolean, bigint, bigint, bigint
-    ];
+      deadline,
+      resolved,
+      outcome,
+      approved,
+      creator
+    } = predictionData as {
+      question: string;
+      description: string;
+      category: string;
+      yesTotalAmount: bigint;
+      noTotalAmount: bigint;
+      deadline: bigint;
+      resolved: boolean;
+      outcome: boolean;
+      approved: boolean;
+      creator: string;
+    };
     
     const prediction = {
       id: predictionId,
       question,
       description,
       category,
-      imageUrl,
+      imageUrl: '', // V2 getPredictionBasic doesn't include imageUrl
       deadline: Number(deadline),
       creator,
-      verified,
-      needsApproval,
+      verified: false, // V2 getPredictionBasic doesn't include verified
+      needsApproval: !approved, // Derive from approved status
       resolved,
       outcome,
-      cancelled,
-      yesTotalAmount,
-      noTotalAmount,
-      totalStakes,
-      participantCount: Number(participantCount),
+      cancelled: false, // V2 getPredictionBasic doesn't include cancelled
+      yesTotalAmount: Number(yesTotalAmount) / 1e18, // Convert from wei
+      noTotalAmount: Number(noTotalAmount) / 1e18, // Convert from wei
+      totalStakes: (Number(yesTotalAmount) + Number(noTotalAmount)) / 1e18, // Calculate total
+      participantCount: Array.isArray(participantCount) ? participantCount.length : Number(participantCount),
+      contractVersion: contract.version,
       timestamp: new Date().toISOString()
     };
     
-    console.log(`✅ Prediction ${predictionId} fetched from blockchain:`, {
+    console.log(`✅ Prediction ${predictionId} fetched from ${contract.version} blockchain:`, {
       question: prediction.question.substring(0, 50) + '...',
       category: prediction.category,
       deadline: new Date(prediction.deadline * 1000).toISOString(),
       creator: prediction.creator.substring(0, 10) + '...',
-      totalStakes: Number(prediction.totalStakes) / 1e18
+      totalStakes: prediction.totalStakes,
+      contractVersion: contract.version
     });
     
     return NextResponse.json({

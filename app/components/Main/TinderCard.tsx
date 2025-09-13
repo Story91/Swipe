@@ -1,8 +1,8 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef, forwardRef, useImperativeHandle } from 'react';
 import TinderCard from 'react-tinder-card';
-import { useAccount, useWriteContract } from "wagmi";
+import { useAccount, useWriteContract, useReadContract } from "wagmi";
 import { ethers } from 'ethers';
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../../../lib/contract';
+import { CONTRACTS, SWIPE_TOKEN, getV2Contract, getContractForAction } from '../../../lib/contract';
 import { useViewProfile } from '@coinbase/onchainkit/minikit';
 import './TinderCard.css';
 import './Dashboards.css';
@@ -92,11 +92,13 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     predictionId: number;
     isYes: boolean;
     stakeAmount: string;
+    selectedToken: 'ETH' | 'SWIPE';
   }>({
     isOpen: false,
     predictionId: 0,
     isYes: true,
-    stakeAmount: '0.001'
+    stakeAmount: '0.001',
+    selectedToken: 'ETH'
   });
 
   // Track user actions for feedback
@@ -111,6 +113,37 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   const [showActionFeedback, setShowActionFeedback] = useState(false);
   const { address } = useAccount();
   const { writeContract } = useWriteContract();
+  
+  // Check SWIPE allowance for user
+  const { data: swipeAllowance, refetch: refetchAllowance } = useReadContract({
+    address: SWIPE_TOKEN.address as `0x${string}`,
+    abi: [
+      {
+        "inputs": [{"name": "owner", "type": "address"}, {"name": "spender", "type": "address"}],
+        "name": "allowance",
+        "outputs": [{"name": "", "type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function"
+      }
+    ],
+    functionName: 'allowance',
+    args: address ? [address as `0x${string}`, CONTRACTS.V2.address as `0x${string}`] : undefined,
+  });
+
+  // Debug log
+  useEffect(() => {
+    if (swipeAllowance !== undefined) {
+      console.log('=== SWIPE ALLOWANCE DEBUG ===');
+      console.log('Raw allowance:', swipeAllowance);
+      console.log('Allowance type:', typeof swipeAllowance);
+      console.log('Allowance string:', swipeAllowance.toString());
+      console.log('User address:', address);
+      console.log('Spender (V2 contract):', CONTRACTS.V2.address);
+      console.log('=============================');
+    } else {
+      console.log('SWIPE Allowance is undefined');
+    }
+  }, [swipeAllowance, address]);
   const [isTransactionLoading, setIsTransactionLoading] = useState(false);
   const viewProfile = useViewProfile();
 
@@ -133,6 +166,27 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     return () => clearInterval(interval);
   }, []);
 
+  // Auto-refresh SWIPE allowance when modal is open and using SWIPE
+  useEffect(() => {
+    if (stakeModal.isOpen && stakeModal.selectedToken === 'SWIPE' && !isTransactionLoading) {
+      const interval = setInterval(async () => {
+        if (refetchAllowance) {
+          await refetchAllowance();
+        }
+      }, 1000); // Check every second
+      
+      return () => clearInterval(interval);
+    }
+  }, [stakeModal.isOpen, stakeModal.selectedToken, isTransactionLoading, refetchAllowance]);
+
+  // Force re-render when allowance changes (for button text update)
+  useEffect(() => {
+    if (stakeModal.isOpen && stakeModal.selectedToken === 'SWIPE') {
+      console.log('Allowance changed, forcing modal re-render');
+      // This will trigger a re-render of the modal component
+    }
+  }, [swipeAllowance, stakeModal.isOpen, stakeModal.selectedToken]);
+
   // Expose refresh function to parent component via ref
   useImperativeHandle(ref, () => ({
     refresh: refreshPredictions
@@ -147,7 +201,8 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       isOpen: true,
       predictionId,
       isYes,
-      stakeAmount: '0.001'
+      stakeAmount: '0.001',
+      selectedToken: 'ETH' // Default to ETH
     });
   }, []);
 
@@ -187,11 +242,17 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
 
   // Transform hybrid predictions to match the expected format (memoized)
   const transformedPredictions = useMemo(() => (hybridPredictions || []).map((pred) => ({
-    id: typeof pred.id === 'string' ? parseInt(pred.id.replace('pred_', ''), 10) || Date.now() : (pred.id || Date.now()),
+    id: typeof pred.id === 'string' 
+      ? (pred.id.includes('v2') 
+        ? parseInt(pred.id.replace('pred_v2_', ''), 10) || Date.now()
+        : parseInt(pred.id.replace('pred_', ''), 10) || Date.now())
+      : (pred.id || Date.now()),
     question: pred.question,
     category: pred.category,
     yesTotalAmount: pred.yesTotalAmount,
     noTotalAmount: pred.noTotalAmount,
+    swipeYesTotalAmount: pred.swipeYesTotalAmount,
+    swipeNoTotalAmount: pred.swipeNoTotalAmount,
     deadline: pred.deadline,
     resolved: pred.resolved,
     outcome: pred.outcome || false,
@@ -227,15 +288,16 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       id: typeof pred.id === 'string'
         ? (() => {
             const idStr = pred.id as string;
+            if (idStr.includes('v2')) {
+              return parseInt(idStr.replace('pred_v2_', ''), 10) || Date.now();
+            }
             return idStr.startsWith('pred_')
               ? parseInt(idStr.replace('pred_', ''), 10) || Date.now()
               : parseInt(idStr, 10) || Date.now();
           })()
         : (pred.id || Date.now()),
       title: (pred.question || 'Unknown prediction').length > 50 ? (pred.question || 'Unknown prediction').substring(0, 50) + '...' : (pred.question || 'Unknown prediction'),
-      image: pred.includeChart && pred.selectedCrypto 
-        ? `https://www.geckoterminal.com/eth/pools/${pred.selectedCrypto.toLowerCase()}?embed=1&info=0&swaps=0&light_chart=1&chart_type=price&resolution=1d&bg_color=f1f5f9`
-        : pred.imageUrl || (() => {
+      image: pred.imageUrl || (() => {
             // Fixed images for each category
             const category = pred.category?.toLowerCase() || 'default';
             
@@ -295,11 +357,15 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       votingYes: votingYes,
       creator: pred.creator,
       participants: hybridPredictions.find(hp => {
-        const hpId = typeof hp.id === 'string' ? parseInt(hp.id.replace('pred_', ''), 10) || Date.now() : (hp.id || Date.now());
+        const hpId = typeof hp.id === 'string' 
+          ? (hp.id.includes('v2') 
+            ? parseInt(hp.id.replace('pred_v2_', ''), 10) || Date.now()
+            : parseInt(hp.id.replace('pred_', ''), 10) || Date.now())
+          : (hp.id || Date.now());
         return hpId === pred.id;
       })?.participants || []
     };
-  }), [transformedPredictions, timeUpdate]);
+  }), [transformedPredictions]);
 
 
 
@@ -325,23 +391,34 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     });
     
     // Log only when the actual data changes, not every second
-    if (timeUpdate === 0) { // Log only on first load
+    if (activeItems.length > 0) {
       console.log(`📊 Total predictions: ${allItems.length}, Active predictions: ${activeItems.length}`);
     }
     return activeItems;
-  }, [realCardItems, items, transformedPredictions, timeUpdate]);
+  }, [realCardItems, items, transformedPredictions]);
 
 
 
   // Dashboard handlers
-  const handleStakeBet = (predictionId: number, isYes: boolean, amount: number) => {
-    if (amount < 0.001) {
-      alert('❌ Minimum stake is 0.001 ETH');
-      return;
-    }
-    if (amount > 100) {
-      alert('❌ Maximum stake is 100 ETH');
-      return;
+
+  const handleStakeBet = (predictionId: number, isYes: boolean, amount: number, token: 'ETH' | 'SWIPE') => {
+    // Validate based on token type
+    if (token === 'ETH') {
+      if (amount < 0.00001) {
+        alert('❌ Minimum stake is 0.00001 ETH');
+        return;
+      }
+      if (amount > 100) {
+        alert('❌ Maximum stake is 100 ETH');
+        return;
+      }
+    } else if (token === 'SWIPE') {
+      if (amount < 10000) {
+        alert('❌ Minimum stake is 10,000 SWIPE');
+        return;
+      }
+      // SWIPE has unlimited maximum
+      // Note: Allowance check is handled in the modal before calling this function
     }
 
     // Check if user is trying to bet on their own prediction
@@ -352,89 +429,144 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     }
 
     const side = isYes ? 'YES' : 'NO';
+    const contract = CONTRACTS.V2; // Always use V2 for new stakes
 
-    // Staking ETH
+    // Execute transaction based on token type
+    if (token === 'ETH') {
+      // ETH staking - use value parameter
+      writeContract({
+        address: contract.address as `0x${string}`,
+        abi: contract.abi,
+        functionName: 'placeStake',
+        args: [BigInt(predictionId), isYes],
+        value: ethers.parseEther(amount.toString()),
+      }, {
+        onSuccess: async (tx) => {
+          console.log('✅ ETH Stake transaction successful:', tx);
+          showNotification('success', 'Stake Placed!', `Successfully staked ${amount} ETH on ${side}!`);
+          await handleStakeSuccess();
+        },
+        onError: (error) => {
+          handleStakeError(error);
+        }
+      });
+    } else {
+      // SWIPE staking - use placeStakeWithToken
+      writeContract({
+        address: contract.address as `0x${string}`,
+        abi: contract.abi,
+        functionName: 'placeStakeWithToken',
+        args: [BigInt(predictionId), isYes, ethers.parseEther(amount.toString())],
+      }, {
+        onSuccess: async (tx) => {
+          console.log('✅ SWIPE Stake transaction successful:', tx);
+          showNotification('success', 'Stake Placed!', `Successfully staked ${amount} SWIPE on ${side}!`);
+          await handleStakeSuccess();
+        },
+        onError: (error) => {
+          handleStakeError(error);
+        }
+      });
+    }
+  };
 
+  // Helper function for stake success
+  const handleStakeSuccess = async () => {
+    // Sync updated data from blockchain to Redis
+    try {
+      console.log('🔄 Syncing updated prediction data after stake...');
+      const syncResponse = await fetch('/api/sync');
+      if (syncResponse.ok) {
+        console.log('✅ Prediction data synced successfully');
+        if (refreshPredictions) {
+          refreshPredictions();
+        }
+      } else {
+        console.warn('⚠️ Failed to sync prediction data');
+      }
+    } catch (syncError) {
+      console.warn('⚠️ Sync request failed:', syncError);
+    }
+    
+    // Trigger data refresh as fallback
+    setTimeout(() => {
+      if (refreshPredictions) {
+        refreshPredictions();
+      }
+    }, 3000);
+  };
 
+  // Helper function for stake error
+  const handleStakeError = (error: any) => {
+    console.error('❌ Stake transaction failed:', error);
 
-    // Execute real transaction with the smart contract
-    writeContract({
-      address: CONTRACT_ADDRESS as `0x${string}`,
-      abi: CONTRACT_ABI,
-      functionName: 'placeStake',
-      args: [BigInt(predictionId), isYes],
-      value: ethers.parseEther(amount.toString()),
-    }, {
-      onSuccess: async (tx) => {
-        console.log('✅ Stake transaction successful:', tx);
-        showNotification('success', 'Stake Placed!', `Successfully staked ${amount} ETH on ${side}!`);
-        
-        // Sync updated data from blockchain to Redis (only after transactions)
-        try {
-          console.log('🔄 Syncing updated prediction data after stake...');
-          const syncResponse = await fetch('/api/sync');
-          if (syncResponse.ok) {
-            console.log('✅ Prediction data synced successfully');
-            // Refresh predictions data
+    let errorMessage = 'Failed to place stake. Please try again.';
+
+    if (error?.message?.includes('insufficient funds')) {
+      errorMessage = '❌ Insufficient funds for this transaction.';
+    } else if (error?.message?.includes('gas')) {
+      errorMessage = '❌ Gas estimation failed. Please try again.';
+    } else if (error?.message?.includes('execution reverted')) {
+      errorMessage = '❌ Transaction reverted by contract.';
+    } else if (error?.message?.includes('allowance')) {
+      errorMessage = '❌ Insufficient SWIPE allowance. Please approve first.';
+    }
+
+    showNotification('error', 'Stake Failed', errorMessage);
+  };
+
+  const handleClaimReward = (predictionId: number, token: 'ETH' | 'SWIPE' = 'ETH') => {
+    // Determine which contract to use based on prediction creation date
+    const prediction = transformedPredictions.find(p => p.id === predictionId);
+    const isV1 = prediction && prediction.createdAt < new Date('2024-01-15').getTime() / 1000;
+    const contract = isV1 ? CONTRACTS.V1 : CONTRACTS.V2;
+
+    // Execute claim transaction based on token type
+    if (token === 'ETH' || isV1) {
+      // ETH claiming or V1 (ETH only)
+      writeContract({
+        address: contract.address as `0x${string}`,
+        abi: contract.abi,
+        functionName: 'claimReward',
+        args: [BigInt(predictionId)],
+      }, {
+        onSuccess: () => {
+          console.log('✅ ETH reward claimed successfully');
+          showNotification('success', 'Reward Claimed!', `Successfully claimed ETH reward!`);
+          setTimeout(() => {
             if (refreshPredictions) {
               refreshPredictions();
             }
-          } else {
-            console.warn('⚠️ Failed to sync prediction data');
-          }
-        } catch (syncError) {
-          console.warn('⚠️ Sync request failed:', syncError);
+          }, 3000);
+        },
+        onError: (error) => {
+          console.error('❌ Claim reward transaction failed:', error);
+          showNotification('error', 'Claim Failed', 'Failed to claim reward. Please try again.');
         }
-        
-        // Trigger data refresh as fallback
-        setTimeout(() => {
-          if (refreshPredictions) {
-            refreshPredictions();
-          }
-        }, 3000);
-      },
-      onError: (error) => {
-        console.error('❌ Stake transaction failed:', error);
-
-        let errorMessage = 'Failed to place stake. Please try again.';
-
-        if (error?.message?.includes('insufficient funds')) {
-          errorMessage = '❌ Insufficient funds for this transaction.';
-        } else if (error?.message?.includes('gas')) {
-          errorMessage = '❌ Gas estimation failed. Please try again.';
-        } else if (error?.message?.includes('execution reverted')) {
-          errorMessage = '❌ Transaction reverted by contract.';
+      });
+    } else {
+      // SWIPE claiming (V2 only)
+      writeContract({
+        address: contract.address as `0x${string}`,
+        abi: contract.abi,
+        functionName: 'claimRewardWithToken',
+        args: [BigInt(predictionId)],
+      }, {
+        onSuccess: () => {
+          console.log('✅ SWIPE reward claimed successfully');
+          showNotification('success', 'Reward Claimed!', `Successfully claimed SWIPE reward!`);
+          setTimeout(() => {
+            if (refreshPredictions) {
+              refreshPredictions();
+            }
+          }, 3000);
+        },
+        onError: (error) => {
+          console.error('❌ Claim SWIPE reward transaction failed:', error);
+          showNotification('error', 'Claim Failed', 'Failed to claim SWIPE reward. Please try again.');
         }
-
-        showNotification('error', 'Stake Failed', errorMessage);
-      }
-    });
-  };
-
-  const handleClaimReward = (predictionId: number) => {
-    // Claiming reward
-
-    // Execute real claim reward transaction
-    writeContract({
-      address: CONTRACT_ADDRESS as `0x${string}`,
-      abi: CONTRACT_ABI,
-      functionName: 'claimReward',
-      args: [BigInt(predictionId)],
-    }, {
-      onSuccess: () => {
-        // Reward claimed successfully
-        // Auto-refresh data after successful transaction
-        setTimeout(() => {
-          if (refreshPredictions) {
-            refreshPredictions();
-          }
-        }, 3000);
-      },
-      onError: (error) => {
-        console.error('❌ Claim reward transaction failed:', error);
-        alert('❌ Claim failed. Please try again.');
-      }
-    });
+      });
+    }
   };
 
   const handleResolvePrediction = (predictionId: string | number, outcome: boolean) => {
@@ -473,10 +605,11 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
         alert('❌ Resolution failed. Please try again.');
       });
     } else {
-      // Handle on-chain prediction
+      // Handle on-chain prediction - use V2 for new predictions
+      const contract = CONTRACTS.V2;
       writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI,
+        address: contract.address as `0x${string}`,
+        abi: contract.abi,
         functionName: 'resolvePrediction',
         args: [BigInt(predictionId), outcome],
       }, {
@@ -531,10 +664,11 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
         alert('❌ Cancellation failed. Please try again.');
       });
     } else {
-      // Handle on-chain prediction
+      // Handle on-chain prediction - use V2 for new predictions
+      const contract = CONTRACTS.V2;
       writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI,
+        address: contract.address as `0x${string}`,
+        abi: contract.abi,
         functionName: 'cancelPrediction',
         args: [BigInt(predictionId), reason],
       }, {
@@ -557,10 +691,11 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   const handleApprovePrediction = (predictionId: number) => {
     console.log(`✅ Approving prediction ${predictionId}`);
 
-    // Execute real approve prediction transaction
+    // Execute real approve prediction transaction - use V2 for new predictions
+    const contract = CONTRACTS.V2;
     writeContract({
-      address: CONTRACT_ADDRESS as `0x${string}`,
-      abi: CONTRACT_ABI,
+      address: contract.address as `0x${string}`,
+      abi: contract.abi,
       functionName: 'approvePrediction',
       args: [BigInt(predictionId)],
     }, {
@@ -596,10 +731,11 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   const handleRejectPrediction = (predictionId: number, reason: string) => {
     console.log(`❌ Rejecting prediction ${predictionId} with reason: ${reason}`);
 
-    // Execute real reject prediction transaction
+    // Execute real reject prediction transaction - use V2 for new predictions
+    const contract = CONTRACTS.V2;
     writeContract({
-      address: CONTRACT_ADDRESS as `0x${string}`,
-      abi: CONTRACT_ABI,
+      address: contract.address as `0x${string}`,
+      abi: contract.abi,
       functionName: 'rejectPrediction',
       args: [BigInt(predictionId), reason],
     }, {
@@ -633,51 +769,123 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   const handleWithdrawFees = () => {
     console.log('💰 Withdrawing collected fees to admin wallet...');
 
-    // Execute real withdraw fees transaction
+    // Execute real withdraw fees transaction - use V2 for new fees
+    const contract = CONTRACTS.V2;
     writeContract({
-      address: CONTRACT_ADDRESS as `0x${string}`,
-      abi: CONTRACT_ABI,
-      functionName: 'withdrawFees',
+      address: contract.address as `0x${string}`,
+      abi: contract.abi,
+      functionName: 'withdrawEthFees',
+      args: [],
     });
   };
 
   const handlePauseContract = () => {
     console.log('⏸️ Pausing contract...');
 
-    // Execute real pause contract transaction
+    // Execute real pause contract transaction - use V2 for new contract
+    const contract = CONTRACTS.V2;
     writeContract({
-      address: CONTRACT_ADDRESS as `0x${string}`,
-      abi: CONTRACT_ABI,
+      address: contract.address as `0x${string}`,
+      abi: contract.abi,
       functionName: 'pause',
+      args: [],
     });
   };
 
   // Stake modal handlers
   const handleStakeAmountChange = (amount: string) => {
-    setStakeModal(prev => ({ ...prev, stakeAmount: '0.001' }));
+    setStakeModal(prev => ({ 
+      ...prev, 
+      stakeAmount: amount
+    }));
   };
 
-  const handleConfirmStake = () => {
-    const { predictionId, isYes, stakeAmount } = stakeModal;
+  const handleTokenChange = (token: 'ETH' | 'SWIPE') => {
+    setStakeModal(prev => ({
+      ...prev,
+      selectedToken: token,
+      stakeAmount: token === 'ETH' ? '0.00001' : '10000'
+    }));
+  };
+
+  const handleConfirmStake = async () => {
+    const { predictionId, isYes, stakeAmount, selectedToken } = stakeModal;
     const amount = parseFloat(stakeAmount);
 
-    if (amount < 0.001) {
-      alert('❌ Minimum stake is 0.001 ETH');
-      return;
-    }
-    if (amount > 100) {
-      alert('❌ Maximum stake is 100 ETH');
-      return;
+    // For SWIPE, check if approval is needed first
+    if (selectedToken === 'SWIPE') {
+      const amountWei = BigInt(Math.floor(amount * 10**18));
+      let currentAllowance = BigInt(0);
+      
+      try {
+        if (swipeAllowance !== undefined && swipeAllowance !== null) {
+          currentAllowance = BigInt(swipeAllowance.toString());
+        }
+      } catch (e) {
+        console.error('Error parsing allowance:', e);
+        currentAllowance = BigInt(0);
+      }
+      
+      console.log('Checking SWIPE approval:');
+      console.log('Amount to stake (wei):', amountWei.toString());
+      console.log('Current allowance:', currentAllowance.toString());
+      console.log('Needs approval?', currentAllowance < amountWei);
+      
+      // TEMPORARY: Always do approve for SWIPE to test
+      if (true) {
+        // Need approval first
+        setIsTransactionLoading(true);
+        showNotification('info', 'Approval Required', `Approving ${amount} SWIPE for this stake`);
+        
+        // Execute approve transaction for exact amount
+        writeContract({
+          address: SWIPE_TOKEN.address as `0x${string}`,
+          abi: [
+            {
+              "inputs": [{"name": "spender", "type": "address"}, {"name": "amount", "type": "uint256"}],
+              "name": "approve",
+              "outputs": [{"name": "", "type": "bool"}],
+              "stateMutability": "nonpayable",
+              "type": "function"
+            }
+          ],
+          functionName: 'approve',
+          args: [CONTRACTS.V2.address as `0x${string}`, amountWei],
+        }, {
+          onSuccess: (tx) => {
+            console.log('✅ SWIPE approval successful:', tx);
+            showNotification('success', 'Approval Successful', `${amount} SWIPE approved! Now placing stake...`);
+            
+            // Immediately proceed to stake after approval
+            setTimeout(() => {
+              console.log('Proceeding to stake after approve...');
+              // Call the actual stake function
+              handleStakeBet(predictionId, isYes, amount, 'SWIPE');
+              // Close modal
+              setStakeModal(prev => ({ ...prev, isOpen: false }));
+              setIsTransactionLoading(false);
+            }, 2000); // Wait 2 seconds for approval to be mined
+          },
+          onError: (error) => {
+            console.error('❌ SWIPE approval failed:', error);
+            showNotification('error', 'Approval Failed', 'Failed to approve SWIPE token');
+            setIsTransactionLoading(false);
+          }
+        });
+        
+        return; // Don't proceed with stake yet
+      }
     }
 
+    // If we get here, either it's ETH or SWIPE is already approved
     // Set loading state
     setIsTransactionLoading(true);
 
     // predictionId is already a number, no conversion needed
     const numericPredictionId = predictionId;
 
-    // Call the stake handler from dashboard
-    handleStakeBet(numericPredictionId, isYes, amount);
+    // Call the stake handler from dashboard with token
+    handleStakeBet(numericPredictionId, isYes, amount, selectedToken);
 
     // Close modal after a short delay to show loading
     setTimeout(() => {
@@ -685,7 +893,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       setIsTransactionLoading(false);
 
       // Show success animation
-      const successMessage = `🎯 Successfully staked ${amount} ETH on ${isYes ? 'YES' : 'NO'}!`;
+      const successMessage = `🎯 Successfully staked ${amount} ${selectedToken} on ${isYes ? 'YES' : 'NO'}!`;
       showNotification('success', 'Transaction Successful!', successMessage);
     }, 1500);
   };
@@ -831,28 +1039,56 @@ KEY USER-FACING CHANGES: V1 → V2
   
   // Get participants for current card to use with Farcaster profiles hook
   const currentCardParticipants = useMemo(() => {
-    if (!currentCard || !hybridPredictions || currentCard.id === 0) return [];
+    if (!currentCard || !hybridPredictions || currentCard.id === 0) {
+      // console.log('🔍 currentCardParticipants: returning empty array');
+      return [];
+    }
     
     const currentPrediction = hybridPredictions.find(hp => {
-      const hpId = typeof hp.id === 'string' ? parseInt(hp.id.replace('pred_', ''), 10) || Date.now() : (hp.id || Date.now());
+      const hpId = typeof hp.id === 'string' 
+        ? (hp.id.includes('v2') 
+          ? parseInt(hp.id.replace('pred_v2_', ''), 10) || Date.now()
+          : parseInt(hp.id.replace('pred_', ''), 10) || Date.now())
+        : (hp.id || Date.now());
       return hpId === currentCard.id;
     });
     
-    return currentPrediction?.participants || [];
-  }, [currentCard, hybridPredictions]);
+    // Remove duplicates from participants array to avoid React key conflicts
+    const participants = currentPrediction?.participants || [];
+    const uniqueParticipants = [...new Set(participants)];
+    
+    // console.log(`🔍 currentCardParticipants: cardId=${currentCard.id}, participants=${uniqueParticipants.length}`, uniqueParticipants);
+    return uniqueParticipants;
+  }, [currentCard?.id, hybridPredictions]);
   
   // State for user stakes/votes
   const [userStakes, setUserStakes] = useState<{[userId: string]: 'YES' | 'NO' | 'BOTH' | 'NONE'}>({});
   const [stakesLoading, setStakesLoading] = useState(false);
   
+  // State for copied addresses animation
+  const [copiedAddresses, setCopiedAddresses] = useState<Set<string>>(new Set());
+  
   // Fetch user stakes for current prediction
   useEffect(() => {
     const fetchUserStakes = async () => {
-      if (!currentCard || !currentCard.id) return;
+      if (!currentCard || !currentCard.id || !hybridPredictions) return;
       
-      const predictionId = typeof currentCard.id === 'string' 
-        ? currentCard.id 
-        : `pred_${currentCard.id}`;
+      // Find the original prediction ID from hybridPredictions
+      const currentPrediction = hybridPredictions.find(hp => {
+        const hpId = typeof hp.id === 'string' 
+          ? (hp.id.includes('v2') 
+            ? parseInt(hp.id.replace('pred_v2_', ''), 10) || Date.now()
+            : parseInt(hp.id.replace('pred_', ''), 10) || Date.now())
+          : (hp.id || Date.now());
+        return hpId === currentCard.id;
+      });
+      
+      if (!currentPrediction) {
+        console.warn('No matching prediction found for current card');
+        return;
+      }
+      
+      const predictionId = currentPrediction.id; // Use original string ID
       
       setStakesLoading(true);
       // Clear previous stakes when switching predictions
@@ -871,6 +1107,8 @@ KEY USER-FACING CHANGES: V1 → V2
             setUserStakes(stakesMap);
             console.log(`✅ Loaded stakes for prediction ${predictionId}:`, stakesMap);
           }
+        } else {
+          console.warn(`Failed to fetch stakes: ${response.status} ${response.statusText}`);
         }
       } catch (error) {
         console.warn('Failed to fetch user stakes:', error);
@@ -880,7 +1118,7 @@ KEY USER-FACING CHANGES: V1 → V2
     };
     
     fetchUserStakes();
-  }, [currentCard?.id]); // Only depend on the ID, not the entire card object
+  }, [currentCard?.id, hybridPredictions]); // Depend on both currentCard.id and hybridPredictions
   
   // Use Farcaster profiles hook at top level to avoid conditional hook calls
   const { profiles, loading: profilesLoading } = useFarcasterProfiles(currentCardParticipants);
@@ -1262,7 +1500,10 @@ KEY USER-FACING CHANGES: V1 → V2
            </div>
            <div className="stat">
              <Badge variant="outline" className="stat-label-badge">Total Staked</Badge>
-             <Badge variant="secondary" className="stat-value-badge">{(((transformedPredictions[currentIndex]?.yesTotalAmount || 0) + (transformedPredictions[currentIndex]?.noTotalAmount || 0)) / 1e18).toFixed(4)} ETH</Badge>
+             <Badge variant="secondary" className="stat-value-badge">{(() => {
+               const total = ((transformedPredictions[currentIndex]?.yesTotalAmount || 0) + (transformedPredictions[currentIndex]?.noTotalAmount || 0)) / 1e18;
+               return total > 0 ? total.toFixed(5) : '0.00000';
+             })()} ETH</Badge>
            </div>
 
          </div>
@@ -1363,13 +1604,19 @@ KEY USER-FACING CHANGES: V1 → V2
                <div className="amount-item yes-amount">
                  <span className="amount-label">YES</span>
                  <span className="amount-value">
-                   {((transformedPredictions[currentIndex]?.yesTotalAmount || 0) / 1e18).toFixed(4)} ETH
+                   {(() => {
+                     const amount = (transformedPredictions[currentIndex]?.yesTotalAmount || 0) / 1e18;
+                     return amount > 0 ? amount.toFixed(5) : '0.00000';
+                   })()} ETH
                  </span>
                </div>
                <div className="amount-item no-amount">
                  <span className="amount-label">NO</span>
                  <span className="amount-value">
-                   {((transformedPredictions[currentIndex]?.noTotalAmount || 0) / 1e18).toFixed(4)} ETH
+                   {(() => {
+                     const amount = (transformedPredictions[currentIndex]?.noTotalAmount || 0) / 1e18;
+                     return amount > 0 ? amount.toFixed(5) : '0.00000';
+                   })()} ETH
                  </span>
                </div>
              </div>
@@ -1419,6 +1666,71 @@ KEY USER-FACING CHANGES: V1 → V2
              </div>
            </div>
            
+           {/* SWIPE Pool */}
+           <div className="chart-item">
+             <div className="chart-title">SWIPE Pool</div>
+             
+             {/* SWIPE YES/NO amounts */}
+             <div className="yes-no-amounts">
+               <div className="amount-item yes-amount">
+                 <span className="amount-label">YES</span>
+                 <span className="amount-value">
+                   {((transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0) / 1e18).toFixed(0)} SWIPE
+                 </span>
+               </div>
+               <div className="amount-item no-amount">
+                 <span className="amount-label">NO</span>
+                 <span className="amount-value">
+                   {((transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0) / 1e18).toFixed(0)} SWIPE
+                 </span>
+               </div>
+             </div>
+             
+             {/* SWIPE proportional visualization */}
+             <div className="proportional-chart">
+               {(() => {
+                 const yesAmount = transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0;
+                 const noAmount = transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0;
+                 const totalAmount = yesAmount + noAmount;
+                 
+                 if (totalAmount === 0) {
+                   return (
+                     <div className="no-stakes">
+                       <div className="no-stakes-text">No SWIPE stakes yet</div>
+                       <div className="no-stakes-bar">
+                         <div className="no-stakes-fill"></div>
+                       </div>
+                     </div>
+                   );
+                 }
+                 
+                 const yesPercentage = (yesAmount / totalAmount) * 100;
+                 const noPercentage = (noAmount / totalAmount) * 100;
+                 
+                 return (
+                   <div className="split-visualization">
+                     <div className="split-bar">
+                       <div 
+                         className="split-yes" 
+                         style={{ width: `${yesPercentage}%` }}
+                         title={`YES: ${yesPercentage.toFixed(1)}%`}
+                       ></div>
+                       <div 
+                         className="split-no" 
+                         style={{ width: `${noPercentage}%` }}
+                         title={`NO: ${noPercentage.toFixed(1)}%`}
+                       ></div>
+                     </div>
+                     <div className="split-percentages">
+                       <span className="yes-percentage">{yesPercentage.toFixed(1)}%</span>
+                       <span className="no-percentage">{noPercentage.toFixed(1)}%</span>
+                     </div>
+                   </div>
+                 );
+               })()}
+             </div>
+           </div>
+
            {/* Swipers */}
            <div className="chart-item">
              <div className="chart-title">Active Swipers</div>
@@ -1450,14 +1762,14 @@ KEY USER-FACING CHANGES: V1 → V2
                                <div className="loading-text">Loading profiles...</div>
                              </div>
                            ) : (
-                             Array.from({ length: participantCount }, (_, i) => {
-                               const participantAddress = currentCardParticipants[i] || '0x0000000000000000000000000000000000000000';
-                               const profile = profiles.find(p => p.address === participantAddress);
+                            currentCardParticipants.map((participantAddress, i) => {
+                              const profile = profiles.find((p: any) => p && p.address === participantAddress);
+                              const hasFarcasterProfile = profile && profile.fid !== null && !profile.isWalletOnly;
                                
                                // Get initials from profile or address
                                const getInitials = () => {
-                                 if (profile?.display_name) {
-                                   return profile.display_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                                 if (hasFarcasterProfile && profile?.display_name) {
+                                   return profile.display_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
                                  }
                                  return participantAddress.slice(2, 4).toUpperCase();
                                };
@@ -1511,34 +1823,52 @@ KEY USER-FACING CHANGES: V1 → V2
                                  }
                                };
                                
-                               return (
-                                 <div key={participantAddress} className="relative">
+                              return (
+                                <div key={`${participantAddress}-${i}`} className="relative">
                                    <div className={`vote-indicator ${getVoteIndicatorClass()}`}>
                                      <Avatar
-                                       className="cursor-pointer hover:scale-110 transition-all duration-300 shadow-lg hover:shadow-xl border-2 border-white/20 hover:border-blue-400/60 ring-2 ring-blue-500/20 hover:ring-blue-400/40"
+                                       className={hasFarcasterProfile 
+                                         ? "cursor-pointer hover:scale-110 transition-all duration-300 shadow-lg hover:shadow-xl border-2 border-white/20 hover:border-blue-400/60 ring-2 ring-blue-500/20 hover:ring-blue-400/40"
+                                         : "cursor-pointer hover:scale-105 transition-all duration-300 shadow-md border-2 border-gray-300 hover:border-gray-400"
+                                       }
                                        onClick={() => {
-                                         console.log(`Clicked on swiper: ${participantAddress}`);
-                                         if (profile) {
-                                           console.log(`Profile: ${profile.display_name} (@${profile.username})`);
+                                         if (!hasFarcasterProfile) {
+                                           // For wallet-only users, copy address to clipboard
+                                           navigator.clipboard.writeText(participantAddress);
+                                           console.log(`Copied wallet address: ${participantAddress}`);
                                            
-                                           // Open Farcaster profile using OnchainKit
-                                           try {
-                                             if (profile.fid) {
-                                               const fidNumber = parseInt(profile.fid, 10);
-                                               console.log(`Opening Farcaster profile with FID: ${fidNumber}`);
-                                               viewProfile(fidNumber);
-                                             } else {
-                                               console.log(`No FID available for profile`);
-                                             }
-                                           } catch (error) {
-                                             console.error('Error opening Farcaster profile:', error);
+                                           // Show copied animation
+                                           setCopiedAddresses(prev => new Set(prev).add(participantAddress));
+                                           setTimeout(() => {
+                                             setCopiedAddresses(prev => {
+                                               const newSet = new Set(prev);
+                                               newSet.delete(participantAddress);
+                                               return newSet;
+                                             });
+                                           }, 2000); // Hide after 2 seconds
+                                           return;
+                                         }
+                                         
+                                         console.log(`Clicked on swiper: ${participantAddress}`);
+                                         console.log(`Profile: ${profile.display_name} (@${profile.username})`);
+                                         
+                                         // Open Farcaster profile using OnchainKit
+                                         try {
+                                           if (profile.fid) {
+                                             const fidNumber = parseInt(profile.fid, 10);
+                                             console.log(`Opening Farcaster profile with FID: ${fidNumber}`);
+                                             viewProfile(fidNumber);
+                                           } else {
+                                             console.log(`No FID available for profile`);
                                            }
+                                         } catch (error) {
+                                           console.error('Error opening Farcaster profile:', error);
                                          }
                                        }}
                                      >
                                        <AvatarImage 
-                                         src={profile?.pfp_url} 
-                                         alt={profile?.display_name || `User ${participantAddress.slice(2, 6)}`}
+                                         src={hasFarcasterProfile ? (profile?.pfp_url || undefined) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${participantAddress.slice(2, 8)}`} 
+                                         alt={hasFarcasterProfile ? (profile?.display_name || `User ${participantAddress.slice(2, 6)}`) : `Wallet ${participantAddress.slice(2, 6)}`}
                                        />
                                        <AvatarFallback className={getAvatarColor(participantAddress)}>
                                          <span className="text-white text-xs font-semibold">
@@ -1554,14 +1884,20 @@ KEY USER-FACING CHANGES: V1 → V2
                                      )}
                                    </div>
                                    {/* Base verification indicator */}
-                                   {profile?.isBaseVerified && (
+                                   {hasFarcasterProfile && profile?.isBaseVerified && (
                                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 rounded-full border-2 border-white flex items-center justify-center">
                                        <span className="text-white text-xs font-bold">B</span>
                                      </div>
                                    )}
+                                   {/* Copied animation for wallet-only users */}
+                                   {!hasFarcasterProfile && copiedAddresses.has(participantAddress) && (
+                                     <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-500 text-white text-sm font-semibold px-4 py-2 rounded-full shadow-2xl animate-bounce z-[9999] border-2 border-white">
+                                       ✅ Copied!
+                                     </div>
+                                   )}
                                  </div>
                                );
-                             })
+                            })
                            )}
                          </div>
                        </>
@@ -1601,12 +1937,52 @@ KEY USER-FACING CHANGES: V1 → V2
               </div>
 
               <div className="amount-section">
-                <div className="amount-display">
-                  <span className="amount-value">0.001</span>
-                  <span className="amount-currency">ETH</span>
+                {/* Token Selection */}
+                <div className="token-selection">
+                  <div className="token-options">
+                    <button
+                      className={`token-option ${stakeModal.selectedToken === 'ETH' ? 'active' : ''}`}
+                      onClick={() => handleTokenChange('ETH')}
+                    >
+                      <div className="token-logo-container">
+                        <img src="/eth.png" alt="ETH" className="token-logo" />
+                      </div>
+                      <span className="token-name">ETH</span>
+                      <span className="token-limit">0.00001 - 100</span>
+                    </button>
+                    <button
+                      className={`token-option ${stakeModal.selectedToken === 'SWIPE' ? 'active' : ''}`}
+                      onClick={() => handleTokenChange('SWIPE')}
+                    >
+                      <div className="token-logo-container">
+                        <img src="/logo.png" alt="SWIPE" className="token-logo swipe-logo" />
+                      </div>
+                      <span className="token-name">$SWIPE</span>
+                      <span className="token-limit">10,000+</span>
+                    </button>
+                  </div>
                 </div>
-                <div className="amount-description">
-                  Minimum participation amount
+
+                {/* Amount Input */}
+                <div className="amount-input-section">
+                  <div className="amount-display">
+                    <input
+                      type="number"
+                      className="amount-input"
+                      value={stakeModal.stakeAmount}
+                      onChange={(e) => handleStakeAmountChange(e.target.value)}
+                      min={stakeModal.selectedToken === 'ETH' ? '0.00001' : '10000'}
+                      step={stakeModal.selectedToken === 'ETH' ? '0.00001' : '1000'}
+                      placeholder={stakeModal.selectedToken === 'ETH' ? '0.00001' : '10000'}
+                    />
+                    <span className="amount-currency">{stakeModal.selectedToken}</span>
+                  </div>
+                  <div className="amount-description">
+                    {stakeModal.selectedToken === 'ETH' 
+                      ? 'Minimum: 0.00001 ETH, Maximum: 100 ETH'
+                      : 'Minimum: 10,000 SWIPE, Maximum: Unlimited'
+                    }
+                  </div>
                 </div>
               </div>
 
@@ -1625,7 +2001,33 @@ KEY USER-FACING CHANGES: V1 → V2
                       Processing...
                     </>
                   ) : (
-                    'Confirm'
+                    (() => {
+                      // Check if SWIPE needs approval
+                      if (stakeModal.selectedToken === 'SWIPE') {
+                        const amount = parseFloat(stakeModal.stakeAmount);
+                        const amountWei = BigInt(Math.floor(amount * 10**18));
+                        let currentAllowance = BigInt(0);
+                        
+                        try {
+                          if (swipeAllowance !== undefined && swipeAllowance !== null) {
+                            currentAllowance = BigInt(swipeAllowance.toString());
+                          }
+                        } catch (e) {
+                          currentAllowance = BigInt(0);
+                        }
+                        
+                        console.log('=== BUTTON TEXT DEBUG ===');
+                        console.log('Amount:', amount);
+                        console.log('AmountWei:', amountWei.toString());
+                        console.log('CurrentAllowance:', currentAllowance.toString());
+                        console.log('Needs approval?', currentAllowance < amountWei);
+                        console.log('========================');
+                        
+                        // TEMPORARY: Always show approve for SWIPE to test
+                        return `Approve ${amount} SWIPE`;
+                      }
+                      return 'Confirm Stake';
+                    })()
                   )}
                 </button>
               </div>

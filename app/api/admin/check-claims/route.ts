@@ -3,6 +3,17 @@ import { redisHelpers } from '../../../../lib/redis';
 
 export async function GET(request: NextRequest) {
   try {
+    // Basic authorization check
+    const authHeader = request.headers.get('authorization');
+    const apiKey = authHeader?.replace('Bearer ', '');
+    
+    if (!apiKey || apiKey !== process.env.ADMIN_API_KEY) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized - Admin access required' },
+        { status: 401 }
+      );
+    }
+    
     const { searchParams } = new URL(request.url);
     const predictionId = searchParams.get('predictionId');
     
@@ -41,7 +52,7 @@ export async function GET(request: NextRequest) {
     const lost = [];
     
     for (const stake of stakes) {
-        const userId = stake.userId;
+        const userId = stake.user;
         const isClaimed = stake.claimed;
         const stakeAmount = stake.yesAmount + stake.noAmount;
         

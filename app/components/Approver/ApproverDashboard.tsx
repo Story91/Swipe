@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useReadContract, usePublicClient, useAccount } from 'wagmi';
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../../../lib/contract';
+import { CONTRACTS, getV2Contract } from '../../../lib/contract';
 
 interface Prediction {
   id: number;
@@ -35,15 +35,15 @@ export function ApproverDashboard({
 
   // Get required approvals from contract
   const { data: requiredApprovals } = useReadContract({
-    address: CONTRACT_ADDRESS as `0x${string}`,
-    abi: CONTRACT_ABI,
+    address: CONTRACTS.V2.address as `0x${string}`,
+    abi: CONTRACTS.V2.abi,
     functionName: 'requiredApprovals',
   });
 
   // Get total predictions count
   const { data: totalPredictions } = useReadContract({
-    address: CONTRACT_ADDRESS as `0x${string}`,
-    abi: CONTRACT_ABI,
+    address: CONTRACTS.V2.address as `0x${string}`,
+    abi: CONTRACTS.V2.abi,
     functionName: 'nextPredictionId',
   });
 
@@ -54,7 +54,8 @@ export function ApproverDashboard({
 
   React.useEffect(() => {
     const fetchPredictions = async () => {
-      if (!totalPredictions || totalPredictions <= 1) {
+      const totalCount = Number(totalPredictions || 0);
+      if (!totalPredictions || totalCount <= 1) {
         setLoading(false);
         return;
       }
@@ -65,7 +66,7 @@ export function ApproverDashboard({
 
         const predictions: Prediction[] = [];
 
-        for (let i = 1; i < totalPredictions; i++) {
+        for (let i = 1; i < totalCount; i++) {
           try {
             if (!publicClient) {
               throw new Error('Public client not available');
@@ -73,8 +74,8 @@ export function ApproverDashboard({
 
             // Get basic prediction info
             const basicResult = await publicClient.readContract({
-              address: CONTRACT_ADDRESS as `0x${string}`,
-              abi: CONTRACT_ABI,
+              address: CONTRACTS.V2.address as `0x${string}`,
+              abi: CONTRACTS.V2.abi,
               functionName: 'getPredictionBasic',
               args: [BigInt(i)],
             }) as {
@@ -92,8 +93,8 @@ export function ApproverDashboard({
 
             // Get extended info
             const extendedResult = await publicClient.readContract({
-              address: CONTRACT_ADDRESS as `0x${string}`,
-              abi: CONTRACT_ABI,
+              address: CONTRACTS.V2.address as `0x${string}`,
+              abi: CONTRACTS.V2.abi,
               functionName: 'getPredictionExtended',
               args: [BigInt(i)],
             }) as [string, bigint, boolean, bigint, boolean, boolean, bigint];
@@ -108,8 +109,8 @@ export function ApproverDashboard({
             if (address) {
               try {
                 const approvalMappingResult = await publicClient.readContract({
-                  address: CONTRACT_ADDRESS as `0x${string}`,
-                  abi: CONTRACT_ABI,
+                  address: CONTRACTS.V2.address as `0x${string}`,
+                  abi: CONTRACTS.V2.abi,
                   functionName: 'predictionApprovals',
                   args: [BigInt(i), address as `0x${string}`],
                 }) as boolean;

@@ -97,6 +97,8 @@ export async function POST(request: NextRequest) {
       resolutionDeadline: deadline + (7 * 24 * 60 * 60), // 7 days after deadline for admin to resolve
       yesTotalAmount: 0,
       noTotalAmount: 0,
+      swipeYesTotalAmount: 0,
+      swipeNoTotalAmount: 0,
       resolved: false,
       cancelled: false,
       createdAt: now,
@@ -197,49 +199,3 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// DELETE /api/predictions - Delete prediction
-export async function DELETE(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
-    
-    if (!id) {
-      return NextResponse.json(
-        { success: false, error: 'Prediction ID is required' },
-        { status: 400 }
-      );
-    }
-    
-    // Check if prediction exists
-    const existingPrediction = await redisHelpers.getPrediction(id);
-    if (!existingPrediction) {
-      return NextResponse.json(
-        { success: false, error: 'Prediction not found' },
-        { status: 404 }
-      );
-    }
-    
-    // Delete prediction
-    await redisHelpers.deletePrediction(id);
-    
-    // Update market stats
-    await redisHelpers.updateMarketStats();
-    
-    return NextResponse.json({
-      success: true,
-      message: 'Prediction deleted successfully',
-      timestamp: new Date().toISOString()
-    });
-    
-  } catch (error) {
-    console.error('❌ Failed to delete prediction:', error);
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Failed to delete prediction',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
-  }
-}

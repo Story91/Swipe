@@ -3,6 +3,17 @@ import { redis } from '../../../../lib/redis';
 
 export async function GET(request: NextRequest) {
   try {
+    // Basic authorization check
+    const authHeader = request.headers.get('authorization');
+    const apiKey = authHeader?.replace('Bearer ', '');
+    
+    if (!apiKey || apiKey !== process.env.ADMIN_API_KEY) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized - Admin access required' },
+        { status: 401 }
+      );
+    }
+    
     // Get all prediction IDs
     const predictionKeys = await redis.keys('prediction:*');
     const predictionIds = predictionKeys.map(key => key.replace('prediction:', ''));
@@ -10,6 +21,12 @@ export async function GET(request: NextRequest) {
     const allResults = [];
     
     for (const predictionId of predictionIds) {
+      // Get prediction data first
+      const predictionData = await redis.get(`prediction:${predictionId}`);
+      if (!predictionData) continue;
+      
+      const prediction = typeof predictionData === 'string' ? JSON.parse(predictionData) : predictionData;
+      
       // Get all stakes for this prediction
       const pattern = `user_stakes:*:${predictionId}`;
       const keys = await redis.keys(pattern);

@@ -116,8 +116,6 @@ export const redisHelpers = {
         if (prediction) {
           // Filter out test predictions
           const isTestPrediction = id.startsWith('test_') ||
-            prediction.question.toLowerCase().includes('test') ||
-            prediction.description.toLowerCase().includes('test') ||
             prediction.creator === 'anonymous' ||
             prediction.creator.toLowerCase().includes('test');
 
@@ -150,8 +148,6 @@ export const redisHelpers = {
           
           // Filter out test predictions
           const isTestPrediction = id.startsWith('test_') ||
-            prediction.question.toLowerCase().includes('test') ||
-            prediction.description.toLowerCase().includes('test') ||
             prediction.creator === 'anonymous' ||
             prediction.creator.toLowerCase().includes('test');
 
@@ -179,8 +175,6 @@ export const redisHelpers = {
         if (prediction) {
           // Filter out test predictions
           const isTestPrediction = id.startsWith('test_') ||
-            prediction.question.toLowerCase().includes('test') ||
-            prediction.description.toLowerCase().includes('test') ||
             prediction.creator === 'anonymous' ||
             prediction.creator.toLowerCase().includes('test');
 
@@ -197,12 +191,12 @@ export const redisHelpers = {
     }
   },
 
-  // Save user stake
-  async saveUserStake(stake: RedisUserStake): Promise<void> {
+  // Save user stake (supports both single stake and multi-token stakes)
+  async saveUserStake(stake: RedisUserStake | any): Promise<void> {
     try {
-      const stakeKey = REDIS_KEYS.USER_STAKES(stake.userId, stake.predictionId);
+      const stakeKey = REDIS_KEYS.USER_STAKES(stake.user, stake.predictionId);
       await redis.set(stakeKey, JSON.stringify(stake));
-      console.log(`✅ User stake saved to Redis: ${stake.userId} on ${stake.predictionId}`);
+      console.log(`✅ User stake saved to Redis: ${stake.user} on ${stake.predictionId}`, stake);
     } catch (error) {
       console.error('❌ Failed to save user stake to Redis:', error);
       throw error;

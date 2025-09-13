@@ -1,489 +1,556 @@
-/* Modern Create Prediction Modal Styles */
-
-.modern-create-modal-overlay {
+/* Modal Overlay */
+.modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(10px);
+  background-color: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  animation: fadeIn 0.3s ease-out;
+  padding: 20px;
+  animation: fadeIn 0.2s ease-out;
 }
 
-.modern-create-modal {
-  background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
-  border-radius: 24px;
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Modal Container */
+.modal-container {
+  background: #1a1a1a;
+  border-radius: 16px;
+  width: 100%;
   max-width: 600px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-  border: 1px solid rgba(212, 255, 0, 0.2);
-  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(212, 255, 0, 0.1);
-  animation: slideUp 0.3s ease-out;
+  max-height: 85vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: slideIn 0.3s ease-out;
 }
 
-.modern-create-modal-header {
+@keyframes slideIn {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Modal Header */
+.modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px 28px;
-  border-bottom: 1px solid rgba(212, 255, 0, 0.1);
-  background: linear-gradient(135deg, rgba(212, 255, 0, 0.05), rgba(212, 255, 0, 0.02));
+  padding: 20px;
+  border-bottom: 1px solid #333;
 }
 
-.modern-modal-title {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.create-title {
+.modal-header h2 {
+  margin: 0;
   font-size: 24px;
-  font-weight: 700;
-  color: #d4ff00;
-  letter-spacing: -0.5px;
-}
-
-.create-subtitle {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.6);
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.modern-create-close-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.7);
-  transition: all 0.3s ease;
-}
-
-.modern-create-close-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-  color: rgba(255, 255, 255, 0.9);
-  border-color: rgba(212, 255, 0, 0.3);
-}
-
-.modern-create-modal-content {
-  padding: 28px;
-}
-
-.modern-form {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.modern-form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.modern-form-label {
-  font-size: 14px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
-  letter-spacing: 0.5px;
+  color: #fff;
 }
 
-.modern-form-textarea,
-.modern-form-input,
-.modern-form-select {
-  width: 100%;
-  padding: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  font-size: 14px;
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.9);
-  transition: all 0.3s ease;
-  resize: vertical;
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #666;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: all 0.2s;
 }
 
-.modern-form-textarea {
-  min-height: 80px;
+.close-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
 }
 
-.modern-form-textarea:focus,
-.modern-form-input:focus,
-.modern-form-select:focus {
-  outline: none;
-  border-color: #d4ff00;
-  box-shadow: 0 0 0 3px rgba(212, 255, 0, 0.1);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.modern-form-textarea.error,
-.modern-form-input.error,
-.modern-form-select.error {
-  border-color: #ef4444;
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
-}
-
-.modern-form-textarea.disabled,
-.modern-form-input.disabled {
-  background: rgba(255, 255, 255, 0.02);
-  border-color: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.4);
+.close-btn:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
-.modern-form-error {
-  font-size: 12px;
-  color: #ef4444;
+/* Modal Form */
+.modal-form {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Form Groups */
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
   font-weight: 500;
-}
-
-.modern-form-counter,
-.modern-form-help {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
-  font-weight: 500;
-}
-/* Chart Section */
-.modern-chart-section {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.modern-checkbox-group {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.modern-checkbox {
-  width: 18px;
-  height: 18px;
-  accent-color: #d4ff00;
-  cursor: pointer;
-}
-
-.modern-checkbox-label {
+  color: #e0e0e0;
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.8);
-  font-weight: 500;
-  cursor: pointer;
 }
 
-/* Crypto Selection */
-.modern-crypto-selection {
+.form-group input,
+.form-group textarea,
+.form-group select {
+  width: 100%;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 12px;
+  color: #fff;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: #6366f1;
+  background: #333;
+}
+
+.form-group input.error,
+.form-group textarea.error,
+.form-group select.error {
+  border-color: #ef4444;
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.error-message {
+  display: block;
+  margin-top: 4px;
+  color: #ef4444;
+  font-size: 12px;
+}
+
+.char-count {
+  display: block;
+  text-align: right;
+  margin-top: 4px;
+  color: #666;
+  font-size: 12px;
+}
+
+/* DateTime Inputs */
+.datetime-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Token Selection */
+.token-selection {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.token-btn {
+  background: #2a2a2a;
+  border: 2px solid #444;
+  border-radius: 12px;
+  padding: 16px 12px;
+  cursor: pointer;
+  transition: all 0.2s;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-left: 24px;
-}
-
-.modern-crypto-label {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.7);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.modern-crypto-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  align-items: center;
   gap: 8px;
+  min-height: 120px;
 }
 
-.modern-crypto-btn {
+.token-btn:hover:not(:disabled) {
+  border-color: #6366f1;
+  background: #333;
+}
+
+.token-btn.active {
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.token-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.token-logo-container {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 12px 8px;
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
+  margin-bottom: 6px;
+  border: 2px solid #444;
+  transition: all 0.2s;
+  overflow: hidden;
 }
 
-.modern-crypto-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.2);
+.token-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
-.modern-crypto-btn.selected {
-  background: rgba(212, 255, 0, 0.1);
-  border-color: #d4ff00;
-  color: #d4ff00;
+.swipe-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
-.crypto-icon {
-  font-size: 14px;
+.token-btn.active .token-logo-container {
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.1);
 }
 
-.crypto-symbol {
-  font-size: 11px;
+.token-btn:hover:not(:disabled) .token-logo-container {
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.token-name {
   font-weight: 700;
+  color: #fff;
+  font-size: 14px;
+  text-align: center;
 }
 
-.modern-crypto-info {
+.token-fee {
+  font-size: 12px;
+  color: #999;
+}
+
+/* Approval Notice */
+.approval-notice {
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 8px;
   padding: 12px;
-  background: rgba(212, 255, 0, 0.05);
-  border: 1px solid rgba(212, 255, 0, 0.2);
-  border-radius: 10px;
-}
-
-.crypto-info-text {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.8);
-  font-weight: 500;
-}
-
-.crypto-info-subtext {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
-  margin-top: 4px;
-}
-
-/* DateTime Section */
-.modern-datetime-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-.modern-datetime-field {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.modern-datetime-label {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.6);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.modern-datetime-info {
-  padding: 16px;
-  background: rgba(59, 130, 246, 0.1);
-  border: 1px solid rgba(59, 130, 246, 0.2);
-  border-radius: 12px;
-}
-
-.datetime-info-text {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.9);
-  font-weight: 500;
-}
-
-.datetime-duration-text {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.6);
-  margin-top: 4px;
-}
-
-/* Info Boxes */
-.modern-info-box {
-  padding: 16px;
-  border-radius: 12px;
-  border: 1px solid;
-}
-
-.modern-info-box.fee-info {
-  background: rgba(212, 255, 0, 0.1);
-  border-color: rgba(212, 255, 0, 0.3);
-}
-
-.modern-info-box.error-info {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgba(239, 68, 68, 0.3);
-}
-
-.info-box-title {
+  justify-content: space-between;
+  align-items: center;
+  color: #fbbf24;
   font-size: 14px;
-  font-weight: 700;
-  margin: 0 0 8px 0;
 }
 
-.fee-info .info-box-title {
-  color: #d4ff00;
+.approve-btn {
+  background: #fbbf24;
+  color: #000;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.error-info .info-box-title {
+.approve-btn:hover:not(:disabled) {
+  background: #f59e0b;
+}
+
+.approve-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Warning/Error Boxes */
+.warning-box,
+.error-box {
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.warning-box {
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  color: #fbbf24;
+}
+
+.error-box {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
   color: #ef4444;
 }
 
-.info-box-text {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.8);
-  font-weight: 500;
-  margin: 0;
-}
-
-.info-box-subtext {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
-  margin-top: 4px;
+.warning-box strong,
+.error-box strong {
   display: block;
-}
-
-/* Debug Info */
-.modern-debug-info {
-  padding: 16px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-}
-
-.debug-title {
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.7);
-  margin: 0 0 12px 0;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.debug-content {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.5);
-  font-family: monospace;
+  margin-bottom: 4px;
 }
 
 /* Form Actions */
-.modern-form-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-top: 8px;
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #333;
 }
 
-.modern-cancel-btn {
-  padding: 16px 24px;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.8);
+.form-actions button {
+  flex: 1;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.form-actions button[type="button"] {
+  background: #444;
+  color: #fff;
+}
+
+.form-actions button[type="button"]:hover:not(:disabled) {
+  background: #555;
+}
+
+.submit-btn {
+  background: #6366f1;
+  color: #fff;
+}
+
+.submit-btn:hover:not(:disabled) {
+  background: #4f46e5;
+}
+
+.submit-btn:disabled {
+  background: #444;
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Chart Section */
+.chart-section {
+  padding: 10px;
+  background: rgba(99, 102, 241, 0.05);
+  border-radius: 8px;
+}
+
+.checkbox-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.checkbox-label {
+  cursor: pointer;
+  color: #e0e0e0;
+  font-size: 14px;
+}
+
+.crypto-selection {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.crypto-header {
+  background: #10b981;
+  padding: 10px;
+  border-radius: 8px 8px 0 0;
+  margin: -10px -10px 12px -10px;
+  text-align: center;
+}
+
+.crypto-header-text {
+  color: #000;
   font-weight: 600;
   font-size: 16px;
-  cursor: pointer;
-  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.modern-cancel-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.3);
-  color: rgba(255, 255, 255, 0.9);
+.crypto-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin-bottom: 12px;
 }
 
-.modern-submit-btn {
-  padding: 16px 24px;
-  border: none;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #d4ff00, #b8e600);
-  color: #1a1a1a;
-  font-weight: 700;
-  font-size: 16px;
+.crypto-btn {
+  background: #2a2a2a;
+  border: 2px solid #444;
+  border-radius: 8px;
+  padding: 10px 6px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 8px 25px rgba(212, 255, 0, 0.3);
+  transition: all 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 40px;
+}
+
+.crypto-btn:hover {
+  border-color: #6366f1;
+  background: #333;
+  transform: translateY(-2px);
+}
+
+.crypto-btn.selected {
+  background: rgba(99, 102, 241, 0.1);
+  transform: translateY(-2px);
+}
+
+.crypto-symbol {
+  font-weight: 600;
+  color: #fff;
+  font-size: 16px;
+  letter-spacing: 0.5px;
+}
+
+.crypto-info {
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 8px;
+  padding: 10px;
+  margin-top: 10px;
+}
+
+.crypto-info-text {
+  margin: 0 0 4px 0;
+  color: #fff;
+  font-size: 14px;
+}
+
+.crypto-info-subtext {
+  margin: 0;
+  color: #999;
+  font-size: 12px;
+}
+
+.help-text {
+  margin-top: 8px;
+  color: #999;
+  font-size: 12px;
+}
+
+input.disabled {
+  background: #1a1a1a;
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* User Status Box */
+.user-status-box {
+  background: rgba(99, 102, 241, 0.05);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 6px;
+}
+
+.user-status-box h4 {
+  margin: 0 0 8px 0;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-info {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
-.modern-submit-btn:hover {
-  background: linear-gradient(135deg, #b8e600, #9ccc00);
-  transform: translateY(-2px);
-  box-shadow: 0 12px 35px rgba(212, 255, 0, 0.4);
+.status-info.owner {
+  color: #fbbf24;
 }
 
-.modern-submit-btn:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-  transform: none;
+.status-info.approved {
+  color: #10b981;
 }
 
-.modern-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(26, 26, 26, 0.3);
-  border-top: 2px solid #1a1a1a;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
+.status-info.public {
+  color: #6366f1;
 }
 
-/* Animations */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.status-info.restricted {
+  color: #ef4444;
 }
 
-@keyframes slideUp {
-  from { 
-    opacity: 0;
-    transform: translateY(30px) scale(0.95);
-  }
-  to { 
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+.free-badge {
+  background: #10b981;
+  color: #000;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  margin-left: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-
-
-
-
-
-/* Mobile Responsive */
+/* Responsive */
 @media (max-width: 640px) {
-  .modern-create-modal {
-    margin: 1rem;
-    max-height: calc(100vh - 2rem);
+  .modal-container {
+    max-height: 100vh;
+    border-radius: 0;
   }
-
-  .modern-create-modal-header {
-    padding: 20px 24px;
+  
+  .modal-overlay {
+    padding: 0;
   }
-
-  .modern-create-modal-content {
-    padding: 24px;
-  }
-
-  .modern-datetime-grid {
+  
+  .datetime-inputs,
+  .token-selection {
     grid-template-columns: 1fr;
   }
-
-  .modern-form-actions {
-    grid-template-columns: 1fr;
-  }
-
-  .modern-crypto-grid {
+  
+  .crypto-grid {
     grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .form-actions {
+    flex-direction: column-reverse;
+  }
+  
+  .form-actions button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 400px) {
+  .crypto-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }

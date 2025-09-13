@@ -188,10 +188,13 @@ export default function App() {
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={() => {
           console.log('Prediction created successfully!');
-          // Refresh predictions data after successful creation
-          setTimeout(() => {
-            refreshPredictions();
-          }, 2000); // Wait 2 seconds for transaction to be mined
+          // Close modal and redirect to home page
+          setIsCreateModalOpen(false);
+          setActiveDashboard('tinder');
+          // Immediately refresh predictions data after successful creation
+          if (tinderCardRef.current?.refresh) {
+            tinderCardRef.current.refresh();
+          }
         }}
       />
 

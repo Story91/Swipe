@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAccount, useWriteContract } from 'wagmi';
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../../../lib/contract';
+import { CONTRACTS, getV2Contract } from '../../../lib/contract';
 import { AdminDashboard } from './AdminDashboard';
 import { ApproverDashboard } from '../Approver/ApproverDashboard';
 import { ClaimsDashboard } from './ClaimsDashboard';
@@ -20,23 +20,26 @@ export function AdminPanel({ defaultTab = 'dashboard' }: AdminPanelProps) {
   const { writeContract } = useWriteContract();
 
   // Admin functions for contract interactions
-  const handleResolvePrediction = async (predictionId: string | number, outcome: boolean) => {
+  const handleResolvePrediction = async (predictionId: string | number, outcome: boolean, contractVersion?: 'V1' | 'V2') => {
     try {
       // Only handle on-chain predictions (numeric IDs)
       if (typeof predictionId === 'number') {
+        // Determine which contract to use based on version or default to V2
+        const contract = contractVersion === 'V1' ? CONTRACTS.V1 : CONTRACTS.V2;
+        
         writeContract({
-          address: CONTRACT_ADDRESS as `0x${string}`,
-          abi: CONTRACT_ABI,
+          address: contract.address as `0x${string}`,
+          abi: contract.abi,
           functionName: 'resolvePrediction',
           args: [BigInt(predictionId), outcome],
         }, {
           onSuccess: (tx) => {
-            console.log(`✅ Prediction ${predictionId} resolved successfully:`, tx);
-            alert(`✅ Prediction resolved successfully! Transaction: ${tx}`);
+            console.log(`✅ Prediction ${predictionId} resolved successfully on ${contractVersion}:`, tx);
+            alert(`✅ Prediction resolved successfully on ${contractVersion}!\nTransaction: ${tx}`);
           },
           onError: (error) => {
             console.error('❌ Resolve prediction failed:', error);
-            alert(`❌ Resolution failed: ${error.message || error}`);
+            alert(`❌ Resolution failed on ${contractVersion}: ${error.message || error}`);
           }
         });
       }
@@ -47,23 +50,26 @@ export function AdminPanel({ defaultTab = 'dashboard' }: AdminPanelProps) {
     }
   };
 
-  const handleCancelPrediction = async (predictionId: string | number, reason: string) => {
+  const handleCancelPrediction = async (predictionId: string | number, reason: string, contractVersion?: 'V1' | 'V2') => {
     try {
       // Only handle on-chain predictions (numeric IDs)
       if (typeof predictionId === 'number') {
+        // Determine which contract to use based on version or default to V2
+        const contract = contractVersion === 'V1' ? CONTRACTS.V1 : CONTRACTS.V2;
+        
         writeContract({
-          address: CONTRACT_ADDRESS as `0x${string}`,
-          abi: CONTRACT_ABI,
+          address: contract.address as `0x${string}`,
+          abi: contract.abi,
           functionName: 'cancelPrediction',
           args: [BigInt(predictionId), reason],
         }, {
           onSuccess: (tx) => {
-            console.log(`✅ Prediction ${predictionId} cancelled successfully:`, tx);
-            alert(`✅ Prediction cancelled successfully! Transaction: ${tx}`);
+            console.log(`✅ Prediction ${predictionId} cancelled successfully on ${contractVersion}:`, tx);
+            alert(`✅ Prediction cancelled successfully on ${contractVersion}!\nTransaction: ${tx}`);
           },
           onError: (error) => {
             console.error('❌ Cancel prediction failed:', error);
-            alert(`❌ Cancellation failed: ${error.message || error}`);
+            alert(`❌ Cancellation failed on ${contractVersion}: ${error.message || error}`);
           }
         });
       }
@@ -77,9 +83,10 @@ export function AdminPanel({ defaultTab = 'dashboard' }: AdminPanelProps) {
   const handleWithdrawFees = async () => {
     try {
       writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI,
+        address: CONTRACTS.V2.address as `0x${string}`,
+        abi: CONTRACTS.V2.abi,
         functionName: 'withdrawFees',
+        args: []
       });
     } catch (error) {
       console.error('Failed to withdraw fees:', error);
@@ -89,9 +96,10 @@ export function AdminPanel({ defaultTab = 'dashboard' }: AdminPanelProps) {
   const handlePauseContract = async (pause: boolean) => {
     try {
       writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI,
+        address: CONTRACTS.V2.address as `0x${string}`,
+        abi: CONTRACTS.V2.abi,
         functionName: pause ? 'pause' : 'unpause',
+        args: []
       });
     } catch (error) {
       console.error('Failed to pause/unpause contract:', error);
@@ -101,8 +109,8 @@ export function AdminPanel({ defaultTab = 'dashboard' }: AdminPanelProps) {
   const handleApprovePrediction = async (predictionId: number) => {
     try {
       writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI,
+        address: CONTRACTS.V2.address as `0x${string}`,
+        abi: CONTRACTS.V2.abi,
         functionName: 'approvePrediction',
         args: [BigInt(predictionId)],
       });
@@ -114,8 +122,8 @@ export function AdminPanel({ defaultTab = 'dashboard' }: AdminPanelProps) {
   const handleRejectPrediction = async (predictionId: number, reason: string) => {
     try {
       writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI,
+        address: CONTRACTS.V2.address as `0x${string}`,
+        abi: CONTRACTS.V2.abi,
         functionName: 'rejectPrediction',
         args: [BigInt(predictionId), reason],
       });
@@ -196,10 +204,6 @@ export function AdminPanel({ defaultTab = 'dashboard' }: AdminPanelProps) {
 
   return (
     <div className="admin-panel">
-      <div className="admin-header">
-        <h1>🔧 Admin Control Panel</h1>
-        <p>Manage platform, predictions, and system settings</p>
-      </div>
 
       <div className="admin-tabs">
         {tabs

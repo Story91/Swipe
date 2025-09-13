@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import TinderCard from 'react-tinder-card';
 import { useAccount, useWriteContract } from "wagmi";
 import { ethers } from 'ethers';
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../../../lib/contract';
+import { CONTRACTS, getV2Contract } from '../../../lib/contract';
 import './TinderCard.css';
 import './Dashboards.css';
 import { NotificationSystem, showNotification, UserDashboard } from '../Portfolio/UserDashboard';
@@ -106,9 +106,7 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
     return {
     id: pred.id,
     title: pred.question,
-    image: pred.includeChart && pred.selectedCrypto 
-      ? `https://www.geckoterminal.com/eth/pools/${pred.selectedCrypto.toLowerCase()}?embed=1&info=0&swaps=0&light_chart=1&chart_type=price&resolution=1d&bg_color=f1f5f9`
-      : pred.imageUrl,
+    image: pred.imageUrl,
     prediction: pred.question,
     timeframe: new Date(pred.deadline * 1000).toLocaleDateString(),
     confidence: Math.round(yesPercentage),
@@ -139,8 +137,8 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
 
     try {
       writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI,
+        address: CONTRACTS.V2.address as `0x${string}`,
+        abi: CONTRACTS.V2.abi,
         functionName: 'placeStake',
         args: [BigInt(predictionId), isYes],
         value: ethers.parseEther(amount.toString()),
@@ -190,8 +188,8 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
 
     try {
       writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI,
+        address: CONTRACTS.V2.address as `0x${string}`,
+        abi: CONTRACTS.V2.abi,
         functionName: 'claimReward',
         args: [BigInt(predictionId)],
       });
@@ -215,8 +213,8 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
 
     try {
       writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI,
+        address: CONTRACTS.V2.address as `0x${string}`,
+        abi: CONTRACTS.V2.abi,
         functionName: 'resolvePrediction',
         args: [BigInt(predictionId), outcome],
       });
@@ -240,8 +238,8 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
 
     try {
       writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI,
+        address: CONTRACTS.V2.address as `0x${string}`,
+        abi: CONTRACTS.V2.abi,
         functionName: 'cancelPrediction',
         args: [BigInt(predictionId), reason],
       });
@@ -265,8 +263,8 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
 
     try {
       writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI,
+        address: CONTRACTS.V2.address as `0x${string}`,
+        abi: CONTRACTS.V2.abi,
         functionName: 'createPrediction',
         args: [
           predictionData.question,
@@ -297,8 +295,8 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
 
     try {
       writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI,
+        address: CONTRACTS.V2.address as `0x${string}`,
+        abi: CONTRACTS.V2.abi,
         functionName: 'setApprover',
         args: [approverAddress as `0x${string}`, isApproved],
       });
@@ -322,9 +320,10 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
 
     try {
       writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI,
+        address: CONTRACTS.V2.address as `0x${string}`,
+        abi: CONTRACTS.V2.abi,
         functionName: 'withdrawFees',
+        args: []
       });
 
       showNotification('success', '✅ Fees withdrawn successfully!', '');
@@ -346,9 +345,10 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
 
     try {
       writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI,
+        address: CONTRACTS.V2.address as `0x${string}`,
+        abi: CONTRACTS.V2.abi,
         functionName: pause ? 'pause' : 'unpause',
+        args: []
       });
 
       showNotification('success', `✅ Contract ${pause ? 'paused' : 'unpaused'} successfully!`, '');
@@ -370,8 +370,8 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
 
     try {
       writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI,
+        address: CONTRACTS.V2.address as `0x${string}`,
+        abi: CONTRACTS.V2.abi,
         functionName: 'approvePrediction',
         args: [BigInt(predictionId)],
       });
@@ -395,8 +395,8 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
 
     try {
       writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI,
+        address: CONTRACTS.V2.address as `0x${string}`,
+        abi: CONTRACTS.V2.abi,
         functionName: 'rejectPrediction',
         args: [BigInt(predictionId), reason],
       });
@@ -543,8 +543,8 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
 
     // TODO: Add contract check for approver role
     // const { data: isContractApprover } = useReadContract({
-    //   address: CONTRACT_ADDRESS as `0x${string}`,
-    //   abi: CONTRACT_ABI,
+    //   address: CONTRACTS.V2.address as `0x${string}`,
+    //   abi: CONTRACTS.V2.abi,
     //   functionName: 'approvers',
     //   args: [address as `0x${string}`],
     // });
