@@ -13,6 +13,7 @@ function withValidProperties(
 
 export async function GET() {
   const URL = process.env.NEXT_PUBLIC_URL;
+  const NEYNAR_WEBHOOK_URL = process.env.NEYNAR_WEBHOOK_URL;
 
   return Response.json({
     accountAssociation: {
@@ -30,7 +31,7 @@ export async function GET() {
       splashImageUrl: process.env.NEXT_PUBLIC_APP_SPLASH_IMAGE,
       splashBackgroundColor: process.env.NEXT_PUBLIC_SPLASH_BACKGROUND_COLOR,
       homeUrl: URL,
-      webhookUrl: `${URL}/api/webhook`,
+      webhookUrl: NEYNAR_WEBHOOK_URL || `${URL}/api/webhook`,
       primaryCategory: process.env.NEXT_PUBLIC_APP_PRIMARY_CATEGORY,
       tags: ["prediction", "ai", "blockchain", "finance"],
       heroImageUrl: process.env.NEXT_PUBLIC_APP_HERO_IMAGE,
