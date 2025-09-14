@@ -496,6 +496,10 @@ input.disabled {
   color: #fbbf24;
 }
 
+.status-info.admin {
+  color: #8b5cf6;
+}
+
 .status-info.approved {
   color: #10b981;
 }

@@ -147,7 +147,8 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
   });
 
   const isOwner = address && contractOwner && address.toLowerCase() === (contractOwner as string).toLowerCase();
-  const canCreateFree = Boolean(isOwner || isApprovedCreator);
+  const isEnvAdmin = address && process.env.NEXT_PUBLIC_ADMIN_1?.toLowerCase() === address.toLowerCase();
+  const canCreateFree = Boolean(isOwner || isApprovedCreator || isEnvAdmin);
   const canCreate = Boolean(publicCreationEnabled || canCreateFree);
 
   // Set default end date/time on mount
@@ -514,6 +515,8 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
                 <h4>Your Status</h4>
                 {isOwner ? (
                   <p className="status-info owner">👑 Contract Owner - Free creation</p>
+                ) : isEnvAdmin ? (
+                  <p className="status-info admin">🔧 Admin - Free creation</p>
                 ) : isApprovedCreator ? (
                   <p className="status-info approved">✅ Approved Creator - Free creation</p>
                 ) : publicCreationEnabled ? (
