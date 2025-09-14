@@ -102,33 +102,5 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/market/stats - Force update market statistics
-export async function POST(request: NextRequest) {
-  try {
-    // Force update market stats
-    await redisHelpers.updateMarketStats();
-    
-    // Get updated stats
-    const stats = await redisHelpers.getMarketStats();
-    
-    return NextResponse.json({
-      success: true,
-      message: 'Market statistics updated successfully',
-      data: stats,
-      timestamp: new Date().toISOString()
-    });
-    
-  } catch (error) {
-    console.error('❌ Failed to update market stats:', error);
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Failed to update market statistics',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
-  }
-}
 
 
