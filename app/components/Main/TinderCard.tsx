@@ -1412,13 +1412,6 @@ KEY USER-FACING CHANGES: V1 → V2
                {!currentCard.isChart && (
                  <div className="image-overlay">
                    <div className="category-badge">{currentCard.category}</div>
-                   <div className="price-info">
-                     <span className="price">{currentCard.price}</span>
-                     <span className={`change ${currentCard.change.startsWith('+') ? 'positive' : 'negative'}`}>
-                       {currentCard.change}
-                     </span>
-                     <span className="voters-info">👥 {transformedPredictions[currentIndex]?.participants || 0}</span>
-                   </div>
                  </div>
                )}
              </div>
