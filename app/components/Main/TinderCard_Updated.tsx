@@ -148,21 +148,30 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
           showNotification('success', '✅ Stake placed successfully!', '');
           setStakeModal({ ...stakeModal, isOpen: false });
           
-          // Force sync with blockchain to update Redis immediately
+          // Auto-sync this specific prediction after stake
           try {
-            console.log('🔄 Syncing blockchain to Redis after stake...');
-            const syncResponse = await fetch('/api/sync');
+            console.log('🔄 Auto-syncing prediction after stake...');
+            const syncResponse = await fetch('/api/blockchain/events', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                eventType: 'stake_placed',
+                predictionId: predictionId,
+                contractVersion: 'V2'
+              })
+            });
+            
             if (syncResponse.ok) {
-              console.log('✅ Redis sync successful after stake');
+              console.log('✅ Prediction auto-synced after stake');
               // Trigger immediate refresh of predictions
               if (refreshPredictions) {
                 refreshPredictions();
               }
             } else {
-              console.warn('⚠️ Redis sync failed after stake');
+              console.warn('⚠️ Auto-sync failed after stake');
             }
           } catch (syncError) {
-            console.error('❌ Failed to sync after stake:', syncError);
+            console.error('❌ Failed to auto-sync after stake:', syncError);
           }
         },
         onError: (error) => {

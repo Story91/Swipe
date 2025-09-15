@@ -588,20 +588,20 @@ export function AdminDashboard({
           </button>
           <button 
             onClick={async () => {
-              if (confirm('🔄 SYNC BLOCKCHAIN TO REDIS\n\nThis will sync all blockchain data to Redis. This may take a few minutes.\n\nContinue?')) {
+              if (confirm('🔄 SYNC ALL BLOCKCHAIN TO REDIS\n\nThis will sync ALL blockchain data to Redis. This may take a few minutes.\n\nContinue?')) {
                 try {
-                  alert('🔄 Starting blockchain sync... This may take a few minutes.');
+                  alert('🔄 Starting full blockchain sync... This may take a few minutes.');
                   const response = await fetch('/api/sync');
                   if (response.ok) {
                     const result = await response.json();
-                    alert(`✅ SYNC COMPLETE!\n\nSynced: ${result.data.syncedCount} predictions\nStakes: ${result.data.totalStakesSynced}\nErrors: ${result.data.errorsCount}\n\nRefreshing data...`);
+                    alert(`✅ FULL SYNC COMPLETE!\n\nSynced: ${result.data.syncedCount} predictions\nStakes: ${result.data.totalStakesSynced}\nErrors: ${result.data.errorsCount}\n\nRefreshing data...`);
                     handleRefresh();
                   } else {
-                    alert('❌ Sync failed. Check console for details.');
+                    alert('❌ Full sync failed. Check console for details.');
                   }
                 } catch (error) {
-                  console.error('Sync error:', error);
-                  alert('❌ Sync failed. Check console for details.');
+                  console.error('Full sync error:', error);
+                  alert('❌ Full sync failed. Check console for details.');
                 }
               }
             }}
@@ -618,7 +618,41 @@ export function AdminDashboard({
               whiteSpace: 'nowrap'
             }}
           >
-            🔄 Sync
+            🔄 Sync All
+          </button>
+          <button 
+            onClick={async () => {
+              if (confirm('⚡ SYNC ACTIVE PREDICTIONS\n\nThis will sync only ACTIVE predictions from blockchain to Redis. Much faster!\n\nContinue?')) {
+                try {
+                  alert('⚡ Starting active predictions sync...');
+                  const response = await fetch('/api/sync/active');
+                  if (response.ok) {
+                    const result = await response.json();
+                    alert(`✅ ACTIVE SYNC COMPLETE!\n\nSynced: ${result.data.syncedCount} active predictions\nErrors: ${result.data.errorsCount}\n\nRefreshing data...`);
+                    handleRefresh();
+                  } else {
+                    alert('❌ Active sync failed. Check console for details.');
+                  }
+                } catch (error) {
+                  console.error('Active sync error:', error);
+                  alert('❌ Active sync failed. Check console for details.');
+                }
+              }
+            }}
+            className="sync-btn"
+            style={{
+              background: '#4CAF50',
+              color: 'white',
+              border: 'none',
+              padding: '3px 6px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '10px',
+              margin: '1px',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            ⚡ Sync Active
           </button>
         </div>
       </div>

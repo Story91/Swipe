@@ -671,12 +671,25 @@ export function EnhancedUserDashboard() {
               // Show success modal
               showSuccessModal(txHash, transaction.basescanUrl);
               
-              // Sync blockchain data to Redis
+              // Auto-sync the specific prediction after claim
               try {
-                await fetch('/api/sync');
-                console.log('✅ Blockchain data synced to Redis');
+                const syncResponse = await fetch('/api/blockchain/events', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    eventType: 'reward_claimed',
+                    predictionId: predictionId.replace('pred_v2_', '').replace('pred_v1_', ''),
+                    contractVersion: predictionId.startsWith('pred_v1_') ? 'V1' : 'V2'
+                  })
+                });
+                
+                if (syncResponse.ok) {
+                  console.log('✅ Prediction auto-synced after claim');
+                } else {
+                  console.warn('⚠️ Auto-sync failed after claim');
+                }
               } catch (syncError) {
-                console.error('❌ Failed to sync blockchain data:', syncError);
+                console.error('❌ Failed to auto-sync after claim:', syncError);
               }
               
               // Refresh user data immediately after successful claim

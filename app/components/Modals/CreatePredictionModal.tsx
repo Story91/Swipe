@@ -169,11 +169,22 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
       const handleSuccess = async () => {
         alert(`🎉 Prediction created successfully!\n\nTransaction: ${hash}\nView on Basescan: https://basescan.org/tx/${hash}`);
         
-        // First sync to Redis and wait a bit for blockchain propagation
+        // Auto-sync the new prediction to Redis (much faster than full sync)
         try {
-          console.log('🔄 Syncing new prediction to Redis...');
-          await fetch('/api/sync');
-          console.log('✅ Prediction synced to Redis');
+          console.log('🔄 Auto-syncing new prediction to Redis...');
+          const syncResponse = await fetch('/api/predictions/auto-sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          });
+          
+          if (syncResponse.ok) {
+            console.log('✅ New prediction auto-synced to Redis');
+          } else {
+            console.warn('⚠️ Auto-sync failed, falling back to full sync...');
+            // Fallback to full sync if auto-sync fails
+            await fetch('/api/sync');
+            console.log('✅ Prediction synced to Redis via fallback');
+          }
           
           // Wait a moment for data to propagate
           await new Promise(resolve => setTimeout(resolve, 1000));

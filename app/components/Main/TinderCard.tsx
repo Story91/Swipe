@@ -444,6 +444,29 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
         onSuccess: async (tx) => {
           console.log('✅ ETH Stake transaction successful:', tx);
           showNotification('success', 'Stake Placed!', `Successfully staked ${amount} ETH on ${side}!`);
+          
+          // Auto-sync this specific prediction after stake
+          try {
+            console.log('🔄 Auto-syncing prediction after stake...');
+            const syncResponse = await fetch('/api/blockchain/events', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                eventType: 'stake_placed',
+                predictionId: predictionId,
+                contractVersion: 'V2'
+              })
+            });
+            
+            if (syncResponse.ok) {
+              console.log('✅ Prediction auto-synced after stake');
+            } else {
+              console.warn('⚠️ Auto-sync failed after stake');
+            }
+          } catch (syncError) {
+            console.error('❌ Failed to auto-sync after stake:', syncError);
+          }
+          
           await handleStakeSuccess();
         },
         onError: (error) => {
@@ -461,6 +484,29 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
         onSuccess: async (tx) => {
           console.log('✅ SWIPE Stake transaction successful:', tx);
           showNotification('success', 'Stake Placed!', `Successfully staked ${amount} SWIPE on ${side}!`);
+          
+          // Auto-sync this specific prediction after stake
+          try {
+            console.log('🔄 Auto-syncing prediction after stake...');
+            const syncResponse = await fetch('/api/blockchain/events', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                eventType: 'stake_placed',
+                predictionId: predictionId,
+                contractVersion: 'V2'
+              })
+            });
+            
+            if (syncResponse.ok) {
+              console.log('✅ Prediction auto-synced after stake');
+            } else {
+              console.warn('⚠️ Auto-sync failed after stake');
+            }
+          } catch (syncError) {
+            console.error('❌ Failed to auto-sync after stake:', syncError);
+          }
+          
           await handleStakeSuccess();
         },
         onError: (error) => {
@@ -472,28 +518,13 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
 
   // Helper function for stake success
   const handleStakeSuccess = async () => {
-    // Sync updated data from blockchain to Redis
-    try {
-      console.log('🔄 Syncing updated prediction data after stake...');
-      const syncResponse = await fetch('/api/sync');
-      if (syncResponse.ok) {
-        console.log('✅ Prediction data synced successfully');
-        if (refreshPredictions) {
-          refreshPredictions();
-        }
-      } else {
-        console.warn('⚠️ Failed to sync prediction data');
-      }
-    } catch (syncError) {
-      console.warn('⚠️ Sync request failed:', syncError);
-    }
-    
-    // Trigger data refresh as fallback
+    // Data refresh is now handled by the auto-sync in onSuccess callbacks
+    // This function just triggers UI refresh
     setTimeout(() => {
       if (refreshPredictions) {
         refreshPredictions();
       }
-    }, 3000);
+    }, 1000); // Shorter delay since auto-sync is already done
   };
 
   // Helper function for stake error
@@ -702,17 +733,26 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       onSuccess: async () => {
         console.log(`✅ Prediction ${predictionId} approved successfully`);
 
-        // Sync updated prediction to Redis
+        // Auto-sync the approved prediction to Redis
         try {
-          console.log('🔄 Syncing approved prediction to Redis...');
-          const syncResponse = await fetch('/api/sync');
+          console.log('🔄 Auto-syncing approved prediction to Redis...');
+          const syncResponse = await fetch('/api/blockchain/events', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              eventType: 'prediction_approved',
+              predictionId: predictionId,
+              contractVersion: 'V2'
+            })
+          });
+          
           if (syncResponse.ok) {
-            console.log('✅ Prediction approval synced to Redis successfully');
+            console.log('✅ Prediction approval auto-synced to Redis successfully');
           } else {
-            console.warn('⚠️ Failed to sync prediction approval to Redis');
+            console.warn('⚠️ Failed to auto-sync prediction approval to Redis');
           }
         } catch (syncError) {
-          console.warn('⚠️ Sync request failed:', syncError);
+          console.warn('⚠️ Auto-sync request failed:', syncError);
         }
 
         setTimeout(() => {

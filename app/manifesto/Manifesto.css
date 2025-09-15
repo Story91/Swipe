@@ -1,0 +1,313 @@
+/* Dexter Manifesto Styles */
+
+.manifesto-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+  color: rgba(255, 255, 255, 0.9);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  line-height: 1.6;
+}
+
+.manifesto-header {
+  padding: 60px 24px 40px;
+  text-align: center;
+  border-bottom: 1px solid rgba(212, 255, 0, 0.1);
+  background: linear-gradient(135deg, rgba(212, 255, 0, 0.05), rgba(0, 0, 0, 0.1));
+}
+
+.manifesto-title-section {
+  margin-bottom: 32px;
+}
+
+.manifesto-main-title {
+  font-size: 48px;
+  font-weight: 800;
+  color: #d4ff00;
+  letter-spacing: -2px;
+  margin-bottom: 16px;
+  text-shadow: 0 0 20px rgba(212, 255, 0, 0.3);
+}
+
+.manifesto-subtitle {
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 500;
+  max-width: 800px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
+.manifesto-social-links {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  align-items: center;
+}
+
+.manifesto-social-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  transition: all 0.3s ease;
+  text-decoration: none;
+}
+
+.manifesto-social-link:hover {
+  background: rgba(212, 255, 0, 0.1);
+  border-color: #d4ff00;
+  color: #d4ff00;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(212, 255, 0, 0.2);
+}
+
+.manifesto-content {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 60px 24px;
+}
+
+.manifesto-section {
+  margin-bottom: 48px;
+}
+
+.section-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: #d4ff00;
+  margin-bottom: 24px;
+  letter-spacing: -1px;
+  position: relative;
+}
+
+.section-title::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  width: 60px;
+  height: 3px;
+  background: linear-gradient(90deg, #d4ff00, transparent);
+  border-radius: 2px;
+}
+
+.section-text {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.85);
+  margin-bottom: 20px;
+  line-height: 1.7;
+  font-weight: 400;
+}
+
+.code-block {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(212, 255, 0, 0.2);
+  border-radius: 12px;
+  padding: 24px;
+  margin: 24px 0;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  position: relative;
+  overflow: hidden;
+}
+
+.code-block::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #d4ff00, transparent);
+}
+
+.code-text {
+  color: #d4ff00;
+  font-size: 16px;
+  margin: 8px 0;
+  font-weight: 500;
+}
+
+.mission-list {
+  margin: 24px 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.mission-list li {
+  margin: 16px 0;
+  padding: 16px 20px;
+  background: rgba(212, 255, 0, 0.05);
+  border-left: 4px solid #d4ff00;
+  border-radius: 8px;
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.9);
+  position: relative;
+}
+
+.mission-list li::before {
+  content: '→';
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #d4ff00;
+  font-weight: bold;
+  font-size: 20px;
+}
+
+.manifesto-signature {
+  text-align: center;
+  font-size: 24px;
+  color: #d4ff00;
+  margin-top: 40px;
+  padding: 20px;
+  background: rgba(212, 255, 0, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(212, 255, 0, 0.2);
+}
+
+.manifesto-footer {
+  background: rgba(0, 0, 0, 0.3);
+  border-top: 1px solid rgba(212, 255, 0, 0.1);
+  padding: 40px 24px;
+  margin-top: 60px;
+}
+
+.footer-content {
+  max-width: 800px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.footer-text {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  margin-bottom: 20px;
+  font-weight: 500;
+}
+
+.footer-links {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  align-items: center;
+}
+
+.footer-link {
+  color: #d4ff00;
+  text-decoration: none;
+  font-weight: 600;
+  padding: 8px 16px;
+  border: 1px solid rgba(212, 255, 0, 0.3);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  font-size: 14px;
+}
+
+.footer-link:hover {
+  background: rgba(212, 255, 0, 0.1);
+  border-color: #d4ff00;
+  transform: translateY(-1px);
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .manifesto-header {
+    padding: 40px 16px 30px;
+  }
+
+  .manifesto-main-title {
+    font-size: 36px;
+  }
+
+  .manifesto-subtitle {
+    font-size: 18px;
+  }
+
+  .manifesto-content {
+    padding: 40px 16px;
+  }
+
+  .section-title {
+    font-size: 28px;
+  }
+
+  .section-text {
+    font-size: 16px;
+  }
+
+  .code-block {
+    padding: 16px;
+  }
+
+  .code-text {
+    font-size: 14px;
+  }
+
+  .mission-list li {
+    font-size: 16px;
+    padding: 12px 16px;
+  }
+
+  .manifesto-signature {
+    font-size: 20px;
+    padding: 16px;
+  }
+
+  .footer-links {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .manifesto-social-links {
+    gap: 16px;
+  }
+
+  .manifesto-social-link {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .manifesto-container {
+    background: white;
+    color: black;
+  }
+
+  .manifesto-main-title {
+    color: #000;
+    text-shadow: none;
+  }
+
+  .section-title {
+    color: #000;
+  }
+
+  .section-text {
+    color: #333;
+  }
+
+  .code-block {
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+  }
+
+  .code-text {
+    color: #000;
+  }
+
+  .manifesto-social-links {
+    display: none;
+  }
+
+  .footer-links {
+    display: none;
+  }
+}
