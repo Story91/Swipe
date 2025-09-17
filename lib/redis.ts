@@ -34,6 +34,7 @@ export const REDIS_KEYS = {
   USER_STAKES: (userId: string, predictionId: string) => `user_stakes:${userId}:${predictionId}`,
   USER_TRANSACTIONS: (userId: string) => `user_transactions:${userId}`,
   MARKET_STATS: 'market:stats',
+  COMPACT_STATS: 'market:compact_stats',
   USER_PORTFOLIO: (userId: string) => `user:portfolio:${userId}`,
 } as const;
 
@@ -246,6 +247,9 @@ export const redisHelpers = {
       
       await redis.set(REDIS_KEYS.MARKET_STATS, JSON.stringify(stats));
       console.log('✅ Market stats updated in Redis');
+      
+      // Also update compact stats cache
+      await this.updateCompactStats();
     } catch (error) {
       console.error('❌ Failed to update market stats in Redis:', error);
     }
@@ -375,6 +379,107 @@ export const redisHelpers = {
       }
     } catch (error) {
       console.error('❌ Failed to update transaction status in Redis:', error);
+    }
+  },
+
+  // Update compact stats cache
+  async updateCompactStats(): Promise<void> {
+    try {
+      const [marketStats, allPredictions] = await Promise.all([
+        this.getMarketStats(),
+        this.getAllPredictions()
+      ]);
+
+      if (!marketStats) return;
+
+      // Calculate ETH and SWIPE volumes from ALL predictions (V1 and V2)
+      let totalETH = 0;
+      let totalSWIPE = 0;
+      
+      allPredictions.forEach((pred) => {
+        totalETH += (pred.yesTotalAmount || 0) + (pred.noTotalAmount || 0);
+        totalSWIPE += (pred.swipeYesTotalAmount || 0) + (pred.swipeNoTotalAmount || 0);
+      });
+
+      // Get active predictions for additional metrics
+      const activePredictions = await this.getActivePredictions();
+      
+      // Calculate additional metrics
+      const now = Math.floor(Date.now() / 1000);
+      const predictionsEndingToday = activePredictions.filter(p => {
+        const endDate = new Date(p.deadline * 1000);
+        const today = new Date();
+        return endDate.toDateString() === today.toDateString();
+      }).length;
+
+      // Get top category from active predictions
+      const categoryBreakdown = activePredictions.reduce((acc, p) => {
+        acc[p.category] = (acc[p.category] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      
+      const topCategory = Object.entries(categoryBreakdown)
+        .sort(([,a], [,b]) => b - a)[0]?.[0] || 'General';
+
+      // Calculate success rate from all predictions
+      const successRate = allPredictions.length > 0 
+        ? (allPredictions.filter(p => p.resolved).length / allPredictions.length) * 100 
+        : 0;
+
+      // Get trending predictions from active predictions
+      const trendingPredictions = activePredictions
+        .map(pred => ({
+          id: pred.id,
+          question: pred.question,
+          volumeETH: (pred.yesTotalAmount || 0) + (pred.noTotalAmount || 0),
+          volumeSWIPE: (pred.swipeYesTotalAmount || 0) + (pred.swipeNoTotalAmount || 0),
+          participants: pred.participants?.length || 0,
+          isPositive: Math.random() > 0.5
+        }))
+        .sort((a, b) => (b.volumeETH + b.volumeSWIPE) - (a.volumeETH + a.volumeSWIPE))
+        .slice(0, 3);
+
+      const compactStats = {
+        totalPredictions: marketStats.totalPredictions,
+        activePredictions: marketStats.activePredictions,
+        totalVolumeETH: totalETH,
+        totalVolumeSWIPE: totalSWIPE,
+        predictionsToday: predictionsEndingToday,
+        topCategory,
+        successRate,
+        totalParticipants: marketStats.totalParticipants,
+        trendingPredictions,
+        lastUpdated: Date.now()
+      };
+
+      await redis.set(REDIS_KEYS.COMPACT_STATS, JSON.stringify(compactStats));
+      console.log('✅ Compact stats updated in Redis');
+    } catch (error) {
+      console.error('❌ Failed to update compact stats in Redis:', error);
+    }
+  },
+
+  // Get compact stats from cache
+  async getCompactStats(): Promise<any | null> {
+    try {
+      const data = await redis.get(REDIS_KEYS.COMPACT_STATS);
+      
+      if (!data) return null;
+      
+      const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+      
+      // Check if cache is fresh (less than 2 minutes old)
+      const twoMinutesAgo = Date.now() - (2 * 60 * 1000);
+      if (parsed.lastUpdated && parsed.lastUpdated < twoMinutesAgo) {
+        console.log('🔄 Compact stats cache expired, updating...');
+        await this.updateCompactStats();
+        return await this.getCompactStats();
+      }
+      
+      return parsed;
+    } catch (error) {
+      console.error('❌ Failed to get compact stats from Redis:', error);
+      return null;
     }
   }
 };

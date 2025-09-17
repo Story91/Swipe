@@ -27,7 +27,7 @@ import { useAccount } from "wagmi";
 import { useState, useEffect, useRef } from "react";
 import TinderCardComponent from "./components/Main/TinderCard";
 import { AdminPanel } from "./components/Admin/AdminPanel";
-import { MarketStats } from "./components/Market/MarketStats";
+import { CompactStats } from "./components/Market/CompactStats";
 import { UserDashboard } from "./components/Portfolio/UserDashboard";
 import { EnhancedUserDashboard } from "./components/Portfolio/EnhancedUserDashboard";
 import { MyPortfolio } from "./components/Portfolio/MyPortfolio";
@@ -157,7 +157,7 @@ export default function App() {
           {activeDashboard === 'approver' && <AdminPanel defaultTab="approver" />}
 
           {/* Market Stats - separate from main dashboard flow */}
-          {activeDashboard === 'market-stats' && <MarketStats />}
+          {activeDashboard === 'market-stats' && <CompactStats />}
 
           {/* Portfolio Components */}
           {activeDashboard === 'my-portfolio' && <MyPortfolio />}
