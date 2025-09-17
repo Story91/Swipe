@@ -3,9 +3,9 @@ import { notFound } from 'next/navigation';
 import PredictionEmbed from './PredictionEmbed';
 
 interface PredictionPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 // Generate metadata for social sharing
