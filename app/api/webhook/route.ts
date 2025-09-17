@@ -88,8 +88,8 @@ export async function POST(request: Request) {
         await setUserNotificationDetails(fid, event.notificationDetails);
         await sendFrameNotification({
           fid,
-          title: `Welcome to ${appName}`,
-          body: `Thank you for adding ${appName}`,
+          title: `👋 Welcome to Swipe!`,
+          body: `Thank you for joining our prediction platform! Good luck predicting the future! 🔮`,
         });
       } else {
         await deleteUserNotificationDetails(fid);
@@ -106,8 +106,8 @@ export async function POST(request: Request) {
       await setUserNotificationDetails(fid, event.notificationDetails);
       await sendFrameNotification({
         fid,
-        title: `Welcome to ${appName}`,
-        body: `Thank you for enabling notifications for ${appName}`,
+        title: `🔔 Notifications Enabled!`,
+        body: `Thank you for enabling notifications for Swipe. You'll receive updates about your stakes and achievements!`,
       });
 
       break;

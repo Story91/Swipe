@@ -3,7 +3,7 @@ import TinderCard from 'react-tinder-card';
 import { useAccount, useWriteContract, useReadContract } from "wagmi";
 import { ethers } from 'ethers';
 import { CONTRACTS, SWIPE_TOKEN, getV2Contract, getContractForAction } from '../../../lib/contract';
-import { useViewProfile } from '@coinbase/onchainkit/minikit';
+import { useViewProfile, useComposeCast, useMiniKit } from '@coinbase/onchainkit/minikit';
 import './TinderCard.css';
 import './Dashboards.css';
 import { NotificationSystem, showNotification, UserDashboard } from '../Portfolio/UserDashboard';
@@ -13,6 +13,8 @@ import { useHybridPredictions } from '../../../lib/hooks/useHybridPredictions';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useFarcasterProfiles } from '../../../lib/hooks/useFarcasterProfiles';
+import SharePredictionButton from '../Actions/SharePredictionButton';
+import { notifyPredictionShared, notifyStakeSuccess } from '../../../lib/notification-helpers';
 
 interface PredictionData {
   id: number;
@@ -41,7 +43,7 @@ interface TinderCardProps {
 type DashboardType = 'tinder' | 'user' | 'admin' | 'approver';
 
 // Helper function to format time left
-function formatTimeLeft(deadline: number): string {
+export function formatTimeLeft(deadline: number): string {
   const now = Date.now() / 1000;
   const timeLeft = deadline - now;
   
@@ -111,8 +113,13 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
 
   // Show action feedback for 3 seconds
   const [showActionFeedback, setShowActionFeedback] = useState(false);
+  // Show share prompt after successful stake
+  const [showSharePrompt, setShowSharePrompt] = useState(false);
+  const [lastStakedPrediction, setLastStakedPrediction] = useState<PredictionData | null>(null);
   const { address } = useAccount();
   const { writeContract } = useWriteContract();
+  const { composeCast } = useComposeCast();
+  const { context } = useMiniKit();
   
   // Check SWIPE allowance for user
   const { data: swipeAllowance, refetch: refetchAllowance } = useReadContract({
@@ -191,20 +198,6 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   useImperativeHandle(ref, () => ({
     refresh: refreshPredictions
   }), []); // Remove dependency to prevent re-creation
-  
-  // Open stake modal after swipe
-  const openStakeModal = useCallback((direction: string, predictionId: number) => {
-    const isYes = direction === 'right';
-    // Opening stake modal
-
-    setStakeModal({
-      isOpen: true,
-      predictionId,
-      isYes,
-      stakeAmount: '0.001',
-      selectedToken: 'ETH' // Default to ETH
-    });
-  }, []);
 
   // Global error handler for network/fetch errors
   useEffect(() => {
@@ -367,8 +360,25 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     };
   }), [transformedPredictions]);
 
+  // Open stake modal after swipe
+  const openStakeModal = useCallback((direction: string, predictionId: number) => {
+    const isYes = direction === 'right';
+    // Opening stake modal
 
+    // Find the prediction data for sharing later
+    const prediction = realCardItems.find(p => p.id === predictionId);
+    if (prediction) {
+      setLastStakedPrediction(prediction);
+    }
 
+    setStakeModal({
+      isOpen: true,
+      predictionId,
+      isYes,
+      stakeAmount: '0.001',
+      selectedToken: 'ETH' // Default to ETH
+    });
+  }, [realCardItems]);
 
 
   // Use real predictions from Redis - filter only active predictions
@@ -525,6 +535,115 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
         refreshPredictions();
       }
     }, 1000); // Shorter delay since auto-sync is already done
+    
+    // Send Farcaster notification about successful stake
+    try {
+      const userFid = await getUserFid();
+      if (userFid && lastStakedPrediction) {
+        const stakeAmount = stakeModal.stakeAmount || '0.001';
+        const outcome = stakeModal.isYes ? 'YES' : 'NO';
+        
+        await notifyStakeSuccess(
+          userFid,
+          lastStakedPrediction.title,
+          stakeAmount,
+          outcome
+        );
+      }
+    } catch (error) {
+      console.error('Failed to send stake success notification:', error);
+    }
+    
+    // Show share option after successful stake
+    setTimeout(() => {
+      setShowSharePrompt(true);
+    }, 2000); // Show share prompt 2 seconds after success
+  };
+
+  // Helper function to get user's FID
+  const getUserFid = async (): Promise<number | null> => {
+    try {
+      console.log('Getting user FID, context:', context);
+      
+      // Try user.fid first (newer MiniKit versions)
+      if (context?.user?.fid) {
+        const fid = context.user.fid;
+        console.log('Found FID in user:', fid);
+        return fid;
+      }
+      // Fallback to client.fid (older versions)
+      else if (context?.client && 'fid' in context.client) {
+        const fid = (context.client as any).fid;
+        console.log('Found FID in client:', fid);
+        return fid;
+      }
+      
+      console.log('No FID found in context');
+      return null;
+    } catch (error) {
+      console.error('Error getting user FID:', error);
+      return null;
+    }
+  };
+
+  // Function to share prediction after stake
+  const shareStakedPrediction = async (type: 'achievement' | 'challenge' | 'prediction' = 'achievement') => {
+    if (!lastStakedPrediction) return;
+    
+    try {
+      let shareText = '';
+      const appUrl = `${window.location.origin}/prediction/${lastStakedPrediction.id}`;
+      
+      switch (type) {
+        case 'achievement':
+          shareText = `🎉 I just staked on: ${lastStakedPrediction.title}\n\n💰 Stake: ${lastStakedPrediction.price} ETH\n\nDo you dare predict the future? 🔮`;
+          break;
+        case 'challenge':
+          shareText = `🏆 Challenge: Can you predict: ${lastStakedPrediction.title}?\n\n💰 Stake: ${lastStakedPrediction.price} ETH\n\nTry to beat my prediction! 🎯`;
+          break;
+        default:
+          shareText = `🔮 I predict: ${lastStakedPrediction.title}\n💰 Stake: ${lastStakedPrediction.price} ETH\n\nJoin the game and create your own prediction! 🎯`;
+      }
+      
+      await composeCast({
+        text: shareText,
+        embeds: [appUrl]
+      });
+      
+      setShowSharePrompt(false);
+      showNotification('success', 'Shared!', 'Your prediction has been shared on Farcaster! 🚀');
+      
+      // Send Farcaster notification if user has notifications enabled
+      try {
+        console.log('Attempting to send Farcaster notification...');
+        const userFid = await getUserFid();
+        console.log('User FID for notification:', userFid);
+        
+        if (userFid) {
+          const shareTypeNames = {
+            'achievement': 'achievement',
+            'challenge': 'challenge', 
+            'prediction': 'prediction'
+          };
+          
+          console.log('Sending notification for FID:', userFid, 'type:', type);
+          const result = await notifyPredictionShared(
+            userFid, 
+            lastStakedPrediction.title, 
+            shareTypeNames[type] || 'prediction'
+          );
+          console.log('Notification result:', result);
+        } else {
+          console.log('No FID available, skipping notification');
+        }
+      } catch (error) {
+        console.error('Failed to send Farcaster notification:', error);
+        // Don't show error to user, just log it
+      }
+    } catch (error) {
+      console.error('Błąd podczas udostępniania:', error);
+      showNotification('error', 'Sharing Error', 'Failed to share prediction. Please try again.');
+    }
   };
 
   // Helper function for stake error
@@ -1372,17 +1491,64 @@ KEY USER-FACING CHANGES: V1 → V2
             </div>
             <div className="feedback-text">
               <div className="feedback-title">
-                {lastAction.type === 'skip' ? 'Skipped' : 'Bet Placed'}
+                {lastAction.type === 'skip' ? 'Skipped' : 'Stake Accepted'}
               </div>
               <div className="feedback-subtitle">
                 {lastAction.type === 'skip'
                   ? 'Prediction skipped'
-                  : `Betting ${lastAction.direction === 'right' ? 'YES' : 'NO'}`
+                  : `Staking ${lastAction.direction === 'right' ? 'YES' : 'NO'}`
                 }
               </div>
             </div>
             <div className="feedback-prediction">
               ID: {lastAction.predictionId}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Share Prompt */}
+      {showSharePrompt && lastStakedPrediction && (
+        <div className="share-prompt-overlay">
+          <div className="share-prompt-content">
+            <div className="share-prompt-header">
+              <div className="share-prompt-icon">🎉</div>
+              <h3>Congratulations!</h3>
+              <p>Your stake has been accepted!</p>
+            </div>
+            
+            <div className="share-prompt-body">
+              <p>Share your prediction on Farcaster and challenge your friends!</p>
+            </div>
+            
+            <div className="share-prompt-actions">
+              <button 
+                onClick={() => shareStakedPrediction('achievement')}
+                className="share-btn share-achievement"
+              >
+                🎉 Share Achievement
+              </button>
+              
+              <button 
+                onClick={() => shareStakedPrediction('challenge')}
+                className="share-btn share-challenge"
+              >
+                🏆 Challenge Friends
+              </button>
+              
+              <button 
+                onClick={() => shareStakedPrediction('prediction')}
+                className="share-btn share-prediction"
+              >
+                🔮 Share Prediction
+              </button>
+              
+              <button 
+                onClick={() => setShowSharePrompt(false)}
+                className="share-btn share-skip"
+              >
+                Not Now
+              </button>
             </div>
           </div>
         </div>

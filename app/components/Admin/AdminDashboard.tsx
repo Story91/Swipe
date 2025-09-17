@@ -5,6 +5,7 @@ import { useReadContract, usePublicClient, useWriteContract } from 'wagmi';
 import { CONTRACTS, getV2Contract } from '../../../lib/contract';
 import { useRedisPredictions } from '../../../lib/hooks/useRedisPredictions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
+import NotificationTest from './NotificationTest';
 
 interface Prediction {
   id: string | number;
@@ -654,8 +655,45 @@ export function AdminDashboard({
           >
             ⚡ Sync Active
           </button>
+          <button 
+            onClick={async () => {
+              if (confirm('🆕 SYNC RECENT PREDICTIONS\n\nThis will sync only predictions from last 24 hours. Perfect for new predictions!\n\nContinue?')) {
+                try {
+                  alert('🆕 Starting recent predictions sync...');
+                  const response = await fetch('/api/sync/recent');
+                  if (response.ok) {
+                    const result = await response.json();
+                    alert(`✅ RECENT SYNC COMPLETE!\n\nSynced: ${result.data.syncedCount} recent predictions\nSkipped: ${result.data.skippedCount} old predictions\nErrors: ${result.data.errorsCount}\n\nRefreshing data...`);
+                    handleRefresh();
+                  } else {
+                    alert('❌ Recent sync failed. Check console for details.');
+                  }
+                } catch (error) {
+                  console.error('Recent sync error:', error);
+                  alert('❌ Recent sync failed. Check console for details.');
+                }
+              }
+            }}
+            className="sync-btn"
+            style={{
+              background: '#FF9800',
+              color: 'white',
+              border: 'none',
+              padding: '3px 6px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '10px',
+              margin: '1px',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            🆕 Sync Recent
+          </button>
         </div>
       </div>
+
+      {/* Notification Test Component */}
+      <NotificationTest />
 
       {/* Stats Table - Vertical Layout for Miniapp */}
       <div className="stats-table" style={{ 

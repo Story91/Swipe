@@ -11,13 +11,20 @@ function getUserNotificationDetailsKey(fid: number): string {
 export async function getUserNotificationDetails(
   fid: number,
 ): Promise<MiniAppNotificationDetails | null> {
+  console.log('getUserNotificationDetails called for FID:', fid);
+  
   if (!redis) {
+    console.log('Redis not available');
     return null;
   }
 
-  return await redis.get<MiniAppNotificationDetails>(
-    getUserNotificationDetailsKey(fid),
-  );
+  const key = getUserNotificationDetailsKey(fid);
+  console.log('Looking for notification details with key:', key);
+  
+  const result = await redis.get<MiniAppNotificationDetails>(key);
+  console.log('Redis result:', result);
+  
+  return result;
 }
 
 export async function setUserNotificationDetails(

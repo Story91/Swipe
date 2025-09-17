@@ -27,10 +27,17 @@ export async function sendFrameNotification({
   body: string;
   notificationDetails?: MiniAppNotificationDetails | null;
 }): Promise<SendFrameNotificationResult> {
+  console.log('sendFrameNotification called for FID:', fid, 'title:', title);
+  
   if (!notificationDetails) {
+    console.log('Fetching notification details for FID:', fid);
     notificationDetails = await getUserNotificationDetails(fid);
   }
+  
+  console.log('Notification details:', notificationDetails);
+  
   if (!notificationDetails) {
+    console.log('No notification details found for FID:', fid);
     return { state: "no_token" };
   }
 
