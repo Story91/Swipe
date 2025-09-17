@@ -592,7 +592,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     
     try {
       let shareText = '';
-      const appUrl = `${window.location.origin}/prediction/${lastStakedPrediction.id}`;
+      const appUrl = window.location.origin; // Just the main app URL
       
       switch (type) {
         case 'achievement':

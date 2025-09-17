@@ -45,8 +45,8 @@ export default function SharePredictionButton({
       
       shareText += `\n\nJoin the game and create your own prediction! 🎯`;
       
-      // Create app URL with prediction embed
-      const appUrl = `${window.location.origin}/prediction/${prediction.id}`;
+      // Create app URL (just main app, no specific prediction page)
+      const appUrl = window.location.origin;
       
       await composeCast({
         text: shareText,
@@ -69,7 +69,7 @@ export default function SharePredictionButton({
     try {
       const shareText = `🎉 I just staked on: ${prediction.question}\n\nStake: ${prediction.stake} ETH\n\nDo you dare predict the future? 🔮`;
       
-      const appUrl = `${window.location.origin}/prediction/${prediction.id}`;
+      const appUrl = window.location.origin;
       
       await composeCast({
         text: shareText,
@@ -92,7 +92,7 @@ export default function SharePredictionButton({
     try {
       const shareText = `🏆 Challenge: Can you predict: ${prediction.question}?\n\nStake: ${prediction.stake} ETH\n\nTry to beat my prediction! 🎯`;
       
-      const appUrl = `${window.location.origin}/prediction/${prediction.id}`;
+      const appUrl = window.location.origin;
       
       await composeCast({
         text: shareText,
