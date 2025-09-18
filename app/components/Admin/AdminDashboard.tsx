@@ -657,6 +657,40 @@ export function AdminDashboard({
           </button>
           <button 
             onClick={async () => {
+              if (confirm('💰 SYNC CLAIMS\n\nThis will sync claim status from blockchain to Redis for all predictions.\n\nContinue?')) {
+                try {
+                  alert('💰 Starting claims sync...');
+                  const response = await fetch('/api/sync/claims');
+                  if (response.ok) {
+                    const result = await response.json();
+                    alert(`✅ CLAIMS SYNC COMPLETE!\n\nSynced: ${result.data.syncedCount} claims\nErrors: ${result.data.errorsCount}\n\nRefreshing data...`);
+                    handleRefresh();
+                  } else {
+                    alert('❌ Claims sync failed. Check console for details.');
+                  }
+                } catch (error) {
+                  console.error('Claims sync error:', error);
+                  alert('❌ Claims sync failed. Check console for details.');
+                }
+              }
+            }}
+            className="sync-btn"
+            style={{
+              background: '#FF9800',
+              color: 'white',
+              border: 'none',
+              padding: '3px 6px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '10px',
+              margin: '1px',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            💰 Sync Claims
+          </button>
+          <button 
+            onClick={async () => {
               if (confirm('🆕 SYNC RECENT PREDICTIONS\n\nThis will sync only predictions from last 24 hours. Perfect for new predictions!\n\nContinue?')) {
                 try {
                   alert('🆕 Starting recent predictions sync...');

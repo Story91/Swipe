@@ -46,6 +46,9 @@ export function EnhancedUserDashboard() {
   const [userTransactions, setUserTransactions] = useState<UserTransaction[]>([]);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
   
+  // Local state for tracking claimed stakes
+  const [claimedStakes, setClaimedStakes] = useState<Set<string>>(new Set());
+  
   // Filter state
   const [selectedFilter, setSelectedFilter] = useState<string>('ready-to-claim');
   
@@ -57,6 +60,51 @@ export function EnhancedUserDashboard() {
   // Convert wei to ETH
   const weiToEth = (wei: number): number => {
     return wei / Math.pow(10, 18);
+  };
+
+  // Mark stake as claimed locally
+  const markStakeAsClaimed = (predictionId: string, tokenType: 'ETH' | 'SWIPE') => {
+    const stakeKey = `${predictionId}-${tokenType}`;
+    setClaimedStakes(prev => new Set([...prev, stakeKey]));
+    
+    // Also update the local state immediately
+    setUserPredictions(prev => prev.map(pred => {
+      if (pred.id === predictionId) {
+        const updatedPred = { ...pred };
+        
+        // Handle multi-token stakes (V2)
+        if (updatedPred.userStakes?.[tokenType]) {
+          updatedPred.userStakes[tokenType] = {
+            ...updatedPred.userStakes[tokenType],
+            claimed: true
+          };
+        }
+        
+        // Also handle single stake format (V1) - check if it's a direct stake
+        if (updatedPred.userStakes && !updatedPred.userStakes.ETH && !updatedPred.userStakes.SWIPE) {
+          // This is a V1 single stake - convert to ETH format
+          if (tokenType === 'ETH') {
+            // For V1 stakes, we need to preserve the original data and add ETH wrapper
+            const originalStake = updatedPred.userStakes as any;
+            updatedPred.userStakes = {
+              ETH: {
+                predictionId: originalStake.predictionId || predictionId,
+                yesAmount: originalStake.yesAmount || 0,
+                noAmount: originalStake.noAmount || 0,
+                claimed: true,
+                potentialPayout: originalStake.potentialPayout || 0,
+                potentialProfit: originalStake.potentialProfit || 0,
+                canClaim: originalStake.canClaim || false,
+                isWinner: originalStake.isWinner || false
+              }
+            };
+          }
+        }
+        
+        return updatedPred;
+      }
+      return pred;
+    }));
   };
 
   // Format ETH for display
@@ -556,6 +604,9 @@ export function EnhancedUserDashboard() {
           onSuccess: async (txHash: string) => {
             console.log('🎯 Claim transaction sent:', txHash);
 
+            // Mark stake as claimed immediately in local state
+            markStakeAsClaimed(predictionId, tokenType || 'ETH');
+
             // Save transaction to Redis
             const transaction: UserTransaction = {
               id: generateTransactionId(),
@@ -574,6 +625,17 @@ export function EnhancedUserDashboard() {
               body: JSON.stringify({
                 userId: address.toLowerCase(),
                 transaction
+              })
+            });
+
+            // Update stake as claimed in Redis
+            await fetch('/api/stakes', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: address.toLowerCase(),
+                predictionId: predictionId,
+                updates: { claimed: true }
               })
             });
             
@@ -789,7 +851,12 @@ export function EnhancedUserDashboard() {
         return userPredictions.filter(p => {
           const ethStake = p.userStakes?.ETH;
           const swipeStake = p.userStakes?.SWIPE;
-          return (ethStake?.canClaim && !ethStake?.claimed) || (swipeStake?.canClaim && !swipeStake?.claimed);
+          
+          // Check local claimed state first
+          const ethClaimed = claimedStakes.has(`${p.id}-ETH`) || ethStake?.claimed;
+          const swipeClaimed = claimedStakes.has(`${p.id}-SWIPE`) || swipeStake?.claimed;
+          
+          return (ethStake?.canClaim && !ethClaimed) || (swipeStake?.canClaim && !swipeClaimed);
         });
       case 'active':
         return activePredictions;
@@ -805,7 +872,12 @@ export function EnhancedUserDashboard() {
         return resolvedPredictions.filter(p => {
           const ethStake = p.userStakes?.ETH;
           const swipeStake = p.userStakes?.SWIPE;
-          return ethStake?.claimed || swipeStake?.claimed;
+          
+          // Check local claimed state first
+          const ethClaimed = claimedStakes.has(`${p.id}-ETH`) || ethStake?.claimed;
+          const swipeClaimed = claimedStakes.has(`${p.id}-SWIPE`) || swipeStake?.claimed;
+          
+          return ethClaimed || swipeClaimed;
         });
       case 'all':
         return userPredictions;
@@ -813,7 +885,12 @@ export function EnhancedUserDashboard() {
         return userPredictions.filter(p => {
           const ethStake = p.userStakes?.ETH;
           const swipeStake = p.userStakes?.SWIPE;
-          return (ethStake?.canClaim && !ethStake?.claimed) || (swipeStake?.canClaim && !swipeStake?.claimed);
+          
+          // Check local claimed state first
+          const ethClaimed = claimedStakes.has(`${p.id}-ETH`) || ethStake?.claimed;
+          const swipeClaimed = claimedStakes.has(`${p.id}-SWIPE`) || swipeStake?.claimed;
+          
+          return (ethStake?.canClaim && !ethClaimed) || (swipeStake?.canClaim && !swipeClaimed);
         });
     }
   };
@@ -856,7 +933,12 @@ export function EnhancedUserDashboard() {
   const canClaimCount = userPredictions.filter(p => {
     const ethStake = p.userStakes?.ETH;
     const swipeStake = p.userStakes?.SWIPE;
-    return (ethStake?.canClaim && !ethStake?.claimed) || (swipeStake?.canClaim && !swipeStake?.claimed);
+    
+    // Check local claimed state first
+    const ethClaimed = claimedStakes.has(`${p.id}-ETH`) || ethStake?.claimed;
+    const swipeClaimed = claimedStakes.has(`${p.id}-SWIPE`) || swipeStake?.claimed;
+    
+    return (ethStake?.canClaim && !ethClaimed) || (swipeStake?.canClaim && !swipeClaimed);
   }).length;
 
   if (!address) {
