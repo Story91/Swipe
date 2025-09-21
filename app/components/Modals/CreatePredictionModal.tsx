@@ -151,6 +151,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
   const canCreateFree = Boolean(isOwner || isApprovedCreator || isEnvAdmin);
   const canCreate = Boolean(publicCreationEnabled || canCreateFree);
 
+
   // Set default end date/time on mount
   useEffect(() => {
     const tomorrow = new Date();
