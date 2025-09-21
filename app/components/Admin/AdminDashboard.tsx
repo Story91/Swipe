@@ -568,21 +568,42 @@ export function AdminDashboard({
             </Select>
           </div>
         </div>
-        {/* Refresh Controls Row */}
-        <div className="refresh-controls" style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        {/* Refresh Controls Row - Mobile Optimized */}
+        <div className="refresh-controls" style={{ 
+          display: 'flex', 
+          gap: '8px', 
+          flexWrap: 'wrap', 
+          justifyContent: 'flex-end',
+          marginBottom: '10px'
+        }}>
           <button 
             onClick={handleRefresh}
-            className="refresh-btn"
+            className="refresh-btn mobile-sync-btn"
             style={{
               background: '#4CAF50',
               color: 'white',
               border: 'none',
-              padding: '3px 6px',
-              borderRadius: '4px',
+              padding: '12px 16px',
+              borderRadius: '8px',
               cursor: 'pointer',
-              fontSize: '10px',
-              margin: '1px',
-              whiteSpace: 'nowrap'
+              fontSize: '14px',
+              fontWeight: '600',
+              margin: '2px',
+              whiteSpace: 'nowrap',
+              minHeight: '44px',
+              minWidth: '80px',
+              touchAction: 'manipulation',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseDown={(e) => {
+              e.currentTarget.style.transform = 'scale(0.95)';
+            }}
+            onMouseUp={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
             }}
           >
             🔄 Refresh
@@ -606,17 +627,32 @@ export function AdminDashboard({
                 }
               }
             }}
-            className="sync-btn"
+            className="sync-btn mobile-sync-btn"
             style={{
               background: '#2196F3',
               color: 'white',
               border: 'none',
-              padding: '3px 6px',
-              borderRadius: '4px',
+              padding: '12px 16px',
+              borderRadius: '8px',
               cursor: 'pointer',
-              fontSize: '10px',
-              margin: '1px',
-              whiteSpace: 'nowrap'
+              fontSize: '14px',
+              fontWeight: '600',
+              margin: '2px',
+              whiteSpace: 'nowrap',
+              minHeight: '44px',
+              minWidth: '100px',
+              touchAction: 'manipulation',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseDown={(e) => {
+              e.currentTarget.style.transform = 'scale(0.95)';
+            }}
+            onMouseUp={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
             }}
           >
             🔄 Sync All
@@ -640,51 +676,81 @@ export function AdminDashboard({
                 }
               }
             }}
-            className="sync-btn"
+            className="sync-btn mobile-sync-btn"
             style={{
               background: '#4CAF50',
               color: 'white',
               border: 'none',
-              padding: '3px 6px',
-              borderRadius: '4px',
+              padding: '12px 16px',
+              borderRadius: '8px',
               cursor: 'pointer',
-              fontSize: '10px',
-              margin: '1px',
-              whiteSpace: 'nowrap'
+              fontSize: '14px',
+              fontWeight: '600',
+              margin: '2px',
+              whiteSpace: 'nowrap',
+              minHeight: '44px',
+              minWidth: '120px',
+              touchAction: 'manipulation',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseDown={(e) => {
+              e.currentTarget.style.transform = 'scale(0.95)';
+            }}
+            onMouseUp={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
             }}
           >
             ⚡ Sync Active
           </button>
           <button 
-            onClick={async () => {
-              if (confirm('💰 SYNC CLAIMS\n\nThis will sync claim status from blockchain to Redis for all predictions.\n\nContinue?')) {
-                try {
-                  alert('💰 Starting claims sync...');
-                  const response = await fetch('/api/sync/claims');
-                  if (response.ok) {
-                    const result = await response.json();
-                    alert(`✅ CLAIMS SYNC COMPLETE!\n\nSynced: ${result.data.syncedCount} claims\nErrors: ${result.data.errorsCount}\n\nRefreshing data...`);
-                    handleRefresh();
-                  } else {
-                    alert('❌ Claims sync failed. Check console for details.');
-                  }
-                } catch (error) {
-                  console.error('Claims sync error:', error);
-                  alert('❌ Claims sync failed. Check console for details.');
-                }
+        onClick={async () => {
+          if (confirm('💰 SYNC CLAIMS (OPTIMIZED)\n\nThis will sync claim status from blockchain to Redis for:\n• Only resolved predictions (ready to claim)\n• Only unclaimed stakes\n\nThis is much faster and uses less data!\n\nContinue?')) {
+            try {
+              alert('💰 Starting optimized claims sync...');
+              const response = await fetch('/api/sync/claims');
+              if (response.ok) {
+                const result = await response.json();
+                alert(`✅ OPTIMIZED CLAIMS SYNC COMPLETE!\n\nSynced: ${result.data.syncedCount} claims\nErrors: ${result.data.errorsCount}\n\nOnly processed ready-to-claim predictions!\n\nRefreshing data...`);
+                handleRefresh();
+              } else {
+                alert('❌ Claims sync failed. Check console for details.');
               }
-            }}
-            className="sync-btn"
+            } catch (error) {
+              console.error('Claims sync error:', error);
+              alert('❌ Claims sync failed. Check console for details.');
+            }
+          }
+        }}
+            className="sync-btn mobile-sync-btn"
             style={{
               background: '#FF9800',
               color: 'white',
               border: 'none',
-              padding: '3px 6px',
-              borderRadius: '4px',
+              padding: '12px 16px',
+              borderRadius: '8px',
               cursor: 'pointer',
-              fontSize: '10px',
-              margin: '1px',
-              whiteSpace: 'nowrap'
+              fontSize: '14px',
+              fontWeight: '600',
+              margin: '2px',
+              whiteSpace: 'nowrap',
+              minHeight: '44px',
+              minWidth: '120px',
+              touchAction: 'manipulation',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseDown={(e) => {
+              e.currentTarget.style.transform = 'scale(0.95)';
+            }}
+            onMouseUp={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
             }}
           >
             💰 Sync Claims
@@ -708,17 +774,32 @@ export function AdminDashboard({
                 }
               }
             }}
-            className="sync-btn"
+            className="sync-btn mobile-sync-btn"
             style={{
               background: '#FF9800',
               color: 'white',
               border: 'none',
-              padding: '3px 6px',
-              borderRadius: '4px',
+              padding: '12px 16px',
+              borderRadius: '8px',
               cursor: 'pointer',
-              fontSize: '10px',
-              margin: '1px',
-              whiteSpace: 'nowrap'
+              fontSize: '14px',
+              fontWeight: '600',
+              margin: '2px',
+              whiteSpace: 'nowrap',
+              minHeight: '44px',
+              minWidth: '120px',
+              touchAction: 'manipulation',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseDown={(e) => {
+              e.currentTarget.style.transform = 'scale(0.95)';
+            }}
+            onMouseUp={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
             }}
           >
             🆕 Sync Recent

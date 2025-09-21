@@ -264,14 +264,16 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading }: 
         {prediction.userStakes?.ETH && (prediction.userStakes.ETH.yesAmount > 0 || prediction.userStakes.ETH.noAmount > 0) && (
           <button 
             onClick={() => onClaimReward(prediction.id, 'ETH')}
-            disabled={isTransactionLoading || prediction.status === 'active' || prediction.userStakes.ETH.claimed}
-            className={`legacy-claim-btn eth-claim-btn ${prediction.status === 'active' || prediction.userStakes.ETH.claimed ? 'disabled' : ''}`}
+            disabled={isTransactionLoading || prediction.status === 'active' || prediction.userStakes.ETH.claimed || !prediction.userStakes.ETH.canClaim}
+            className={`legacy-claim-btn eth-claim-btn ${prediction.status === 'active' || prediction.userStakes.ETH.claimed || !prediction.userStakes.ETH.canClaim ? 'disabled' : ''}`}
             title={
               prediction.status === 'active' 
                 ? 'Prediction is still active - wait for resolution' 
                 : prediction.userStakes.ETH.claimed 
                   ? 'Already claimed' 
-                  : 'Claim ETH reward'
+                  : !prediction.userStakes.ETH.canClaim
+                    ? 'Cannot claim - you lost this prediction'
+                    : 'Claim ETH reward'
             }
           >
             {isTransactionLoading ? 'Processing...' : 
@@ -284,14 +286,16 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading }: 
         {prediction.userStakes?.SWIPE && (prediction.userStakes.SWIPE.yesAmount > 0 || prediction.userStakes.SWIPE.noAmount > 0) && (
           <button 
             onClick={() => onClaimReward(prediction.id, 'SWIPE')}
-            disabled={isTransactionLoading || prediction.status === 'active' || prediction.userStakes.SWIPE.claimed}
-            className={`legacy-claim-btn swipe-claim-btn ${prediction.status === 'active' || prediction.userStakes.SWIPE.claimed ? 'disabled' : ''}`}
+            disabled={isTransactionLoading || prediction.status === 'active' || prediction.userStakes.SWIPE.claimed || !prediction.userStakes.SWIPE.canClaim}
+            className={`legacy-claim-btn swipe-claim-btn ${prediction.status === 'active' || prediction.userStakes.SWIPE.claimed || !prediction.userStakes.SWIPE.canClaim ? 'disabled' : ''}`}
             title={
               prediction.status === 'active' 
                 ? 'Prediction is still active - wait for resolution' 
                 : prediction.userStakes.SWIPE.claimed 
                   ? 'Already claimed' 
-                  : 'Claim SWIPE reward'
+                  : !prediction.userStakes.SWIPE.canClaim
+                    ? 'Cannot claim - you lost this prediction'
+                    : 'Claim SWIPE reward'
             }
           >
             {isTransactionLoading ? 'Processing...' : 

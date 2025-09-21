@@ -369,7 +369,7 @@ export async function GET(request: NextRequest) {
                 functionName: 'userStakes',
                 args: [BigInt(i), participant],
               });
-            }) as [bigint, bigint, boolean]; // [yesAmount, noAmount, claimed]
+            }) as any; // V2 returns struct {yesAmount, noAmount, claimed}
 
             // Get SWIPE stakes
             const swipeStakeData = await retryWithBackoff(async () => {
@@ -379,10 +379,14 @@ export async function GET(request: NextRequest) {
                 functionName: 'userSwipeStakes',
                 args: [BigInt(i), participant],
               });
-            }) as [bigint, bigint, boolean]; // [yesAmount, noAmount, claimed]
+            }) as any; // V2 returns struct {yesAmount, noAmount, claimed}
 
-            const [ethYesAmount, ethNoAmount, ethClaimed] = ethStakeData;
-            const [swipeYesAmount, swipeNoAmount, swipeClaimed] = swipeStakeData;
+            const ethYesAmount = ethStakeData.yesAmount;
+            const ethNoAmount = ethStakeData.noAmount;
+            const ethClaimed = ethStakeData.claimed;
+            const swipeYesAmount = swipeStakeData.yesAmount;
+            const swipeNoAmount = swipeStakeData.noAmount;
+            const swipeClaimed = swipeStakeData.claimed;
 
             // Collect all stakes for this user
             const userStakes: any = {

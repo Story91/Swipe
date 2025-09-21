@@ -49,6 +49,9 @@ export function EnhancedUserDashboard() {
   // Local state for tracking claimed stakes
   const [claimedStakes, setClaimedStakes] = useState<Set<string>>(new Set());
   
+  // Cache state
+  const [cacheLoaded, setCacheLoaded] = useState(false);
+  
   // Filter state
   const [selectedFilter, setSelectedFilter] = useState<string>('ready-to-claim');
   
@@ -114,6 +117,53 @@ export function EnhancedUserDashboard() {
     return eth.toFixed(6); // Always use decimal format with 6 decimal places
   };
 
+  // Cache management functions
+  const saveToCache = (data: any, key: string) => {
+    try {
+      const cacheData = {
+        data,
+        timestamp: Date.now(),
+        version: '1.0'
+      };
+      localStorage.setItem(`dexter_cache_${key}`, JSON.stringify(cacheData));
+      console.log(`💾 Cached ${key} data`);
+    } catch (error) {
+      console.warn('⚠️ Failed to save to cache:', error);
+    }
+  };
+
+  const loadFromCache = (key: string, maxAge: number = 5 * 60 * 1000) => { // 5 minutes default
+    try {
+      const cached = localStorage.getItem(`dexter_cache_${key}`);
+      if (!cached) return null;
+      
+      const { data, timestamp, version } = JSON.parse(cached);
+      
+      // Check if cache is still valid
+      if (Date.now() - timestamp > maxAge) {
+        console.log(`⏰ Cache expired for ${key}`);
+        localStorage.removeItem(`dexter_cache_${key}`);
+        return null;
+      }
+      
+      console.log(`📦 Loaded ${key} from cache`);
+      return data;
+    } catch (error) {
+      console.warn('⚠️ Failed to load from cache:', error);
+      return null;
+    }
+  };
+
+  const clearCache = () => {
+    try {
+      const keys = Object.keys(localStorage).filter(key => key.startsWith('dexter_cache_'));
+      keys.forEach(key => localStorage.removeItem(key));
+      console.log('🗑️ Cache cleared');
+    } catch (error) {
+      console.warn('⚠️ Failed to clear cache:', error);
+    }
+  };
+
   // Modal functions
   const showClaimModal = (txHash: string, basescanUrl: string) => {
     setModalType('claim');
@@ -135,8 +185,8 @@ export function EnhancedUserDashboard() {
     setTimeout(() => {
       setShowModal(false);
       // Refresh data one more time to ensure everything is up to date
-      fetchUserStakes();
-      fetchUserTransactions();
+      fetchUserStakes(true); // Force refresh after claim
+      fetchUserTransactions(true); // Force refresh after claim
       console.log('🔄 Final data refresh after modal close');
     }, 3000);
   };
@@ -159,17 +209,31 @@ export function EnhancedUserDashboard() {
   // Redis predictions hook
   const { predictions: allPredictions, loading: predictionsLoading, error: predictionsError } = useRedisPredictions();
 
-  // Fetch user transactions
-  const fetchUserTransactions = useCallback(async () => {
+  // Fetch user transactions with cache
+  const fetchUserTransactions = useCallback(async (forceRefresh: boolean = false) => {
     if (!address) return;
+    
+    // Try to load from cache first (unless force refresh)
+    if (!forceRefresh) {
+      const cachedTransactions = loadFromCache(`user_transactions_${address.toLowerCase()}`, 2 * 60 * 1000); // 2 minutes cache
+      if (cachedTransactions) {
+        console.log('📦 Using cached user transactions');
+        setUserTransactions(cachedTransactions);
+        return;
+      }
+    }
     
     setLoadingTransactions(true);
     try {
+      console.log('🔄 Fetching user transactions from server...');
       const response = await fetch(`/api/user-transactions?userId=${address.toLowerCase()}`);
       const result = await response.json();
       const transactions = result.success ? result.data : [];
       setUserTransactions(transactions);
       console.log(`📊 Loaded ${transactions.length} user transactions`);
+      
+      // Save to cache
+      saveToCache(transactions, `user_transactions_${address.toLowerCase()}`);
     } catch (error) {
       console.error('Failed to fetch user transactions:', error);
     } finally {
@@ -177,11 +241,22 @@ export function EnhancedUserDashboard() {
     }
   }, [address]);
 
-  // Fetch user stakes for all predictions - simplified to use only Redis
-  const fetchUserStakes = useCallback(async () => {
+  // Fetch user stakes for predictions - optimized with lazy loading
+  const fetchUserStakes = useCallback(async (forceRefresh: boolean = false, filterType: string = 'ready-to-claim') => {
     if (!address) {
       console.log('❌ No address connected, skipping fetchUserStakes');
       return;
+    }
+    
+    // Try to load from cache first (unless force refresh)
+    if (!forceRefresh) {
+      const cachedData = loadFromCache(`user_predictions_${address.toLowerCase()}`, 30 * 1000); // 30 seconds cache
+      if (cachedData) {
+        console.log('📦 Using cached user predictions');
+        setUserPredictions(cachedData);
+        setCacheLoaded(true);
+        return;
+      }
     }
     
     // Don't fetch if predictions are still loading
@@ -205,9 +280,47 @@ export function EnhancedUserDashboard() {
         return;
       }
       
+      // Filter predictions based on filterType for lazy loading
+      let filteredPredictions = predictions;
+      if (filterType === 'ready-to-claim') {
+        // Only load resolved predictions for ready-to-claim filter
+        filteredPredictions = predictions.filter(p => p.resolved);
+        console.log(`🚀 Lazy loading: Loading only ${filteredPredictions.length} resolved predictions for ready-to-claim`);
+      } else if (filterType === 'active') {
+        // Only load active predictions
+        filteredPredictions = predictions.filter(p => !p.resolved && !p.cancelled && p.deadline > Date.now() / 1000);
+        console.log(`🚀 Lazy loading: Loading only ${filteredPredictions.length} active predictions`);
+      } else if (filterType === 'won') {
+        // Only load resolved predictions for won filter
+        filteredPredictions = predictions.filter(p => p.resolved);
+        console.log(`🚀 Lazy loading: Loading only ${filteredPredictions.length} resolved predictions for won filter`);
+      } else if (filterType === 'lost') {
+        // Only load resolved predictions for lost filter
+        filteredPredictions = predictions.filter(p => p.resolved);
+        console.log(`🚀 Lazy loading: Loading only ${filteredPredictions.length} resolved predictions for lost filter`);
+      } else if (filterType === 'expired') {
+        // Only load expired predictions
+        filteredPredictions = predictions.filter(p => !p.resolved && !p.cancelled && p.deadline <= Date.now() / 1000);
+        console.log(`🚀 Lazy loading: Loading only ${filteredPredictions.length} expired predictions`);
+      } else if (filterType === 'cancelled') {
+        // Only load cancelled predictions
+        filteredPredictions = predictions.filter(p => p.cancelled);
+        console.log(`🚀 Lazy loading: Loading only ${filteredPredictions.length} cancelled predictions`);
+      } else if (filterType === 'claimed') {
+        // Only load resolved predictions for claimed filter
+        filteredPredictions = predictions.filter(p => p.resolved);
+        console.log(`🚀 Lazy loading: Loading only ${filteredPredictions.length} resolved predictions for claimed filter`);
+      }
+      
+      console.log(`🔍 Processing ${filteredPredictions.length} predictions for filter: ${filterType}`);
+      
       const userPredictionsWithStakes: PredictionWithStakes[] = [];
       
-      for (const prediction of predictions) {
+      // Log all resolved predictions
+      const resolvedPredictions = filteredPredictions.filter(p => p.resolved);
+      console.log(`📊 Found ${resolvedPredictions.length} resolved predictions:`, resolvedPredictions.map(p => ({ id: p.id, resolved: p.resolved, outcome: p.outcome })));
+      
+      for (const prediction of filteredPredictions) {
         try {
           console.log(`🔍 Processing prediction ${prediction.id}...`);
           
@@ -372,6 +485,8 @@ export function EnhancedUserDashboard() {
           const stakeData = await stakeInfo.json();
           
           console.log(`🔍 API response for prediction ${prediction.id}:`, stakeData);
+          console.log(`🔍 Prediction ${prediction.id} resolved status:`, prediction.resolved);
+          console.log(`🔍 Prediction ${prediction.id} outcome:`, prediction.outcome);
           
           // Only process V2 predictions if user has stakes
           if (stakeData.success && stakeData.data.length > 0) {
@@ -523,6 +638,10 @@ export function EnhancedUserDashboard() {
       console.log(`📊 Claimed predictions:`, claimedPredictions);
       
       setUserPredictions(userPredictionsWithStakes);
+      
+      // Save to cache
+      saveToCache(userPredictionsWithStakes, `user_predictions_${address.toLowerCase()}`);
+      setCacheLoaded(true);
     } catch (error) {
       console.error('Failed to fetch user stakes:', error);
     } finally {
@@ -532,18 +651,145 @@ export function EnhancedUserDashboard() {
 
   // No auto-refresh - data loads once on page load
 
+  // Calculate statistics without loading all predictions
+  const calculateStats = useCallback(async () => {
+    if (!address || !allPredictions || allPredictions.length === 0) return;
+    
+    try {
+      console.log('📊 Calculating statistics...');
+      
+      // Count total predictions by status
+      const totalPredictions = allPredictions.length;
+      const activeCount = allPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline > Date.now() / 1000).length;
+      const resolvedCount = allPredictions.filter(p => p.resolved).length;
+      const cancelledCount = allPredictions.filter(p => p.cancelled).length;
+      const expiredCount = allPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline <= Date.now() / 1000).length;
+      
+      // Calculate total pool size
+      const totalPool = allPredictions.reduce((sum, p) => {
+        const ethPool = (p.yesTotalAmount || 0) + (p.noTotalAmount || 0);
+        const swipePool = (p.swipeYesTotalAmount || 0) + (p.swipeNoTotalAmount || 0);
+        return sum + ethPool + swipePool;
+      }, 0);
+      
+      console.log('📊 Statistics calculated:', {
+        totalPredictions,
+        activeCount,
+        resolvedCount,
+        cancelledCount,
+        expiredCount,
+        totalPool: totalPool / Math.pow(10, 18) // Convert to ETH
+      });
+      
+      // Store stats in state (you might want to add stats state)
+      // For now, just log them
+      
+    } catch (error) {
+      console.error('❌ Failed to calculate statistics:', error);
+    }
+  }, [address, allPredictions]);
+  
+  // Check for new claim transactions and sync if needed (only once per session)
+  const checkAndSyncClaims = useCallback(async () => {
+    if (!address || userTransactions.length === 0) return;
+    
+    // Check if we already synced recently (avoid multiple syncs)
+    const lastSyncKey = `last_claim_sync_${address.toLowerCase()}`;
+    const lastSyncTime = localStorage.getItem(lastSyncKey);
+    const oneHourAgo = Date.now() - (60 * 60 * 1000); // 1 hour
+    
+    if (lastSyncTime && parseInt(lastSyncTime) > oneHourAgo) {
+      console.log('⏭️ Skipping claim sync - already synced recently');
+      return;
+    }
+    
+    // Find the most recent claim transaction
+    const recentClaimTx = userTransactions
+      .filter(tx => tx.type === 'claim' && tx.status === 'success')
+      .sort((a, b) => b.timestamp - a.timestamp)[0];
+    
+    if (!recentClaimTx) return;
+    
+    // Check if this claim transaction is recent (within last 30 minutes)
+    const thirtyMinutesAgo = Date.now() - (30 * 60 * 1000);
+    if (recentClaimTx.timestamp < thirtyMinutesAgo) return;
+    
+    console.log('🔄 Found recent claim transaction, triggering sync...', recentClaimTx);
+    
+    try {
+      const syncResponse = await fetch('/api/sync/claims', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      const syncResult = await syncResponse.json();
+      console.log('✅ Auto-sync claims result:', syncResult);
+      
+      if (syncResult.success) {
+        // Mark that we synced recently
+        localStorage.setItem(lastSyncKey, Date.now().toString());
+        
+        // Refresh user data after sync
+        fetchUserStakes(true, selectedFilter);
+      }
+    } catch (error) {
+      console.error('❌ Failed to auto-sync claims:', error);
+    }
+  }, [address, userTransactions, fetchUserStakes, selectedFilter]);
+  
   // Initial fetch - only fetch transactions initially
   useEffect(() => {
     fetchUserTransactions();
   }, [fetchUserTransactions]);
+  
+  // Check for claim transactions after loading transactions (only once on initial load)
+  useEffect(() => {
+    if (userTransactions.length > 0 && address) {
+      // Only check on initial load, not on every transaction update
+      const hasCheckedKey = `has_checked_claims_${address.toLowerCase()}`;
+      const hasChecked = sessionStorage.getItem(hasCheckedKey);
+      
+      if (!hasChecked) {
+        sessionStorage.setItem(hasCheckedKey, 'true');
+        checkAndSyncClaims();
+      }
+    }
+  }, [userTransactions, checkAndSyncClaims, address]);
 
-  // Fetch user stakes when predictions are loaded
+  // Fetch user stakes when predictions are loaded - only ready-to-claim initially
   useEffect(() => {
     if (allPredictions && allPredictions.length > 0 && address) {
-      console.log('🔄 Predictions loaded, fetching user stakes...');
-      fetchUserStakes();
+      console.log('🔄 Predictions loaded, calculating stats and fetching ready-to-claim...');
+      calculateStats(); // Calculate statistics first
+      fetchUserStakes(false, 'ready-to-claim'); // Only load ready-to-claim initially
     }
-  }, [allPredictions, address]);
+  }, [allPredictions, address, calculateStats]);
+  
+  // Auto-refresh every 30 seconds to get latest data (without sync to keep it fast)
+  useEffect(() => {
+    if (!address) return;
+    
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-refreshing user data...');
+      fetchUserStakes(true, selectedFilter); // Just refresh, don't sync
+    }, 30000); // 30 seconds
+    
+    return () => clearInterval(interval);
+  }, [address, fetchUserStakes, selectedFilter]);
+  
+  // Handle filter change with lazy loading
+  const handleFilterChange = useCallback(async (newFilter: string) => {
+    console.log(`🔄 Filter changed from ${selectedFilter} to ${newFilter}`);
+    setSelectedFilter(newFilter);
+    
+    // Clear current predictions and load new ones with lazy loading
+    setUserPredictions([]);
+    setLoadingStakes(true);
+    
+    // Load predictions for the new filter
+    await fetchUserStakes(true, newFilter);
+  }, [selectedFilter, fetchUserStakes]);
 
   // Handle claim reward
   const handleClaimReward = async (predictionId: string, tokenType?: 'ETH' | 'SWIPE') => {
@@ -606,6 +852,53 @@ export function EnhancedUserDashboard() {
 
             // Mark stake as claimed immediately in local state
             markStakeAsClaimed(predictionId, tokenType || 'ETH');
+            
+            // Clear cache to ensure fresh data is loaded
+            clearCache();
+            
+            // Update transaction status to success in Redis
+            console.log('🔄 Updating transaction status to success...');
+            try {
+              await fetch('/api/user-transactions', {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  userId: address,
+                  txHash: txHash,
+                  status: 'success'
+                }),
+              });
+              console.log('✅ Transaction status updated to success');
+            } catch (error) {
+              console.error('❌ Failed to update transaction status:', error);
+            }
+            
+            // Trigger claims sync to update Redis from blockchain (single attempt, async)
+            console.log('🔄 Triggering claims sync to update Redis...');
+            
+            // Do sync in background without blocking UI
+            setTimeout(async () => {
+              try {
+                const syncResponse = await fetch('/api/sync/claims', {
+                  method: 'GET',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                });
+                const syncResult = await syncResponse.json();
+                console.log('✅ Claims sync result:', syncResult);
+                
+                // If sync was successful, refresh user data
+                if (syncResult.success) {
+                  console.log('🔄 Refreshing user data after successful sync...');
+                  fetchUserStakes(true, selectedFilter);
+                }
+              } catch (error) {
+                console.error('❌ Claims sync failed:', error);
+              }
+            }, 2000); // Wait 2 seconds for transaction to be confirmed
 
             // Save transaction to Redis
             const transaction: UserTransaction = {
@@ -761,9 +1054,9 @@ export function EnhancedUserDashboard() {
               // Add a small delay to ensure Redis is updated
               setTimeout(() => {
                 console.log('🔄 Calling fetchUserStakes after delay...');
-                fetchUserStakes();
-                fetchUserTransactions();
-                console.log('🔄 fetchUserStakes called');
+                fetchUserStakes(true); // Force refresh to get latest data from Redis
+                fetchUserTransactions(true); // Force refresh transactions too
+                console.log('🔄 fetchUserStakes called with force refresh');
               }, 1000);
             } else {
               // Update transaction status in Redis
@@ -809,7 +1102,7 @@ export function EnhancedUserDashboard() {
             console.log('✅ Stake marked as claimed successfully');
             // Refresh user stakes after successful claim
             setTimeout(() => {
-              fetchUserStakes();
+              fetchUserStakes(true); // Force refresh after claim
             }, 1000);
           } else {
             console.error('Failed to mark stake as claimed');
@@ -973,7 +1266,7 @@ export function EnhancedUserDashboard() {
           <h3>❌ Error Loading Predictions</h3>
           <p>Error: {predictionsError}</p>
           <p>Connected wallet: {address}</p>
-          <button onClick={fetchUserStakes}>Retry</button>
+          <button onClick={() => fetchUserStakes(true)}>Retry</button>
         </div>
       </div>
     );
@@ -1029,7 +1322,7 @@ export function EnhancedUserDashboard() {
           <label htmlFor="prediction-filter" className="filter-label">
             Filter Predictions:
           </label>
-          <Select value={selectedFilter} onValueChange={setSelectedFilter}>
+          <Select value={selectedFilter} onValueChange={handleFilterChange}>
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Select filter" />
             </SelectTrigger>
@@ -1225,8 +1518,8 @@ export function EnhancedUserDashboard() {
                     </a>
                     <button 
                       onClick={() => {
-                        fetchUserStakes();
-                        fetchUserTransactions();
+                        fetchUserStakes(true); // Force refresh
+                        fetchUserTransactions(true); // Force refresh
                         closeModal();
                       }}
                       className="refresh-btn"
