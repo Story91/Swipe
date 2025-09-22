@@ -420,7 +420,17 @@ export function AdminDashboard({
               const syncResponse = await fetch('/api/sync');
               if (syncResponse.ok) {
                 console.log('✅ Redis sync successful after FORCE RESOLVE');
-                alert(`✅ SYNC COMPLETE!\nPrediction ${numericId} resolved as ${side}\nTransaction: ${tx}\n\nRedis has been updated. Refreshing data...`);
+                
+                // Also sync claims to update user stakes
+                console.log('🔄 Syncing claims after FORCE RESOLVE...');
+                const claimsSyncResponse = await fetch('/api/sync/claims');
+                if (claimsSyncResponse.ok) {
+                  console.log('✅ Claims sync successful after FORCE RESOLVE');
+                } else {
+                  console.warn('⚠️ Claims sync failed after FORCE RESOLVE');
+                }
+                
+                alert(`✅ SYNC COMPLETE!\nPrediction ${numericId} resolved as ${side}\nTransaction: ${tx}\n\nRedis and claims have been updated. Refreshing data...`);
                 // Refresh data after successful sync
                 setTimeout(() => {
                   handleRefresh();
@@ -754,6 +764,119 @@ export function AdminDashboard({
             }}
           >
             💰 Sync Claims
+          </button>
+          <button 
+            onClick={async (e) => {
+              const button = e.currentTarget;
+              if (button) {
+                button.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                  if (button) {
+                    button.style.transform = 'scale(1)';
+                  }
+                }, 150);
+              }
+              
+              if (confirm('🔄 SYNC RECENT RESOLVED\n\nThis will sync recently resolved predictions from blockchain to Redis:\n• Last 24 hours\n• V2 contract only\n• Creates/updates predictions in Redis\n• Syncs user stakes automatically\n\nContinue?')) {
+                try {
+                  alert('🔄 Starting recent resolved sync...');
+                  const response = await fetch('/api/sync/recent-resolved');
+                  if (response.ok) {
+                    const result = await response.json();
+                    alert(`✅ RECENT RESOLVED SYNC COMPLETE!\n\nSynced: ${result.data.syncedCount} predictions\nErrors: ${result.data.errorsCount}\n\nRefreshing data...`);
+                    handleRefresh();
+                  } else {
+                    alert('❌ Recent resolved sync failed. Check console for details.');
+                  }
+                } catch (error) {
+                  console.error('Recent resolved sync error:', error);
+                  alert('❌ Recent resolved sync failed. Check console for details.');
+                }
+              }
+            }}
+            onMouseDown={(e) => {
+              e.currentTarget.style.transform = 'scale(0.95)';
+            }}
+            onMouseUp={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+            className="btn btn-info"
+            style={{ 
+              margin: '5px',
+              padding: '8px 16px',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              borderRadius: '8px',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              backgroundColor: '#17a2b8',
+              color: 'white'
+            }}
+          >
+            🔄 Sync Recent Resolved
+          </button>
+          <button 
+            onClick={async (e) => {
+              const button = e.currentTarget;
+              if (button) {
+                button.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                  if (button) {
+                    button.style.transform = 'scale(1)';
+                  }
+                }, 150);
+              }
+              
+              if (confirm('🔍 SYNC MISSING PREDICTIONS\n\nThis will sync predictions that exist on blockchain but not in Redis:\n• Checks all predictions\n• Only syncs missing ones\n• V2 contract only\n• Creates predictions in Redis\n• Syncs user stakes for resolved predictions\n\nContinue?')) {
+                try {
+                  alert('🔍 Starting missing predictions sync...');
+                  const response = await fetch('/api/sync/missing-predictions');
+                  if (response.ok) {
+                    const result = await response.json();
+                    alert(`✅ MISSING PREDICTIONS SYNC COMPLETE!\n\nSynced: ${result.data.syncedCount} predictions\nMissing found: ${result.data.missingFound}\nErrors: ${result.data.errorsCount}\n\nRefreshing data...`);
+                    handleRefresh();
+                  } else {
+                    alert('❌ Missing predictions sync failed. Check console for details.');
+                  }
+                } catch (error) {
+                  console.error('Missing predictions sync error:', error);
+                  alert('❌ Missing predictions sync failed. Check console for details.');
+                }
+              }
+            }}
+            onMouseDown={(e) => {
+              e.currentTarget.style.transform = 'scale(0.95)';
+            }}
+            onMouseUp={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+            className="btn btn-info"
+            style={{ 
+              margin: '5px',
+              padding: '8px 16px',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              borderRadius: '8px',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              backgroundColor: '#17a2b8',
+              color: 'white',
+              minHeight: '44px',
+              minWidth: '120px',
+              touchAction: 'manipulation',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            🔍 Sync Missing
           </button>
           <button 
             onClick={async () => {

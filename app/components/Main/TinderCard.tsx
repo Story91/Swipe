@@ -740,6 +740,17 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       .then(data => {
         if (data.success) {
           console.log(`✅ Redis prediction ${predictionId} resolved successfully`);
+          
+          // Auto-sync claims after resolve
+          fetch('/api/sync/claims')
+            .then(response => response.json())
+            .then(syncData => {
+              console.log('✅ Claims synced after resolve:', syncData);
+            })
+            .catch(syncError => {
+              console.warn('⚠️ Claims sync failed after resolve:', syncError);
+            });
+          
           setTimeout(() => {
             if (refreshPredictions) {
               refreshPredictions();
@@ -765,6 +776,17 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       }, {
         onSuccess: () => {
           console.log(`✅ Prediction ${predictionId} resolved successfully`);
+          
+          // Auto-sync claims after blockchain resolve
+          fetch('/api/sync/claims')
+            .then(response => response.json())
+            .then(syncData => {
+              console.log('✅ Claims synced after blockchain resolve:', syncData);
+            })
+            .catch(syncError => {
+              console.warn('⚠️ Claims sync failed after blockchain resolve:', syncError);
+            });
+          
           setTimeout(() => {
             if (refreshPredictions) {
               refreshPredictions();

@@ -6,9 +6,26 @@ import { RedisPrediction } from '../../../lib/types/redis';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
     const category = searchParams.get('category');
     const status = searchParams.get('status');
     const creator = searchParams.get('creator');
+    
+    // If ID is provided, return single prediction
+    if (id) {
+      const prediction = await redisHelpers.getPrediction(id);
+      if (!prediction) {
+        return NextResponse.json(
+          { success: false, error: 'Prediction not found' },
+          { status: 404 }
+        );
+      }
+      return NextResponse.json({
+        success: true,
+        data: prediction,
+        timestamp: new Date().toISOString()
+      });
+    }
     
     let predictions: RedisPrediction[] = [];
     

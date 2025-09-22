@@ -72,10 +72,104 @@ export async function POST(request: NextRequest) {
     
     console.log(`✅ Prediction ${predictionId} resolved as ${outcome ? 'YES' : 'NO'}`);
     
+    // Update user stakes in Redis immediately after resolve
+    try {
+      console.log('🔄 Updating user stakes after prediction resolve...');
+      
+      // Get all stakes for this prediction
+      const stakes = await redisHelpers.getUserStakes(predictionId);
+      console.log(`📊 Found ${stakes.length} stakes for prediction ${predictionId}`);
+      
+      let updatedStakes = 0;
+      
+      for (const stake of stakes) {
+        if (!stake.user) continue;
+        
+        try {
+          // For V2 multi-token format, we need to check both ETH and SWIPE stakes
+          if (stake.ETH || stake.SWIPE) {
+            let needsUpdate = false;
+            const updatedStake = { ...stake };
+            
+            // Check ETH stake
+            if (stake.ETH && stake.ETH.yesAmount > 0) {
+              const userChoice = stake.ETH.yesAmount > stake.ETH.noAmount ? 'YES' : 'NO';
+              const isWinner = (userChoice === 'YES' && outcome) || (userChoice === 'NO' && !outcome);
+              
+              if (isWinner && !stake.ETH.claimed) {
+                // User won but hasn't claimed yet - mark as ready to claim
+                console.log(`🎯 User ${stake.user} won ETH stake for prediction ${predictionId} - marking as ready to claim`);
+                updatedStake.ETH.claimed = false; // Keep false so it shows in "ready to claim"
+                needsUpdate = true;
+              }
+            }
+            
+            // Check SWIPE stake
+            if (stake.SWIPE && stake.SWIPE.yesAmount > 0) {
+              const userChoice = stake.SWIPE.yesAmount > stake.SWIPE.noAmount ? 'YES' : 'NO';
+              const isWinner = (userChoice === 'YES' && outcome) || (userChoice === 'NO' && !outcome);
+              
+              if (isWinner && !stake.SWIPE.claimed) {
+                // User won but hasn't claimed yet - mark as ready to claim
+                console.log(`🎯 User ${stake.user} won SWIPE stake for prediction ${predictionId} - marking as ready to claim`);
+                updatedStake.SWIPE.claimed = false; // Keep false so it shows in "ready to claim"
+                needsUpdate = true;
+              }
+            }
+            
+            // Save the stake only if it needs update
+            if (needsUpdate) {
+              await redisHelpers.saveUserStake(updatedStake);
+              updatedStakes++;
+            }
+            
+          } else {
+            // For V1 format or legacy stakes
+            const userChoice = stake.yesAmount > stake.noAmount ? 'YES' : 'NO';
+            const isWinner = (userChoice === 'YES' && outcome) || (userChoice === 'NO' && !outcome);
+            
+            if (isWinner && !stake.claimed) {
+              console.log(`🎯 User ${stake.user} won legacy stake for prediction ${predictionId} - marking as ready to claim`);
+              stake.claimed = false; // Keep false so it shows in "ready to claim"
+              await redisHelpers.saveUserStake(stake);
+              updatedStakes++;
+            }
+          }
+        } catch (stakeError) {
+          console.error(`❌ Failed to update stake for user ${stake.user}:`, stakeError);
+        }
+      }
+      
+      console.log(`✅ Updated ${updatedStakes} stakes after resolve`);
+      
+    } catch (stakeUpdateError) {
+      console.error('❌ Failed to update user stakes after resolve:', stakeUpdateError);
+    }
+    
+    // Auto-sync claims after resolve to update user stakes
+    try {
+      console.log('🔄 Auto-syncing claims after prediction resolve...');
+      const syncResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/sync/claims`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${process.env.ADMIN_API_KEY}`,
+        },
+      });
+      
+      if (syncResponse.ok) {
+        const syncResult = await syncResponse.json();
+        console.log('✅ Auto-sync claims successful:', syncResult);
+      } else {
+        console.warn('⚠️ Auto-sync claims failed:', await syncResponse.text());
+      }
+    } catch (syncError) {
+      console.error('❌ Auto-sync claims error:', syncError);
+    }
+    
     return NextResponse.json({
       success: true,
       data: updatedPrediction,
-      message: `Prediction resolved as ${outcome ? 'YES' : 'NO'}`,
+      message: `Prediction resolved as ${outcome ? 'YES' : 'NO'} and claims synced`,
       timestamp: new Date().toISOString()
     });
     

@@ -649,7 +649,17 @@ export function EnhancedUserDashboard() {
     }
   }, [address, allPredictions, predictionsLoading, userPredictions]);
 
-  // No auto-refresh - data loads once on page load
+  // Auto-refresh user data every 30 seconds to catch new resolved predictions
+  useEffect(() => {
+    if (!address) return;
+    
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-refreshing user data...');
+      fetchUserStakes(true); // Force refresh
+    }, 30000); // 30 seconds
+    
+    return () => clearInterval(interval);
+  }, [address, fetchUserStakes]);
 
   // Calculate statistics without loading all predictions
   const calculateStats = useCallback(async () => {
