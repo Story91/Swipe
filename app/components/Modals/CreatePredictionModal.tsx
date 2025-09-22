@@ -59,8 +59,8 @@ const CRYPTO_OPTIONS = [
     name: 'Ripple', 
     icon: '✕', 
     color: '#23292f',
-    poolAddress: '0x1a2e8705d5b42e15ce5f94b61a48b178b49c97d5',
-    chain: 'eth'
+    poolAddress: '0x1d2f0da169ceb9fc7b3144628db156f3f6c60dbe',
+    chain: 'bsc'
   },
   { 
     symbol: 'BNB', 
@@ -308,7 +308,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
       
       if (formData.includeChart && selectedCryptoData) {
         // Store the full GeckoTerminal URL
-        finalImageUrl = `https://www.geckoterminal.com/${selectedCryptoData.chain}/pools/${selectedCryptoData.poolAddress}?embed=1&info=0&swaps=0&light_chart=1&chart_type=price&resolution=1d&bg_color=f1f5f9`;
+        finalImageUrl = `https://www.geckoterminal.com/${selectedCryptoData.chain}/pools/${selectedCryptoData.poolAddress}?embed=1&info=0&swaps=0&light_chart=1&chart_type=price&resolution=1d&bg_color=ffffff`;
       }
 
       if (formData.paymentToken === 'ETH') {
