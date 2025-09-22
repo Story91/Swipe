@@ -65,6 +65,7 @@ export async function GET(request: NextRequest) {
         address: contract.address as `0x${string}`,
         abi: contract.abi,
         functionName: 'getContractStats',
+        args: []
       }) as any;
     } catch (error) {
       console.warn('⚠️ Could not get contract stats:', error);

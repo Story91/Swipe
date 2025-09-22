@@ -173,6 +173,26 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     return () => clearInterval(interval);
   }, []);
 
+  // Auto-refresh predictions every 30 seconds to catch new stakes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-refreshing predictions to catch new stakes...');
+      refreshPredictions();
+    }, 30000); // 30 seconds
+    
+    return () => clearInterval(interval);
+  }, [refreshPredictions]);
+
+  // Auto-refresh predictions every 30 seconds to catch new participants
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-refreshing predictions for new participants...');
+      refreshPredictions();
+    }, 30000); // Refresh every 30 seconds
+    
+    return () => clearInterval(interval);
+  }, [refreshPredictions]);
+
   // Auto-refresh SWIPE allowance when modal is open and using SWIPE
   useEffect(() => {
     if (stakeModal.isOpen && stakeModal.selectedToken === 'SWIPE' && !isTransactionLoading) {

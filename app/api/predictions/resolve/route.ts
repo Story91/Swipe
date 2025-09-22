@@ -87,32 +87,32 @@ export async function POST(request: NextRequest) {
         
         try {
           // For V2 multi-token format, we need to check both ETH and SWIPE stakes
-          if (stake.ETH || stake.SWIPE) {
+          if ((stake as any).ETH || (stake as any).SWIPE) {
             let needsUpdate = false;
             const updatedStake = { ...stake };
             
             // Check ETH stake
-            if (stake.ETH && stake.ETH.yesAmount > 0) {
-              const userChoice = stake.ETH.yesAmount > stake.ETH.noAmount ? 'YES' : 'NO';
+            if ((stake as any).ETH && (stake as any).ETH.yesAmount > 0) {
+              const userChoice = (stake as any).ETH.yesAmount > (stake as any).ETH.noAmount ? 'YES' : 'NO';
               const isWinner = (userChoice === 'YES' && outcome) || (userChoice === 'NO' && !outcome);
               
-              if (isWinner && !stake.ETH.claimed) {
+              if (isWinner && !(stake as any).ETH.claimed) {
                 // User won but hasn't claimed yet - mark as ready to claim
                 console.log(`🎯 User ${stake.user} won ETH stake for prediction ${predictionId} - marking as ready to claim`);
-                updatedStake.ETH.claimed = false; // Keep false so it shows in "ready to claim"
+                (updatedStake as any).ETH.claimed = false; // Keep false so it shows in "ready to claim"
                 needsUpdate = true;
               }
             }
             
             // Check SWIPE stake
-            if (stake.SWIPE && stake.SWIPE.yesAmount > 0) {
-              const userChoice = stake.SWIPE.yesAmount > stake.SWIPE.noAmount ? 'YES' : 'NO';
+            if ((stake as any).SWIPE && (stake as any).SWIPE.yesAmount > 0) {
+              const userChoice = (stake as any).SWIPE.yesAmount > (stake as any).SWIPE.noAmount ? 'YES' : 'NO';
               const isWinner = (userChoice === 'YES' && outcome) || (userChoice === 'NO' && !outcome);
               
-              if (isWinner && !stake.SWIPE.claimed) {
+              if (isWinner && !(stake as any).SWIPE.claimed) {
                 // User won but hasn't claimed yet - mark as ready to claim
                 console.log(`🎯 User ${stake.user} won SWIPE stake for prediction ${predictionId} - marking as ready to claim`);
-                updatedStake.SWIPE.claimed = false; // Keep false so it shows in "ready to claim"
+                (updatedStake as any).SWIPE.claimed = false; // Keep false so it shows in "ready to claim"
                 needsUpdate = true;
               }
             }

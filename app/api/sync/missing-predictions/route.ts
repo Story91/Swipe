@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
       address: CONTRACTS.V2.address as `0x${string}`,
       abi: CONTRACTS.V2.abi,
       functionName: 'nextPredictionId',
+      args: []
     }) as bigint;
 
     const totalCountNumber = Number(totalCount);
@@ -155,7 +156,7 @@ export async function GET(request: NextRequest) {
             timeLeft: 0,
             totalPool: 0
           },
-          contractVersion: 'V2'
+          contractVersion: 'V2' as const
         };
 
         // Calculate market stats
