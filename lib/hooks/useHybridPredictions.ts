@@ -36,6 +36,11 @@ export interface HybridPrediction {
     totalPool: number;
   };
   
+  // Additional fields needed for compatibility
+  createdAt: number;
+  approved: boolean;
+  status: 'active' | 'resolved' | 'expired' | 'cancelled';
+  
   // Computed fields
   totalPool: number;
   yesPercentage: number;
@@ -89,6 +94,13 @@ export function useHybridPredictions() {
         participants: pred.participants || [],
         marketStats: pred.marketStats,
         
+        // Additional fields for compatibility
+        createdAt: pred.createdAt || (pred.deadline - (24 * 60 * 60)), // Default to 24h before deadline
+        approved: !pred.needsApproval,
+        status: (pred.resolved ? 'resolved' : 
+                pred.cancelled ? 'cancelled' :
+                pred.deadline <= Date.now() / 1000 ? 'expired' : 'active') as 'active' | 'resolved' | 'expired' | 'cancelled',
+        
         // Computed fields (moved to component to avoid Date.now() causing re-renders)
         totalPool,
         yesPercentage: totalPool > 0 ? (pred.yesTotalAmount / totalPool) * 100 : 0,
@@ -97,16 +109,16 @@ export function useHybridPredictions() {
     });
   }, []);
   
-  // Main fetch function - only from Redis (no RPC calls)
+  // Main fetch function - fetch ALL predictions from Redis
   const fetchAllPredictions = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      // Fetch only active predictions from Redis (no blockchain sync to avoid RPC limits)
-      console.log('🔄 Fetching active predictions from Redis...');
-      await fetchRedisPredictions({ status: 'active' });
-      console.log('✅ Active predictions fetched from Redis successfully');
+      // Fetch ALL predictions from Redis (not just active ones)
+      console.log('🔄 Fetching ALL predictions from Redis...');
+      await fetchRedisPredictions(); // No status filter - get all predictions
+      console.log('✅ All predictions fetched from Redis successfully');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch predictions';
       setError(errorMessage);
@@ -124,7 +136,7 @@ export function useHybridPredictions() {
     }
   }, [redisPredictions, transformPredictions]);
   
-  // Fetch predictions only on mount and when wallet connects
+  // Fetch predictions on mount and when wallet connects
   useEffect(() => {
     fetchAllPredictions();
   }, []); // Only on mount
@@ -140,6 +152,16 @@ export function useHybridPredictions() {
       return () => clearTimeout(timeoutId);
     }
   }, [address]);
+  
+  // No auto-refresh - only manual refresh when needed
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     console.log('🔄 Auto-refreshing hybrid predictions...');
+  //     fetchAllPredictions();
+  //   }, 60000); // 1 minute
+  //   
+  //   return () => clearInterval(interval);
+  // }, [fetchAllPredictions]);
   
   return {
     predictions,

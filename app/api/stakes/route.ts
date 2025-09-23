@@ -22,6 +22,8 @@ export async function GET(request: NextRequest) {
       // Get specific user's stake for this prediction
       const stakeKey = `user_stakes:${userId}:${predictionId}`;
       const data = await redis.get(stakeKey);
+      
+      
       if (data) {
         const stake = typeof data === 'string' ? JSON.parse(data) : data;
         if (stake && typeof stake === 'object' && 'user' in stake) {
@@ -64,11 +66,48 @@ export async function GET(request: NextRequest) {
       // Get all stakes for this prediction
       stakes = await redisHelpers.getUserStakes(predictionId);
     }
+
+    // Get prediction data to calculate canClaim
+    const predictionData = await redis.get(`prediction:${predictionId}`);
+    let prediction: any = null;
+    if (predictionData) {
+      prediction = typeof predictionData === 'string' ? JSON.parse(predictionData) : predictionData;
+    }
+
+    // Calculate canClaim for each stake
+    const stakesWithCanClaim = stakes.map(stake => {
+      let canClaim = false;
+      
+      if (prediction) {
+        const isResolved = prediction.resolved || prediction.cancelled;
+        
+        if (isResolved && !stake.claimed) {
+          if (prediction.cancelled) {
+            // Can claim refund if cancelled
+            canClaim = stake.yesAmount > 0 || stake.noAmount > 0;
+          } else if (prediction.resolved) {
+            // Can claim if user won
+            const userChoice = stake.yesAmount > stake.noAmount ? 'YES' : 'NO';
+            const userWon = (userChoice === 'YES' && prediction.outcome) || (userChoice === 'NO' && !prediction.outcome);
+            canClaim = userWon;
+          }
+        } else if (stake.claimed) {
+          // Already claimed - cannot claim again
+          canClaim = false;
+        }
+      }
+      
+      return {
+        ...stake,
+        canClaim
+      };
+    });
+    
     
     return NextResponse.json({
       success: true,
-      data: stakes,
-      count: stakes.length,
+      data: stakesWithCanClaim,
+      count: stakesWithCanClaim.length,
       timestamp: new Date().toISOString()
     });
     

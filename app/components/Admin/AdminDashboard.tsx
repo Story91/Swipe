@@ -5,7 +5,6 @@ import { useReadContract, usePublicClient, useWriteContract } from 'wagmi';
 import { CONTRACTS, getV2Contract } from '../../../lib/contract';
 import { useRedisPredictions } from '../../../lib/hooks/useRedisPredictions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
-import NotificationTest from './NotificationTest';
 
 interface Prediction {
   id: string | number;
@@ -578,8 +577,8 @@ export function AdminDashboard({
             </Select>
           </div>
         </div>
-        {/* Refresh Controls Row - Mobile Optimized */}
-        <div className="refresh-controls" style={{ 
+        {/* V2 Sync Controls - Mobile Optimized */}
+        <div className="v2-sync-controls" style={{ 
           display: 'flex', 
           gap: '8px', 
           flexWrap: 'wrap', 
@@ -606,34 +605,26 @@ export function AdminDashboard({
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
               transition: 'all 0.2s ease'
             }}
-            onMouseDown={(e) => {
-              e.currentTarget.style.transform = 'scale(0.95)';
-            }}
-            onMouseUp={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
           >
             🔄 Refresh
           </button>
+          
           <button 
             onClick={async () => {
-              if (confirm('🔄 SYNC ALL BLOCKCHAIN TO REDIS\n\nThis will sync ALL blockchain data to Redis. This may take a few minutes.\n\nContinue?')) {
+              if (confirm('🚀 V2 FULL SYNC\n\nThis will sync ALL V2 predictions and stakes from blockchain to Redis.\nThis may take a few minutes.\n\nContinue?')) {
                 try {
-                  alert('🔄 Starting full blockchain sync... This may take a few minutes.');
-                  const response = await fetch('/api/sync');
+                  alert('🚀 Starting V2 full sync... This may take a few minutes.');
+                  const response = await fetch('/api/sync/v2');
                   if (response.ok) {
                     const result = await response.json();
-                    alert(`✅ FULL SYNC COMPLETE!\n\nSynced: ${result.data.syncedCount} predictions\nStakes: ${result.data.totalStakesSynced}\nErrors: ${result.data.errorsCount}\n\nRefreshing data...`);
+                    alert(`✅ V2 FULL SYNC COMPLETE!\n\nSynced: ${result.data.syncedPredictions} predictions\nStakes: ${result.data.syncedStakes}\nErrors: ${result.data.errorsCount}\n\nRefreshing data...`);
                     handleRefresh();
                   } else {
-                    alert('❌ Full sync failed. Check console for details.');
+                    alert('❌ V2 full sync failed. Check console for details.');
                   }
                 } catch (error) {
-                  console.error('Full sync error:', error);
-                  alert('❌ Full sync failed. Check console for details.');
+                  console.error('V2 full sync error:', error);
+                  alert('❌ V2 full sync failed. Check console for details.');
                 }
               }
             }}
@@ -655,34 +646,26 @@ export function AdminDashboard({
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
               transition: 'all 0.2s ease'
             }}
-            onMouseDown={(e) => {
-              e.currentTarget.style.transform = 'scale(0.95)';
-            }}
-            onMouseUp={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
           >
-            🔄 Sync All
+            🚀 V2 Full Sync
           </button>
+          
           <button 
             onClick={async () => {
-              if (confirm('⚡ SYNC ACTIVE PREDICTIONS\n\nThis will sync only ACTIVE predictions from blockchain to Redis. Much faster!\n\nContinue?')) {
+              if (confirm('⚡ V2 ACTIVE SYNC\n\nThis will sync only ACTIVE V2 predictions from blockchain to Redis.\nMuch faster!\n\nContinue?')) {
                 try {
-                  alert('⚡ Starting active predictions sync...');
-                  const response = await fetch('/api/sync/active');
+                  alert('⚡ Starting V2 active predictions sync...');
+                  const response = await fetch('/api/sync/v2/active');
                   if (response.ok) {
                     const result = await response.json();
-                    alert(`✅ ACTIVE SYNC COMPLETE!\n\nSynced: ${result.data.syncedCount} active predictions\nErrors: ${result.data.errorsCount}\n\nRefreshing data...`);
+                    alert(`✅ V2 ACTIVE SYNC COMPLETE!\n\nSynced: ${result.data.activePredictions} active predictions\nStakes: ${result.data.syncedStakes}\nErrors: ${result.data.errorsCount}\n\nRefreshing data...`);
                     handleRefresh();
                   } else {
-                    alert('❌ Active sync failed. Check console for details.');
+                    alert('❌ V2 active sync failed. Check console for details.');
                   }
                 } catch (error) {
-                  console.error('Active sync error:', error);
-                  alert('❌ Active sync failed. Check console for details.');
+                  console.error('V2 active sync error:', error);
+                  alert('❌ V2 active sync failed. Check console for details.');
                 }
               }
             }}
@@ -704,195 +687,26 @@ export function AdminDashboard({
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
               transition: 'all 0.2s ease'
             }}
-            onMouseDown={(e) => {
-              e.currentTarget.style.transform = 'scale(0.95)';
-            }}
-            onMouseUp={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
           >
-            ⚡ Sync Active
+            ⚡ V2 Active Sync
           </button>
-          <button 
-        onClick={async () => {
-          if (confirm('💰 SYNC CLAIMS (OPTIMIZED)\n\nThis will sync claim status from blockchain to Redis for:\n• Only resolved predictions (ready to claim)\n• Only unclaimed stakes\n\nThis is much faster and uses less data!\n\nContinue?')) {
-            try {
-              alert('💰 Starting optimized claims sync...');
-              const response = await fetch('/api/sync/claims');
-              if (response.ok) {
-                const result = await response.json();
-                alert(`✅ OPTIMIZED CLAIMS SYNC COMPLETE!\n\nSynced: ${result.data.syncedCount} claims\nErrors: ${result.data.errorsCount}\n\nOnly processed ready-to-claim predictions!\n\nRefreshing data...`);
-                handleRefresh();
-              } else {
-                alert('❌ Claims sync failed. Check console for details.');
-              }
-            } catch (error) {
-              console.error('Claims sync error:', error);
-              alert('❌ Claims sync failed. Check console for details.');
-            }
-          }
-        }}
-            className="sync-btn mobile-sync-btn"
-            style={{
-              background: '#FF9800',
-              color: 'white',
-              border: 'none',
-              padding: '12px 16px',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '600',
-              margin: '2px',
-              whiteSpace: 'nowrap',
-              minHeight: '44px',
-              minWidth: '120px',
-              touchAction: 'manipulation',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              transition: 'all 0.2s ease'
-            }}
-            onMouseDown={(e) => {
-              e.currentTarget.style.transform = 'scale(0.95)';
-            }}
-            onMouseUp={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-          >
-            💰 Sync Claims
-          </button>
-          <button 
-            onClick={async (e) => {
-              const button = e.currentTarget;
-              if (button) {
-                button.style.transform = 'scale(0.95)';
-                setTimeout(() => {
-                  if (button) {
-                    button.style.transform = 'scale(1)';
-                  }
-                }, 150);
-              }
-              
-              if (confirm('🔄 SYNC RECENT RESOLVED\n\nThis will sync recently resolved predictions from blockchain to Redis:\n• Last 24 hours\n• V2 contract only\n• Creates/updates predictions in Redis\n• Syncs user stakes automatically\n\nContinue?')) {
-                try {
-                  alert('🔄 Starting recent resolved sync...');
-                  const response = await fetch('/api/sync/recent-resolved');
-                  if (response.ok) {
-                    const result = await response.json();
-                    alert(`✅ RECENT RESOLVED SYNC COMPLETE!\n\nSynced: ${result.data.syncedCount} predictions\nErrors: ${result.data.errorsCount}\n\nRefreshing data...`);
-                    handleRefresh();
-                  } else {
-                    alert('❌ Recent resolved sync failed. Check console for details.');
-                  }
-                } catch (error) {
-                  console.error('Recent resolved sync error:', error);
-                  alert('❌ Recent resolved sync failed. Check console for details.');
-                }
-              }
-            }}
-            onMouseDown={(e) => {
-              e.currentTarget.style.transform = 'scale(0.95)';
-            }}
-            onMouseUp={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-            className="btn btn-info"
-            style={{ 
-              margin: '5px',
-              padding: '8px 16px',
-              fontSize: '14px',
-              fontWeight: 'bold',
-              borderRadius: '8px',
-              border: 'none',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              backgroundColor: '#17a2b8',
-              color: 'white'
-            }}
-          >
-            🔄 Sync Recent Resolved
-          </button>
-          <button 
-            onClick={async (e) => {
-              const button = e.currentTarget;
-              if (button) {
-                button.style.transform = 'scale(0.95)';
-                setTimeout(() => {
-                  if (button) {
-                    button.style.transform = 'scale(1)';
-                  }
-                }, 150);
-              }
-              
-              if (confirm('🔍 SYNC MISSING PREDICTIONS\n\nThis will sync predictions that exist on blockchain but not in Redis:\n• Checks all predictions\n• Only syncs missing ones\n• V2 contract only\n• Creates predictions in Redis\n• Syncs user stakes for resolved predictions\n\nContinue?')) {
-                try {
-                  alert('🔍 Starting missing predictions sync...');
-                  const response = await fetch('/api/sync/missing-predictions');
-                  if (response.ok) {
-                    const result = await response.json();
-                    alert(`✅ MISSING PREDICTIONS SYNC COMPLETE!\n\nSynced: ${result.data.syncedCount} predictions\nMissing found: ${result.data.missingFound}\nErrors: ${result.data.errorsCount}\n\nRefreshing data...`);
-                    handleRefresh();
-                  } else {
-                    alert('❌ Missing predictions sync failed. Check console for details.');
-                  }
-                } catch (error) {
-                  console.error('Missing predictions sync error:', error);
-                  alert('❌ Missing predictions sync failed. Check console for details.');
-                }
-              }
-            }}
-            onMouseDown={(e) => {
-              e.currentTarget.style.transform = 'scale(0.95)';
-            }}
-            onMouseUp={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-            className="btn btn-info"
-            style={{ 
-              margin: '5px',
-              padding: '8px 16px',
-              fontSize: '14px',
-              fontWeight: 'bold',
-              borderRadius: '8px',
-              border: 'none',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              backgroundColor: '#17a2b8',
-              color: 'white',
-              minHeight: '44px',
-              minWidth: '120px',
-              touchAction: 'manipulation',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-            }}
-          >
-            🔍 Sync Missing
-          </button>
+          
           <button 
             onClick={async () => {
-              if (confirm('🆕 SYNC RECENT PREDICTIONS\n\nThis will sync only predictions from last 24 hours. Perfect for new predictions!\n\nContinue?')) {
+              if (confirm('💰 V2 RESOLVED SYNC\n\nThis will sync only RESOLVED V2 predictions and their stakes.\nPerfect for ready-to-claim data!\n\nContinue?')) {
                 try {
-                  alert('🆕 Starting recent predictions sync...');
-                  const response = await fetch('/api/sync/recent');
+                  alert('💰 Starting V2 resolved predictions sync...');
+                  const response = await fetch('/api/sync/v2/resolved');
                   if (response.ok) {
                     const result = await response.json();
-                    alert(`✅ RECENT SYNC COMPLETE!\n\nSynced: ${result.data.syncedCount} recent predictions\nSkipped: ${result.data.skippedCount} old predictions\nErrors: ${result.data.errorsCount}\n\nRefreshing data...`);
+                    alert(`✅ V2 RESOLVED SYNC COMPLETE!\n\nSynced: ${result.data.resolvedPredictions} resolved predictions\nStakes: ${result.data.syncedStakes}\nErrors: ${result.data.errorsCount}\n\nRefreshing data...`);
                     handleRefresh();
                   } else {
-                    alert('❌ Recent sync failed. Check console for details.');
+                    alert('❌ V2 resolved sync failed. Check console for details.');
                   }
                 } catch (error) {
-                  console.error('Recent sync error:', error);
-                  alert('❌ Recent sync failed. Check console for details.');
+                  console.error('V2 resolved sync error:', error);
+                  alert('❌ V2 resolved sync failed. Check console for details.');
                 }
               }
             }}
@@ -914,23 +728,54 @@ export function AdminDashboard({
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
               transition: 'all 0.2s ease'
             }}
-            onMouseDown={(e) => {
-              e.currentTarget.style.transform = 'scale(0.95)';
+          >
+            💰 V2 Resolved Sync
+          </button>
+          
+          <button 
+            onClick={async () => {
+              if (confirm('🔍 V2 CLAIMS SYNC\n\nThis will sync claim status for all resolved V2 predictions.\nUpdates ready-to-claim status!\n\nContinue?')) {
+                try {
+                  alert('🔍 Starting V2 claims sync...');
+                  const response = await fetch('/api/sync/v2/claims');
+                  if (response.ok) {
+                    const result = await response.json();
+                    alert(`✅ V2 CLAIMS SYNC COMPLETE!\n\nSynced: ${result.data.syncedClaims} claim statuses\nErrors: ${result.data.errorsCount}\n\nRefreshing data...`);
+                    handleRefresh();
+                  } else {
+                    alert('❌ V2 claims sync failed. Check console for details.');
+                  }
+                } catch (error) {
+                  console.error('V2 claims sync error:', error);
+                  alert('❌ V2 claims sync failed. Check console for details.');
+                }
+              }
             }}
-            onMouseUp={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
+            className="sync-btn mobile-sync-btn"
+            style={{
+              background: '#9C27B0',
+              color: 'white',
+              border: 'none',
+              padding: '12px 16px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '600',
+              margin: '2px',
+              whiteSpace: 'nowrap',
+              minHeight: '44px',
+              minWidth: '120px',
+              touchAction: 'manipulation',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s ease'
             }}
           >
-            🆕 Sync Recent
+            🔍 V2 Claims Sync
           </button>
+          
         </div>
       </div>
 
-      {/* Notification Test Component */}
-      <NotificationTest />
 
       {/* Stats Table - Vertical Layout for Miniapp */}
       <div className="stats-table" style={{ 

@@ -44,6 +44,7 @@ export interface RedisUserStake {
   contractVersion?: 'V1' | 'V2'; // Contract version for hybrid migration
   isWinner?: boolean; // V2 only
   tokenType?: 'ETH' | 'SWIPE'; // Token type for V2 multi-token support
+  canClaim?: boolean; // Calculated property - whether stake is ready to claim
 }
 
 // User transaction interface

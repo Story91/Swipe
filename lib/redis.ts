@@ -204,7 +204,7 @@ export const redisHelpers = {
     }
   },
 
-  // Get user stakes for a prediction
+  // Get user stakes for a prediction (supports both single and multi-token format)
   async getUserStakes(predictionId: string): Promise<RedisUserStake[]> {
     try {
       // This is a simplified approach - in production you might want to use a different pattern
@@ -219,7 +219,38 @@ export const redisHelpers = {
         if (data) {
           const stake = typeof data === 'string' ? JSON.parse(data) : data;
           console.log(`🔍 Found stake:`, stake);
-          stakes.push(stake);
+          
+          // Check if this is a multi-token stake (V2) or single stake (V1)
+          if (stake.ETH || stake.SWIPE) {
+            // Multi-token stake - convert to array format
+            if (stake.ETH) {
+              stakes.push({
+                user: stake.user,
+                predictionId: stake.predictionId,
+                yesAmount: stake.ETH.yesAmount,
+                noAmount: stake.ETH.noAmount,
+                claimed: stake.ETH.claimed,
+                stakedAt: stake.stakedAt,
+                contractVersion: stake.contractVersion,
+                tokenType: 'ETH'
+              });
+            }
+            if (stake.SWIPE) {
+              stakes.push({
+                user: stake.user,
+                predictionId: stake.predictionId,
+                yesAmount: stake.SWIPE.yesAmount,
+                noAmount: stake.SWIPE.noAmount,
+                claimed: stake.SWIPE.claimed,
+                stakedAt: stake.stakedAt,
+                contractVersion: stake.contractVersion,
+                tokenType: 'SWIPE'
+              });
+            }
+          } else {
+            // Single stake (V1)
+            stakes.push(stake as RedisUserStake);
+          }
         }
       }
       

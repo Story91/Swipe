@@ -41,6 +41,18 @@ export async function GET(request: NextRequest) {
       predictions = await redisHelpers.getAllPredictions();
     }
     
+    // Debug: Log all prediction IDs
+    console.log(`📊 API returning ${predictions.length} predictions:`, predictions.map(p => p.id));
+    
+    // Check for specific predictions 17, 18, 19
+    const targetIds = ['pred_17', 'pred_18', 'pred_19', 'pred_v2_17', 'pred_v2_18', 'pred_v2_19'];
+    const foundTargets = predictions.filter(p => targetIds.includes(p.id));
+    if (foundTargets.length > 0) {
+      console.log(`🎯 Found target predictions:`, foundTargets.map(p => ({ id: p.id, question: p.question, resolved: p.resolved })));
+    } else {
+      console.log(`❌ Target predictions 17, 18, 19 not found in Redis`);
+    }
+    
     return NextResponse.json({
       success: true,
       data: predictions,

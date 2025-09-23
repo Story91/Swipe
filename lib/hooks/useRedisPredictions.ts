@@ -40,6 +40,8 @@ export function useRedisPredictions() {
       const result = await response.json();
       
       if (result.success) {
+        console.log(`📊 Loaded ${result.data.length} predictions from Redis API`);
+        console.log(`📊 Prediction IDs:`, result.data.map((p: any) => p.id));
         setPredictions(result.data);
       } else {
         throw new Error(result.error || 'Failed to fetch predictions');
@@ -296,10 +298,10 @@ export function useRedisPredictions() {
     ]);
   }, [fetchPredictions, fetchMarketStats]);
 
-  // Initial data fetch only on mount
+  // Initial data fetch only - no auto-refresh
   useEffect(() => {
     refreshData();
-  }, []); // Only on mount - no auto-refresh
+  }, []); // Only on mount
 
   return {
     // State

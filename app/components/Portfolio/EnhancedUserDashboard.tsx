@@ -4,24 +4,53 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { CONTRACTS, getV1Contract, getV2Contract, getContractForPrediction } from '../../../lib/contract';
 import { ethers } from 'ethers';
-import { useRedisPredictions } from '../../../lib/hooks/useRedisPredictions';
+import { useHybridPredictions } from '../../../lib/hooks/useHybridPredictions';
 import { RedisPrediction, RedisUserStake, UserTransaction } from '../../../lib/types/redis';
 import { generateBasescanUrl, generateTransactionId } from '../../../lib/utils/redis-utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LegacyCard } from './LegacyCard';
 import './EnhancedUserDashboard.css';
 
-interface PredictionWithStakes extends RedisPrediction {
+interface PredictionWithStakes {
+  // Core data
+  id: string;
+  question: string;
+  description: string;
+  category: string;
+  imageUrl: string;
+  deadline: number;
+  creator: string;
+  verified: boolean;
+  needsApproval: boolean;
+  resolved: boolean;
+  outcome?: boolean;
+  cancelled: boolean;
+  yesTotalAmount: number;
+  noTotalAmount: number;
+  swipeYesTotalAmount: number;
+  swipeNoTotalAmount: number;
+  totalStakes: number;
+  
+  // Enhanced data
+  includeChart?: boolean;
+  selectedCrypto?: string;
+  endDate?: string;
+  endTime?: string;
+  participants: string[];
+  createdAt: number;
+  approved: boolean;
+  
+  // User stakes
   userStakes?: {
     ETH?: {
-    predictionId: string;
-    yesAmount: number;
-    noAmount: number;
-    claimed: boolean;
-    potentialPayout: number;
-    potentialProfit: number;
-    canClaim: boolean;
-    isWinner: boolean;
+      predictionId: string;
+      yesAmount: number;
+      noAmount: number;
+      claimed: boolean;
+      potentialPayout: number;
+      potentialProfit: number;
+      canClaim: boolean;
+      isWinner: boolean;
     };
     SWIPE?: {
       predictionId: string;
@@ -132,7 +161,7 @@ export function EnhancedUserDashboard() {
     }
   };
 
-  const loadFromCache = (key: string, maxAge: number = 5 * 60 * 1000) => { // 5 minutes default
+  const loadFromCache = (key: string, maxAge: number = 30 * 1000) => { // 30 seconds default (reduced from 5 minutes)
     try {
       const cached = localStorage.getItem(`dexter_cache_${key}`);
       if (!cached) return null;
@@ -206,8 +235,8 @@ export function EnhancedUserDashboard() {
     setShowModal(false);
   };
   
-  // Redis predictions hook
-  const { predictions: allPredictions, loading: predictionsLoading, error: predictionsError } = useRedisPredictions();
+  // Hybrid predictions hook (includes both Redis and blockchain data)
+  const { predictions: allPredictions, loading: predictionsLoading, error: predictionsError, refresh: refreshPredictions } = useHybridPredictions();
 
   // Fetch user transactions with cache
   const fetchUserTransactions = useCallback(async (forceRefresh: boolean = false) => {
@@ -250,7 +279,7 @@ export function EnhancedUserDashboard() {
     
     // Try to load from cache first (unless force refresh)
     if (!forceRefresh) {
-      const cachedData = loadFromCache(`user_predictions_${address.toLowerCase()}`, 30 * 1000); // 30 seconds cache
+      const cachedData = loadFromCache(`user_predictions_${address.toLowerCase()}`, 10 * 1000); // 10 seconds cache (reduced from 30)
       if (cachedData) {
         console.log('📦 Using cached user predictions');
         setUserPredictions(cachedData);
@@ -318,7 +347,25 @@ export function EnhancedUserDashboard() {
       
       // Log all resolved predictions
       const resolvedPredictions = filteredPredictions.filter(p => p.resolved);
-      console.log(`📊 Found ${resolvedPredictions.length} resolved predictions:`, resolvedPredictions.map(p => ({ id: p.id, resolved: p.resolved, outcome: p.outcome })));
+      console.log(`📊 Found ${resolvedPredictions.length} resolved predictions:`, resolvedPredictions.map(p => ({ 
+        id: p.id, 
+        resolved: p.resolved, 
+        outcome: p.outcome,
+        question: p.question,
+        deadline: p.deadline,
+        createdAt: p.createdAt
+      })));
+      
+      // Log recent predictions (last 24 hours)
+      const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
+      const recentPredictions = resolvedPredictions.filter(p => 
+        p.deadline && (p.deadline * 1000) > oneDayAgo
+      );
+      console.log(`🆕 Recent resolved predictions (24h): ${recentPredictions.length}`, recentPredictions.map(p => ({ 
+        id: p.id, 
+        question: p.question,
+        deadline: new Date(p.deadline * 1000).toLocaleString()
+      })));
       
       for (const prediction of filteredPredictions) {
         try {
@@ -335,6 +382,7 @@ export function EnhancedUserDashboard() {
             // Check if user has stakes in this V1 prediction
             const stakeInfo = await fetch(`/api/stakes?predictionId=${prediction.id}&userId=${address.toLowerCase()}`);
             const stakeData = await stakeInfo.json();
+            
             
             let userStakes = {};
             
@@ -369,7 +417,7 @@ export function EnhancedUserDashboard() {
                   const userStakeAmount = userStake.yesAmount + userStake.noAmount;
 
                   // Calculate payout for resolved predictions
-                  if (prediction.resolved && !userStake.claimed) {
+                  if (prediction.resolved) {
                     const winnersPool = prediction.outcome ? prediction.yesTotalAmount : prediction.noTotalAmount;
                     const losersPool = prediction.outcome ? prediction.noTotalAmount : prediction.yesTotalAmount;
                     const platformFee = losersPool * 0.01; // 1% platform fee
@@ -380,25 +428,26 @@ export function EnhancedUserDashboard() {
                       isWinner = true;
                       potentialPayout = userStake.yesAmount + (userStake.yesAmount / winnersPool) * netLosersPool;
                       potentialProfit = potentialPayout - userStake.yesAmount;
-                      canClaim = true;
+                      canClaim = !userStake.claimed; // Can claim if not already claimed
                     } else if (!prediction.outcome && userStakedNo) {
                       // User bet NO and won
                       isWinner = true;
                       potentialPayout = userStake.noAmount + (userStake.noAmount / winnersPool) * netLosersPool;
                       potentialProfit = potentialPayout - userStake.noAmount;
-                      canClaim = true;
+                      canClaim = !userStake.claimed; // Can claim if not already claimed
                     } else {
                       // User lost - they staked on the losing side
                       isWinner = false;
                       potentialPayout = 0;
                       potentialProfit = -(userStakedYes ? userStake.yesAmount : userStake.noAmount);
-                      canClaim = false;
+                      canClaim = false; // Cannot claim if lost
                     }
-                  } else if (prediction.cancelled && !userStake.claimed) {
+                  } else if (prediction.cancelled) {
                     // Full refund for cancelled predictions
                     potentialPayout = userStakedYes ? userStake.yesAmount : userStake.noAmount;
                     potentialProfit = 0;
-                    canClaim = true;
+                    canClaim = !userStake.claimed; // Can claim refund if not already claimed
+                    isWinner = false; // Cancelled is not a win
                   } else if (!prediction.resolved && !prediction.cancelled && prediction.deadline > Date.now() / 1000) {
                     // Active prediction - calculate potential payout based on current pool
                     const yesPool = prediction.yesTotalAmount || 0;
@@ -422,32 +471,13 @@ export function EnhancedUserDashboard() {
                       }
                     }
                     canClaim = false; // Can't claim until resolved
-                  } else if (prediction.resolved && userStake.claimed) {
-                    // Already claimed - show as claimed with calculated payout
-                    const winnersPool = prediction.outcome ? prediction.yesTotalAmount : prediction.noTotalAmount;
-                    const losersPool = prediction.outcome ? prediction.noTotalAmount : prediction.yesTotalAmount;
-                    const platformFee = losersPool * 0.01; // 1% platform fee
-                    const netLosersPool = losersPool - platformFee;
-
-                    if (prediction.outcome && userStakedYes) {
-                      // User bet YES and won
-                      isWinner = true;
-                      potentialPayout = userStake.yesAmount + (userStake.yesAmount / winnersPool) * netLosersPool;
-                      potentialProfit = potentialPayout - userStake.yesAmount;
-                      canClaim = false; // Already claimed
-                    } else if (!prediction.outcome && userStakedNo) {
-                      // User bet NO and won
-                      isWinner = true;
-                      potentialPayout = userStake.noAmount + (userStake.noAmount / winnersPool) * netLosersPool;
-                      potentialProfit = potentialPayout - userStake.noAmount;
-                      canClaim = false; // Already claimed
-                    } else {
-                      // User lost
-                      isWinner = false;
-                      potentialPayout = 0;
-                      potentialProfit = -(userStakedYes ? userStake.yesAmount : userStake.noAmount);
-                      canClaim = false;
-                    }
+                    isWinner = false; // No winner yet
+                  } else {
+                    // Expired but not resolved - no payout
+                    potentialPayout = 0;
+                    potentialProfit = -(userStakedYes ? userStake.yesAmount : userStake.noAmount);
+                    canClaim = false;
+                    isWinner = false;
                   }
 
                   userStakes = {
@@ -475,6 +505,7 @@ export function EnhancedUserDashboard() {
                      prediction.deadline <= Date.now() / 1000 ? 'expired' : 'active'
             };
 
+
             userPredictionsWithStakes.push(predictionWithStakes);
             continue; // Skip V2 processing for V1 predictions
           }
@@ -483,6 +514,7 @@ export function EnhancedUserDashboard() {
           console.log(`🔍 Fetching stake for V2 prediction ${prediction.id} and user ${address.toLowerCase()}`);
           const stakeInfo = await fetch(`/api/stakes?predictionId=${prediction.id}&userId=${address.toLowerCase()}`);
           const stakeData = await stakeInfo.json();
+          
           
           console.log(`🔍 API response for prediction ${prediction.id}:`, stakeData);
           console.log(`🔍 Prediction ${prediction.id} resolved status:`, prediction.resolved);
@@ -513,7 +545,7 @@ export function EnhancedUserDashboard() {
               const noPool = isSwipeStake ? (prediction.swipeNoTotalAmount || 0) : (prediction.noTotalAmount || 0);
 
               // Calculate payout for resolved predictions
-              if (prediction.resolved && !userStake.claimed) {
+              if (prediction.resolved) {
                 const winnersPool = prediction.outcome ? yesPool : noPool;
                 const losersPool = prediction.outcome ? noPool : yesPool;
                 const platformFee = losersPool * 0.01; // 1% platform fee
@@ -524,25 +556,26 @@ export function EnhancedUserDashboard() {
                   isWinner = true;
                   potentialPayout = userStakeAmount + (userStake.yesAmount / winnersPool) * netLosersPool;
                   potentialProfit = potentialPayout - userStakeAmount;
-                  canClaim = true;
+                  canClaim = !userStake.claimed; // Can claim if not already claimed
                 } else if (!prediction.outcome && userStake.noAmount > 0) {
                   // User bet NO and won
                   isWinner = true;
                   potentialPayout = userStakeAmount + (userStake.noAmount / winnersPool) * netLosersPool;
                   potentialProfit = potentialPayout - userStakeAmount;
-                  canClaim = true;
+                  canClaim = !userStake.claimed; // Can claim if not already claimed
                 } else {
                   // User lost
                   isWinner = false;
                   potentialPayout = 0;
                   potentialProfit = -userStakeAmount;
-                  canClaim = false;
+                  canClaim = false; // Cannot claim if lost
                 }
-              } else if (prediction.cancelled && !userStake.claimed) {
+              } else if (prediction.cancelled) {
                 // Full refund for cancelled predictions
                 potentialPayout = userStakeAmount;
                 potentialProfit = 0;
-                canClaim = true;
+                canClaim = !userStake.claimed; // Can claim refund if not already claimed
+                isWinner = false; // Cancelled is not a win
               } else if (!prediction.resolved && !prediction.cancelled && prediction.deadline > Date.now() / 1000) {
                 // Active prediction - calculate potential payout based on current pool
                 
@@ -564,32 +597,13 @@ export function EnhancedUserDashboard() {
                   }
                 }
                 canClaim = false; // Can't claim until resolved
-              } else if (prediction.resolved && userStake.claimed) {
-                // Already claimed - show as claimed with calculated payout
-                const winnersPool = prediction.outcome ? yesPool : noPool;
-                const losersPool = prediction.outcome ? noPool : yesPool;
-                const platformFee = losersPool * 0.01; // 1% platform fee
-                const netLosersPool = losersPool - platformFee;
-
-                if (prediction.outcome && userStake.yesAmount > 0) {
-                  // User bet YES and won
-                  isWinner = true;
-                  potentialPayout = userStakeAmount + (userStake.yesAmount / winnersPool) * netLosersPool;
-                  potentialProfit = potentialPayout - userStakeAmount;
-                  canClaim = false; // Already claimed
-                } else if (!prediction.outcome && userStake.noAmount > 0) {
-                  // User bet NO and won
-                  isWinner = true;
-                  potentialPayout = userStakeAmount + (userStake.noAmount / winnersPool) * netLosersPool;
-                  potentialProfit = potentialPayout - userStakeAmount;
-                  canClaim = false; // Already claimed
-                } else {
-                  // User lost
-                  isWinner = false;
-                  potentialPayout = 0;
-                  potentialProfit = -userStakeAmount;
-                  canClaim = false;
-                }
+                isWinner = false; // No winner yet
+              } else {
+                // Expired but not resolved - no payout
+                potentialPayout = 0;
+                potentialProfit = -userStakeAmount;
+                canClaim = false;
+                isWinner = false;
               }
 
                 stakesByToken[tokenType] = {
@@ -618,7 +632,9 @@ export function EnhancedUserDashboard() {
                        prediction.deadline <= Date.now() / 1000 ? 'expired' : 'active'
               };
 
+
               userPredictionsWithStakes.push(predictionWithStakes);
+            } else {
             }
           }
         } catch (error) {
@@ -776,28 +792,31 @@ export function EnhancedUserDashboard() {
     }
   }, [allPredictions, address, calculateStats]);
   
-  // Auto-refresh every 30 seconds to get latest data (without sync to keep it fast)
-  useEffect(() => {
-    if (!address) return;
-    
-    const interval = setInterval(() => {
-      console.log('🔄 Auto-refreshing user data...');
-      fetchUserStakes(true, selectedFilter); // Just refresh, don't sync
-    }, 30000); // 30 seconds
-    
-    return () => clearInterval(interval);
-  }, [address, fetchUserStakes, selectedFilter]);
+  // No auto-refresh - only manual refresh when needed
+  // useEffect(() => {
+  //   if (!address) return;
+  //   
+  //   const interval = setInterval(() => {
+  //     console.log('🔄 Auto-refreshing user data...');
+  //     fetchUserStakes(true, selectedFilter); // Force refresh to get latest data
+  //   }, 60000); // 1 minute
+  //   
+  //   return () => clearInterval(interval);
+  // }, [address, fetchUserStakes, selectedFilter]);
   
   // Handle filter change with lazy loading
   const handleFilterChange = useCallback(async (newFilter: string) => {
     console.log(`🔄 Filter changed from ${selectedFilter} to ${newFilter}`);
     setSelectedFilter(newFilter);
     
+    // Clear cache to ensure fresh data
+    clearCache();
+    
     // Clear current predictions and load new ones with lazy loading
     setUserPredictions([]);
     setLoadingStakes(true);
     
-    // Load predictions for the new filter
+    // Load predictions for the new filter with force refresh
     await fetchUserStakes(true, newFilter);
   }, [selectedFilter, fetchUserStakes]);
 
@@ -805,6 +824,33 @@ export function EnhancedUserDashboard() {
   const handleClaimReward = async (predictionId: string, tokenType?: 'ETH' | 'SWIPE') => {
     if (!address) {
       alert('❌ Please connect your wallet first');
+      return;
+    }
+
+    // Validate that this prediction can actually be claimed
+    const prediction = userPredictions.find(p => p.id === predictionId);
+    if (!prediction) {
+      alert('❌ Prediction not found');
+      return;
+    }
+
+    const stake = prediction.userStakes?.[tokenType || 'ETH'];
+    if (!stake) {
+      alert('❌ No stake found for this prediction');
+      return;
+    }
+
+    // Check if already claimed
+    const stakeKey = `${predictionId}-${tokenType || 'ETH'}`;
+    const isLocallyClaimed = claimedStakes.has(stakeKey);
+    if (stake.claimed || isLocallyClaimed) {
+      alert('❌ This reward has already been claimed');
+      return;
+    }
+
+    // Check if can claim
+    if (!stake.canClaim) {
+      alert('❌ Cannot claim this reward - you lost this prediction');
       return;
     }
 
@@ -832,13 +878,6 @@ export function EnhancedUserDashboard() {
         }
 
         console.log(`🎯 Attempting to claim reward for prediction ${numericId}...`);
-
-        // Find prediction details for transaction record
-        const prediction = allPredictions.find(p => p.id === predictionId);
-        if (!prediction) {
-          alert('❌ Prediction not found');
-          return;
-        }
 
         // Determine which contract to use based on prediction ID
         const isV1 = predictionId.startsWith('pred_v1_');
@@ -1151,6 +1190,7 @@ export function EnhancedUserDashboard() {
   const getFilteredPredictions = () => {
     switch (selectedFilter) {
       case 'ready-to-claim':
+        // Show only predictions that can be claimed (won + not claimed)
         return userPredictions.filter(p => {
           const ethStake = p.userStakes?.ETH;
           const swipeStake = p.userStakes?.SWIPE;
@@ -1159,22 +1199,53 @@ export function EnhancedUserDashboard() {
           const ethClaimed = claimedStakes.has(`${p.id}-ETH`) || ethStake?.claimed;
           const swipeClaimed = claimedStakes.has(`${p.id}-SWIPE`) || swipeStake?.claimed;
           
-          return (ethStake?.canClaim && !ethClaimed) || (swipeStake?.canClaim && !swipeClaimed);
+          // Must be resolved, user must have won, and not already claimed
+          const ethCanClaim = ethStake && ethStake.isWinner && ethStake.canClaim && !ethClaimed;
+          const swipeCanClaim = swipeStake && swipeStake.isWinner && swipeStake.canClaim && !swipeClaimed;
+          
+          return ethCanClaim || swipeCanClaim;
         });
       case 'active':
-        return activePredictions;
+        // Show all active predictions from allPredictions (not just user predictions)
+        return allPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline > Date.now() / 1000);
       case 'won':
-        return wonPredictions;
+        // Show only predictions where user won (regardless of claimed status)
+        return allPredictions.filter(p => {
+          // Check if user has stakes in this prediction
+          const userPrediction = userPredictions.find(up => up.id === p.id);
+          if (!userPrediction) return false;
+          
+          const ethStake = userPrediction.userStakes?.ETH;
+          const swipeStake = userPrediction.userStakes?.SWIPE;
+          return (ethStake?.isWinner) || (swipeStake?.isWinner);
+        });
       case 'lost':
-        return lostPredictions;
+        // Show only predictions where user lost
+        return allPredictions.filter(p => {
+          // Check if user has stakes in this prediction
+          const userPrediction = userPredictions.find(up => up.id === p.id);
+          if (!userPrediction) return false;
+          
+          const ethStake = userPrediction.userStakes?.ETH;
+          const swipeStake = userPrediction.userStakes?.SWIPE;
+          return (ethStake && !ethStake.isWinner && p.status === 'resolved') || 
+                 (swipeStake && !swipeStake.isWinner && p.status === 'resolved');
+        });
       case 'expired':
-        return expiredPredictions;
+        // Show all expired predictions (deadline passed but not resolved)
+        return allPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline <= Date.now() / 1000);
       case 'cancelled':
-        return cancelledPredictions;
+        // Show all cancelled predictions
+        return allPredictions.filter(p => p.cancelled);
       case 'claimed':
-        return resolvedPredictions.filter(p => {
-          const ethStake = p.userStakes?.ETH;
-          const swipeStake = p.userStakes?.SWIPE;
+        // Show only predictions that have been claimed
+        return allPredictions.filter(p => {
+          // Check if user has stakes in this prediction
+          const userPrediction = userPredictions.find(up => up.id === p.id);
+          if (!userPrediction) return false;
+          
+          const ethStake = userPrediction.userStakes?.ETH;
+          const swipeStake = userPrediction.userStakes?.SWIPE;
           
           // Check local claimed state first
           const ethClaimed = claimedStakes.has(`${p.id}-ETH`) || ethStake?.claimed;
@@ -1183,8 +1254,10 @@ export function EnhancedUserDashboard() {
           return ethClaimed || swipeClaimed;
         });
       case 'all':
-        return userPredictions;
+        // Show all predictions (both user predictions and all predictions)
+        return allPredictions;
       default:
+        // Default to ready-to-claim
         return userPredictions.filter(p => {
           const ethStake = p.userStakes?.ETH;
           const swipeStake = p.userStakes?.SWIPE;
@@ -1193,7 +1266,10 @@ export function EnhancedUserDashboard() {
           const ethClaimed = claimedStakes.has(`${p.id}-ETH`) || ethStake?.claimed;
           const swipeClaimed = claimedStakes.has(`${p.id}-SWIPE`) || swipeStake?.claimed;
           
-          return (ethStake?.canClaim && !ethClaimed) || (swipeStake?.canClaim && !swipeClaimed);
+          const ethCanClaim = ethStake && ethStake.isWinner && ethStake.canClaim && !ethClaimed;
+          const swipeCanClaim = swipeStake && swipeStake.isWinner && swipeStake.canClaim && !swipeClaimed;
+          
+          return ethCanClaim || swipeCanClaim;
         });
     }
   };
@@ -1241,7 +1317,11 @@ export function EnhancedUserDashboard() {
     const ethClaimed = claimedStakes.has(`${p.id}-ETH`) || ethStake?.claimed;
     const swipeClaimed = claimedStakes.has(`${p.id}-SWIPE`) || swipeStake?.claimed;
     
-    return (ethStake?.canClaim && !ethClaimed) || (swipeStake?.canClaim && !swipeClaimed);
+    // Must be resolved, user must have won, and not already claimed
+    const ethCanClaim = ethStake && ethStake.isWinner && ethStake.canClaim && !ethClaimed;
+    const swipeCanClaim = swipeStake && swipeStake.isWinner && swipeStake.canClaim && !swipeClaimed;
+    
+    return ethCanClaim || swipeCanClaim;
   }).length;
 
   if (!address) {
@@ -1526,16 +1606,6 @@ export function EnhancedUserDashboard() {
                     >
                       🔗 View on Basescan
                     </a>
-                    <button 
-                      onClick={() => {
-                        fetchUserStakes(true); // Force refresh
-                        fetchUserTransactions(true); // Force refresh
-                        closeModal();
-                      }}
-                      className="refresh-btn"
-                    >
-                      🔄 Refresh Dashboard
-                    </button>
                   </div>
                 </>
               )}

@@ -109,12 +109,13 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
     args: [SWIPE_TOKEN.address as `0x${string}`]
   });
 
-  const { data: isApprovedCreator } = useReadContract({
-    address: CONTRACTS.V2.address as `0x${string}`,
-    abi: CONTRACTS.V2.abi,
-    functionName: 'approvedCreators',
-    args: address ? [address] : undefined,
-  });
+  // Check if user is an approved creator via environment variables
+  const approver1 = process.env.NEXT_PUBLIC_APPROVER_1?.toLowerCase();
+  const approver2 = process.env.NEXT_PUBLIC_APPROVER_2?.toLowerCase();
+  const isApprovedCreator = address && (
+    approver1 === address.toLowerCase() || 
+    approver2 === address.toLowerCase()
+  );
 
   const { data: contractOwner } = useReadContract({
     address: CONTRACTS.V2.address as `0x${string}`,
