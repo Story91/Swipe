@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
                     claimed: stake.ETH.claimed,
                     stakedAt: stake.stakedAt,
                     contractVersion: stake.contractVersion,
-                    tokenType: 'ETH'
+                    tokenType: 'ETH' as const
                   });
                 }
                 if (stake.SWIPE) {
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
                     claimed: stake.SWIPE.claimed,
                     stakedAt: stake.stakedAt,
                     contractVersion: stake.contractVersion,
-                    tokenType: 'SWIPE'
+                    tokenType: 'SWIPE' as const
                   });
                 }
                 return multiStakes;
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
                   claimed: stake.claimed || false,
                   stakedAt: stake.stakedAt,
                   contractVersion: stake.contractVersion || 'V1',
-                  tokenType: 'ETH' // V1 stakes are always ETH
+                  tokenType: 'ETH' as const // V1 stakes are always ETH
                 }];
               }
             }
@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
                 claimed: stake.ETH.claimed,
                 stakedAt: stake.stakedAt,
                 contractVersion: stake.contractVersion,
-                tokenType: 'ETH'
+                tokenType: 'ETH' as const
               });
             }
             if (stake.SWIPE) {
@@ -137,7 +137,7 @@ export async function GET(request: NextRequest) {
                 claimed: stake.SWIPE.claimed,
                 stakedAt: stake.stakedAt,
                 contractVersion: stake.contractVersion,
-                tokenType: 'SWIPE'
+                tokenType: 'SWIPE' as const
               });
             }
             stakes = multiStakes;
