@@ -129,8 +129,17 @@ body::before {
 /* Mini App Specific - Limit card height to prevent internal scroll */
 @media (max-width: 600px) {
   .tinder-container {
-    height: 60vh !important;
-    max-height: 60vh !important;
+    height: 75vh !important;
+    max-height: 75vh !important;
+    overflow-y: hidden !important;
+  }
+}
+
+/* Najmniejsze urządzenia - jeszcze więcej miejsca */
+@media (max-width: 480px) {
+  .tinder-container {
+    height: 70vh !important;
+    max-height: 70vh !important;
     overflow-y: hidden !important;
   }
 }
