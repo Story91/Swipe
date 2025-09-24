@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef, forwardRef, useImperativeHandle } from 'react';
 import TinderCard from 'react-tinder-card';
-import { useAccount, useWriteContract, useReadContract } from "wagmi";
+import { useAccount, useWriteContract, useReadContract, useWaitForTransactionReceipt } from "wagmi";
 import { ethers } from 'ethers';
 import { CONTRACTS, SWIPE_TOKEN, getV2Contract, getContractForAction } from '../../../lib/contract';
 import { useViewProfile, useComposeCast, useMiniKit } from '@coinbase/onchainkit/minikit';
@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useFarcasterProfiles } from '../../../lib/hooks/useFarcasterProfiles';
 import SharePredictionButton from '../Actions/SharePredictionButton';
 import { notifyPredictionShared, notifyStakeSuccess } from '../../../lib/notification-helpers';
+import { generateTransactionId, generateBasescanUrl } from '../../../lib/utils/redis-utils';
 
 interface PredictionData {
   id: number;
@@ -116,10 +117,23 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   // Show share prompt after successful stake
   const [showSharePrompt, setShowSharePrompt] = useState(false);
   const [lastStakedPrediction, setLastStakedPrediction] = useState<PredictionData | null>(null);
+  
+  // State for tracking stake transactions
+  const [stakeTransactionHash, setStakeTransactionHash] = useState<`0x${string}` | null>(null);
+  const [stakePredictionId, setStakePredictionId] = useState<number | null>(null);
+  const [stakeAmount, setStakeAmount] = useState<number | null>(null);
+  const [stakeToken, setStakeToken] = useState<'ETH' | 'SWIPE' | null>(null);
+  const [stakeIsYes, setStakeIsYes] = useState<boolean | null>(null);
+  
   const { address } = useAccount();
   const { writeContract } = useWriteContract();
   const { composeCast } = useComposeCast();
   const { context } = useMiniKit();
+  
+  // Wait for stake transaction confirmation
+  const { isLoading: isStakeConfirming, isSuccess: isStakeConfirmed } = useWaitForTransactionReceipt({
+    hash: stakeTransactionHash || undefined,
+  });
   
   // Check SWIPE allowance for user
   const { data: swipeAllowance, refetch: refetchAllowance } = useReadContract({
@@ -175,6 +189,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
 
   // No auto-refresh interval - only refresh on mount and after transactions
   // Auto-refresh was causing unnecessary flickering and API calls
+
 
   // Auto-refresh SWIPE allowance when modal is open and using SWIPE
   useEffect(() => {
@@ -410,7 +425,89 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     return activeItems;
   }, [realCardItems, items, transformedPredictions]);
 
-
+  // Auto-sync after stake transaction confirmation
+  useEffect(() => {
+    if (isStakeConfirmed && stakeTransactionHash && stakePredictionId && stakeAmount && stakeToken && stakeIsYes !== null) {
+      const handleStakeAutoSync = async () => {
+        console.log('⏳ Waiting for blockchain propagation after stake...');
+        // Wait for blockchain propagation (same as create prediction)
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Find prediction data for transaction history
+        const prediction = cardItems.find(card => card.id === stakePredictionId);
+        const predictionQuestion = prediction?.title || `Prediction ${stakePredictionId}`;
+        
+        // Save transaction to user history
+        try {
+          console.log('💾 Saving stake transaction to user history...');
+          const transactionData = {
+            id: generateTransactionId(),
+            type: 'stake' as const,
+            predictionId: `pred_v2_${stakePredictionId}`,
+            predictionQuestion,
+            amount: stakeAmount,
+            txHash: stakeTransactionHash,
+            basescanUrl: generateBasescanUrl(stakeTransactionHash),
+            timestamp: Date.now(),
+            status: 'success' as const
+          };
+          
+          const saveResponse = await fetch('/api/user-transactions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: address?.toLowerCase(),
+              transaction: transactionData
+            })
+          });
+          
+          if (saveResponse.ok) {
+            console.log('✅ Stake transaction saved to user history');
+          } else {
+            console.warn('⚠️ Failed to save stake transaction to history');
+          }
+        } catch (error) {
+          console.error('❌ Failed to save stake transaction:', error);
+        }
+        
+        console.log('🔄 Auto-syncing prediction after stake...');
+        try {
+          const syncResponse = await fetch('/api/blockchain/events', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              eventType: 'stake_placed',
+              predictionId: stakePredictionId,
+              contractVersion: 'V2'
+            })
+          });
+          
+          if (syncResponse.ok) {
+            console.log('✅ Prediction auto-synced after stake - refreshing data');
+            // Refresh data to show updated values
+            setTimeout(() => {
+              if (refreshPredictions) {
+                refreshPredictions();
+              }
+            }, 1000);
+          } else {
+            console.warn('⚠️ Auto-sync failed after stake');
+          }
+        } catch (error) {
+          console.error('❌ Failed to auto-sync after stake:', error);
+        }
+        
+        // Reset transaction tracking
+        setStakeTransactionHash(null);
+        setStakePredictionId(null);
+        setStakeAmount(null);
+        setStakeToken(null);
+        setStakeIsYes(null);
+      };
+      
+      handleStakeAutoSync();
+    }
+  }, [isStakeConfirmed, stakeTransactionHash, stakePredictionId, stakeAmount, stakeToken, stakeIsYes, address, cardItems, refreshPredictions]);
 
   // Dashboard handlers
 
@@ -458,28 +555,14 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
           console.log('✅ ETH Stake transaction successful:', tx);
           showNotification('success', 'Stake Placed!', `Successfully staked ${amount} ETH on ${side}!`);
           
-          // Auto-sync this specific prediction after stake
-          try {
-            console.log('🔄 Auto-syncing prediction after stake...');
-            const syncResponse = await fetch('/api/blockchain/events', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                eventType: 'stake_placed',
-                predictionId: predictionId,
-                contractVersion: 'V2'
-              })
-            });
-            
-            if (syncResponse.ok) {
-              console.log('✅ Prediction auto-synced after stake - data updated in Redis');
-              // No need for refresh - auto-sync handles data updates
-            } else {
-              console.warn('⚠️ Auto-sync failed after stake');
-            }
-          } catch (syncError) {
-            console.error('❌ Failed to auto-sync after stake:', syncError);
-          }
+          // Set transaction hash and prediction ID for auto-sync
+          setStakeTransactionHash(tx);
+          setStakePredictionId(predictionId);
+          setStakeAmount(amount);
+          setStakeToken('ETH');
+          setStakeIsYes(isYes);
+          
+          // Auto-sync will be handled by useEffect after transaction confirmation
           
           await handleStakeSuccess();
         },
@@ -499,28 +582,14 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
           console.log('✅ SWIPE Stake transaction successful:', tx);
           showNotification('success', 'Stake Placed!', `Successfully staked ${amount} SWIPE on ${side}!`);
           
-          // Auto-sync this specific prediction after stake
-          try {
-            console.log('🔄 Auto-syncing prediction after stake...');
-            const syncResponse = await fetch('/api/blockchain/events', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                eventType: 'stake_placed',
-                predictionId: predictionId,
-                contractVersion: 'V2'
-              })
-            });
-            
-            if (syncResponse.ok) {
-              console.log('✅ Prediction auto-synced after stake - data updated in Redis');
-              // No need for refresh - auto-sync handles data updates
-            } else {
-              console.warn('⚠️ Auto-sync failed after stake');
-            }
-          } catch (syncError) {
-            console.error('❌ Failed to auto-sync after stake:', syncError);
-          }
+          // Set transaction hash and prediction ID for auto-sync
+          setStakeTransactionHash(tx);
+          setStakePredictionId(predictionId);
+          setStakeAmount(amount);
+          setStakeToken('SWIPE');
+          setStakeIsYes(isYes);
+          
+          // Auto-sync will be handled by useEffect after transaction confirmation
           
           await handleStakeSuccess();
         },

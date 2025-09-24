@@ -127,37 +127,38 @@ export async function GET(request: NextRequest) {
           });
         });
 
-        if (!predictionData || predictionData.length === 0) {
+        if (!predictionData || (Array.isArray(predictionData) && predictionData.length === 0)) {
           console.log(`⚠️ No data found for prediction ${i}, skipping...`);
           continue;
         }
 
         // Convert contract data to Redis format
+        const predictionArray = predictionData as any[];
         const redisPrediction = {
           id: `pred_v2_${i}`,
-          question: predictionData[0] || '',
-          description: predictionData[1] || '',
-          category: predictionData[2] || 'general',
-          imageUrl: predictionData[3] || '',
+          question: predictionArray[0] || '',
+          description: predictionArray[1] || '',
+          category: predictionArray[2] || 'general',
+          imageUrl: predictionArray[3] || '',
           includeChart: false,
-          endDate: new Date(Number(predictionData[4]) * 1000).toISOString().split('T')[0],
-          endTime: new Date(Number(predictionData[4]) * 1000).toTimeString().split(' ')[0],
-          deadline: Number(predictionData[4]),
-          resolutionDeadline: Number(predictionData[4]) + (7 * 24 * 60 * 60), // 7 days after deadline
-          yesTotalAmount: Number(predictionData[5]),
-          noTotalAmount: Number(predictionData[6]),
-          swipeYesTotalAmount: Number(predictionData[7]),
-          swipeNoTotalAmount: Number(predictionData[8]),
-          resolved: predictionData[9],
-          outcome: predictionData[10] ? Boolean(predictionData[10]) : undefined,
-          cancelled: predictionData[11],
-          createdAt: Number(predictionData[12]),
-          creator: predictionData[13] || '0x0000000000000000000000000000000000000000',
+          endDate: new Date(Number(predictionArray[4]) * 1000).toISOString().split('T')[0],
+          endTime: new Date(Number(predictionArray[4]) * 1000).toTimeString().split(' ')[0],
+          deadline: Number(predictionArray[4]),
+          resolutionDeadline: Number(predictionArray[4]) + (7 * 24 * 60 * 60), // 7 days after deadline
+          yesTotalAmount: Number(predictionArray[5]),
+          noTotalAmount: Number(predictionArray[6]),
+          swipeYesTotalAmount: Number(predictionArray[7]),
+          swipeNoTotalAmount: Number(predictionArray[8]),
+          resolved: predictionArray[9],
+          outcome: predictionArray[10] ? Boolean(predictionArray[10]) : undefined,
+          cancelled: predictionArray[11],
+          createdAt: Number(predictionArray[12]),
+          creator: predictionArray[13] || '0x0000000000000000000000000000000000000000',
           verified: false,
           approved: true,
           needsApproval: false,
           participants: [],
-          totalStakes: Number(predictionData[5]) + Number(predictionData[6]) + Number(predictionData[7]) + Number(predictionData[8]),
+          totalStakes: Number(predictionArray[5]) + Number(predictionArray[6]) + Number(predictionArray[7]) + Number(predictionArray[8]),
           contractVersion: 'V2' as const
         };
 
@@ -176,7 +177,7 @@ export async function GET(request: NextRequest) {
             });
           });
 
-          if (stakesData && stakesData.length > 0) {
+          if (stakesData && Array.isArray(stakesData) && stakesData.length > 0) {
             for (const stake of stakesData) {
               try {
                 const redisStake = {
