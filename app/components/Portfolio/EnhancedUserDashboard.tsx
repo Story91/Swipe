@@ -786,18 +786,6 @@ export function EnhancedUserDashboard() {
   //   return () => clearInterval(interval);
   // }, [address, fetchUserStakes, selectedFilter]);
   
-  // Handle refresh
-  const handleRefresh = useCallback(async () => {
-    console.log('🔄 Refreshing user dashboard data...');
-    setCacheLoaded(false); // Clear cache
-    
-    // Refresh ALL predictions first (not just active)
-    await fetchAllPredictionsComplete();
-    
-    // Then refresh user data
-    await fetchAllUserPredictions(true);
-    await fetchUserTransactions(true);
-  }, [fetchAllPredictionsComplete, fetchAllUserPredictions, fetchUserTransactions]);
 
   // Handle filter change with lazy loading
   const handleFilterChange = useCallback(async (newFilter: string) => {
@@ -920,14 +908,20 @@ export function EnhancedUserDashboard() {
             // Trigger claims sync to update Redis from blockchain (single attempt, async)
             console.log('🔄 Triggering claims sync to update Redis...');
             
-            // Do sync in background without blocking UI
+            // Do targeted sync in background without blocking UI
             setTimeout(async () => {
               try {
-                const syncResponse = await fetch('/api/sync/v2/claims', {
-                  method: 'GET',
+                console.log('🔄 Auto-syncing prediction after claim...');
+                const syncResponse = await fetch('/api/blockchain/events', {
+                  method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
                   },
+                  body: JSON.stringify({
+                    eventType: 'reward_claimed',
+                    predictionId: numericId,
+                    contractVersion: 'V2'
+                  }),
                 });
                 const syncResult = await syncResponse.json();
                 console.log('✅ Claims sync result:', syncResult);
@@ -1408,13 +1402,6 @@ export function EnhancedUserDashboard() {
             </SelectContent>
           </Select>
           
-          <button 
-            onClick={handleRefresh}
-            className="refresh-button"
-            disabled={loadingStakes || predictionsLoading}
-          >
-            🔄 Refresh
-          </button>
         </div>
       </div>
 
