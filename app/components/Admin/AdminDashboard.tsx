@@ -652,6 +652,47 @@ export function AdminDashboard({
           
           <button 
             onClick={async () => {
+              if (confirm('⚡ V2 INCREMENTAL SYNC\n\nThis will sync only NEW V2 predictions (newer than last in Redis).\nMuch faster than full sync!\n\nContinue?')) {
+                try {
+                  alert('⚡ Starting V2 incremental sync...');
+                  const response = await fetch('/api/sync/v2/incremental');
+                  if (response.ok) {
+                    const result = await response.json();
+                    alert(`✅ V2 INCREMENTAL SYNC COMPLETE!\n\nSynced: ${result.data.syncedPredictions} new predictions\nStakes: ${result.data.syncedStakes}\nErrors: ${result.data.errorsCount}\n\nFound ${result.data.newPredictionsFound} new predictions\nRefreshing data...`);
+                    handleRefresh();
+                  } else {
+                    alert('❌ V2 incremental sync failed. Check console for details.');
+                  }
+                } catch (error) {
+                  console.error('V2 incremental sync error:', error);
+                  alert('❌ V2 incremental sync failed. Check console for details.');
+                }
+              }
+            }}
+            className="sync-btn mobile-sync-btn"
+            style={{
+              background: '#4CAF50',
+              color: 'white',
+              border: 'none',
+              padding: '12px 16px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '600',
+              margin: '2px',
+              whiteSpace: 'nowrap',
+              minHeight: '44px',
+              minWidth: '100px',
+              touchAction: 'manipulation',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            ⚡ V2 Incremental Sync
+          </button>
+          
+          <button 
+            onClick={async () => {
               if (confirm('⚡ V2 ACTIVE SYNC\n\nThis will sync only ACTIVE V2 predictions from blockchain to Redis.\nMuch faster!\n\nContinue?')) {
                 try {
                   alert('⚡ Starting V2 active predictions sync...');
