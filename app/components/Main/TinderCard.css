@@ -20,7 +20,8 @@ html, body {
 /* Animated Background */
 .tinder-container {
   width: 100%;
-  min-height: 100vh;
+  height: 70vh;
+  max-height: 70vh;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -28,9 +29,24 @@ html, body {
   position: relative;
   background: #d4ff00;
   overflow-x: hidden;
-  overflow-y: visible;
+  overflow-y: hidden;
   margin: 0;
   padding: 40px 20px;
+}
+
+/* Wyśrodkowanie tylko na mobile */
+@media (max-width: 768px) {
+  .tinder-container {
+    justify-content: center;
+  }
+}
+
+/* Mniejsza wysokość kontenera na desktop */
+@media (min-width: 769px) {
+  .tinder-container {
+    height: 65vh !important;
+    max-height: 65vh !important;
+  }
 }
 
 /* Animated background elements */
@@ -516,10 +532,10 @@ html, body {
   100% { transform: rotate(360deg); }
 }
 
-/* Prediction Details Below Card */
+/* Prediction Details Below Card - Now outside main container */
 .prediction-details {
   position: relative;
-  margin-top: 20px;
+  margin: 20px auto 40px auto;
   width: 95%;
   max-width: 600px;
   background: rgba(255, 255, 255, 0.95);
@@ -531,7 +547,6 @@ html, body {
     0 0 0 1px rgba(255, 255, 255, 0.3) inset;
   border: 1px solid rgba(255, 255, 255, 0.3);
   z-index: 15;
-  margin-bottom: 40px;
 }
 
 .details-header {
@@ -812,7 +827,8 @@ html, body {
 @media (max-width: 768px) {
   .tinder-container {
     padding: 20px 15px;
-    min-height: 100vh;
+    height: 65vh;
+    max-height: 65vh;
   }
 
   .card-container {
@@ -849,6 +865,7 @@ html, body {
     width: 95%;
     padding: 16px;
     margin-top: 15px;
+    margin-bottom: 40px;
   }
 
   .voting-section-fixed {
@@ -1219,6 +1236,13 @@ html, body {
   margin: 20px 15px;
   flex-wrap: wrap;
   max-width: 100%;
+}
+
+/* Mniejszy odstęp na desktop - bardziej specyficzny */
+@media (min-width: 769px) {
+  .action-buttons-section {
+    margin: 5px 15px 20px 15px !important; /* Mniejszy odstęp na desktop */
+  }
 }
 
 .or-text {

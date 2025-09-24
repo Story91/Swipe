@@ -126,6 +126,15 @@ body::before {
   min-height: 100vh;
 }
 
+/* Mini App Specific - Limit card height to prevent internal scroll */
+@media (max-width: 600px) {
+  .tinder-container {
+    height: 60vh !important;
+    max-height: 60vh !important;
+    overflow-y: hidden !important;
+  }
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;

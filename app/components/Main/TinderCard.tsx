@@ -1573,6 +1573,7 @@ KEY USER-FACING CHANGES: V1 → V2
 
   // Default: Tinder Mode
   return (
+    <>
     <div className="tinder-container">
       {/* Action Feedback */}
       {showActionFeedback && lastAction && (
@@ -1749,30 +1750,32 @@ KEY USER-FACING CHANGES: V1 → V2
         </TinderCard>
       </div>
 
-      {/* Action Buttons - moved under Tinder card */}
-      <div className="action-buttons-section">
-        <button
-          className="tutorial-button"
-          disabled
-        >
-          <div className="swipe-animation">
-            <div className="swipe-icon">👈</div>
-            <div className="swipe-icon">👉</div>
-          </div>
-        </button>
-        
-        <div className="or-text">OR</div>
-        
-        <button
-          className="skip-button"
-          onClick={() => handleSkip(currentCard.id)}
-        >
-          SKIP
-        </button>
-      </div>
+    </div>
 
-             {/* Prediction Details Below Card */}
-       <div className="prediction-details">
+    {/* Action Buttons - moved above Prediction Details */}
+    <div className="action-buttons-section">
+      <button
+        className="tutorial-button"
+        disabled
+      >
+        <div className="swipe-animation">
+          <div className="swipe-icon">👈</div>
+          <div className="swipe-icon">👉</div>
+        </div>
+      </button>
+      
+      <div className="or-text">OR</div>
+      
+      <button
+        className="skip-button"
+        onClick={() => handleSkip(currentCard.id)}
+      >
+        SKIP
+      </button>
+    </div>
+
+    {/* Prediction Details - Outside main card container */}
+    <div className="prediction-details">
          <div className="details-header">
            <h4>Prediction Analysis</h4>
            <span className="card-number">ID: {currentCard.id} | {currentIndex + 1} / {cardItems.length}</span>
@@ -2329,7 +2332,7 @@ KEY USER-FACING CHANGES: V1 → V2
 
       {/* Global Notification System */}
       <NotificationSystem />
-      </div>
+    </>
     );
   });
 
