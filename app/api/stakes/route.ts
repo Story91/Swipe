@@ -2,12 +2,97 @@ import { NextRequest, NextResponse } from 'next/server';
 import { redis, redisHelpers } from '../../../lib/redis';
 import { RedisUserStake } from '../../../lib/types/redis';
 
-// GET /api/stakes - Get stakes for a specific prediction
+// GET /api/stakes - Get stakes for a specific prediction or all user stakes
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const predictionId = searchParams.get('predictionId');
     const userId = searchParams.get('userId');
+    const getAllUserStakes = searchParams.get('getAllUserStakes') === 'true';
+    
+    // If getAllUserStakes is true, return all stakes for the user
+    if (getAllUserStakes && userId) {
+      console.log(`🔍 Getting all stakes for user: ${userId}`);
+      
+      // Get all stake keys for this user
+      const userStakePattern = `user_stakes:${userId}:*`;
+      const stakeKeys = await redis.keys(userStakePattern);
+      
+      console.log(`📊 Found ${stakeKeys.length} stake keys for user ${userId}`);
+      
+      const allUserStakes: RedisUserStake[] = [];
+      
+      // Fetch all stakes in parallel
+      const stakePromises = stakeKeys.map(async (key) => {
+        try {
+          const data = await redis.get(key);
+          if (data) {
+            const stake = typeof data === 'string' ? JSON.parse(data) : data;
+            if (stake && typeof stake === 'object' && 'user' in stake) {
+              // Check if this is a multi-token stake (V2) or single stake (V1)
+              if (stake.ETH || stake.SWIPE) {
+                // Multi-token stake - convert to array format
+                const multiStakes: RedisUserStake[] = [];
+                if (stake.ETH) {
+                  multiStakes.push({
+                    user: stake.user,
+                    predictionId: stake.predictionId,
+                    yesAmount: stake.ETH.yesAmount,
+                    noAmount: stake.ETH.noAmount,
+                    claimed: stake.ETH.claimed,
+                    stakedAt: stake.stakedAt,
+                    contractVersion: stake.contractVersion,
+                    tokenType: 'ETH'
+                  });
+                }
+                if (stake.SWIPE) {
+                  multiStakes.push({
+                    user: stake.user,
+                    predictionId: stake.predictionId,
+                    yesAmount: stake.SWIPE.yesAmount,
+                    noAmount: stake.SWIPE.noAmount,
+                    claimed: stake.SWIPE.claimed,
+                    stakedAt: stake.stakedAt,
+                    contractVersion: stake.contractVersion,
+                    tokenType: 'SWIPE'
+                  });
+                }
+                return multiStakes;
+              } else {
+                // Single stake (V1) - convert to array format
+                return [{
+                  user: stake.user,
+                  predictionId: stake.predictionId,
+                  yesAmount: stake.yesAmount || 0,
+                  noAmount: stake.noAmount || 0,
+                  claimed: stake.claimed || false,
+                  stakedAt: stake.stakedAt,
+                  contractVersion: stake.contractVersion || 'V1',
+                  tokenType: 'ETH' // V1 stakes are always ETH
+                }];
+              }
+            }
+          }
+          return [];
+        } catch (error) {
+          console.error(`Failed to parse stake from key ${key}:`, error);
+          return [];
+        }
+      });
+      
+      const stakeResults = await Promise.all(stakePromises);
+      stakeResults.forEach(stakes => {
+        allUserStakes.push(...stakes);
+      });
+      
+      console.log(`✅ Returning ${allUserStakes.length} total stakes for user ${userId}`);
+      
+      return NextResponse.json({
+        success: true,
+        data: allUserStakes,
+        count: allUserStakes.length
+      });
+    }
     
     if (!predictionId) {
       return NextResponse.json(

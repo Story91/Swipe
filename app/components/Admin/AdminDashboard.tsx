@@ -422,7 +422,7 @@ export function AdminDashboard({
                 
                 // Also sync claims to update user stakes
                 console.log('🔄 Syncing claims after FORCE RESOLVE...');
-                const claimsSyncResponse = await fetch('/api/sync/claims');
+                const claimsSyncResponse = await fetch('/api/sync/v2/claims');
                 if (claimsSyncResponse.ok) {
                   console.log('✅ Claims sync successful after FORCE RESOLVE');
                 } else {
@@ -813,6 +813,7 @@ export function AdminDashboard({
           >
             🔍 V2 Claims Sync
           </button>
+          
           
         </div>
       </div>

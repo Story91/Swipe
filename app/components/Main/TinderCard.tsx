@@ -812,7 +812,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
           console.log(`✅ Redis prediction ${predictionId} resolved successfully`);
           
           // Auto-sync claims after resolve
-          fetch('/api/sync/claims')
+          fetch('/api/sync/v2/claims')
             .then(response => response.json())
             .then(syncData => {
               console.log('✅ Claims synced after resolve:', syncData);
@@ -844,7 +844,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
           console.log(`✅ Prediction ${predictionId} resolved successfully`);
           
           // Auto-sync claims after blockchain resolve
-          fetch('/api/sync/claims')
+          fetch('/api/sync/v2/claims')
             .then(response => response.json())
             .then(syncData => {
               console.log('✅ Claims synced after blockchain resolve:', syncData);

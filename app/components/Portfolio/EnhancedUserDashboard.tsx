@@ -70,6 +70,7 @@ export function EnhancedUserDashboard() {
   const { address } = useAccount();
   const { writeContract } = useWriteContract();
   const [userPredictions, setUserPredictions] = useState<PredictionWithStakes[]>([]);
+  const [allUserPredictions, setAllUserPredictions] = useState<PredictionWithStakes[]>([]);
   const [loadingStakes, setLoadingStakes] = useState(false);
   const [isTransactionLoading, setIsTransactionLoading] = useState(false);
   const [userTransactions, setUserTransactions] = useState<UserTransaction[]>([]);
@@ -236,7 +237,7 @@ export function EnhancedUserDashboard() {
   };
   
   // Hybrid predictions hook (includes both Redis and blockchain data)
-  const { predictions: allPredictions, loading: predictionsLoading, error: predictionsError, refresh: refreshPredictions, fetchAllPredictions } = useHybridPredictions();
+  const { predictions: allPredictions, loading: predictionsLoading, error: predictionsError, refresh: refreshPredictions, fetchAllPredictions: fetchAllPredictionsComplete } = useHybridPredictions();
 
   // Fetch user transactions with cache
   const fetchUserTransactions = useCallback(async (forceRefresh: boolean = false) => {
@@ -270,268 +271,93 @@ export function EnhancedUserDashboard() {
     }
   }, [address]);
 
-  // Fetch user stakes for predictions - optimized with lazy loading
-  const fetchUserStakes = useCallback(async (forceRefresh: boolean = false, filterType: string = 'ready-to-claim') => {
+  // Fetch ALL user predictions (for statistics) - optimized with single API call
+  const fetchAllUserPredictions = useCallback(async (forceRefresh: boolean = false) => {
     if (!address) {
-      console.log('❌ No address connected, skipping fetchUserStakes');
+      console.log('❌ No address connected, skipping fetchAllUserPredictions');
       return;
     }
     
     // Try to load from cache first (unless force refresh)
     if (!forceRefresh) {
-      const cachedData = loadFromCache(`user_predictions_${address.toLowerCase()}`, 10 * 1000); // 10 seconds cache (reduced from 30)
+      const cachedData = loadFromCache(`all_user_predictions_${address.toLowerCase()}`, 10 * 1000); // 10 seconds cache
       if (cachedData) {
-        console.log('📦 Using cached user predictions');
-        setUserPredictions(cachedData);
-        setCacheLoaded(true);
+        console.log('📦 Using cached all user predictions');
+        setAllUserPredictions(cachedData);
         return;
       }
     }
     
     // Don't fetch if predictions are still loading
     if (predictionsLoading) {
-      console.log('⏳ Predictions still loading, skipping fetchUserStakes');
+      console.log('⏳ Predictions still loading, skipping fetchAllUserPredictions');
+      return;
+    }
+    
+    // Don't fetch if already loading
+    if (loadingStakes) {
+      console.log('⏳ Already loading stakes, skipping fetchAllUserPredictions');
       return;
     }
     
     setLoadingStakes(true);
     try {
-      console.log(`🔍 Fetching user stakes for ${address}`);
-      console.log(`🔍 Current userPredictions state:`, userPredictions);
+      console.log(`🔍 Fetching ALL user stakes for ${address} in single API call`);
       
-      // Use the Redis predictions from the hook instead of fetching from API
+      // OPTIMIZATION: Get all user stakes in one API call instead of individual calls
+      const allStakesResponse = await fetch(`/api/stakes?getAllUserStakes=true&userId=${address.toLowerCase()}`);
+      const allStakesData = await allStakesResponse.json();
+      
+      if (!allStakesData.success) {
+        console.log('⚠️ No stakes found for user');
+        setAllUserPredictions([]);
+        return;
+      }
+      
+      const userStakes = allStakesData.data || [];
+      console.log(`💰 Found ${userStakes.length} total stakes for user ${address}`);
+      
+      // Use the Redis predictions from the hook
       const predictions = allPredictions || [];
       console.log(`📊 Found ${predictions.length} total predictions`);
       
       if (predictions.length === 0) {
         console.log('⚠️ No predictions found in Redis');
-        setUserPredictions([]);
+        setAllUserPredictions([]);
         return;
       }
       
-      // Filter predictions based on filterType for lazy loading
-      let filteredPredictions = predictions;
-      if (filterType === 'ready-to-claim') {
-        // Only load resolved predictions for ready-to-claim filter
-        filteredPredictions = predictions.filter(p => p.resolved);
-        console.log(`🚀 Lazy loading: Loading only ${filteredPredictions.length} resolved predictions for ready-to-claim`);
-      } else if (filterType === 'active') {
-        // Only load active predictions
-        filteredPredictions = predictions.filter(p => !p.resolved && !p.cancelled && p.deadline > Date.now() / 1000);
-        console.log(`🚀 Lazy loading: Loading only ${filteredPredictions.length} active predictions`);
-      } else if (filterType === 'won') {
-        // Only load resolved predictions for won filter
-        filteredPredictions = predictions.filter(p => p.resolved);
-        console.log(`🚀 Lazy loading: Loading only ${filteredPredictions.length} resolved predictions for won filter`);
-      } else if (filterType === 'lost') {
-        // Only load resolved predictions for lost filter
-        filteredPredictions = predictions.filter(p => p.resolved);
-        console.log(`🚀 Lazy loading: Loading only ${filteredPredictions.length} resolved predictions for lost filter`);
-      } else if (filterType === 'expired') {
-        // Only load expired predictions
-        filteredPredictions = predictions.filter(p => !p.resolved && !p.cancelled && p.deadline <= Date.now() / 1000);
-        console.log(`🚀 Lazy loading: Loading only ${filteredPredictions.length} expired predictions`);
-      } else if (filterType === 'cancelled') {
-        // Only load cancelled predictions
-        filteredPredictions = predictions.filter(p => p.cancelled);
-        console.log(`🚀 Lazy loading: Loading only ${filteredPredictions.length} cancelled predictions`);
-      } else if (filterType === 'claimed') {
-        // Only load resolved predictions for claimed filter
-        filteredPredictions = predictions.filter(p => p.resolved);
-        console.log(`🚀 Lazy loading: Loading only ${filteredPredictions.length} resolved predictions for claimed filter`);
-      }
+      // OPTIMIZATION: Fetch stakes for each prediction in parallel instead of sequential
+      console.log(`🚀 Processing ${userStakes.length} stakes for ${predictions.length} predictions`);
       
-      console.log(`🔍 Processing ${filteredPredictions.length} predictions for filter: ${filterType}`);
+      // Group stakes by prediction ID for faster lookup
+      const stakesByPrediction: { [key: string]: any[] } = {};
+      userStakes.forEach((stake: any) => {
+        if (!stakesByPrediction[stake.predictionId]) {
+          stakesByPrediction[stake.predictionId] = [];
+        }
+        stakesByPrediction[stake.predictionId].push(stake);
+      });
       
-      const userPredictionsWithStakes: PredictionWithStakes[] = [];
+      console.log(`💰 Found stakes for ${Object.keys(stakesByPrediction).length} predictions:`, Object.keys(stakesByPrediction));
       
-      // Log all resolved predictions
-      const resolvedPredictions = filteredPredictions.filter(p => p.resolved);
-      console.log(`📊 Found ${resolvedPredictions.length} resolved predictions:`, resolvedPredictions.map(p => ({ 
-        id: p.id, 
-        resolved: p.resolved, 
-        outcome: p.outcome,
-        question: p.question,
-        deadline: p.deadline,
-        createdAt: p.createdAt
-      })));
+      const allUserPredictionsWithStakes: PredictionWithStakes[] = [];
       
-      // Log recent predictions (last 24 hours)
-      const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
-      const recentPredictions = resolvedPredictions.filter(p => 
-        p.deadline && (p.deadline * 1000) > oneDayAgo
-      );
-      console.log(`🆕 Recent resolved predictions (24h): ${recentPredictions.length}`, recentPredictions.map(p => ({ 
-        id: p.id, 
-        question: p.question,
-        deadline: new Date(p.deadline * 1000).toLocaleString()
-      })));
-      
-      for (const prediction of filteredPredictions) {
+      for (const prediction of predictions) {
         try {
-          console.log(`🔍 Processing prediction ${prediction.id}...`);
+          // Get stakes for this prediction (if any)
+          const predictionStakes = stakesByPrediction[prediction.id] || [];
           
-          // Check if this is a V1 prediction
-          const isV1 = prediction.id.startsWith('pred_v1_');
-          
-          // For V1 predictions, show all (even without user stakes)
-          // For V2 predictions, only show if user has stakes
-          if (isV1) {
-            console.log(`📋 V1 prediction - checking for user stakes: ${prediction.id}`);
-            
-            // Check if user has stakes in this V1 prediction
-            const stakeInfo = await fetch(`/api/stakes?predictionId=${prediction.id}&userId=${address.toLowerCase()}`);
-            const stakeData = await stakeInfo.json();
-            
-            
-            let userStakes = {};
-            
-            if (stakeData.success && stakeData.data.length > 0) {
-              console.log(`💰 Found ${stakeData.data.length} V1 stakes for prediction ${prediction.id}:`, stakeData.data);
-              
-              // Process V1 stakes (they are always ETH)
-              for (const userStake of stakeData.data) {
-                if (userStake.yesAmount > 0 || userStake.noAmount > 0) {
-                  console.log(`💰 Processing V1 ETH stake:`, userStake);
-                  
-                  // In V1, user can only stake on one side, so determine which side
-                  const isYesStake = userStake.yesAmount > 0;
-                  const isNoStake = userStake.noAmount > 0;
-                  
-                  // This should never happen in V1, but just in case
-                  if (isYesStake && isNoStake) {
-                    console.warn(`⚠️ V1 user has stakes on both sides - this shouldn't happen!`, userStake);
-                    // Use the larger stake
-                    const useYes = userStake.yesAmount >= userStake.noAmount;
-                    console.log(`⚠️ Using ${useYes ? 'YES' : 'NO'} stake: ${useYes ? userStake.yesAmount : userStake.noAmount}`);
-                  }
-                  
-                  // Determine which side user staked on (should be only one in V1)
-                  const userStakedYes = userStake.yesAmount > 0;
-                  const userStakedNo = userStake.noAmount > 0;
-                  
-                  let potentialPayout = 0;
-                  let potentialProfit = 0;
-                  let canClaim = false;
-                  let isWinner = false;
-                  const userStakeAmount = userStake.yesAmount + userStake.noAmount;
-
-                  // Calculate payout for resolved predictions
-                  if (prediction.resolved) {
-                    const winnersPool = prediction.outcome ? prediction.yesTotalAmount : prediction.noTotalAmount;
-                    const losersPool = prediction.outcome ? prediction.noTotalAmount : prediction.yesTotalAmount;
-                    const platformFee = losersPool * 0.01; // 1% platform fee
-                    const netLosersPool = losersPool - platformFee;
-                    
-                    if (prediction.outcome && userStakedYes) {
-                      // User bet YES and won
-                      isWinner = true;
-                      potentialPayout = userStake.yesAmount + (userStake.yesAmount / winnersPool) * netLosersPool;
-                      potentialProfit = potentialPayout - userStake.yesAmount;
-                      canClaim = !userStake.claimed; // Can claim if not already claimed
-                    } else if (!prediction.outcome && userStakedNo) {
-                      // User bet NO and won
-                      isWinner = true;
-                      potentialPayout = userStake.noAmount + (userStake.noAmount / winnersPool) * netLosersPool;
-                      potentialProfit = potentialPayout - userStake.noAmount;
-                      canClaim = !userStake.claimed; // Can claim if not already claimed
-                    } else {
-                      // User lost - they staked on the losing side
-                      isWinner = false;
-                      potentialPayout = 0;
-                      potentialProfit = -(userStakedYes ? userStake.yesAmount : userStake.noAmount);
-                      canClaim = false; // Cannot claim if lost
-                    }
-                  } else if (prediction.cancelled) {
-                    // Full refund for cancelled predictions
-                    potentialPayout = userStakedYes ? userStake.yesAmount : userStake.noAmount;
-                    potentialProfit = 0;
-                    canClaim = !userStake.claimed; // Can claim refund if not already claimed
-                    isWinner = false; // Cancelled is not a win
-                  } else if (!prediction.resolved && !prediction.cancelled && prediction.deadline > Date.now() / 1000) {
-                    // Active prediction - calculate potential payout based on current pool
-                    const yesPool = prediction.yesTotalAmount || 0;
-                    const noPool = prediction.noTotalAmount || 0;
-                    
-                    if (userStakedYes) {
-                      // User bet YES - calculate potential payout if YES wins
-                      if (yesPool > 0) {
-                        const platformFee = noPool * 0.01; // 1% platform fee from losers
-                        const netNoPool = noPool - platformFee;
-                        potentialPayout = userStake.yesAmount + (userStake.yesAmount / yesPool) * netNoPool;
-                        potentialProfit = potentialPayout - userStake.yesAmount;
-                      }
-                    } else if (userStakedNo) {
-                      // User bet NO - calculate potential payout if NO wins
-                      if (noPool > 0) {
-                        const platformFee = yesPool * 0.01; // 1% platform fee from losers
-                        const netYesPool = yesPool - platformFee;
-                        potentialPayout = userStake.noAmount + (userStake.noAmount / noPool) * netYesPool;
-                        potentialProfit = potentialPayout - userStake.noAmount;
-                      }
-                    }
-                    canClaim = false; // Can't claim until resolved
-                    isWinner = false; // No winner yet
-                  } else {
-                    // Expired but not resolved - no payout
-                    potentialPayout = 0;
-                    potentialProfit = -(userStakedYes ? userStake.yesAmount : userStake.noAmount);
-                    canClaim = false;
-                    isWinner = false;
-                  }
-
-                  userStakes = {
-                    ETH: {
-                      predictionId: userStake.predictionId,
-                      yesAmount: userStakedYes ? userStake.yesAmount : 0,
-                      noAmount: userStakedNo ? userStake.noAmount : 0,
-                      claimed: userStake.claimed,
-                      potentialPayout,
-                      potentialProfit,
-                      canClaim,
-                      isWinner
-                    }
-                  };
-                }
-              }
-            }
-            
-            // Create V1 prediction with or without stakes
-            const predictionWithStakes: PredictionWithStakes = {
-              ...prediction,
-              userStakes,
-              status: prediction.resolved ? 'resolved' : 
-                     prediction.cancelled ? 'cancelled' :
-                     prediction.deadline <= Date.now() / 1000 ? 'expired' : 'active'
-            };
-
-
-            userPredictionsWithStakes.push(predictionWithStakes);
-            continue; // Skip V2 processing for V1 predictions
+          if (predictionStakes.length === 0) {
+            continue; // Skip predictions without user stakes
           }
-          
-          // For V2 predictions, only show if user has stakes
-          console.log(`🔍 Fetching stake for V2 prediction ${prediction.id} and user ${address.toLowerCase()}`);
-          const stakeInfo = await fetch(`/api/stakes?predictionId=${prediction.id}&userId=${address.toLowerCase()}`);
-          const stakeData = await stakeInfo.json();
-          
-          
-          console.log(`🔍 API response for prediction ${prediction.id}:`, stakeData);
-          console.log(`🔍 Prediction ${prediction.id} resolved status:`, prediction.resolved);
-          console.log(`🔍 Prediction ${prediction.id} outcome:`, prediction.outcome);
-          
-          // Only process V2 predictions if user has stakes
-          if (stakeData.success && stakeData.data.length > 0) {
-            console.log(`💰 Found ${stakeData.data.length} stakes for prediction ${prediction.id}:`, stakeData.data);
             
             // Group stakes by token type
             const stakesByToken: { [key: string]: any } = {};
             
-            for (const userStake of stakeData.data) {
+          for (const userStake of predictionStakes) {
             if (userStake.yesAmount > 0 || userStake.noAmount > 0) {
                 const tokenType = userStake.tokenType || 'ETH'; // Default to ETH for V1 stakes
-                console.log(`💰 Processing ${tokenType} stake:`, userStake);
-                console.log(`💰 TokenType from API:`, userStake.tokenType);
               
               let potentialPayout = 0;
               let potentialProfit = 0;
@@ -616,11 +442,9 @@ export function EnhancedUserDashboard() {
                 canClaim,
                 isWinner
               };
-              console.log(`💰 Saved ${tokenType} stake to stakesByToken:`, stakesByToken[tokenType]);
               }
             }
             
-            console.log(`💰 Final stakesByToken for prediction ${prediction.id}:`, stakesByToken);
             
             // Only add prediction if there are stakes
             if (Object.keys(stakesByToken).length > 0) {
@@ -632,50 +456,192 @@ export function EnhancedUserDashboard() {
                        prediction.deadline <= Date.now() / 1000 ? 'expired' : 'active'
               };
 
-
-              userPredictionsWithStakes.push(predictionWithStakes);
+            allUserPredictionsWithStakes.push(predictionWithStakes);
             } else {
-            }
           }
         } catch (error) {
-          console.warn(`Failed to fetch stake for prediction ${prediction.id}:`, error);
+          console.warn(`Failed to process prediction ${prediction.id}:`, error);
         }
       }
       
-      console.log(`📊 Found ${userPredictionsWithStakes.length} predictions with stakes for user ${address}`);
-      console.log(`📊 User predictions data:`, userPredictionsWithStakes);
+      console.log(`📊 Found ${allUserPredictionsWithStakes.length} ALL user predictions with stakes for user ${address}`);
+      console.log(`📊 All user predictions data:`, allUserPredictionsWithStakes);
       
-      // Check if any predictions have claimed status
-      const claimedPredictions = userPredictionsWithStakes.filter(p => {
-        const ethStake = p.userStakes?.ETH;
-        const swipeStake = p.userStakes?.SWIPE;
-        return ethStake?.claimed || swipeStake?.claimed;
-      });
-      console.log(`📊 Claimed predictions:`, claimedPredictions);
       
-      setUserPredictions(userPredictionsWithStakes);
+      setAllUserPredictions(allUserPredictionsWithStakes);
       
       // Save to cache
-      saveToCache(userPredictionsWithStakes, `user_predictions_${address.toLowerCase()}`);
-      setCacheLoaded(true);
+      saveToCache(allUserPredictionsWithStakes, `all_user_predictions_${address.toLowerCase()}`);
     } catch (error) {
-      console.error('Failed to fetch user stakes:', error);
+      console.error('Failed to fetch all user predictions:', error);
     } finally {
       setLoadingStakes(false);
     }
-  }, [address, allPredictions, predictionsLoading, userPredictions]);
+  }, [address, allPredictions, predictionsLoading]);
 
-  // Auto-refresh user data every 30 seconds to catch new resolved predictions
+  // Fetch user stakes for predictions - now filters allUserPredictions
+  const fetchUserStakes = useCallback(async (forceRefresh: boolean = false, filterType: string = 'ready-to-claim') => {
+    if (!address) {
+      console.log('❌ No address connected, skipping fetchUserStakes');
+      return;
+    }
+    
+    // If allUserPredictions is empty, fetch it first
+    if (allUserPredictions.length === 0) {
+      console.log('🔄 No allUserPredictions found, fetching first...');
+      await fetchAllUserPredictions(forceRefresh);
+      return;
+    }
+    
+    console.log(`🔍 Filtering ${allUserPredictions.length} allUserPredictions for filter: ${filterType}`);
+    
+    // Filter allUserPredictions based on filterType
+    let filteredPredictions = allUserPredictions;
+    
+    switch (filterType) {
+      case 'ready-to-claim':
+        // Show only predictions that can be claimed (won + not claimed)
+        filteredPredictions = allUserPredictions.filter(p => {
+          const ethStake = p.userStakes?.ETH;
+          const swipeStake = p.userStakes?.SWIPE;
+          
+          // Check local claimed state first
+          const ethClaimed = claimedStakes.has(`${p.id}-ETH`) || ethStake?.claimed;
+          const swipeClaimed = claimedStakes.has(`${p.id}-SWIPE`) || swipeStake?.claimed;
+          
+          // Must be resolved, user must have won, and not already claimed
+          const ethCanClaim = ethStake && ethStake.isWinner && ethStake.canClaim && !ethClaimed;
+          const swipeCanClaim = swipeStake && swipeStake.isWinner && swipeStake.canClaim && !swipeClaimed;
+          
+          return ethCanClaim || swipeCanClaim;
+        });
+        break;
+        
+      case 'active':
+        // Show all active predictions from allPredictions (not just user predictions)
+        filteredPredictions = allPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline > Date.now() / 1000);
+        break;
+        
+      case 'won':
+        // Show only predictions where user won (regardless of claimed status)
+        filteredPredictions = allUserPredictions.filter(p => {
+          const ethStake = p.userStakes?.ETH;
+          const swipeStake = p.userStakes?.SWIPE;
+          return (ethStake?.isWinner) || (swipeStake?.isWinner);
+        });
+        break;
+        
+      case 'lost':
+        // Show only predictions where user lost
+        filteredPredictions = allUserPredictions.filter(p => {
+          const ethStake = p.userStakes?.ETH;
+          const swipeStake = p.userStakes?.SWIPE;
+          return (ethStake && !ethStake.isWinner && p.status === 'resolved') || 
+                 (swipeStake && !swipeStake.isWinner && p.status === 'resolved');
+        });
+        break;
+        
+      case 'expired':
+        // Show all expired predictions (deadline passed but not resolved)
+        filteredPredictions = allPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline <= Date.now() / 1000);
+        break;
+        
+      case 'cancelled':
+        // Show all cancelled predictions
+        filteredPredictions = allPredictions.filter(p => p.cancelled);
+        break;
+        
+      case 'claimed':
+        // Show only predictions that have been claimed
+        filteredPredictions = allUserPredictions.filter(p => {
+          const ethStake = p.userStakes?.ETH;
+          const swipeStake = p.userStakes?.SWIPE;
+          
+          // Check local claimed state first
+          const ethClaimed = claimedStakes.has(`${p.id}-ETH`) || ethStake?.claimed;
+          const swipeClaimed = claimedStakes.has(`${p.id}-SWIPE`) || swipeStake?.claimed;
+          
+          return ethClaimed || swipeClaimed;
+        });
+        break;
+        
+      case 'all':
+        // Show all predictions (both user predictions and all predictions)
+        filteredPredictions = allPredictions;
+        break;
+        
+      default:
+        // Default to ready-to-claim
+        filteredPredictions = allUserPredictions.filter(p => {
+          const ethStake = p.userStakes?.ETH;
+          const swipeStake = p.userStakes?.SWIPE;
+          
+          // Check local claimed state first
+          const ethClaimed = claimedStakes.has(`${p.id}-ETH`) || ethStake?.claimed;
+          const swipeClaimed = claimedStakes.has(`${p.id}-SWIPE`) || swipeStake?.claimed;
+          
+          const ethCanClaim = ethStake && ethStake.isWinner && ethStake.canClaim && !ethClaimed;
+          const swipeCanClaim = swipeStake && swipeStake.isWinner && swipeStake.canClaim && !swipeClaimed;
+          
+          return ethCanClaim || swipeCanClaim;
+        });
+    }
+    
+    console.log(`📊 Filtered ${filteredPredictions.length} predictions for filter: ${filterType}`);
+    setUserPredictions(filteredPredictions);
+  }, [address, allUserPredictions, allPredictions, claimedStakes, fetchAllUserPredictions]);
+
+  // No auto-refresh - only manual refresh when needed
+  // Auto-refresh was causing infinite loops and performance issues
+
+  // Auto-sync after claim transactions (with delay like TinderCard)
   useEffect(() => {
-    if (!address) return;
-    
-    const interval = setInterval(() => {
-      console.log('🔄 Auto-refreshing user data...');
-      fetchUserStakes(true); // Force refresh
-    }, 30000); // 30 seconds
-    
-    return () => clearInterval(interval);
-  }, [address, fetchUserStakes]);
+    if (userTransactions.length > 0 && address) {
+      // Check for recent claim transactions
+      const recentClaimTx = userTransactions
+        .filter(tx => tx.type === 'claim' && tx.status === 'success')
+        .sort((a, b) => b.timestamp - a.timestamp)[0];
+      
+      if (recentClaimTx) {
+        // Check if this claim transaction is recent (within last 5 minutes)
+        const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+        if (recentClaimTx.timestamp > fiveMinutesAgo) {
+          console.log('🔄 Found recent claim transaction, auto-syncing with delay...');
+          
+          // Auto-sync with delay (like TinderCard)
+          setTimeout(async () => {
+            try {
+              console.log('⏳ Waiting for blockchain propagation after claim...');
+              await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay
+              
+              console.log('🔄 Auto-syncing prediction after claim...');
+              const syncResponse = await fetch('/api/blockchain/events', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  eventType: 'reward_claimed',
+                  predictionId: recentClaimTx.predictionId?.replace('pred_v2_', ''),
+                  contractVersion: 'V2'
+                })
+              });
+              
+              if (syncResponse.ok) {
+                console.log('✅ Prediction auto-synced after claim');
+                // Refresh data to show updated values
+                setTimeout(() => {
+                  fetchAllUserPredictions(true); // Force refresh to get latest data
+                }, 1000);
+              } else {
+                console.warn('⚠️ Auto-sync failed after claim');
+              }
+            } catch (error) {
+              console.error('❌ Failed to auto-sync after claim:', error);
+            }
+          }, 2000); // Initial 2 second delay
+        }
+      }
+    }
+  }, [userTransactions, address, fetchAllUserPredictions]);
 
   // Calculate statistics without loading all predictions
   const calculateStats = useCallback(async () => {
@@ -743,7 +709,7 @@ export function EnhancedUserDashboard() {
     console.log('🔄 Found recent claim transaction, triggering sync...', recentClaimTx);
     
     try {
-      const syncResponse = await fetch('/api/sync/claims', {
+      const syncResponse = await fetch('/api/sync/v2/claims', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -785,20 +751,28 @@ export function EnhancedUserDashboard() {
 
   // Fetch ALL predictions for user dashboard (not just active ones)
   useEffect(() => {
-    if (address && fetchAllPredictions) {
+    if (address && fetchAllPredictionsComplete) {
       console.log('🔄 User dashboard: fetching ALL predictions...');
-      fetchAllPredictions(); // Fetch all predictions for user dashboard
+      fetchAllPredictionsComplete(); // Fetch all predictions for user dashboard
     }
-  }, [address]); // Remove fetchAllPredictions from dependencies to avoid conflicts
+  }, [address, fetchAllPredictionsComplete]); // Add fetchAllPredictionsComplete back to dependencies
 
-  // Fetch user stakes when predictions are loaded - only ready-to-claim initially
+  // Fetch all predictions first, then user predictions
   useEffect(() => {
-    if (allPredictions && allPredictions.length > 0 && address) {
-      console.log('🔄 Predictions loaded, calculating stats and fetching ready-to-claim...');
-      calculateStats(); // Calculate statistics first
-      fetchUserStakes(false, 'ready-to-claim'); // Only load ready-to-claim initially
+    if (address && allPredictions.length === 0 && !predictionsLoading) {
+      console.log('🔄 No predictions loaded, fetching all predictions first...');
+      fetchAllPredictionsComplete(); // Fetch ALL predictions (not just active)
     }
-  }, [allPredictions, address, calculateStats]);
+  }, [address, allPredictions.length, predictionsLoading, fetchAllPredictionsComplete]);
+
+  // Fetch all user predictions when predictions are loaded
+  useEffect(() => {
+    if (allPredictions && allPredictions.length > 0 && address && allUserPredictions.length === 0) {
+      console.log('🔄 Predictions loaded, fetching all user predictions...');
+      calculateStats(); // Calculate statistics first
+      fetchAllUserPredictions(false); // Fetch all user predictions for statistics
+    }
+  }, [allPredictions, address, calculateStats, fetchAllUserPredictions, allUserPredictions.length]);
   
   // No auto-refresh - only manual refresh when needed
   // useEffect(() => {
@@ -812,21 +786,33 @@ export function EnhancedUserDashboard() {
   //   return () => clearInterval(interval);
   // }, [address, fetchUserStakes, selectedFilter]);
   
+  // Handle refresh
+  const handleRefresh = useCallback(async () => {
+    console.log('🔄 Refreshing user dashboard data...');
+    setCacheLoaded(false); // Clear cache
+    
+    // Refresh ALL predictions first (not just active)
+    await fetchAllPredictionsComplete();
+    
+    // Then refresh user data
+    await fetchAllUserPredictions(true);
+    await fetchUserTransactions(true);
+  }, [fetchAllPredictionsComplete, fetchAllUserPredictions, fetchUserTransactions]);
+
   // Handle filter change with lazy loading
   const handleFilterChange = useCallback(async (newFilter: string) => {
     console.log(`🔄 Filter changed from ${selectedFilter} to ${newFilter}`);
     setSelectedFilter(newFilter);
     
-    // Clear cache to ensure fresh data
-    clearCache();
+    // If allUserPredictions is empty, fetch it first
+    if (allUserPredictions.length === 0) {
+      console.log('🔄 No allUserPredictions found, fetching first...');
+      await fetchAllUserPredictions(true);
+    }
     
-    // Clear current predictions and load new ones with lazy loading
-    setUserPredictions([]);
-    setLoadingStakes(true);
-    
-    // Load predictions for the new filter with force refresh
-    await fetchUserStakes(true, newFilter);
-  }, [selectedFilter, fetchUserStakes]);
+    // Filter allUserPredictions based on new filter
+    await fetchUserStakes(false, newFilter);
+  }, [selectedFilter, allUserPredictions.length, fetchAllUserPredictions, fetchUserStakes]);
 
   // Handle claim reward
   const handleClaimReward = async (predictionId: string, tokenType?: 'ETH' | 'SWIPE') => {
@@ -887,11 +873,10 @@ export function EnhancedUserDashboard() {
 
         console.log(`🎯 Attempting to claim reward for prediction ${numericId}...`);
 
-        // Determine which contract to use based on prediction ID
-        const isV1 = predictionId.startsWith('pred_v1_');
-        const contract = isV1 ? CONTRACTS.V1 : CONTRACTS.V2;
+        // All predictions use V2 contract (pred_v1_ are synced V1 predictions on V2)
+        const contract = CONTRACTS.V2;
         
-        console.log(`🎯 Using ${isV1 ? 'V1' : 'V2'} contract for claim`);
+        console.log(`🎯 Using V2 contract for claim (all predictions are on V2)`);
 
         // Determine function name based on token type
         const functionName = tokenType === 'SWIPE' ? 'claimRewardWithToken' : 'claimReward';
@@ -938,7 +923,7 @@ export function EnhancedUserDashboard() {
             // Do sync in background without blocking UI
             setTimeout(async () => {
               try {
-                const syncResponse = await fetch('/api/sync/claims', {
+                const syncResponse = await fetch('/api/sync/v2/claims', {
                   method: 'GET',
                   headers: {
                     'Content-Type': 'application/json',
@@ -1083,38 +1068,37 @@ export function EnhancedUserDashboard() {
               // Show success modal
               showSuccessModal(txHash, transaction.basescanUrl);
               
-              // Auto-sync the specific prediction after claim
+              // Auto-sync the specific prediction after claim with delay (like TinderCard)
+              setTimeout(async () => {
               try {
+                  console.log('⏳ Waiting for blockchain propagation after claim...');
+                  await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay
+                  
+                  console.log('🔄 Auto-syncing prediction after claim...');
                 const syncResponse = await fetch('/api/blockchain/events', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                     eventType: 'reward_claimed',
                     predictionId: predictionId.replace('pred_v2_', '').replace('pred_v1_', ''),
-                    contractVersion: predictionId.startsWith('pred_v1_') ? 'V1' : 'V2'
+                    contractVersion: 'V2' // All predictions are on V2 contract
                   })
                 });
                 
                 if (syncResponse.ok) {
                   console.log('✅ Prediction auto-synced after claim');
+                    // Refresh data to show updated values
+                    setTimeout(() => {
+                      fetchAllUserPredictions(true); // Force refresh to get latest data
+                      fetchUserTransactions(true); // Force refresh transactions too
+                    }, 1000);
                 } else {
                   console.warn('⚠️ Auto-sync failed after claim');
                 }
               } catch (syncError) {
                 console.error('❌ Failed to auto-sync after claim:', syncError);
               }
-              
-              // Refresh user data immediately after successful claim
-              console.log('🔄 Refreshing data after successful claim...');
-              console.log('🔄 About to call fetchUserStakes...');
-              
-              // Add a small delay to ensure Redis is updated
-              setTimeout(() => {
-                console.log('🔄 Calling fetchUserStakes after delay...');
-                fetchUserStakes(true); // Force refresh to get latest data from Redis
-                fetchUserTransactions(true); // Force refresh transactions too
-                console.log('🔄 fetchUserStakes called with force refresh');
-              }, 1000);
+              }, 2000); // Initial 2 second delay
             } else {
               // Update transaction status in Redis
               await fetch('/api/user-transactions', {
@@ -1194,12 +1178,12 @@ export function EnhancedUserDashboard() {
     return (ethLost || swipeLost) && p.status === 'resolved';
   });
   
-  // Filter predictions based on selected filter
+  // Filter predictions based on selected filter (now uses allUserPredictions for user-specific filters)
   const getFilteredPredictions = () => {
     switch (selectedFilter) {
       case 'ready-to-claim':
         // Show only predictions that can be claimed (won + not claimed)
-        return userPredictions.filter(p => {
+        return allUserPredictions.filter(p => {
           const ethStake = p.userStakes?.ETH;
           const swipeStake = p.userStakes?.SWIPE;
           
@@ -1218,24 +1202,16 @@ export function EnhancedUserDashboard() {
         return allPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline > Date.now() / 1000);
       case 'won':
         // Show only predictions where user won (regardless of claimed status)
-        return allPredictions.filter(p => {
-          // Check if user has stakes in this prediction
-          const userPrediction = userPredictions.find(up => up.id === p.id);
-          if (!userPrediction) return false;
-          
-          const ethStake = userPrediction.userStakes?.ETH;
-          const swipeStake = userPrediction.userStakes?.SWIPE;
+        return allUserPredictions.filter(p => {
+          const ethStake = p.userStakes?.ETH;
+          const swipeStake = p.userStakes?.SWIPE;
           return (ethStake?.isWinner) || (swipeStake?.isWinner);
         });
       case 'lost':
         // Show only predictions where user lost
-        return allPredictions.filter(p => {
-          // Check if user has stakes in this prediction
-          const userPrediction = userPredictions.find(up => up.id === p.id);
-          if (!userPrediction) return false;
-          
-          const ethStake = userPrediction.userStakes?.ETH;
-          const swipeStake = userPrediction.userStakes?.SWIPE;
+        return allUserPredictions.filter(p => {
+          const ethStake = p.userStakes?.ETH;
+          const swipeStake = p.userStakes?.SWIPE;
           return (ethStake && !ethStake.isWinner && p.status === 'resolved') || 
                  (swipeStake && !swipeStake.isWinner && p.status === 'resolved');
         });
@@ -1247,13 +1223,9 @@ export function EnhancedUserDashboard() {
         return allPredictions.filter(p => p.cancelled);
       case 'claimed':
         // Show only predictions that have been claimed
-        return allPredictions.filter(p => {
-          // Check if user has stakes in this prediction
-          const userPrediction = userPredictions.find(up => up.id === p.id);
-          if (!userPrediction) return false;
-          
-          const ethStake = userPrediction.userStakes?.ETH;
-          const swipeStake = userPrediction.userStakes?.SWIPE;
+        return allUserPredictions.filter(p => {
+          const ethStake = p.userStakes?.ETH;
+          const swipeStake = p.userStakes?.SWIPE;
           
           // Check local claimed state first
           const ethClaimed = claimedStakes.has(`${p.id}-ETH`) || ethStake?.claimed;
@@ -1266,7 +1238,7 @@ export function EnhancedUserDashboard() {
         return allPredictions;
       default:
         // Default to ready-to-claim
-        return userPredictions.filter(p => {
+        return allUserPredictions.filter(p => {
           const ethStake = p.userStakes?.ETH;
           const swipeStake = p.userStakes?.SWIPE;
           
@@ -1284,40 +1256,40 @@ export function EnhancedUserDashboard() {
   
   const filteredPredictions = getFilteredPredictions();
 
-  // Calculate totals - separate ETH and SWIPE
-  const ethTotalStaked = userPredictions.reduce((sum, p) => {
+  // Calculate totals - separate ETH and SWIPE (from ALL user predictions for full statistics)
+  const ethTotalStaked = allUserPredictions.reduce((sum, p) => {
     const ethStake = p.userStakes?.ETH;
     const ethAmount = (ethStake?.yesAmount || 0) + (ethStake?.noAmount || 0);
     return sum + ethAmount;
   }, 0);
   
-  const swipeTotalStaked = userPredictions.reduce((sum, p) => {
+  const swipeTotalStaked = allUserPredictions.reduce((sum, p) => {
     const swipeStake = p.userStakes?.SWIPE;
     const swipeAmount = (swipeStake?.yesAmount || 0) + (swipeStake?.noAmount || 0);
     return sum + swipeAmount;
   }, 0);
   
-  const ethTotalPotentialPayout = userPredictions.reduce((sum, p) => {
+  const ethTotalPotentialPayout = allUserPredictions.reduce((sum, p) => {
     const ethStake = p.userStakes?.ETH;
     return sum + (ethStake?.potentialPayout || 0);
   }, 0);
   
-  const swipeTotalPotentialPayout = userPredictions.reduce((sum, p) => {
+  const swipeTotalPotentialPayout = allUserPredictions.reduce((sum, p) => {
     const swipeStake = p.userStakes?.SWIPE;
     return sum + (swipeStake?.potentialPayout || 0);
   }, 0);
   
-  const ethTotalPotentialProfit = userPredictions.reduce((sum, p) => {
+  const ethTotalPotentialProfit = allUserPredictions.reduce((sum, p) => {
     const ethStake = p.userStakes?.ETH;
     return sum + (ethStake?.potentialProfit || 0);
   }, 0);
   
-  const swipeTotalPotentialProfit = userPredictions.reduce((sum, p) => {
+  const swipeTotalPotentialProfit = allUserPredictions.reduce((sum, p) => {
     const swipeStake = p.userStakes?.SWIPE;
     return sum + (swipeStake?.potentialProfit || 0);
   }, 0);
   
-  const canClaimCount = userPredictions.filter(p => {
+  const canClaimCount = allUserPredictions.filter(p => {
     const ethStake = p.userStakes?.ETH;
     const swipeStake = p.userStakes?.SWIPE;
     
@@ -1435,6 +1407,14 @@ export function EnhancedUserDashboard() {
               <SelectItem value="all">📊 All Predictions</SelectItem>
             </SelectContent>
           </Select>
+          
+          <button 
+            onClick={handleRefresh}
+            className="refresh-button"
+            disabled={loadingStakes || predictionsLoading}
+          >
+            🔄 Refresh
+          </button>
         </div>
       </div>
 

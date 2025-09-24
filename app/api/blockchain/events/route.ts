@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createPublicClient, http, parseAbiItem } from 'viem';
 import { base } from 'viem/chains';
 import { CONTRACTS } from '../../../../lib/contract';
-import { redisHelpers } from '../../../../lib/redis';
+import { redisHelpers, redis } from '../../../../lib/redis';
 
 // Initialize public client for Base network
 const publicClient = createPublicClient({
@@ -24,8 +24,110 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const contract = contractVersion === 'V1' ? CONTRACTS.V1 : CONTRACTS.V2;
+    // All predictions use V2 contract (pred_v1_ are synced V1 predictions on V2)
+    const contract = CONTRACTS.V2;
     const predictionKey = `pred_${contractVersion.toLowerCase()}_${predictionId}`;
+
+    // Handle reward_claimed event - sync stakes data
+    if (eventType === 'reward_claimed') {
+      console.log(`💰 Syncing stakes data after reward claimed for prediction ${predictionId}`);
+      
+      try {
+        // Get participants from prediction
+        const participants = await publicClient.readContract({
+          address: contract.address as `0x${string}`,
+          abi: contract.abi,
+          functionName: 'getParticipants',
+          args: [BigInt(predictionId)],
+        }) as string[];
+
+        let stakesUpdated = 0;
+
+        // Update stakes for each participant
+        for (const participant of participants) {
+          try {
+            // V2 - get separate ETH and SWIPE stakes (all predictions use V2)
+            const [userStakeData, userSwipeStakeData] = await Promise.all([
+              publicClient.readContract({
+                address: contract.address as `0x${string}`,
+                abi: contract.abi,
+                functionName: 'userStakes',
+                args: [BigInt(predictionId), participant as `0x${string}`],
+              }) as any,
+              publicClient.readContract({
+                address: contract.address as `0x${string}`,
+                abi: contract.abi,
+                functionName: 'userSwipeStakes',
+                args: [BigInt(predictionId), participant as `0x${string}`],
+              }) as any
+            ]);
+
+            const stakeKey = `user_stakes:${participant.toLowerCase()}:${predictionKey}`;
+            
+            // V2 format - multi-token stake (all predictions use V2)
+            const ethYesAmount = userStakeData.ethYesAmount || 0;
+            const ethNoAmount = userStakeData.ethNoAmount || 0;
+            const swipeYesAmount = userSwipeStakeData.swipeYesAmount || 0;
+            const swipeNoAmount = userSwipeStakeData.swipeNoAmount || 0;
+            const ethClaimed = userStakeData.ethClaimed || false;
+            const swipeClaimed = userSwipeStakeData.swipeClaimed || false;
+
+            const stakeData: any = {
+              user: participant.toLowerCase(),
+              predictionId: predictionKey,
+              stakedAt: Math.floor(Date.now() / 1000),
+              contractVersion: 'V2'
+            };
+
+            // Add ETH stakes if any
+            if (ethYesAmount > 0 || ethNoAmount > 0) {
+              stakeData.ETH = {
+                yesAmount: Number(ethYesAmount),
+                noAmount: Number(ethNoAmount),
+                claimed: ethClaimed,
+                tokenType: 'ETH'
+              };
+            }
+
+            // Add SWIPE stakes if any
+            if (swipeYesAmount > 0 || swipeNoAmount > 0) {
+              stakeData.SWIPE = {
+                yesAmount: Number(swipeYesAmount),
+                noAmount: Number(swipeNoAmount),
+                claimed: swipeClaimed,
+                tokenType: 'SWIPE'
+              };
+            }
+
+            // Save stake data to Redis
+            await redis.set(stakeKey, JSON.stringify(stakeData));
+            stakesUpdated++;
+            console.log(`✅ Updated V2 stake for user ${participant} in prediction ${predictionId} - ETH: ${ethClaimed}, SWIPE: ${swipeClaimed}`);
+          } catch (stakeError) {
+            console.error(`❌ Failed to update stake for user ${participant}:`, stakeError);
+          }
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: `Stakes synced after reward claimed for prediction ${predictionId}`,
+          data: {
+            predictionId,
+            eventType,
+            contractVersion,
+            stakesUpdated
+          },
+          timestamp: new Date().toISOString()
+        });
+
+      } catch (error) {
+        console.error('❌ Failed to sync stakes after reward claimed:', error);
+        return NextResponse.json({
+          success: false,
+          error: 'Failed to sync stakes after reward claimed'
+        }, { status: 500 });
+      }
+    }
 
     // Get current prediction data from blockchain
     const predictionData = await publicClient.readContract({

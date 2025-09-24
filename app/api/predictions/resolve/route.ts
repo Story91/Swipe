@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
     // Auto-sync claims after resolve to update user stakes
     try {
       console.log('🔄 Auto-syncing claims after prediction resolve...');
-      const syncResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/sync/claims`, {
+      const syncResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/sync/v2/claims`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${process.env.ADMIN_API_KEY}`,

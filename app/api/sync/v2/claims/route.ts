@@ -52,8 +52,8 @@ export async function GET(request: NextRequest) {
     // Check claims for each resolved prediction
     for (const prediction of resolvedPredictions) {
       try {
-        // Extract numeric ID from prediction ID (e.g., "pred_v2_123" -> "123")
-        const numericId = prediction.id.replace(/^pred_v2_/, '');
+        // Extract numeric ID from prediction ID (e.g., "pred_v1_123" or "pred_v2_123" -> "123")
+        const numericId = prediction.id.replace(/^pred_v[12]_/, '');
         
         console.log(`🔍 Checking claims for prediction ${prediction.id} (numeric: ${numericId})...`);
 
@@ -67,9 +67,20 @@ export async function GET(request: NextRequest) {
 
         console.log(`📊 Found ${stakes.length} stakes for prediction ${prediction.id}`);
 
-        // Check each stake's claim status on blockchain
+        // Check each stake's claim status on blockchain - but only if it appears as "ready to claim" in Redis
         for (const stake of stakes) {
           try {
+            // Skip if stake doesn't appear as "ready to claim" in Redis
+            const hasUnclaimedEth = (stake as any).ETH && !(stake as any).ETH.claimed;
+            const hasUnclaimedSwipe = (stake as any).SWIPE && !(stake as any).SWIPE.claimed;
+            
+            if (!hasUnclaimedEth && !hasUnclaimedSwipe) {
+              console.log(`⏭️ Skipping user ${stake.user} - no unclaimed rewards in Redis`);
+              continue;
+            }
+
+            console.log(`🔍 Checking user ${stake.user} - appears to have unclaimed rewards in Redis`);
+
             // Get user stake data from blockchain
             const userStakeData = await retryWithBackoff(async () => {
               return await publicClient.readContract({
@@ -90,24 +101,27 @@ export async function GET(request: NextRequest) {
             let needsUpdate = false;
             const updatedStake = { ...stake } as any;
 
-            // Check ETH claims
+            // Check ETH claims - only update if Redis shows unclaimed but blockchain shows claimed
             if ((stake as any).ETH && (stake as any).ETH.claimed !== ethClaimed) {
               updatedStake.ETH.claimed = ethClaimed;
               needsUpdate = true;
-              console.log(`🔄 Updated ETH claim status for user ${stake.user}: ${ethClaimed}`);
+              console.log(`🔄 Updated ETH claim status for user ${stake.user}: Redis=${(stake as any).ETH.claimed} → Blockchain=${ethClaimed}`);
             }
 
-            // Check SWIPE claims
+            // Check SWIPE claims - only update if Redis shows unclaimed but blockchain shows claimed
             if ((stake as any).SWIPE && (stake as any).SWIPE.claimed !== swipeClaimed) {
               updatedStake.SWIPE.claimed = swipeClaimed;
               needsUpdate = true;
-              console.log(`🔄 Updated SWIPE claim status for user ${stake.user}: ${swipeClaimed}`);
+              console.log(`🔄 Updated SWIPE claim status for user ${stake.user}: Redis=${(stake as any).SWIPE.claimed} → Blockchain=${swipeClaimed}`);
             }
 
             // Save updated stake if needed
             if (needsUpdate) {
               await redisHelpers.saveUserStake(updatedStake);
               syncedClaims++;
+              console.log(`✅ Fixed claim status for user ${stake.user} in prediction ${prediction.id}`);
+            } else {
+              console.log(`✅ User ${stake.user} claim status is already correct`);
             }
 
           } catch (stakeError) {
