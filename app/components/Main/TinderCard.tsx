@@ -173,15 +173,8 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     return () => clearInterval(interval);
   }, []);
 
-  // Auto-refresh predictions every 60 seconds to catch new stakes and participants
-  useEffect(() => {
-    const interval = setInterval(() => {
-      console.log('🔄 Auto-refreshing predictions to catch new stakes and participants...');
-      refreshPredictions();
-    }, 60000); // 60 seconds - reduced frequency to prevent flickering
-    
-    return () => clearInterval(interval);
-  }, [refreshPredictions]);
+  // No auto-refresh interval - only refresh on mount and after transactions
+  // Auto-refresh was causing unnecessary flickering and API calls
 
   // Auto-refresh SWIPE allowance when modal is open and using SWIPE
   useEffect(() => {
@@ -479,7 +472,8 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
             });
             
             if (syncResponse.ok) {
-              console.log('✅ Prediction auto-synced after stake');
+              console.log('✅ Prediction auto-synced after stake - data updated in Redis');
+              // No need for refresh - auto-sync handles data updates
             } else {
               console.warn('⚠️ Auto-sync failed after stake');
             }
@@ -519,7 +513,8 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
             });
             
             if (syncResponse.ok) {
-              console.log('✅ Prediction auto-synced after stake');
+              console.log('✅ Prediction auto-synced after stake - data updated in Redis');
+              // No need for refresh - auto-sync handles data updates
             } else {
               console.warn('⚠️ Auto-sync failed after stake');
             }
