@@ -191,10 +191,13 @@ export default function App() {
           // Close modal and redirect to home page
           setIsCreateModalOpen(false);
           setActiveDashboard('tinder');
-          // Immediately refresh predictions data after successful creation
-          if (tinderCardRef.current?.refresh) {
-            tinderCardRef.current.refresh();
-          }
+          // Refresh predictions data after successful creation with delay
+          setTimeout(() => {
+            if (tinderCardRef.current?.refresh) {
+              console.log('🔄 Refreshing predictions after creation...');
+              tinderCardRef.current.refresh();
+            }
+          }, 5000); // Wait 5 seconds for data to propagate (3s auto-sync + 2s buffer)
         }}
       />
 

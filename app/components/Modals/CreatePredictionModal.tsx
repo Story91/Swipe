@@ -74,7 +74,7 @@ const CRYPTO_OPTIONS = [
 
 export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePredictionModalProps) {
   const { address } = useAccount();
-  const { writeContract, data: hash, error: writeError, isPending } = useWriteContract();
+  const { writeContract, data: hash, error: writeError, isPending, reset: resetWriteContract } = useWriteContract();
   
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
@@ -171,8 +171,12 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
       const handleSuccess = async () => {
         alert(`🎉 Prediction created successfully!\n\nTransaction: ${hash}\nView on Basescan: https://basescan.org/tx/${hash}`);
         
-        // Auto-sync the new prediction to Redis (much faster than full sync)
+        // Auto-sync the new prediction to Redis (with delay for blockchain propagation)
         try {
+          console.log('⏳ Waiting for blockchain propagation before auto-sync...');
+          // Wait for blockchain propagation and transaction finalization
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          
           console.log('🔄 Auto-syncing new prediction to Redis...');
           const syncResponse = await fetch('/api/predictions/auto-sync', {
             method: 'POST',
@@ -202,6 +206,18 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
       handleSuccess();
     }
   }, [isConfirmed, hash, onSuccess, onClose]);
+
+  // Reset wagmi state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      // Reset form and errors when modal closes
+      resetForm();
+      // Reset wagmi state to clear any pending transactions
+      if (resetWriteContract) {
+        resetWriteContract();
+      }
+    }
+  }, [isOpen, resetWriteContract]);
 
   const resetForm = () => {
     const tomorrow = new Date();

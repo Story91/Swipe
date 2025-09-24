@@ -173,22 +173,12 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     return () => clearInterval(interval);
   }, []);
 
-  // Auto-refresh predictions every 30 seconds to catch new stakes
+  // Auto-refresh predictions every 60 seconds to catch new stakes and participants
   useEffect(() => {
     const interval = setInterval(() => {
-      console.log('🔄 Auto-refreshing predictions to catch new stakes...');
+      console.log('🔄 Auto-refreshing predictions to catch new stakes and participants...');
       refreshPredictions();
-    }, 30000); // 30 seconds
-    
-    return () => clearInterval(interval);
-  }, [refreshPredictions]);
-
-  // Auto-refresh predictions every 30 seconds to catch new participants
-  useEffect(() => {
-    const interval = setInterval(() => {
-      console.log('🔄 Auto-refreshing predictions for new participants...');
-      refreshPredictions();
-    }, 30000); // Refresh every 30 seconds
+    }, 60000); // 60 seconds - reduced frequency to prevent flickering
     
     return () => clearInterval(interval);
   }, [refreshPredictions]);
@@ -549,12 +539,8 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   // Helper function for stake success
   const handleStakeSuccess = async () => {
     // Data refresh is now handled by the auto-sync in onSuccess callbacks
-    // This function just triggers UI refresh
-    setTimeout(() => {
-      if (refreshPredictions) {
-        refreshPredictions();
-      }
-    }, 1000); // Shorter delay since auto-sync is already done
+    // No need for additional refresh - auto-sync handles it
+    console.log('✅ Stake successful, auto-sync will handle data refresh');
     
     // Send Farcaster notification about successful stake
     try {
@@ -703,11 +689,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
         onSuccess: () => {
           console.log('✅ ETH reward claimed successfully');
           showNotification('success', 'Reward Claimed!', `Successfully claimed ETH reward!`);
-          setTimeout(() => {
-            if (refreshPredictions) {
-              refreshPredictions();
-            }
-          }, 3000);
+          // No need to refresh predictions after claim - data is already updated
         },
         onError: (error) => {
           console.error('❌ Claim reward transaction failed:', error);
@@ -725,11 +707,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
         onSuccess: () => {
           console.log('✅ SWIPE reward claimed successfully');
           showNotification('success', 'Reward Claimed!', `Successfully claimed SWIPE reward!`);
-          setTimeout(() => {
-            if (refreshPredictions) {
-              refreshPredictions();
-            }
-          }, 3000);
+          // No need to refresh predictions after claim - data is already updated
         },
         onError: (error) => {
           console.error('❌ Claim SWIPE reward transaction failed:', error);
@@ -771,11 +749,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
               console.warn('⚠️ Claims sync failed after resolve:', syncError);
             });
           
-          setTimeout(() => {
-            if (refreshPredictions) {
-              refreshPredictions();
-            }
-          }, 1000);
+          // Auto-sync will handle data refresh, no need for additional refresh
         } else {
           console.error('❌ Failed to resolve Redis prediction:', data.error);
           alert(`❌ Resolution failed: ${data.error}`);
@@ -807,11 +781,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
               console.warn('⚠️ Claims sync failed after blockchain resolve:', syncError);
             });
           
-          setTimeout(() => {
-            if (refreshPredictions) {
-              refreshPredictions();
-            }
-          }, 3000);
+          // Auto-sync will handle data refresh, no need for additional refresh
         },
         onError: (error) => {
           console.error('❌ Resolve prediction failed:', error);
@@ -841,11 +811,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       .then(data => {
         if (data.success) {
           console.log(`✅ Redis prediction ${predictionId} cancelled successfully`);
-          setTimeout(() => {
-            if (refreshPredictions) {
-              refreshPredictions();
-            }
-          }, 1000);
+          // Auto-sync will handle data refresh, no need for additional refresh
         } else {
           console.error('❌ Failed to cancel Redis prediction:', data.error);
           alert(`❌ Cancellation failed: ${data.error}`);
@@ -866,11 +832,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       }, {
         onSuccess: () => {
           console.log(`✅ Prediction ${predictionId} cancelled successfully`);
-          setTimeout(() => {
-            if (refreshPredictions) {
-              refreshPredictions();
-            }
-          }, 3000);
+          // Auto-sync will handle data refresh, no need for additional refresh
         },
         onError: (error) => {
           console.error('❌ Cancel prediction failed:', error);
@@ -916,11 +878,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
           console.warn('⚠️ Auto-sync request failed:', syncError);
         }
 
-        setTimeout(() => {
-          if (refreshPredictions) {
-            refreshPredictions();
-          }
-        }, 3000);
+        // Auto-sync will handle data refresh, no need for additional refresh
       },
       onError: (error) => {
         console.error('❌ Approve prediction failed:', error);
@@ -942,11 +900,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     }, {
       onSuccess: () => {
         console.log(`✅ Prediction ${predictionId} rejected successfully`);
-        setTimeout(() => {
-          if (refreshPredictions) {
-            refreshPredictions();
-          }
-        }, 3000);
+        // Auto-sync will handle data refresh, no need for additional refresh
       },
       onError: (error) => {
         console.error('❌ Reject prediction failed:', error);
