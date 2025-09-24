@@ -173,7 +173,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   const dashboardChangeHandler = onDashboardChange || setInternalActiveDashboard;
   
   // Use hybrid predictions hook
-  const { predictions: hybridPredictions, loading: predictionsLoading, error: predictionsError, refresh: refreshPredictions } = useHybridPredictions();
+  const { predictions: hybridPredictions, loading: predictionsLoading, error: predictionsError, refresh: refreshPredictions, fetchAllPredictions } = useHybridPredictions();
   
   // State for forcing re-render of time display
   const [timeUpdate, setTimeUpdate] = useState(0);
@@ -186,6 +186,14 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     
     return () => clearInterval(interval);
   }, []);
+
+  // Fetch all predictions when admin dashboard is active
+  useEffect(() => {
+    if (activeDashboard === 'admin' && fetchAllPredictions) {
+      console.log('🔄 Admin dashboard: fetching ALL predictions...');
+      fetchAllPredictions(); // Fetch all predictions for admin dashboard
+    }
+  }, [activeDashboard, fetchAllPredictions]);
 
   // No auto-refresh interval - only refresh on mount and after transactions
   // Auto-refresh was causing unnecessary flickering and API calls

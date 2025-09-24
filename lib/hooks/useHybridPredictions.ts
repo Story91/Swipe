@@ -109,16 +109,16 @@ export function useHybridPredictions() {
     });
   }, []);
   
-  // Main fetch function - fetch ALL predictions from Redis
+  // Main fetch function - fetch ACTIVE predictions from Redis (optimized for main page)
   const fetchAllPredictions = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      // Fetch ALL predictions from Redis (not just active ones)
-      console.log('🔄 Fetching ALL predictions from Redis...');
-      await fetchRedisPredictions(); // No status filter - get all predictions
-      console.log('✅ All predictions fetched from Redis successfully');
+      // Fetch only ACTIVE predictions from Redis for better performance
+      console.log('🔄 Fetching ACTIVE predictions from Redis...');
+      await fetchRedisPredictions({ status: 'active' }); // Only active predictions
+      console.log('✅ Active predictions fetched from Redis successfully');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch predictions';
       setError(errorMessage);
@@ -163,11 +163,30 @@ export function useHybridPredictions() {
   //   return () => clearInterval(interval);
   // }, [fetchAllPredictions]);
   
+  // Function to fetch ALL predictions (for admin/user dashboards)
+  const fetchAllPredictionsComplete = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      console.log('🔄 Fetching ALL predictions from Redis...');
+      await fetchRedisPredictions(); // No filter - get all predictions
+      console.log('✅ All predictions fetched from Redis successfully');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch predictions';
+      setError(errorMessage);
+      console.error('❌ Failed to fetch all predictions:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchRedisPredictions]);
+
   return {
     predictions,
     loading: loading || redisLoading,
     error: error || redisError,
-    fetchPredictions: fetchAllPredictions,
+    fetchPredictions: fetchAllPredictions, // Default: active only
+    fetchAllPredictions: fetchAllPredictionsComplete, // All predictions
     refresh: fetchAllPredictions,
     // Manual refresh functions for specific actions
     refreshAfterStake: () => {

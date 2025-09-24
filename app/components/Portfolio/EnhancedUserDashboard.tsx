@@ -236,7 +236,7 @@ export function EnhancedUserDashboard() {
   };
   
   // Hybrid predictions hook (includes both Redis and blockchain data)
-  const { predictions: allPredictions, loading: predictionsLoading, error: predictionsError, refresh: refreshPredictions } = useHybridPredictions();
+  const { predictions: allPredictions, loading: predictionsLoading, error: predictionsError, refresh: refreshPredictions, fetchAllPredictions } = useHybridPredictions();
 
   // Fetch user transactions with cache
   const fetchUserTransactions = useCallback(async (forceRefresh: boolean = false) => {
@@ -782,6 +782,14 @@ export function EnhancedUserDashboard() {
       }
     }
   }, [userTransactions, checkAndSyncClaims, address]);
+
+  // Fetch ALL predictions for user dashboard (not just active ones)
+  useEffect(() => {
+    if (address && fetchAllPredictions) {
+      console.log('🔄 User dashboard: fetching ALL predictions...');
+      fetchAllPredictions(); // Fetch all predictions for user dashboard
+    }
+  }, [address, fetchAllPredictions]);
 
   // Fetch user stakes when predictions are loaded - only ready-to-claim initially
   useEffect(() => {
