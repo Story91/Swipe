@@ -136,22 +136,14 @@ export function useHybridPredictions() {
     }
   }, [redisPredictions, transformPredictions]);
   
-  // Fetch predictions on mount and when wallet connects
+  // Fetch predictions on mount and when wallet connects - but only once
   useEffect(() => {
+    // Always fetch on mount, regardless of wallet status
     fetchAllPredictions();
   }, []); // Only on mount
   
-  // Refresh when user connects wallet (but not on disconnect)
-  useEffect(() => {
-    if (address) {
-      // Small delay to avoid rapid refreshes
-      const timeoutId = setTimeout(() => {
-        fetchAllPredictions();
-      }, 1000);
-      
-      return () => clearTimeout(timeoutId);
-    }
-  }, [address]);
+  // No additional fetch when wallet connects - data is already loaded
+  // This prevents double loading and flickering
   
   // No auto-refresh - only manual refresh when needed
   // useEffect(() => {

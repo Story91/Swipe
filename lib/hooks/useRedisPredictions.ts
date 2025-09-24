@@ -298,10 +298,8 @@ export function useRedisPredictions() {
     ]);
   }, [fetchPredictions, fetchMarketStats]);
 
-  // Initial data fetch only - no auto-refresh
-  useEffect(() => {
-    refreshData();
-  }, []); // Only on mount
+  // No automatic data fetch - let useHybridPredictions handle it
+  // This prevents double loading and conflicts
 
   return {
     // State

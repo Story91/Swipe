@@ -193,7 +193,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       console.log('🔄 Admin dashboard: fetching ALL predictions...');
       fetchAllPredictions(); // Fetch all predictions for admin dashboard
     }
-  }, [activeDashboard, fetchAllPredictions]);
+  }, [activeDashboard]); // Remove fetchAllPredictions from dependencies to prevent re-calls
 
   // No auto-refresh interval - only refresh on mount and after transactions
   // Auto-refresh was causing unnecessary flickering and API calls
@@ -426,12 +426,36 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       return isNotExpired && isNotResolved && isNotCancelled && isApproved;
     });
     
+    // Sort active items by deadline (closest deadline first), then by ID as tiebreaker
+    const sortedItems = activeItems.sort((a, b) => {
+      // Find corresponding predictions for sorting
+      const predictionA = transformedPredictions.find(p => p.id === a.id);
+      const predictionB = transformedPredictions.find(p => p.id === b.id);
+      
+      // Sort by deadline (closest first)
+      const deadlineA = predictionA?.deadline || 0;
+      const deadlineB = predictionB?.deadline || 0;
+      
+      if (deadlineA !== deadlineB) {
+        return deadlineA - deadlineB; // Closest deadline first
+      }
+      
+      // If deadlines are equal, sort by ID
+      return a.id - b.id;
+    });
+    
     // Log only when the actual data changes, not every second
-    if (activeItems.length > 0) {
-      console.log(`📊 Total predictions: ${allItems.length}, Active predictions: ${activeItems.length}`);
+    if (sortedItems.length > 0) {
+      console.log(`📊 Total predictions: ${allItems.length}, Active predictions: ${sortedItems.length}`);
+      console.log(`📊 Card order:`, sortedItems.map(item => `ID:${item.id}`));
     }
-    return activeItems;
+    return sortedItems;
   }, [realCardItems, items, transformedPredictions]);
+
+  // Reset currentIndex when cardItems change (new data loaded)
+  useEffect(() => {
+    setCurrentIndex(0);
+  }, [cardItems.length]); // Reset when number of cards changes
 
   // Auto-sync after stake transaction confirmation
   useEffect(() => {
@@ -1295,10 +1319,10 @@ KEY USER-FACING CHANGES: V1 → V2
   // State for copied addresses animation
   const [copiedAddresses, setCopiedAddresses] = useState<Set<string>>(new Set());
   
-  // Fetch user stakes for current prediction
+  // Fetch user stakes for current prediction - only when card changes, not when data loads
   useEffect(() => {
     const fetchUserStakes = async () => {
-      if (!currentCard || !currentCard.id || !hybridPredictions) return;
+      if (!currentCard || !currentCard.id || !hybridPredictions || hybridPredictions.length === 0) return;
       
       // Find the original prediction ID from hybridPredictions
       const currentPrediction = hybridPredictions.find(hp => {
@@ -1345,7 +1369,7 @@ KEY USER-FACING CHANGES: V1 → V2
     };
     
     fetchUserStakes();
-  }, [currentCard?.id, hybridPredictions]); // Depend on both currentCard.id and hybridPredictions
+  }, [currentCard?.id]); // Only depend on currentCard.id, not hybridPredictions
   
   // Use Farcaster profiles hook at top level to avoid conditional hook calls
   const { profiles, loading: profilesLoading } = useFarcasterProfiles(currentCardParticipants);
