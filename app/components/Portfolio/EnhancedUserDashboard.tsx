@@ -789,7 +789,7 @@ export function EnhancedUserDashboard() {
       console.log('🔄 User dashboard: fetching ALL predictions...');
       fetchAllPredictions(); // Fetch all predictions for user dashboard
     }
-  }, [address, fetchAllPredictions]);
+  }, [address]); // Remove fetchAllPredictions from dependencies to avoid conflicts
 
   // Fetch user stakes when predictions are loaded - only ready-to-claim initially
   useEffect(() => {
