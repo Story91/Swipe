@@ -1905,14 +1905,6 @@ KEY USER-FACING CHANGES: V1 → V2
                    {(() => {
                      const pred = transformedPredictions[currentIndex];
                      const ethAmount = (pred?.yesTotalAmount || 0) / 1e18;
-                     // Don't add SWIPE to ETH display - they are separate tokens
-                     console.log('🔍 YES Amount Debug:', {
-                       predId: pred?.id,
-                       yesTotalAmount: pred?.yesTotalAmount,
-                       swipeYesTotalAmount: pred?.swipeYesTotalAmount,
-                       ethAmount,
-                       swipeAmount: (pred?.swipeYesTotalAmount || 0) / 1e18
-                     });
                      return ethAmount > 0 ? ethAmount.toFixed(5) : '0.00000';
                    })()} ETH
                  </span>
@@ -1923,14 +1915,6 @@ KEY USER-FACING CHANGES: V1 → V2
                    {(() => {
                      const pred = transformedPredictions[currentIndex];
                      const ethAmount = (pred?.noTotalAmount || 0) / 1e18;
-                     // Don't add SWIPE to ETH display - they are separate tokens
-                     console.log('🔍 NO Amount Debug:', {
-                       predId: pred?.id,
-                       noTotalAmount: pred?.noTotalAmount,
-                       swipeNoTotalAmount: pred?.swipeNoTotalAmount,
-                       ethAmount,
-                       swipeAmount: (pred?.swipeNoTotalAmount || 0) / 1e18
-                     });
                      return ethAmount > 0 ? ethAmount.toFixed(5) : '0.00000';
                    })()} ETH
                  </span>
