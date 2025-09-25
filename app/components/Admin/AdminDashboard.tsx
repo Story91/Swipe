@@ -51,8 +51,13 @@ export function AdminDashboard({
   // Filter state
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
   
-  // Use Redis predictions hook to get all predictions
-  const { predictions: redisPredictions, loading: predictionsLoading, error: predictionsError, refreshData } = useRedisPredictions();
+  // Use Redis predictions hook to get ALL predictions (not just active ones)
+  const { predictions: redisPredictions, loading: predictionsLoading, error: predictionsError, refreshData, fetchPredictions } = useRedisPredictions();
+  
+  // Fetch ALL predictions (not just active) when admin dashboard loads
+  useEffect(() => {
+    fetchPredictions(); // No filter - get all predictions
+  }, []); // Only run once on mount
   
   // Filter out duplicate predictions - only keep synced ones (pred_v1_, pred_v2_) and exclude pure Redis ones (pred_*)
   const filteredRedisPredictions = redisPredictions.filter(p => 
@@ -75,6 +80,7 @@ export function AdminDashboard({
     resolutionDeadline: p.resolutionDeadline || (p.deadline + (7 * 24 * 60 * 60)) // Use existing or calculate
   })) : propPredictions;
 
+
   // Get contract stats
   const { data: contractStats } = useReadContract({
     address: CONTRACTS.V2.address as `0x${string}`,
@@ -95,8 +101,10 @@ export function AdminDashboard({
   const [error, setError] = React.useState<string | null>(null);
 
   // Categorize predictions
-  // Use real data if available, fallback to props
-  const displayPredictions = realPredictions.length > 0 ? realPredictions : predictions;
+  // Use Redis predictions (which include all data) instead of blockchain-only data
+  // This prevents duplicates and ensures we have the most up-to-date information
+  const displayPredictions = predictions.length > 0 ? predictions : realPredictions;
+
   
   // Helper function to check if prediction needs resolution
   const needsResolution = (prediction: Prediction) => {
@@ -104,7 +112,8 @@ export function AdminDashboard({
     
     // For Redis predictions, check if deadline has passed
     if (typeof prediction.id === 'string') {
-      return Date.now() / 1000 > prediction.deadline;
+      const currentTime = Date.now() / 1000;
+      return currentTime > prediction.deadline;
     }
     
     // For on-chain predictions, check resolution deadline
@@ -114,17 +123,21 @@ export function AdminDashboard({
   
   // Filter predictions based on selected filter
   const getFilteredPredictions = () => {
+    const currentTime = Date.now() / 1000;
+    
     switch (selectedFilter) {
       case 'active':
-        return displayPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline > Date.now() / 1000);
+        return displayPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline > currentTime);
       case 'expired':
-        return displayPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline <= Date.now() / 1000);
+        // Expired = deadline passed but still unresolved (same as needs-resolution)
+        return displayPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline <= currentTime);
       case 'resolved':
         return displayPredictions.filter(p => p.resolved);
       case 'cancelled':
         return displayPredictions.filter(p => p.cancelled);
       case 'needs-resolution':
-        return displayPredictions.filter(p => needsResolution(p));
+        // Needs resolution = expired and not resolved/cancelled (same as expired)
+        return displayPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline <= currentTime);
       case 'v1':
         return displayPredictions.filter(p => typeof p.id === 'string' && p.id.startsWith('pred_v1_'));
       case 'v2':
@@ -259,50 +272,8 @@ export function AdminDashboard({
   const handleResolve = async (predictionId: string | number, outcome: boolean) => {
     const side = outcome ? 'YES' : 'NO';
     if (confirm(`Are you sure you want to resolve this prediction as ${side}?`)) {
-      // Check if this is a synced on-chain prediction (string ID starting with 'pred_v1_' or 'pred_v2_') or on-chain prediction (number ID)
-      if (typeof predictionId === 'string' && (predictionId.startsWith('pred_v1_') || predictionId.startsWith('pred_v2_'))) {
-        // This is a synced on-chain prediction - call the contract directly
-        const isV1 = predictionId.startsWith('pred_v1_');
-        const numericId = parseInt(predictionId.replace('pred_v1_', '').replace('pred_v2_', ''));
-        if (!isNaN(numericId)) {
-          console.log(`🔄 Resolving ${isV1 ? 'V1' : 'V2'} on-chain prediction ${predictionId} (numeric ID: ${numericId}) as ${side}`);
-          onResolvePrediction(numericId, outcome, isV1 ? 'V1' : 'V2');
-        } else {
-          alert(`❌ Invalid ${isV1 ? 'V1' : 'V2'} prediction ID format`);
-          return;
-        }
-      } else if (typeof predictionId === 'string' && predictionId.startsWith('pred_')) {
-        // This is a pure Redis prediction (not synced from blockchain) - handle via API
-        try {
-          const response = await fetch('/api/predictions/resolve', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              predictionId: predictionId,
-              outcome: outcome,
-              reason: `Admin resolved as ${side}`
-            }),
-          });
-          
-          if (response.ok) {
-            console.log(`✅ Redis prediction ${predictionId} resolved as ${side}`);
-            // Refresh data
-            handleRefresh();
-          } else {
-            const errorData = await response.json();
-            console.error('Failed to resolve Redis prediction:', errorData.error);
-            alert(`Failed to resolve prediction: ${errorData.error}`);
-          }
-        } catch (error) {
-          console.error('Error resolving Redis prediction:', error);
-          alert('Failed to resolve prediction');
-        }
-      } else {
-        // Handle on-chain prediction (numeric ID)
-        onResolvePrediction(predictionId, outcome);
-      }
+      // Use handleDirectResolve for all cases - it has auto-sync built in
+      handleDirectResolve(predictionId, outcome);
     }
   };
 
@@ -375,7 +346,7 @@ export function AdminDashboard({
     return `${hours} hours`;
   };
 
-  // Direct contract transaction functions (bypass UI state)
+  // Enhanced resolve function with auto-sync (replaces both handleResolve and handleDirectResolve)
   const handleDirectResolve = async (predictionId: string | number, outcome: boolean) => {
     const side = outcome ? 'YES' : 'NO';
     let numericId: number | null = null;
@@ -386,8 +357,33 @@ export function AdminDashboard({
       contractVersion = predictionId.startsWith('pred_v1_') ? 'V1' : 'V2';
       numericId = parseInt(predictionId.replace('pred_v1_', '').replace('pred_v2_', ''));
     } else if (typeof predictionId === 'string' && predictionId.startsWith('pred_')) {
-      // Pure Redis prediction - cannot do direct contract transaction
-      alert('❌ Cannot perform direct contract transaction on pure Redis prediction. Use regular resolve instead.');
+      // Pure Redis prediction - use API resolve (which has auto-sync)
+      try {
+        const response = await fetch('/api/predictions/resolve', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            predictionId: predictionId,
+            outcome: outcome,
+            reason: `Admin resolved as ${side}`
+          }),
+        });
+        
+        if (response.ok) {
+          console.log(`✅ Redis prediction ${predictionId} resolved as ${side}`);
+          // API already handles auto-sync and claims update
+          handleRefresh();
+        } else {
+          const errorData = await response.json();
+          console.error('Failed to resolve Redis prediction:', errorData.error);
+          alert(`Failed to resolve prediction: ${errorData.error}`);
+        }
+      } catch (error) {
+        console.error('Error resolving Redis prediction:', error);
+        alert('Failed to resolve prediction');
+      }
       return;
     } else if (typeof predictionId === 'number') {
       numericId = predictionId;
@@ -401,128 +397,64 @@ export function AdminDashboard({
 
     const contract = contractVersion === 'V1' ? CONTRACTS.V1 : CONTRACTS.V2;
 
-    if (confirm(`🚨 FORCE RESOLVE: Are you sure you want to resolve prediction ${numericId} as ${side} on the ${contractVersion} blockchain? This will execute a real transaction.`)) {
-      try {
-        writeContract({
-          address: contract.address as `0x${string}`,
-          abi: contract.abi,
-          functionName: 'resolvePrediction',
-          args: [BigInt(numericId), outcome],
-        }, {
-          onSuccess: async (tx) => {
-            console.log(`✅ FORCE RESOLVE: Prediction ${numericId} resolved successfully on ${contractVersion}:`, tx);
-            alert(`✅ FORCE RESOLVE SUCCESS!\nPrediction ${numericId} resolved as ${side} on ${contractVersion}\nTransaction: ${tx}\n\nSyncing with Redis...`);
+    try {
+      writeContract({
+        address: contract.address as `0x${string}`,
+        abi: contract.abi,
+        functionName: 'resolvePrediction',
+        args: [BigInt(numericId), outcome],
+      }, {
+        onSuccess: async (tx) => {
+          console.log(`✅ Prediction ${numericId} resolved successfully on ${contractVersion}:`, tx);
+          alert(`✅ Prediction resolved as ${side}!\nTransaction: ${tx}\n\nAuto-syncing with Redis...`);
+          
+          // Auto-sync single prediction (like TinderCard stake)
+          try {
+            console.log('🔄 Auto-syncing single prediction after resolve...');
+            const syncResponse = await fetch('/api/blockchain/events', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                eventType: 'prediction_resolved',
+                predictionId: numericId,
+                contractVersion: contractVersion
+              })
+            });
             
-            // Force sync with blockchain to update Redis immediately
-            try {
-              console.log('🔄 Syncing blockchain to Redis after FORCE RESOLVE...');
-              const syncResponse = await fetch('/api/sync');
-              if (syncResponse.ok) {
-                console.log('✅ Redis sync successful after FORCE RESOLVE');
-                
-                // Also sync claims to update user stakes
-                console.log('🔄 Syncing claims after FORCE RESOLVE...');
-                const claimsSyncResponse = await fetch('/api/sync/v2/claims');
-                if (claimsSyncResponse.ok) {
-                  console.log('✅ Claims sync successful after FORCE RESOLVE');
-                } else {
-                  console.warn('⚠️ Claims sync failed after FORCE RESOLVE');
-                }
-                
-                alert(`✅ SYNC COMPLETE!\nPrediction ${numericId} resolved as ${side}\nTransaction: ${tx}\n\nRedis and claims have been updated. Refreshing data...`);
-                // Refresh data after successful sync
-                setTimeout(() => {
-                  handleRefresh();
-                }, 2000);
+            if (syncResponse.ok) {
+              console.log('✅ Single prediction sync successful after resolve');
+              
+              // Also sync claims to update user stakes
+              console.log('🔄 Auto-syncing claims after resolve...');
+              const claimsSyncResponse = await fetch('/api/sync/v2/claims');
+              if (claimsSyncResponse.ok) {
+                console.log('✅ Claims sync successful after resolve');
               } else {
-                console.warn('⚠️ Redis sync failed after FORCE RESOLVE');
-                alert(`⚠️ WARNING: Transaction successful but sync failed!\nPrediction ${numericId} resolved as ${side}\nTransaction: ${tx}\n\nPlease manually refresh the page.`);
+                console.warn('⚠️ Claims sync failed after resolve');
               }
-            } catch (syncError) {
-              console.error('❌ Failed to sync after FORCE RESOLVE:', syncError);
+              
+              alert(`✅ Auto-sync complete!\nPrediction ${numericId} resolved as ${side}\nRedis and claims updated. Refreshing data...`);
+              // Refresh data after successful sync
+              setTimeout(() => {
+                handleRefresh();
+              }, 2000);
+            } else {
+              console.warn('⚠️ Single prediction sync failed after resolve');
               alert(`⚠️ WARNING: Transaction successful but sync failed!\nPrediction ${numericId} resolved as ${side}\nTransaction: ${tx}\n\nPlease manually refresh the page.`);
             }
-          },
-          onError: (error) => {
-            console.error('❌ FORCE RESOLVE FAILED:', error);
-            alert(`❌ FORCE RESOLVE FAILED!\nPrediction ${numericId}\nError: ${error.message || error}\n\nPlease check your wallet and try again.`);
+          } catch (syncError) {
+            console.error('❌ Failed to auto-sync single prediction after resolve:', syncError);
+            alert(`⚠️ WARNING: Transaction successful but sync failed!\nPrediction ${numericId} resolved as ${side}\nTransaction: ${tx}\n\nPlease manually refresh the page.`);
           }
-        });
-      } catch (error) {
-        console.error('❌ FORCE RESOLVE ERROR:', error);
-        alert(`❌ FORCE RESOLVE ERROR!\nPrediction ${numericId}\nError: ${error}`);
-      }
-    }
-  };
-
-  const handleDirectCancel = async (predictionId: string | number) => {
-    const reason = prompt('🚨 FORCE CANCEL: Enter reason for emergency cancellation:');
-    if (!reason) return;
-
-    let numericId: number | null = null;
-    let contractVersion: 'V1' | 'V2' = 'V2'; // Default to V2
-    
-    if (typeof predictionId === 'string' && (predictionId.startsWith('pred_v1_') || predictionId.startsWith('pred_v2_'))) {
-      // V1 or V2 synced prediction
-      contractVersion = predictionId.startsWith('pred_v1_') ? 'V1' : 'V2';
-      numericId = parseInt(predictionId.replace('pred_v1_', '').replace('pred_v2_', ''));
-    } else if (typeof predictionId === 'string' && predictionId.startsWith('pred_')) {
-      // Pure Redis prediction - cannot do direct contract transaction
-      alert('❌ Cannot perform direct contract transaction on pure Redis prediction. Use regular cancel instead.');
-      return;
-    } else if (typeof predictionId === 'number') {
-      numericId = predictionId;
-      // For numeric IDs, we can't determine version, so default to V2
-    }
-    
-    if (!numericId || isNaN(numericId)) {
-      alert('❌ Invalid prediction ID for contract transaction');
-      return;
-    }
-
-    const contract = contractVersion === 'V1' ? CONTRACTS.V1 : CONTRACTS.V2;
-
-    if (confirm(`🚨 FORCE CANCEL: Are you sure you want to cancel prediction ${numericId} on the ${contractVersion} blockchain?\nReason: ${reason}\n\nThis will execute a real transaction.`)) {
-      try {
-        writeContract({
-          address: contract.address as `0x${string}`,
-          abi: contract.abi,
-          functionName: 'cancelPrediction',
-          args: [BigInt(numericId), reason],
-        }, {
-          onSuccess: async (tx) => {
-            console.log(`✅ FORCE CANCEL: Prediction ${numericId} cancelled successfully on ${contractVersion}:`, tx);
-            alert(`✅ FORCE CANCEL SUCCESS!\nPrediction ${numericId} cancelled on ${contractVersion}\nReason: ${reason}\nTransaction: ${tx}\n\nSyncing with Redis...`);
-            
-            // Force sync with blockchain to update Redis immediately
-            try {
-              console.log('🔄 Syncing blockchain to Redis after FORCE CANCEL...');
-              const syncResponse = await fetch('/api/sync');
-              if (syncResponse.ok) {
-                console.log('✅ Redis sync successful after FORCE CANCEL');
-                alert(`✅ SYNC COMPLETE!\nPrediction ${numericId} cancelled\nReason: ${reason}\nTransaction: ${tx}\n\nRedis has been updated. Refreshing data...`);
-                // Refresh data after successful sync
-                setTimeout(() => {
-                  handleRefresh();
-                }, 2000);
-              } else {
-                console.warn('⚠️ Redis sync failed after FORCE CANCEL');
-                alert(`⚠️ WARNING: Transaction successful but sync failed!\nPrediction ${numericId} cancelled\nReason: ${reason}\nTransaction: ${tx}\n\nPlease manually refresh the page.`);
-              }
-            } catch (syncError) {
-              console.error('❌ Failed to sync after FORCE CANCEL:', syncError);
-              alert(`⚠️ WARNING: Transaction successful but sync failed!\nPrediction ${numericId} cancelled\nReason: ${reason}\nTransaction: ${tx}\n\nPlease manually refresh the page.`);
-            }
-          },
-          onError: (error) => {
-            console.error('❌ FORCE CANCEL FAILED:', error);
-            alert(`❌ FORCE CANCEL FAILED!\nPrediction ${numericId}\nError: ${error.message || error}\n\nPlease check your wallet and try again.`);
-          }
-        });
-      } catch (error) {
-        console.error('❌ FORCE CANCEL ERROR:', error);
-        alert(`❌ FORCE CANCEL ERROR!\nPrediction ${numericId}\nError: ${error}`);
-      }
+        },
+        onError: (error) => {
+          console.error('❌ Resolve failed:', error);
+          alert(`❌ Resolve failed!\nPrediction ${numericId}\nError: ${error.message || error}\n\nPlease check your wallet and try again.`);
+        }
+      });
+    } catch (error) {
+      console.error('❌ Resolve error:', error);
+      alert(`❌ Resolve error!\nPrediction ${numericId}\nError: ${error}`);
     }
   };
 
@@ -922,35 +854,6 @@ export function AdminDashboard({
                 </button>
               </div>
 
-              {/* Force Contract Transaction Buttons */}
-              <div className="force-buttons" style={{ marginTop: '10px', padding: '10px', background: 'rgba(255, 0, 0, 0.1)', borderRadius: '8px', border: '1px solid rgba(255, 0, 0, 0.3)' }}>
-                <div style={{ fontSize: '12px', color: '#dc2626', fontWeight: 'bold', marginBottom: '8px' }}>
-                  🚨 FORCE CONTRACT TRANSACTIONS (Bypass UI State)
-                </div>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  <button
-                    className="btn"
-                    style={{ background: '#dc2626', color: 'white', fontSize: '12px', padding: '6px 12px' }}
-                    onClick={() => handleDirectResolve(prediction.id, true)}
-                  >
-                    🔥 FORCE YES
-                  </button>
-                  <button
-                    className="btn"
-                    style={{ background: '#dc2626', color: 'white', fontSize: '12px', padding: '6px 12px' }}
-                    onClick={() => handleDirectResolve(prediction.id, false)}
-                  >
-                    🔥 FORCE NO
-                  </button>
-                  <button
-                    className="btn"
-                    style={{ background: '#dc2626', color: 'white', fontSize: '12px', padding: '6px 12px' }}
-                    onClick={() => handleDirectCancel(prediction.id)}
-                  >
-                    🔥 FORCE CANCEL
-                  </button>
-                </div>
-              </div>
             </div>
           );
         })}
@@ -1001,35 +904,6 @@ export function AdminDashboard({
                 </button>
               </div>
 
-              {/* Force Contract Transaction Buttons */}
-              <div className="force-buttons" style={{ marginTop: '10px', padding: '10px', background: 'rgba(255, 0, 0, 0.1)', borderRadius: '8px', border: '1px solid rgba(255, 0, 0, 0.3)' }}>
-                <div style={{ fontSize: '12px', color: '#dc2626', fontWeight: 'bold', marginBottom: '8px' }}>
-                  🚨 FORCE CONTRACT TRANSACTIONS (Bypass UI State)
-                </div>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  <button
-                    className="btn"
-                    style={{ background: '#dc2626', color: 'white', fontSize: '12px', padding: '6px 12px' }}
-                    onClick={() => handleDirectResolve(prediction.id, true)}
-                  >
-                    🔥 FORCE YES
-                  </button>
-                  <button
-                    className="btn"
-                    style={{ background: '#dc2626', color: 'white', fontSize: '12px', padding: '6px 12px' }}
-                    onClick={() => handleDirectResolve(prediction.id, false)}
-                  >
-                    🔥 FORCE NO
-                  </button>
-                  <button
-                    className="btn"
-                    style={{ background: '#dc2626', color: 'white', fontSize: '12px', padding: '6px 12px' }}
-                    onClick={() => handleDirectCancel(prediction.id)}
-                  >
-                    🔥 FORCE CANCEL
-                  </button>
-                </div>
-              </div>
             </div>
           );
         })}
@@ -1081,38 +955,6 @@ export function AdminDashboard({
                 </button>
               </div>
 
-              {/* Force Contract Transaction Buttons - Even for resolved predictions */}
-              <div className="force-buttons" style={{ marginTop: '10px', padding: '10px', background: 'rgba(255, 0, 0, 0.1)', borderRadius: '8px', border: '1px solid rgba(255, 0, 0, 0.3)' }}>
-                <div style={{ fontSize: '12px', color: '#dc2626', fontWeight: 'bold', marginBottom: '8px' }}>
-                  🚨 FORCE CONTRACT TRANSACTIONS (Bypass UI State)
-                </div>
-                <div style={{ fontSize: '10px', color: '#dc2626', marginBottom: '8px' }}>
-                  ⚠️ WARNING: This prediction appears resolved in UI, but you can force contract transactions
-                </div>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  <button
-                    className="btn"
-                    style={{ background: '#dc2626', color: 'white', fontSize: '12px', padding: '6px 12px' }}
-                    onClick={() => handleDirectResolve(prediction.id, true)}
-                  >
-                    🔥 FORCE YES
-                  </button>
-                  <button
-                    className="btn"
-                    style={{ background: '#dc2626', color: 'white', fontSize: '12px', padding: '6px 12px' }}
-                    onClick={() => handleDirectResolve(prediction.id, false)}
-                  >
-                    🔥 FORCE NO
-                  </button>
-                  <button
-                    className="btn"
-                    style={{ background: '#dc2626', color: 'white', fontSize: '12px', padding: '6px 12px' }}
-                    onClick={() => handleDirectCancel(prediction.id)}
-                  >
-                    🔥 FORCE CANCEL
-                  </button>
-                </div>
-              </div>
             </div>
           );
         })}
@@ -1230,38 +1072,6 @@ export function AdminDashboard({
                 </button>
               </div>
 
-              {/* Force Contract Transaction Buttons */}
-              <div style={{ marginTop: '10px', padding: '10px', border: '2px solid #ff4444', borderRadius: '8px', backgroundColor: '#ffe6e6' }}>
-                <div style={{ color: '#ff4444', fontWeight: 'bold', marginBottom: '8px' }}>
-                  🔥 FORCE CONTRACT TRANSACTIONS (Bypass UI State)
-                </div>
-                <div style={{ color: '#ff4444', fontSize: '12px', marginBottom: '8px' }}>
-                  ⚠️ WARNING: This prediction appears expired in UI, but you can force contract transactions
-                </div>
-                <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-                  <button 
-                    className="btn btn-danger"
-                    onClick={() => handleDirectResolve(prediction.id, true)}
-                    style={{ fontSize: '11px', padding: '4px 8px' }}
-                  >
-                    🔥 FORCE YES
-                  </button>
-                  <button 
-                    className="btn btn-danger"
-                    onClick={() => handleDirectResolve(prediction.id, false)}
-                    style={{ fontSize: '11px', padding: '4px 8px' }}
-                  >
-                    🔥 FORCE NO
-                  </button>
-                  <button 
-                    className="btn btn-danger"
-                    onClick={() => handleDirectCancel(prediction.id)}
-                    style={{ fontSize: '11px', padding: '4px 8px' }}
-                  >
-                    🔥 FORCE CANCEL
-                  </button>
-                </div>
-              </div>
             </div>
           );
         })}

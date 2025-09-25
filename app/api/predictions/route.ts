@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
       predictions = await redisHelpers.getAllPredictions();
       predictions = predictions.filter(p => p.creator.toLowerCase() === creator.toLowerCase());
     } else {
+      // No filter - get ALL predictions (including expired ones for admin)
       predictions = await redisHelpers.getAllPredictions();
     }
     

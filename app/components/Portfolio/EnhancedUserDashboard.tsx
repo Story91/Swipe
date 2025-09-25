@@ -243,15 +243,7 @@ export function EnhancedUserDashboard() {
   const fetchUserTransactions = useCallback(async (forceRefresh: boolean = false) => {
     if (!address) return;
     
-    // Try to load from cache first (unless force refresh)
-    if (!forceRefresh) {
-      const cachedTransactions = loadFromCache(`user_transactions_${address.toLowerCase()}`, 2 * 60 * 1000); // 2 minutes cache
-      if (cachedTransactions) {
-        console.log('📦 Using cached user transactions');
-        setUserTransactions(cachedTransactions);
-        return;
-      }
-    }
+    // Always fetch fresh from Redis - no cache
     
     setLoadingTransactions(true);
     try {
@@ -262,8 +254,7 @@ export function EnhancedUserDashboard() {
       setUserTransactions(transactions);
       console.log(`📊 Loaded ${transactions.length} user transactions`);
       
-      // Save to cache
-      saveToCache(transactions, `user_transactions_${address.toLowerCase()}`);
+      // No cache - always fresh from Redis
     } catch (error) {
       console.error('Failed to fetch user transactions:', error);
     } finally {
@@ -271,22 +262,60 @@ export function EnhancedUserDashboard() {
     }
   }, [address]);
 
-  // Fetch ALL user predictions (for statistics) - optimized with single API call
-  const fetchAllUserPredictions = useCallback(async (forceRefresh: boolean = false) => {
-    if (!address) {
-      console.log('❌ No address connected, skipping fetchAllUserPredictions');
-      return;
-    }
+         // No more cache - always fetch fresh from Redis
+
+         // Incremental update function - add new transaction to existing data instead of refetching all
+         const addNewTransaction = useCallback((newTransaction: UserTransaction) => {
+           console.log('📈 Adding new transaction incrementally:', newTransaction);
+           
+           setUserTransactions(prev => {
+             const updated = [...prev, newTransaction];
+             // No cache - always fresh from Redis
+             return updated;
+           });
     
-    // Try to load from cache first (unless force refresh)
-    if (!forceRefresh) {
-      const cachedData = loadFromCache(`all_user_predictions_${address.toLowerCase()}`, 10 * 1000); // 10 seconds cache
-      if (cachedData) {
-        console.log('📦 Using cached all user predictions');
-        setAllUserPredictions(cachedData);
-        return;
-      }
+    // If it's a claim transaction, update the corresponding stake in allUserPredictions
+    if (newTransaction.type === 'claim') {
+      setAllUserPredictions(prev => {
+        const updated = prev.map(prediction => {
+          if (prediction.id === newTransaction.predictionId) {
+            const updatedPrediction = { ...prediction };
+            
+            // Update the claimed status - assume ETH for now (can be enhanced later)
+            if (updatedPrediction.userStakes?.ETH) {
+              updatedPrediction.userStakes.ETH.claimed = true;
+            }
+            if (updatedPrediction.userStakes?.SWIPE) {
+              updatedPrediction.userStakes.SWIPE.claimed = true;
+            }
+            
+            return updatedPrediction;
+          }
+          return prediction;
+        });
+        
+                 // No cache - always fresh from Redis
+                 return updated;
+      });
     }
+  }, [address]);
+
+         // Fetch ALL user predictions (for statistics) - always fresh from Redis
+         const fetchAllUserPredictions = useCallback(async (forceRefresh: boolean = false) => {
+           if (!address) {
+             console.log('❌ No address connected, skipping fetchAllUserPredictions');
+             return;
+           }
+           
+           console.log('🔍 DEBUG: fetchAllUserPredictions called with:', {
+             forceRefresh,
+             address,
+             predictionsLoading,
+             loadingStakes,
+             allPredictionsLength: allPredictions?.length || 0
+           });
+           
+           // Always fetch fresh from Redis - no cache
     
     // Don't fetch if predictions are still loading
     if (predictionsLoading) {
@@ -307,6 +336,8 @@ export function EnhancedUserDashboard() {
       // OPTIMIZATION: Get all user stakes in one API call instead of individual calls
       const allStakesResponse = await fetch(`/api/stakes?getAllUserStakes=true&userId=${address.toLowerCase()}`);
       const allStakesData = await allStakesResponse.json();
+      
+      console.log('🔍 DEBUG: All stakes response:', allStakesData);
       
       if (!allStakesData.success) {
         console.log('⚠️ No stakes found for user');
@@ -470,8 +501,7 @@ export function EnhancedUserDashboard() {
       
       setAllUserPredictions(allUserPredictionsWithStakes);
       
-      // Save to cache
-      saveToCache(allUserPredictionsWithStakes, `all_user_predictions_${address.toLowerCase()}`);
+      // No cache - always fresh from Redis
     } catch (error) {
       console.error('Failed to fetch all user predictions:', error);
     } finally {
@@ -956,6 +986,9 @@ export function EnhancedUserDashboard() {
                 transaction
               })
             });
+
+            // Add transaction incrementally instead of refetching all
+            addNewTransaction(transaction);
 
             // Update stake as claimed in Redis
             await fetch('/api/stakes', {

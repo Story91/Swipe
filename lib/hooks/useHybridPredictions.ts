@@ -138,8 +138,8 @@ export function useHybridPredictions() {
   
   // Fetch predictions on mount and when wallet connects - but only once
   useEffect(() => {
-    // Always fetch on mount, regardless of wallet status
-    fetchAllPredictions();
+    // Always fetch ALL predictions on mount (for dashboards compatibility)
+    fetchAllPredictionsComplete();
   }, []); // Only on mount
   
   // No additional fetch when wallet connects - data is already loaded
@@ -173,21 +173,31 @@ export function useHybridPredictions() {
     }
   }, [fetchRedisPredictions]);
 
+  // Debug log when predictions change
+  useEffect(() => {
+    console.log('🔍 DEBUG: useHybridPredictions predictions changed:', {
+      predictionsLength: predictions.length,
+      redisPredictionsLength: redisPredictions.length,
+      loading: loading || redisLoading,
+      error: error || redisError
+    });
+  }, [predictions.length, redisPredictions.length, loading, redisLoading, error, redisError]);
+
   return {
     predictions,
     loading: loading || redisLoading,
     error: error || redisError,
     fetchPredictions: fetchAllPredictions, // Default: active only
     fetchAllPredictions: fetchAllPredictionsComplete, // All predictions
-    refresh: fetchAllPredictions,
+    refresh: fetchAllPredictionsComplete, // Refresh all predictions
     // Manual refresh functions for specific actions
     refreshAfterStake: () => {
       // Refresh after stake is placed
-      setTimeout(() => fetchAllPredictions(), 2000);
+      setTimeout(() => fetchAllPredictionsComplete(), 2000);
     },
     refreshAfterCreate: () => {
       // Refresh after new prediction is created
-      setTimeout(() => fetchAllPredictions(), 1000);
+      setTimeout(() => fetchAllPredictionsComplete(), 1000);
     }
   };
 }
