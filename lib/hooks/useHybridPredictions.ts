@@ -145,15 +145,15 @@ export function useHybridPredictions() {
   // No additional fetch when wallet connects - data is already loaded
   // This prevents double loading and flickering
   
-  // No auto-refresh - only manual refresh when needed
-  // useEffect(() => {
-  //   const interval = setInterval(() => {
-  //     console.log('🔄 Auto-refreshing hybrid predictions...');
-  //     fetchAllPredictions();
-  //   }, 60000); // 1 minute
-  //   
-  //   return () => clearInterval(interval);
-  // }, [fetchAllPredictions]);
+  // Auto-refresh for live updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-refreshing hybrid predictions...');
+      fetchAllPredictions();
+    }, 30000); // 30 seconds for live updates
+    
+    return () => clearInterval(interval);
+  }, [fetchAllPredictions]);
   
   // Function to fetch ALL predictions (for admin/user dashboards)
   const fetchAllPredictionsComplete = useCallback(async () => {

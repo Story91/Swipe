@@ -300,8 +300,11 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   
   // Transform real predictions to match TinderCard format (memoized for performance)
   const realCardItems: PredictionData[] = useMemo(() => transformedPredictions.map((pred) => {
+    // Only use ETH amounts for main display (SWIPE is separate)
     const totalPool = (pred.yesTotalAmount || 0) + (pred.noTotalAmount || 0);
-    const votingYes = totalPool > 0 ? Math.floor(((pred.yesTotalAmount || 0) / totalPool) * 100) : 50;
+    const totalYesAmount = (pred.yesTotalAmount || 0);
+    const totalNoAmount = (pred.noTotalAmount || 0);
+    const votingYes = totalPool > 0 ? Math.floor((totalYesAmount / totalPool) * 100) : 50;
 
     return {
       id: typeof pred.id === 'string'
@@ -334,9 +337,9 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       prediction: pred.question || 'Unknown prediction',
       timeframe: pred.deadline ? formatTimeLeft(pred.deadline) : 'Unknown',
       confidence: (() => {
-        // Calculate confidence based on real stake distribution
-        const yesAmount = pred.yesTotalAmount || 0;
-        const noAmount = pred.noTotalAmount || 0;
+        // Calculate confidence based on ETH stake distribution only (SWIPE is separate)
+        const yesAmount = (pred.yesTotalAmount || 0);
+        const noAmount = (pred.noTotalAmount || 0);
         const totalAmount = yesAmount + noAmount;
         
         if (totalAmount === 0) {
@@ -352,8 +355,8 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       category: pred.category || 'Unknown',
       price: totalPool > 0 ? `${(totalPool / 1e18).toFixed(4)} ETH` : "0.0000 ETH", // Convert wei to ETH
       change: (() => {
-        const yesAmount = pred.yesTotalAmount || 0;
-        const noAmount = pred.noTotalAmount || 0;
+        const yesAmount = (pred.yesTotalAmount || 0);
+        const noAmount = (pred.noTotalAmount || 0);
         const totalAmount = yesAmount + noAmount;
         
         if (totalAmount === 0) return "0%"; // No stakes yet
@@ -1900,8 +1903,17 @@ KEY USER-FACING CHANGES: V1 → V2
                  <span className="amount-label">YES</span>
                  <span className="amount-value">
                    {(() => {
-                     const amount = (transformedPredictions[currentIndex]?.yesTotalAmount || 0) / 1e18;
-                     return amount > 0 ? amount.toFixed(5) : '0.00000';
+                     const pred = transformedPredictions[currentIndex];
+                     const ethAmount = (pred?.yesTotalAmount || 0) / 1e18;
+                     // Don't add SWIPE to ETH display - they are separate tokens
+                     console.log('🔍 YES Amount Debug:', {
+                       predId: pred?.id,
+                       yesTotalAmount: pred?.yesTotalAmount,
+                       swipeYesTotalAmount: pred?.swipeYesTotalAmount,
+                       ethAmount,
+                       swipeAmount: (pred?.swipeYesTotalAmount || 0) / 1e18
+                     });
+                     return ethAmount > 0 ? ethAmount.toFixed(5) : '0.00000';
                    })()} ETH
                  </span>
                </div>
@@ -1909,8 +1921,17 @@ KEY USER-FACING CHANGES: V1 → V2
                  <span className="amount-label">NO</span>
                  <span className="amount-value">
                    {(() => {
-                     const amount = (transformedPredictions[currentIndex]?.noTotalAmount || 0) / 1e18;
-                     return amount > 0 ? amount.toFixed(5) : '0.00000';
+                     const pred = transformedPredictions[currentIndex];
+                     const ethAmount = (pred?.noTotalAmount || 0) / 1e18;
+                     // Don't add SWIPE to ETH display - they are separate tokens
+                     console.log('🔍 NO Amount Debug:', {
+                       predId: pred?.id,
+                       noTotalAmount: pred?.noTotalAmount,
+                       swipeNoTotalAmount: pred?.swipeNoTotalAmount,
+                       ethAmount,
+                       swipeAmount: (pred?.swipeNoTotalAmount || 0) / 1e18
+                     });
+                     return ethAmount > 0 ? ethAmount.toFixed(5) : '0.00000';
                    })()} ETH
                  </span>
                </div>
@@ -1919,8 +1940,8 @@ KEY USER-FACING CHANGES: V1 → V2
              {/* Real proportional visualization */}
              <div className="proportional-chart">
                {(() => {
-                 const yesAmount = transformedPredictions[currentIndex]?.yesTotalAmount || 0;
-                 const noAmount = transformedPredictions[currentIndex]?.noTotalAmount || 0;
+                 const yesAmount = (transformedPredictions[currentIndex]?.yesTotalAmount || 0);
+                 const noAmount = (transformedPredictions[currentIndex]?.noTotalAmount || 0);
                  const totalAmount = yesAmount + noAmount;
                  
                  if (totalAmount === 0) {
