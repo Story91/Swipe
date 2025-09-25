@@ -649,7 +649,8 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
           userFid,
           lastStakedPrediction.title,
           stakeAmount,
-          outcome
+          outcome,
+          stakeModal.selectedToken
         );
       }
     } catch (error) {

@@ -32,10 +32,10 @@ export async function sendNotificationToUser(data: NotificationData): Promise<bo
 
 // Predefined notification templates
 export const notificationTemplates = {
-  stakeSuccess: (fid: number, predictionTitle: string, stakeAmount: string, outcome: string) => ({
+  stakeSuccess: (fid: number, predictionTitle: string, stakeAmount: string, outcome: string, token: string = 'ETH') => ({
     fid,
     title: "🎉 Stake Accepted!",
-    body: `Your ${stakeAmount} ETH stake on "${predictionTitle}" has been accepted! Prediction: ${outcome}`,
+    body: `Your ${stakeAmount} ${token} stake on "${predictionTitle}" has been accepted! Prediction: ${outcome}`,
     type: 'stake_success' as const
   }),
 
@@ -90,8 +90,8 @@ export const notificationTemplates = {
 };
 
 // Convenience functions
-export async function notifyStakeSuccess(fid: number, predictionTitle: string, stakeAmount: string, outcome: string) {
-  const notification = notificationTemplates.stakeSuccess(fid, predictionTitle, stakeAmount, outcome);
+export async function notifyStakeSuccess(fid: number, predictionTitle: string, stakeAmount: string, outcome: string, token: string = 'ETH') {
+  const notification = notificationTemplates.stakeSuccess(fid, predictionTitle, stakeAmount, outcome, token);
   return await sendNotificationToUser(notification);
 }
 
