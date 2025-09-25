@@ -839,8 +839,15 @@ export function EnhancedUserDashboard() {
       return;
     }
 
+    // Ensure allUserPredictions is populated before attempting to claim
+    if (allUserPredictions.length === 0) {
+      console.log('🔄 No allUserPredictions found, fetching first...');
+      await fetchAllUserPredictions(true);
+    }
+
     // Validate that this prediction can actually be claimed
-    const prediction = userPredictions.find(p => p.id === predictionId);
+    // Use allUserPredictions instead of userPredictions to avoid filtering issues
+    const prediction = allUserPredictions.find(p => p.id === predictionId);
     if (!prediction) {
       alert('❌ Prediction not found');
       return;
