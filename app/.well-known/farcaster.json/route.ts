@@ -1,10 +1,15 @@
+import { noindexSchema } from "@farcaster/miniapp-sdk";
+
 function withValidProperties(
-  properties: Record<string, undefined | string | string[]>,
+  properties: Record<string, undefined | string | string[] | boolean>,
 ) {
   return Object.fromEntries(
     Object.entries(properties).filter(([key, value]) => {
       if (Array.isArray(value)) {
         return value.length > 0;
+      }
+      if (typeof value === 'boolean') {
+        return true; // Always include boolean values
       }
       return !!value;
     }),
@@ -33,12 +38,13 @@ export async function GET() {
       homeUrl: URL,
       webhookUrl: NEYNAR_WEBHOOK_URL || `${URL}/api/webhook`,
       primaryCategory: process.env.NEXT_PUBLIC_APP_PRIMARY_CATEGORY,
-      tags: ["prediction", "ai", "blockchain", "finance"],
+      tags: ["prediction", "ai", "games", "finance"],
       heroImageUrl: process.env.NEXT_PUBLIC_APP_HERO_IMAGE,
       tagline: process.env.NEXT_PUBLIC_APP_TAGLINE,
       ogTitle: process.env.NEXT_PUBLIC_APP_OG_TITLE,
       ogDescription: process.env.NEXT_PUBLIC_APP_OG_DESCRIPTION,
       ogImageUrl: process.env.NEXT_PUBLIC_APP_OG_IMAGE,
+      noindex: false,
     }),
     baseBuilder: {
       "allowedAddresses": ["0x5B9Db509BdA743DE9FF52C8049EFa92FEdD29126"]
