@@ -29,6 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
             splashBackgroundColor: "#d4ff00",
           },
         },
+        noindex: false,
       }),
     },
   };
