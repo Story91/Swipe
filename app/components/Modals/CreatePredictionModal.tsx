@@ -69,6 +69,14 @@ const CRYPTO_OPTIONS = [
     color: '#f3ba2f',
     poolAddress: '0xb8c77482e45f1f44de1745f52c74426c631bdd52',
     chain: 'eth'
+  },
+  { 
+    symbol: 'SWIPE', 
+    name: 'Swipe', 
+    icon: '💎', 
+    color: '#6366f1',
+    poolAddress: '0xd0187d77af0ed6a44f0a631b406c78b30e160aa9',
+    chain: 'base'
   }
 ];
 
