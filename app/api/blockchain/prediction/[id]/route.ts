@@ -1,20 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createPublicClient, http, parseAbiItem } from 'viem';
+import { createPublicClient, http } from 'viem';
 import { base } from 'viem/chains';
-import { CONTRACTS, getContractForPrediction } from '../../../../../lib/contract';
+import { CONTRACTS } from '../../../../../lib/contract';
 
 // Initialize public client for Base network
 const publicClient = createPublicClient({
   chain: base,
   transport: http(process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org'),
 });
-
-// Helper function to determine which contract to use based on prediction ID
-function getContractForPredictionId(predictionId: string) {
-  // For now, use V2 for all new predictions
-  // In the future, this could be based on prediction ID ranges or timestamps
-  return CONTRACTS.V2;
-}
 
 // GET /api/blockchain/prediction/[id] - Get prediction data from blockchain
 export async function GET(
@@ -24,79 +17,104 @@ export async function GET(
   try {
     const resolvedParams = await params;
     const predictionId = resolvedParams.id;
-    const contract = getContractForPredictionId(predictionId);
     
-    console.log(`🔍 Fetching prediction ${predictionId} from ${contract.version} contract...`);
+    // Extract numeric ID from prediction ID string
+    const numericId = predictionId.replace('pred_v2_', '').replace('pred_v1_', '').replace('pred_', '');
     
-    // Fetch prediction data from contract using V2 ABI
-    const predictionData = await publicClient.readContract({
-      address: contract.address as `0x${string}`,
-      abi: contract.abi,
-      functionName: 'getPredictionBasic',
-      args: [BigInt(predictionId)],
+    // Validate numeric ID
+    if (!numericId || isNaN(Number(numericId))) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid prediction ID format' },
+        { status: 400 }
+      );
+    }
+    
+    const predictionIdBigInt = BigInt(numericId);
+    
+    console.log(`🔍 Fetching prediction ${predictionId} (numeric: ${numericId}) from V2 contract...`);
+    
+    // Fetch prediction data from contract using V2 ABI (predictions function returns full data)
+    console.log('Contract address:', CONTRACTS.V2.address);
+    console.log('ABI length:', CONTRACTS.V2.abi?.length);
+    
+    let predictionData, participantCount;
+    
+    try {
+      predictionData = await publicClient.readContract({
+        address: CONTRACTS.V2.address as `0x${string}`,
+        abi: CONTRACTS.V2.abi,
+        functionName: 'predictions',
+        args: [predictionIdBigInt],
+      });
+      
+      // Fetch additional data
+      participantCount = await publicClient.readContract({
+        address: CONTRACTS.V2.address as `0x${string}`,
+        abi: CONTRACTS.V2.abi,
+        functionName: 'getParticipants',
+        args: [predictionIdBigInt],
+      });
+    } catch (contractError) {
+      console.error('Contract read error:', contractError);
+      return NextResponse.json(
+        { success: false, error: `Contract read failed: ${contractError}` },
+        { status: 500 }
+      );
+    }
+    
+    // Parse the prediction data (V2 predictions function returns full structure)
+    // Correct order based on Prediction struct in PredictionMarket_V2.sol
+    const [
+      question, description, category, imageUrl,
+      yesTotalAmount, noTotalAmount, swipeYesTotalAmount, swipeNoTotalAmount,
+      deadline, resolutionDeadline,
+      resolved, outcome, cancelled, createdAt, creator,
+      verified, approved, needsApproval, creationToken, creationTokenAmount
+    ] = predictionData as any[];
+    
+    console.log('Raw blockchain data:', {
+      deadline: deadline,
+      deadlineType: typeof deadline,
+      deadlineValue: deadline?.toString(),
+      yesTotalAmount: yesTotalAmount?.toString(),
+      noTotalAmount: noTotalAmount?.toString(),
+      swipeYesTotalAmount: swipeYesTotalAmount?.toString(),
+      swipeNoTotalAmount: swipeNoTotalAmount?.toString(),
     });
-    
-    // Fetch additional data
-    const participantCount = await publicClient.readContract({
-      address: contract.address as `0x${string}`,
-      abi: contract.abi,
-      functionName: 'getParticipants',
-      args: [BigInt(predictionId)],
-    });
-    
-    // Parse the prediction data (V2 getPredictionBasic returns different structure)
-    const {
-      question,
-      description,
-      category,
-      yesTotalAmount,
-      noTotalAmount,
-      deadline,
-      resolved,
-      outcome,
-      approved,
-      creator
-    } = predictionData as {
-      question: string;
-      description: string;
-      category: string;
-      yesTotalAmount: bigint;
-      noTotalAmount: bigint;
-      deadline: bigint;
-      resolved: boolean;
-      outcome: boolean;
-      approved: boolean;
-      creator: string;
-    };
     
     const prediction = {
       id: predictionId,
       question,
       description,
       category,
-      imageUrl: '', // V2 getPredictionBasic doesn't include imageUrl
-      deadline: Number(deadline),
-      creator,
-      verified: false, // V2 getPredictionBasic doesn't include verified
-      needsApproval: !approved, // Derive from approved status
-      resolved,
-      outcome,
-      cancelled: false, // V2 getPredictionBasic doesn't include cancelled
+      imageUrl: String(imageUrl),
+      deadline: Number(deadline) > 0 ? Number(deadline) : 0,
+      creator: String(creator),
+      verified: Boolean(verified),
+      needsApproval: Boolean(needsApproval),
+      resolved: Boolean(resolved),
+      outcome: Boolean(outcome),
+      cancelled: Boolean(cancelled),
       yesTotalAmount: Number(yesTotalAmount) / 1e18, // Convert from wei
       noTotalAmount: Number(noTotalAmount) / 1e18, // Convert from wei
-      totalStakes: (Number(yesTotalAmount) + Number(noTotalAmount)) / 1e18, // Calculate total
+      swipeYesTotalAmount: Number(swipeYesTotalAmount) / 1e18, // Convert from wei
+      swipeNoTotalAmount: Number(swipeNoTotalAmount) / 1e18, // Convert from wei
+      totalStakes: (Number(yesTotalAmount) + Number(noTotalAmount)) / 1e18, // Calculate ETH total
+      totalSwipeStakes: (Number(swipeYesTotalAmount) + Number(swipeNoTotalAmount)) / 1e18, // Calculate SWIPE total
       participantCount: Array.isArray(participantCount) ? participantCount.length : Number(participantCount),
-      contractVersion: contract.version,
+      contractVersion: 'v2',
       timestamp: new Date().toISOString()
     };
     
-    console.log(`✅ Prediction ${predictionId} fetched from ${contract.version} blockchain:`, {
+    console.log(`✅ Prediction ${predictionId} fetched from V2 blockchain:`, {
       question: prediction.question.substring(0, 50) + '...',
       category: prediction.category,
-      deadline: new Date(prediction.deadline * 1000).toISOString(),
+      deadline: prediction.deadline,
+      deadlineDate: prediction.deadline > 0 ? new Date(prediction.deadline * 1000).toISOString() : 'Invalid',
       creator: prediction.creator.substring(0, 10) + '...',
       totalStakes: prediction.totalStakes,
-      contractVersion: contract.version
+      totalSwipeStakes: prediction.totalSwipeStakes,
+      participantCount: prediction.participantCount
     });
     
     return NextResponse.json({

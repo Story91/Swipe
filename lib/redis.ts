@@ -96,13 +96,6 @@ export const redisHelpers = {
       
       // Validate that parsed data has required fields
       if (parsed && typeof parsed === 'object' && 'id' in parsed && 'question' in parsed) {
-        console.log(`📊 Live data for prediction ${id}:`, {
-          yesTotalAmount: parsed.yesTotalAmount,
-          noTotalAmount: parsed.noTotalAmount,
-          swipeYesTotalAmount: parsed.swipeYesTotalAmount,
-          swipeNoTotalAmount: parsed.swipeNoTotalAmount,
-          timestamp: new Date().toISOString()
-        });
         return parsed as RedisPrediction;
       }
       

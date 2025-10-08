@@ -176,6 +176,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   // Use hybrid predictions hook
   const { predictions: hybridPredictions, loading: predictionsLoading, error: predictionsError, refresh: refreshPredictions, fetchAllPredictions } = useHybridPredictions();
   
+  
   // State for forcing re-render of time display
   const [timeUpdate, setTimeUpdate] = useState(0);
   
@@ -389,6 +390,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       })?.participants || []
     };
   }), [transformedPredictions]);
+
 
   // Open stake modal after swipe
   const openStakeModal = useCallback((direction: string, predictionId: number) => {
@@ -689,8 +691,31 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   const handleStakeSuccess = async () => {
     // Refresh predictions immediately after stake for live data
     console.log('✅ Stake successful, refreshing predictions for live data...');
+    
+    // First, quick refresh from Redis
     if (refreshPredictions) {
       refreshPredictions();
+    }
+    
+    // Then sync active predictions stakes from blockchain
+    try {
+      console.log('🔄 Syncing active predictions stakes from blockchain after stake...');
+      const syncResponse = await fetch('/api/sync/v2/active-stakes', { 
+        method: 'POST' 
+      });
+      
+      if (syncResponse.ok) {
+        const result = await syncResponse.json();
+        console.log(`✅ Synced stakes for ${result.data?.syncedPredictions || 0} active predictions after stake`);
+        // Refresh again after sync to show updated data
+        setTimeout(() => {
+          if (refreshPredictions) {
+            refreshPredictions();
+          }
+        }, 1000);
+      }
+    } catch (error) {
+      console.error('Failed to sync active predictions stakes after stake:', error);
     }
     
     // Send Farcaster notification about successful stake
@@ -1858,14 +1883,14 @@ KEY USER-FACING CHANGES: V1 → V2
              </Badge>
            </div>
           <div className="stat">
-            <Badge variant="outline" className="stat-label-badge">ETH Staked</Badge>
+            <Badge variant="outline" className="stat-label-badge">ETH Staked 🔄</Badge>
             <Badge variant="secondary" className="stat-value-badge">{(() => {
               const total = ((transformedPredictions[currentIndex]?.yesTotalAmount || 0) + (transformedPredictions[currentIndex]?.noTotalAmount || 0)) / 1e18;
               return total > 0 ? total.toFixed(5) : '0.00000';
             })()} ETH</Badge>
           </div>
           <div className="stat">
-            <Badge variant="outline" className="stat-label-badge">SWIPE Staked</Badge>
+            <Badge variant="outline" className="stat-label-badge">SWIPE Staked 🔄</Badge>
             <Badge variant="secondary" className="stat-value-badge">{(() => {
               const total = ((transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0) + (transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0)) / 1e18;
               return total > 0 ? total.toFixed(0) : '0';

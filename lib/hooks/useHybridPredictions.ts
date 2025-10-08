@@ -161,21 +161,21 @@ export function useHybridPredictions() {
       console.log('⚡ Quick fetch from Redis cache...');
       fetchAllPredictions();
       
-      // 2. Then, sync ACTIVE predictions from blockchain to Redis in background
-      console.log('🔄 Syncing active predictions from blockchain...');
+      // 2. Then, sync ACTIVE predictions stakes from blockchain to Redis in background
+      console.log('🔄 Syncing active predictions stakes from blockchain...');
       try {
-        const response = await fetch('/api/sync/v2/active', { method: 'GET' });
+        const response = await fetch('/api/sync/v2/active-stakes', { method: 'POST' });
         if (response.ok) {
           const result = await response.json();
-          console.log(`✅ Synced ${result.data?.activePredictions || 0} active predictions from blockchain`);
+          console.log(`✅ Synced stakes for ${result.data?.syncedPredictions || 0} active predictions from blockchain`);
           // 3. Refresh from Redis to get updated data
           setTimeout(() => {
-            console.log('🔄 Refreshing after blockchain sync...');
+            console.log('🔄 Refreshing after stakes sync...');
             fetchAllPredictions();
           }, 1000);
         }
       } catch (error) {
-        console.error('Failed to sync active predictions from blockchain:', error);
+        console.error('Failed to sync active predictions stakes from blockchain:', error);
       }
     };
     
