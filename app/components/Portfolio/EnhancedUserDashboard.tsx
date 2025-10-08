@@ -1508,16 +1508,19 @@ export function EnhancedUserDashboard() {
           </div>
         ) : userTransactions.length > 0 ? (
           <div className="transactions-list">
-                         {userTransactions.map((transaction) => {
-               // Determine the actual status to display
-               let displayStatus = transaction.status;
-               if (transaction.txHash && transaction.txHash !== 'undefined' && transaction.txHash.length > 10) {
-                 // If we have a valid transaction hash, assume it's successful
-                 displayStatus = 'success';
-               }
-               
-               return (
-                 <div key={transaction.id} className="transaction-card">
+                         {userTransactions.map((transaction, index) => {
+              // Determine the actual status to display
+              let displayStatus = transaction.status;
+              if (transaction.txHash && transaction.txHash !== 'undefined' && transaction.txHash.length > 10) {
+                // If we have a valid transaction hash, assume it's successful
+                displayStatus = 'success';
+              }
+              
+              // Create unique key combining index, id, and hash to avoid React duplicate key warnings
+              const uniqueKey = `${transaction.id}_${index}_${transaction.txHash || transaction.timestamp || ''}`;
+              
+              return (
+                <div key={uniqueKey} className="transaction-card">
                    <div className="transaction-header">
                      <div className="transaction-type">
                        <span className={`type-badge ${transaction.type}`}>

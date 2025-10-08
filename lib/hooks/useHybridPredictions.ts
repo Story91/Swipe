@@ -154,22 +154,52 @@ export function useHybridPredictions() {
     }
   }, [redisPredictions, transformPredictions]);
   
-  // Fetch predictions on mount
+  // Fetch predictions on mount with blockchain sync
   useEffect(() => {
-    // Always fetch ALL predictions on mount (for dashboards compatibility)
-    fetchAllPredictionsComplete();
-  }, [fetchAllPredictionsComplete]); // Add dependency
+    const initializePredictions = async () => {
+      // 1. First, fetch from Redis for instant display
+      console.log('⚡ Quick fetch from Redis cache...');
+      fetchAllPredictions();
+      
+      // 2. Then, sync ACTIVE predictions from blockchain to Redis in background
+      console.log('🔄 Syncing active predictions from blockchain...');
+      try {
+        const response = await fetch('/api/sync/v2/active', { method: 'GET' });
+        if (response.ok) {
+          const result = await response.json();
+          console.log(`✅ Synced ${result.data?.activePredictions || 0} active predictions from blockchain`);
+          // 3. Refresh from Redis to get updated data
+          setTimeout(() => {
+            console.log('🔄 Refreshing after blockchain sync...');
+            fetchAllPredictions();
+          }, 1000);
+        }
+      } catch (error) {
+        console.error('Failed to sync active predictions from blockchain:', error);
+      }
+    };
+    
+    initializePredictions();
+  }, []); // Run only once on mount
   
   // Fetch predictions when wallet connects for immediate live data (only once)
   useEffect(() => {
     if (address) {
-      console.log('🔄 Wallet connected, fetching live predictions...');
-      fetchAllPredictionsComplete();
+      console.log('🔄 Wallet connected, fetching active predictions...');
+      fetchAllPredictions(); // Fetch only active predictions
     }
-  }, [address, fetchAllPredictionsComplete]);
+  }, [address, fetchAllPredictions]);
   
-  // No auto-refresh interval - only refresh on mount and after transactions
-  // Auto-refresh was causing unnecessary flickering and API calls
+  // Auto-refresh interval for live data (every 2 minutes)
+  // Only refreshes ACTIVE predictions from Redis cache (no blockchain sync)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-refreshing active predictions (2 min interval)...');
+      fetchAllPredictions(); // Fetch only active predictions from Redis
+    }, 120000); // Refresh every 2 minutes (120 seconds)
+    
+    return () => clearInterval(interval);
+  }, [fetchAllPredictions]);
   
   // Debug log when predictions change
   useEffect(() => {
@@ -189,13 +219,37 @@ export function useHybridPredictions() {
     fetchAllPredictions: fetchAllPredictionsComplete, // All predictions
     refresh: fetchAllPredictionsComplete, // Refresh all predictions
     // Manual refresh functions for specific actions
-    refreshAfterStake: () => {
-      // Refresh after stake is placed
-      setTimeout(() => fetchAllPredictionsComplete(), 2000);
+    refreshAfterStake: (predictionId?: string) => {
+      // Only refresh active predictions from Redis (fast, no blockchain sync)
+      console.log('🔄 Refreshing active predictions after stake...');
+      fetchAllPredictions(); // Fetch only active predictions from Redis
+      
+      // If predictionId provided, sync only that specific prediction from blockchain
+      if (predictionId) {
+        setTimeout(async () => {
+          try {
+            console.log(`🔄 Syncing prediction ${predictionId} from blockchain...`);
+            const response = await fetch(`/api/sync/prediction/${predictionId}`, { method: 'POST' });
+            if (response.ok) {
+              console.log(`✅ Prediction ${predictionId} synced from blockchain`);
+              // Refresh predictions again after sync
+              fetchAllPredictions();
+            }
+          } catch (error) {
+            console.error(`Failed to sync prediction ${predictionId}:`, error);
+          }
+        }, 2000);
+      }
     },
     refreshAfterCreate: () => {
-      // Refresh after new prediction is created
-      setTimeout(() => fetchAllPredictionsComplete(), 1000);
+      // Only refresh active predictions after create
+      console.log('🔄 Refreshing active predictions after create...');
+      fetchAllPredictions(); // Fetch only active predictions from Redis
+      // Also refresh again after 1 second to ensure new prediction is in Redis
+      setTimeout(() => {
+        console.log('🔄 Secondary refresh after create...');
+        fetchAllPredictions();
+      }, 1000);
     }
   };
 }

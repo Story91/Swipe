@@ -3,6 +3,7 @@ import TinderCard from 'react-tinder-card';
 import { useAccount, useWriteContract, useReadContract, useWaitForTransactionReceipt } from "wagmi";
 import { ethers } from 'ethers';
 import { CONTRACTS, SWIPE_TOKEN, getV2Contract, getContractForAction } from '../../../lib/contract';
+import { calculateApprovalAmount } from '../../../lib/constants/approval';
 import { useViewProfile, useComposeCast, useMiniKit } from '@coinbase/onchainkit/minikit';
 import './TinderCard.css';
 import './Dashboards.css';
@@ -686,9 +687,11 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
 
   // Helper function for stake success
   const handleStakeSuccess = async () => {
-    // Data refresh is now handled by the auto-sync in onSuccess callbacks
-    // No need for additional refresh - auto-sync handles it
-    console.log('✅ Stake successful, auto-sync will handle data refresh');
+    // Refresh predictions immediately after stake for live data
+    console.log('✅ Stake successful, refreshing predictions for live data...');
+    if (refreshPredictions) {
+      refreshPredictions();
+    }
     
     // Send Farcaster notification about successful stake
     try {
@@ -1141,7 +1144,16 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
         setIsTransactionLoading(true);
         showNotification('info', 'Approval Required', `Approving ${amount} SWIPE for this stake`);
         
-        // Execute approve transaction for exact amount
+        // Execute approve transaction with slippage buffer to handle price fluctuations
+        // Using calculateApprovalAmount to add 10% buffer (1000 bps)
+        // This ensures approval covers potential slippage for large stakes
+        const approvalAmount = calculateApprovalAmount(amountWei);
+        
+        console.log('💰 SWIPE Approval Details:');
+        console.log('  Stake amount:', amountWei.toString(), 'wei');
+        console.log('  Approval amount (with 10% buffer):', approvalAmount.toString(), 'wei');
+        console.log('  Buffer:', ((approvalAmount - amountWei) * BigInt(100) / amountWei).toString() + '%');
+        
         writeContract({
           address: SWIPE_TOKEN.address as `0x${string}`,
           abi: [
@@ -1154,7 +1166,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
             }
           ],
           functionName: 'approve',
-          args: [CONTRACTS.V2.address as `0x${string}`, amountWei],
+          args: [CONTRACTS.V2.address as `0x${string}`, approvalAmount],
         }, {
           onSuccess: (tx) => {
             console.log('✅ SWIPE approval successful:', tx);
@@ -1845,13 +1857,20 @@ KEY USER-FACING CHANGES: V1 → V2
                {currentCard.timeframe}
              </Badge>
            </div>
-           <div className="stat">
-             <Badge variant="outline" className="stat-label-badge">Total Staked</Badge>
-             <Badge variant="secondary" className="stat-value-badge">{(() => {
-               const total = ((transformedPredictions[currentIndex]?.yesTotalAmount || 0) + (transformedPredictions[currentIndex]?.noTotalAmount || 0)) / 1e18;
-               return total > 0 ? total.toFixed(5) : '0.00000';
-             })()} ETH</Badge>
-           </div>
+          <div className="stat">
+            <Badge variant="outline" className="stat-label-badge">ETH Staked</Badge>
+            <Badge variant="secondary" className="stat-value-badge">{(() => {
+              const total = ((transformedPredictions[currentIndex]?.yesTotalAmount || 0) + (transformedPredictions[currentIndex]?.noTotalAmount || 0)) / 1e18;
+              return total > 0 ? total.toFixed(5) : '0.00000';
+            })()} ETH</Badge>
+          </div>
+          <div className="stat">
+            <Badge variant="outline" className="stat-label-badge">SWIPE Staked</Badge>
+            <Badge variant="secondary" className="stat-value-badge">{(() => {
+              const total = ((transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0) + (transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0)) / 1e18;
+              return total > 0 ? total.toFixed(0) : '0';
+            })()} SWIPE</Badge>
+          </div>
 
          </div>
          
@@ -1874,27 +1893,32 @@ KEY USER-FACING CHANGES: V1 → V2
            <div className="chart-item">
              <div className="chart-title">Risk Level</div>
              <div className="chart-value">
-               {(() => {
-                 const confidence = currentCard.confidence;
-                 const totalStaked = ((transformedPredictions[currentIndex]?.yesTotalAmount || 0) + (transformedPredictions[currentIndex]?.noTotalAmount || 0)) / 1e18;
-                 const participantCount = transformedPredictions[currentIndex]?.participants || 0;
-                 
-                 // Calculate risk based on multiple factors
-                 let riskScore = 0;
-                 let factors = [];
-                 
-                 // Confidence factor (lower confidence = higher risk)
-                 const confidenceRisk = (100 - confidence) * 0.4;
-                 riskScore += confidenceRisk;
-                 factors.push(`Conf: ${confidenceRisk.toFixed(1)}`);
-                 
-                 // Liquidity factor (less staked = higher risk)
-                 let liquidityRisk = 0;
-                 if (totalStaked < 0.1) liquidityRisk = 30;
-                 else if (totalStaked < 1) liquidityRisk = 15;
-                 else if (totalStaked < 5) liquidityRisk = 5;
-                 riskScore += liquidityRisk;
-                 factors.push(`Liq: ${liquidityRisk}`);
+              {(() => {
+                const confidence = currentCard.confidence;
+                const totalStakedETH = ((transformedPredictions[currentIndex]?.yesTotalAmount || 0) + (transformedPredictions[currentIndex]?.noTotalAmount || 0)) / 1e18;
+                const totalStakedSWIPE = ((transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0) + (transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0)) / 1e18;
+                const participantCount = transformedPredictions[currentIndex]?.participants || 0;
+                
+                // Calculate risk based on multiple factors
+                let riskScore = 0;
+                let factors = [];
+                
+                // Confidence factor (lower confidence = higher risk)
+                const confidenceRisk = (100 - confidence) * 0.4;
+                riskScore += confidenceRisk;
+                factors.push(`Conf: ${confidenceRisk.toFixed(1)}`);
+                
+                // Liquidity factor (less staked = higher risk)
+                // Consider both ETH and SWIPE for liquidity assessment
+                const hasETHLiquidity = totalStakedETH >= 0.1;
+                const hasSWIPELiquidity = totalStakedSWIPE >= 10000;
+                let liquidityRisk = 0;
+                if (!hasETHLiquidity && !hasSWIPELiquidity) liquidityRisk = 30; // No liquidity in either
+                else if (totalStakedETH < 1 && totalStakedSWIPE < 50000) liquidityRisk = 15; // Low liquidity
+                else if (totalStakedETH < 5 && totalStakedSWIPE < 100000) liquidityRisk = 5; // Medium liquidity
+                // Good liquidity if either has high stakes
+                riskScore += liquidityRisk;
+                factors.push(`Liq: ${liquidityRisk}`);
                  
                  // Participation factor (fewer participants = higher risk)
                  let participationRisk = 0;

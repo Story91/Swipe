@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useWriteContract, useAccount, useReadContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther, formatEther } from 'viem';
 import { CONTRACTS, SWIPE_TOKEN } from '../../../lib/contract';
+import { calculateApprovalAmount } from '../../../lib/constants/approval';
 import './CreatePredictionModal.css';
 
 interface CreatePredictionModalProps {
@@ -296,6 +297,14 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
     if (!address || !swipeFee) return;
 
     try {
+      // Add 10% slippage buffer to approval amount to handle price fluctuations
+      const swipeFeeAmount = BigInt(swipeFee.toString());
+      const approvalAmount = calculateApprovalAmount(swipeFeeAmount);
+      
+      console.log('💰 SWIPE Fee Approval Details:');
+      console.log('  Fee amount:', swipeFeeAmount.toString(), 'wei');
+      console.log('  Approval amount (with 10% buffer):', approvalAmount.toString(), 'wei');
+      
       await writeContract({
         address: SWIPE_TOKEN.address as `0x${string}`,
         abi: [
@@ -311,7 +320,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
           }
         ],
         functionName: 'approve',
-        args: [CONTRACTS.V2.address as `0x${string}`, swipeFee as bigint],
+        args: [CONTRACTS.V2.address as `0x${string}`, approvalAmount],
       });
     } catch (error) {
       console.error('Approval failed:', error);

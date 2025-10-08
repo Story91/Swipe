@@ -507,8 +507,8 @@ export function UserDashboard({ predictions, onClaimReward }: UserDashboardProps
                 <p>📝 No transactions yet. Start by staking on a prediction!</p>
               </div>
             ) : (
-              transactionHistory.map((tx) => (
-                <div key={tx.id} className={`transaction-item ${tx.status}`}>
+              transactionHistory.map((tx, txIndex) => (
+                <div key={`${tx.id}_${txIndex}_${tx.txHash || tx.timestamp || ''}`} className={`transaction-item ${tx.status}`}>
                   <div className="transaction-icon">
                     {tx.type === 'stake' ? '💰' : tx.type === 'claim' ? '🎉' : '⚡'}
                   </div>
