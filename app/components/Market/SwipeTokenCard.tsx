@@ -9,6 +9,33 @@ import { SWIPE_TOKEN } from "../../../lib/contract";
 import Image from "next/image";
 
 export function SwipeTokenCard() {
+  // Add CSS for range slider
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      input[type="range"]::-webkit-slider-thumb {
+        appearance: none;
+        height: 20px;
+        width: 20px;
+        border-radius: 50%;
+        background: #d4ff00;
+        cursor: pointer;
+        border: 2px solid #000;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      }
+      input[type="range"]::-moz-range-thumb {
+        height: 20px;
+        width: 20px;
+        border-radius: 50%;
+        background: #d4ff00;
+        cursor: pointer;
+        border: 2px solid #000;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      }
+    `;
+    document.head.appendChild(style);
+    return () => document.head.removeChild(style);
+  }, []);
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
@@ -304,10 +331,29 @@ export function SwipeTokenCard() {
         <div className="bg-gradient-to-r from-gray-800 to-gray-900 rounded-xl p-4 mb-6 border border-gray-700">
           <div className="text-sm text-[#d4ff00] mb-1">Your Balance</div>
           <div className="text-lg font-bold text-white">
-            {formatEther(swipeBalance as bigint)}
+            {Math.floor(parseFloat(formatEther(swipeBalance as bigint))).toLocaleString()}
           </div>
-          <div className="text-xs text-gray-400 mt-1">
-            Token: {SWIPE_TOKEN.address.slice(0, 6)}...{SWIPE_TOKEN.address.slice(-4)}
+          <div className="flex items-center gap-2 mt-2">
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(SWIPE_TOKEN.address);
+                sendNotification({
+                  title: "Copied!",
+                  body: "Token address copied to clipboard",
+                });
+              }}
+              className="text-xs text-gray-400 hover:text-[#d4ff00] transition-colors cursor-pointer"
+            >
+              {SWIPE_TOKEN.address.slice(0, 6)}...{SWIPE_TOKEN.address.slice(-4)}
+            </button>
+            <a
+              href={`https://basescan.org/token/${SWIPE_TOKEN.address}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gray-400 hover:text-[#d4ff00] transition-colors"
+            >
+              🔗
+            </a>
           </div>
         </div>
       )}
@@ -453,6 +499,49 @@ export function SwipeTokenCard() {
               </button>
             </div>
 
+            {/* Range Slider */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-gray-400">
+                  {inputMode === "eth" ? "0.0001 ETH" : "$1"}
+                </span>
+                <span className="text-xs text-gray-400">
+                  {inputMode === "eth" ? "0.224 ETH" : "$1000"}
+                </span>
+              </div>
+              <input
+                type="range"
+                min={inputMode === "eth" ? "0.0001" : "1"}
+                max={inputMode === "eth" ? "0.224" : "1000"}
+                step={inputMode === "eth" ? "0.0001" : "1"}
+                value={inputMode === "eth" ? buyAmount : buyAmountUsd}
+                onChange={(e) => {
+                  if (inputMode === "eth") {
+                    handleEthAmountChange(e.target.value);
+                  } else {
+                    handleUsdAmountChange(e.target.value);
+                  }
+                }}
+                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                style={{
+                  background: `linear-gradient(to right, #d4ff00 0%, #d4ff00 ${
+                    inputMode === "eth" 
+                      ? ((parseFloat(buyAmount || "0") - 0.0001) / (0.224 - 0.0001)) * 100
+                      : ((parseFloat(buyAmountUsd || "0") - 1) / (1000 - 1)) * 100
+                  }%, #374151 ${
+                    inputMode === "eth" 
+                      ? ((parseFloat(buyAmount || "0") - 0.0001) / (0.224 - 0.0001)) * 100
+                      : ((parseFloat(buyAmountUsd || "0") - 1) / (1000 - 1)) * 100
+                  }%, #374151 100%)`
+                }}
+              />
+              <div className="flex justify-center mt-1">
+                <span className="text-xs text-[#d4ff00] font-medium">
+                  {inputMode === "eth" ? buyAmount : buyAmountUsd} {inputMode === "eth" ? "ETH" : "USD"}
+                </span>
+              </div>
+            </div>
+
             <div className="flex gap-2">
               <div className="flex-1">
                 <input
@@ -467,7 +556,7 @@ export function SwipeTokenCard() {
                     }
                   }}
                   className="w-full px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-[#d4ff00] focus:border-[#d4ff00] text-white placeholder-gray-400"
-                  placeholder={inputMode === "eth" ? "0.001" : "4.46"}
+                  placeholder={inputMode === "eth" ? "0.001" : "100"}
                   disabled={isLoading}
                 />
                 {inputMode === "eth" && buyAmount && ethPrice && (
