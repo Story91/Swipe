@@ -514,7 +514,7 @@ export function SwipeTokenCard() {
                 min={inputMode === "eth" ? "0.0001" : "1"}
                 max={inputMode === "eth" ? "0.224" : "1000"}
                 step={inputMode === "eth" ? "0.0001" : "1"}
-                value={inputMode === "eth" ? buyAmount : buyAmountUsd}
+                value={inputMode === "eth" ? (buyAmount || "0.0001") : (buyAmountUsd || "1")}
                 onChange={(e) => {
                   if (inputMode === "eth") {
                     handleEthAmountChange(e.target.value);
@@ -526,18 +526,18 @@ export function SwipeTokenCard() {
                 style={{
                   background: `linear-gradient(to right, #d4ff00 0%, #d4ff00 ${
                     inputMode === "eth" 
-                      ? ((parseFloat(buyAmount || "0") - 0.0001) / (0.224 - 0.0001)) * 100
-                      : ((parseFloat(buyAmountUsd || "0") - 1) / (1000 - 1)) * 100
+                      ? ((parseFloat(buyAmount || "0.0001") - 0.0001) / (0.224 - 0.0001)) * 100
+                      : ((parseFloat(buyAmountUsd || "1") - 1) / (1000 - 1)) * 100
                   }%, #374151 ${
                     inputMode === "eth" 
-                      ? ((parseFloat(buyAmount || "0") - 0.0001) / (0.224 - 0.0001)) * 100
-                      : ((parseFloat(buyAmountUsd || "0") - 1) / (1000 - 1)) * 100
+                      ? ((parseFloat(buyAmount || "0.0001") - 0.0001) / (0.224 - 0.0001)) * 100
+                      : ((parseFloat(buyAmountUsd || "1") - 1) / (1000 - 1)) * 100
                   }%, #374151 100%)`
                 }}
               />
               <div className="flex justify-center mt-1">
                 <span className="text-xs text-[#d4ff00] font-medium">
-                  {inputMode === "eth" ? buyAmount : buyAmountUsd} {inputMode === "eth" ? "ETH" : "USD"}
+                  {inputMode === "eth" ? (buyAmount || "0.0001") : (buyAmountUsd || "1")} {inputMode === "eth" ? "ETH" : "USD"}
                 </span>
               </div>
             </div>
