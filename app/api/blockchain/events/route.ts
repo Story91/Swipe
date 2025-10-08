@@ -13,7 +13,7 @@ const publicClient = createPublicClient({
 // POST /api/blockchain/events - Handle blockchain events and auto-sync
 export async function POST(request: NextRequest) {
   try {
-    const { eventType, predictionId, contractVersion = 'V2' } = await request.json();
+    const { eventType, predictionId, contractVersion = 'V2', userId, txHash } = await request.json();
     
     console.log(`🔄 Handling blockchain event: ${eventType} for prediction ${predictionId} (${contractVersion})`);
 
@@ -28,9 +28,9 @@ export async function POST(request: NextRequest) {
     const contract = CONTRACTS.V2;
     const predictionKey = `pred_${contractVersion.toLowerCase()}_${predictionId}`;
 
-    // Handle reward_claimed event - sync stakes data
-    if (eventType === 'reward_claimed') {
-      console.log(`💰 Syncing stakes data after reward claimed for prediction ${predictionId}`);
+    // Handle stake_placed and reward_claimed events - sync stakes data
+    if (eventType === 'stake_placed' || eventType === 'reward_claimed') {
+      console.log(`💰 Syncing stakes data after ${eventType} for prediction ${predictionId}`);
       
       try {
         // Get participants from prediction
@@ -99,10 +99,53 @@ export async function POST(request: NextRequest) {
               };
             }
 
-            // Save stake data to Redis
-            await redis.set(stakeKey, JSON.stringify(stakeData));
-            stakesUpdated++;
-            console.log(`✅ Updated V2 stake for user ${participant} in prediction ${predictionId} - ETH: ${ethClaimed}, SWIPE: ${swipeClaimed}`);
+            // Save stake data to Redis (only if user has any stakes)
+            if (stakeData.ETH || stakeData.SWIPE) {
+              await redis.set(stakeKey, JSON.stringify(stakeData));
+              stakesUpdated++;
+              console.log(`✅ Updated V2 stake for user ${participant} in prediction ${predictionId} - ETH: ${ethClaimed}, SWIPE: ${swipeClaimed}`);
+              
+              // Save transaction to user's history if this is a new stake (eventType === 'stake_placed')
+              if (eventType === 'stake_placed' && userId && participant.toLowerCase() === userId.toLowerCase()) {
+                try {
+                  // Get prediction data for transaction record
+                  const predictionData = await redis.get(`prediction:${predictionKey}`);
+                  let predictionQuestion = `Prediction #${predictionId}`;
+                  if (predictionData) {
+                    const prediction = typeof predictionData === 'string' ? JSON.parse(predictionData) : predictionData;
+                    predictionQuestion = prediction.question || predictionQuestion;
+                  }
+                  
+                  // Create transaction record
+                  const transaction = {
+                    id: `stake_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    type: 'stake',
+                    predictionId: predictionKey,
+                    predictionQuestion,
+                    txHash: txHash || 'unknown',
+                    basescanUrl: txHash ? `https://basescan.org/tx/${txHash}` : undefined,
+                    timestamp: Date.now(),
+                    status: 'success',
+                    amount: Number(ethYesAmount + ethNoAmount + swipeYesAmount + swipeNoAmount),
+                    tokenType: (ethYesAmount > 0 || ethNoAmount > 0) ? 'ETH' : 'SWIPE'
+                  };
+                  
+                  // Save to user transactions
+                  const userTxKey = `user_transactions:${participant.toLowerCase()}`;
+                  const existingTxs = await redis.get(userTxKey);
+                  let transactions = existingTxs ? (typeof existingTxs === 'string' ? JSON.parse(existingTxs) : existingTxs) : [];
+                  
+                  // Add new transaction to beginning of array
+                  transactions = [transaction, ...transactions].slice(0, 100); // Keep last 100
+                  
+                  await redis.set(userTxKey, JSON.stringify(transactions));
+                  console.log(`✅ Saved stake transaction to user history: ${participant}`);
+                } catch (txError) {
+                  console.error(`⚠️ Failed to save transaction to user history:`, txError);
+                  // Don't fail the whole sync if transaction save fails
+                }
+              }
+            }
           } catch (stakeError) {
             console.error(`❌ Failed to update stake for user ${participant}:`, stakeError);
           }
@@ -110,7 +153,7 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
           success: true,
-          message: `Stakes synced after reward claimed for prediction ${predictionId}`,
+          message: `Stakes synced after ${eventType} for prediction ${predictionId}`,
           data: {
             predictionId,
             eventType,
@@ -121,10 +164,10 @@ export async function POST(request: NextRequest) {
         });
 
       } catch (error) {
-        console.error('❌ Failed to sync stakes after reward claimed:', error);
+        console.error(`❌ Failed to sync stakes after ${eventType}:`, error);
         return NextResponse.json({
           success: false,
-          error: 'Failed to sync stakes after reward claimed'
+          error: `Failed to sync stakes after ${eventType}`
         }, { status: 500 });
       }
     }

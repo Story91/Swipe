@@ -746,6 +746,264 @@ export function AdminDashboard({
             🔍 V2 Claims Sync
           </button>
           
+          <button 
+            onClick={async () => {
+              const userId = prompt('👤 USER BLOCKCHAIN SYNC\n\nEnter user wallet address to sync their complete transaction history from blockchain to Redis.\n\nThis will find ALL missing stakes and transactions!\n\nWallet address (0x...):');
+              if (userId && userId.startsWith('0x')) {
+                try {
+                  alert('🔍 Starting blockchain sync for user...\nThis may take a few minutes as we scan all predictions.');
+                  const response = await fetch('/api/admin/sync-user-blockchain', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: userId.toLowerCase() })
+                  });
+                  
+                  if (response.ok) {
+                    const result = await response.json();
+                    const data = result.data;
+                    
+                    // Show detailed results
+                    let message = `✅ BLOCKCHAIN SYNC COMPLETE FOR USER!\n\n`;
+                    message += `📊 Total stakes in blockchain: ${data.blockchainStakes}\n`;
+                    message += `📦 Total stakes in Redis: ${data.redisStakes}\n`;
+                    message += `❌ Missing/outdated stakes: ${data.missingStakes}\n`;
+                    message += `✅ Synced stakes: ${data.syncedStakes}\n\n`;
+                    
+                    if (data.missingStakesList && data.missingStakesList.length > 0) {
+                      message += `📋 Missing Stakes Details:\n\n`;
+                      data.missingStakesList.slice(0, 5).forEach((stake: any) => {
+                        message += `• Prediction ${stake.predictionNumericId}: ${stake.question.substring(0, 50)}...\n`;
+                        if (stake.ETH.yesAmount > 0 || stake.ETH.noAmount > 0) {
+                          message += `  ETH: ${stake.ETH.yesAmount} YES, ${stake.ETH.noAmount} NO, claimed: ${stake.ETH.claimed}\n`;
+                        }
+                        if (stake.SWIPE.yesAmount > 0 || stake.SWIPE.noAmount > 0) {
+                          message += `  SWIPE: ${stake.SWIPE.yesAmount} YES, ${stake.SWIPE.noAmount} NO, claimed: ${stake.SWIPE.claimed}\n`;
+                        }
+                      });
+                      
+                      if (data.missingStakesList.length > 5) {
+                        message += `\n... and ${data.missingStakesList.length - 5} more\n`;
+                      }
+                    }
+                    
+                    alert(message + '\nData synced successfully! User can now see their complete history.');
+                    console.log('📊 Full sync results:', result);
+                  } else {
+                    const errorData = await response.json();
+                    alert(`❌ Blockchain sync failed: ${errorData.error}\n\nCheck console for details.`);
+                  }
+                } catch (error) {
+                  console.error('User blockchain sync error:', error);
+                  alert('❌ Blockchain sync failed. Check console for details.');
+                }
+              } else if (userId) {
+                alert('❌ Invalid wallet address. Must start with 0x');
+              }
+            }}
+            className="sync-btn mobile-sync-btn"
+            style={{
+              background: '#E91E63',
+              color: 'white',
+              border: 'none',
+              padding: '12px 16px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '600',
+              margin: '2px',
+              whiteSpace: 'nowrap',
+              minHeight: '44px',
+              minWidth: '140px',
+              touchAction: 'manipulation',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            👤 User Blockchain Sync
+          </button>
+          
+          <button 
+            onClick={async () => {
+              if (confirm('🌍 ALL USERS TRANSACTIONS SYNC\n\nThis will scan ALL predictions and sync transaction history for ALL users from blockchain to Redis.\n\nThis may take 10-30 minutes!\n\nContinue?')) {
+                try {
+                  alert('🌍 Starting all users transactions sync...\nThis will take 10-30 minutes. Please wait...');
+                  const response = await fetch('/api/admin/sync-all-user-transactions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                  });
+                  
+                  if (response.ok) {
+                    const result = await response.json();
+                    const data = result.data;
+                    
+                    let message = `✅ ALL USERS TRANSACTIONS SYNC COMPLETE!\n\n`;
+                    message += `📊 Predictions scanned: ${data.totalPredictionsScanned}\n`;
+                    message += `👥 Unique users found: ${data.totalUniqueUsers}\n`;
+                    message += `💰 Total stakes found: ${data.totalStakesFound}\n`;
+                    message += `💾 New transactions saved: ${data.totalTransactionsSaved}\n`;
+                    message += `✅ Users processed: ${data.usersProcessed}\n\n`;
+                    message += `All users can now see their complete transaction history!`;
+                    
+                    alert(message);
+                    console.log('📊 All users sync results:', result);
+                  } else {
+                    const errorData = await response.json();
+                    alert(`❌ All users sync failed: ${errorData.error}\n\nCheck console for details.`);
+                  }
+                } catch (error) {
+                  console.error('All users sync error:', error);
+                  alert('❌ All users sync failed. Check console for details.');
+                }
+              }
+            }}
+            className="sync-btn mobile-sync-btn"
+            style={{
+              background: '#FF5722',
+              color: 'white',
+              border: 'none',
+              padding: '12px 16px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '600',
+              margin: '2px',
+              whiteSpace: 'nowrap',
+              minHeight: '44px',
+              minWidth: '160px',
+              touchAction: 'manipulation',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            🌍 All Users Transactions Sync
+          </button>
+          
+          <button 
+            onClick={async () => {
+              try {
+                const response = await fetch('/api/debug/active-swipers');
+                
+                if (response.ok) {
+                  const result = await response.json();
+                  const data = result.data;
+                  
+                  let message = `📊 ACTIVE SWIPERS STATISTICS\n\n`;
+                  message += `🔴 Active predictions: ${data.activePredictions}\n`;
+                  message += `👥 Total participants (with duplicates): ${data.totalParticipants}\n`;
+                  message += `👤 Unique active users: ${data.uniqueActiveUsers}\n`;
+                  message += `📈 Avg participants per prediction: ${data.averageParticipantsPerPrediction}\n\n`;
+                  
+                  if (data.topPredictions && data.topPredictions.length > 0) {
+                    message += `🏆 TOP ACTIVE PREDICTIONS:\n\n`;
+                    data.topPredictions.slice(0, 5).forEach((pred: any, i: number) => {
+                      message += `${i + 1}. ${pred.question}\n`;
+                      message += `   👥 ${pred.participants} participants\n`;
+                      message += `   💰 ${pred.yesPool.toFixed(4)} ETH YES / ${pred.noPool.toFixed(4)} ETH NO\n`;
+                      if (pred.swipeYesPool > 0 || pred.swipeNoPool > 0) {
+                        message += `   🪙 ${pred.swipeYesPool.toFixed(0)} SWIPE YES / ${pred.swipeNoPool.toFixed(0)} SWIPE NO\n`;
+                      }
+                      message += `\n`;
+                    });
+                  }
+                  
+                  alert(message);
+                  console.log('📊 Full active swipers data:', result);
+                } else {
+                  const errorData = await response.json();
+                  alert(`❌ Failed to get active swipers: ${errorData.error}`);
+                }
+              } catch (error) {
+                console.error('Active swipers check error:', error);
+                alert('❌ Failed to check active swipers. Check console for details.');
+              }
+            }}
+            className="sync-btn mobile-sync-btn"
+            style={{
+              background: '#00BCD4',
+              color: 'white',
+              border: 'none',
+              padding: '12px 16px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '600',
+              margin: '2px',
+              whiteSpace: 'nowrap',
+              minHeight: '44px',
+              minWidth: '140px',
+              touchAction: 'manipulation',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            📊 Check Active Swipers
+          </button>
+          
+          <button 
+            onClick={async () => {
+              try {
+                const response = await fetch('/api/debug/predictions-breakdown');
+                
+                if (response.ok) {
+                  const result = await response.json();
+                  const data = result.data;
+                  
+                  let message = `📊 PREDICTIONS BREAKDOWN\n\n`;
+                  message += `Total: ${data.total} predictions\n\n`;
+                  message += `🔴 Active: ${data.counts.active} (${data.percentages.active})\n`;
+                  message += `✅ Resolved: ${data.counts.resolved} (${data.percentages.resolved})\n`;
+                  message += `⏰ Expired: ${data.counts.expired} (${data.percentages.expired})\n`;
+                  message += `🚫 Cancelled: ${data.counts.cancelled} (${data.percentages.cancelled})\n`;
+                  message += `⏳ Needs Approval: ${data.counts.needsApproval} (${data.percentages.needsApproval})\n\n`;
+                  
+                  if (data.breakdown.active && data.breakdown.active.length > 0) {
+                    message += `🔴 ACTIVE PREDICTIONS (${data.breakdown.active.length}):\n`;
+                    data.breakdown.active.forEach((pred: any, i: number) => {
+                      message += `${i + 1}. ${pred.question}\n`;
+                      message += `   👥 ${pred.participants} | 💰 ${pred.ethPool.toFixed(4)} ETH\n`;
+                    });
+                    message += `\n`;
+                  }
+                  
+                  if (data.breakdown.expired && data.breakdown.expired.length > 0) {
+                    message += `⏰ EXPIRED (need resolution): ${data.breakdown.expired.length}\n\n`;
+                  }
+                  
+                  message += `💡 TIP: Resolve expired predictions to keep platform active!`;
+                  
+                  alert(message);
+                  console.log('📊 Full breakdown data:', result);
+                } else {
+                  const errorData = await response.json();
+                  alert(`❌ Failed to get breakdown: ${errorData.error}`);
+                }
+              } catch (error) {
+                console.error('Predictions breakdown error:', error);
+                alert('❌ Failed to get predictions breakdown. Check console for details.');
+              }
+            }}
+            className="sync-btn mobile-sync-btn"
+            style={{
+              background: '#673AB7',
+              color: 'white',
+              border: 'none',
+              padding: '12px 16px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '600',
+              margin: '2px',
+              whiteSpace: 'nowrap',
+              minHeight: '44px',
+              minWidth: '140px',
+              touchAction: 'manipulation',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            📈 Predictions Breakdown
+          </button>
+          
           
         </div>
       </div>

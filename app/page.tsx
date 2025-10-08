@@ -41,8 +41,9 @@ import { Leaderboard } from "./components/Support/Leaderboard";
 import { RecentActivity } from "./components/Support/RecentActivity";
 import { CreatePredictionModal } from "./components/Modals/CreatePredictionModal";
 import AIAssistant from "./components/AIAssistant/AIAssistant";
+import { SwipeTokenCard } from "./components/Market/SwipeTokenCard";
 
-type DashboardType = 'tinder' | 'user' | 'admin' | 'approver' | 'market-stats' | 'analytics' | 'settings' | 'audit-logs' | 'my-portfolio' | 'active-bets' | 'bet-history' | 'help-faq' | 'leaderboard' | 'recent-activity';
+type DashboardType = 'tinder' | 'user' | 'admin' | 'approver' | 'market-stats' | 'analytics' | 'settings' | 'audit-logs' | 'my-portfolio' | 'active-bets' | 'bet-history' | 'help-faq' | 'leaderboard' | 'recent-activity' | 'swipe-token';
 
 export default function App() {
   const { setFrameReady, isFrameReady } = useMiniKit();
@@ -109,6 +110,11 @@ export default function App() {
               </MenubarTrigger>
             </MenubarMenu>
             <MenubarMenu>
+              <MenubarTrigger className="menubar-trigger" onClick={() => setActiveDashboard('swipe-token')}>
+                $SWIPE
+              </MenubarTrigger>
+            </MenubarMenu>
+            <MenubarMenu>
               <MenubarTrigger className="menubar-trigger" onClick={() => setActiveDashboard('market-stats')}>
                 Stats
               </MenubarTrigger>
@@ -155,6 +161,9 @@ export default function App() {
           {activeDashboard === 'admin' && <AdminPanel />}
 
           {activeDashboard === 'approver' && <AdminPanel defaultTab="approver" />}
+
+          {/* SWIPE Token Card */}
+          {activeDashboard === 'swipe-token' && <SwipeTokenCard />}
 
           {/* Market Stats - separate from main dashboard flow */}
           {activeDashboard === 'market-stats' && <CompactStats />}

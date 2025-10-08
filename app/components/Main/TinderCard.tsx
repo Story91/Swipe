@@ -506,30 +506,79 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
         }
         
         console.log('🔄 Auto-syncing prediction after stake...');
-        try {
-          const syncResponse = await fetch('/api/blockchain/events', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              eventType: 'stake_placed',
-              predictionId: stakePredictionId,
-              contractVersion: 'V2'
-            })
-          });
+        console.log('⏳ Waiting 3 seconds for blockchain propagation...');
+        
+        // Wait for blockchain to propagate the new participant
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Retry logic with better error handling
+        let syncAttempts = 0;
+        const maxSyncAttempts = 3;
+        
+        const attemptSync = async (): Promise<boolean> => {
+          syncAttempts++;
+          console.log(`🔄 Auto-sync attempt ${syncAttempts}/${maxSyncAttempts}...`);
           
-          if (syncResponse.ok) {
-            console.log('✅ Prediction auto-synced after stake - refreshing data');
-            // Refresh data to show updated values
-            setTimeout(() => {
+          try {
+            const syncResponse = await fetch('/api/blockchain/events', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                eventType: 'stake_placed',
+                predictionId: stakePredictionId,
+                contractVersion: 'V2',
+                userId: address?.toLowerCase(),
+                txHash: stakeTransactionHash
+              })
+            });
+            
+            if (syncResponse.ok) {
+              const result = await syncResponse.json();
+              console.log('✅ Prediction auto-synced after stake:', result);
+              
+              // Refresh data immediately to show new participant
               if (refreshPredictions) {
+                console.log('🔄 Refreshing predictions to show new participant...');
                 refreshPredictions();
               }
-            }, 1000);
-          } else {
-            console.warn('⚠️ Auto-sync failed after stake');
+              
+              // Refresh again after 2 seconds to ensure blockchain data is synced
+              setTimeout(() => {
+                if (refreshPredictions) {
+                  console.log('🔄 Second refresh to ensure sync...');
+                  refreshPredictions();
+                }
+              }, 2000);
+              
+              return true;
+            } else {
+              const errorData = await syncResponse.json();
+              console.error(`⚠️ Auto-sync failed (attempt ${syncAttempts}):`, errorData);
+              return false;
+            }
+          } catch (error) {
+            console.error(`❌ Auto-sync error (attempt ${syncAttempts}):`, error);
+            return false;
           }
-        } catch (error) {
-          console.error('❌ Failed to auto-sync after stake:', error);
+        };
+        
+        // Try sync with retries
+        let syncSuccess = await attemptSync();
+        
+        while (!syncSuccess && syncAttempts < maxSyncAttempts) {
+          console.log(`⏳ Retrying auto-sync in 2 seconds...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          syncSuccess = await attemptSync();
+        }
+        
+        if (!syncSuccess) {
+          console.error('❌ Auto-sync failed after all attempts - manual sync may be needed');
+          // Show notification to user
+          showNotification(
+            'warning',
+            'Sync Delayed',
+            'Your stake is confirmed but display may be delayed. Refresh the page if needed.'
+          );
         }
         
         // Reset transaction tracking

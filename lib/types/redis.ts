@@ -54,6 +54,7 @@ export interface UserTransaction {
   predictionId: string;
   predictionQuestion: string;
   amount?: number;
+  tokenType?: 'ETH' | 'SWIPE'; // Token type for multi-token support
   txHash: string;
   basescanUrl: string;
   timestamp: number;

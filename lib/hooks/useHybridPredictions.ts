@@ -128,33 +128,6 @@ export function useHybridPredictions() {
     }
   }, [fetchRedisPredictions]);
   
-  // Transform predictions when Redis data changes
-  useEffect(() => {
-    if (redisPredictions.length > 0) {
-      const transformed = transformPredictions(redisPredictions);
-      setPredictions(transformed);
-    }
-  }, [redisPredictions, transformPredictions]);
-  
-  // Fetch predictions on mount and when wallet connects - but only once
-  useEffect(() => {
-    // Always fetch ALL predictions on mount (for dashboards compatibility)
-    fetchAllPredictionsComplete();
-  }, []); // Only on mount
-  
-  // No additional fetch when wallet connects - data is already loaded
-  // This prevents double loading and flickering
-  
-  // Auto-refresh for live updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      console.log('🔄 Auto-refreshing hybrid predictions...');
-      fetchAllPredictions();
-    }, 30000); // 30 seconds for live updates
-    
-    return () => clearInterval(interval);
-  }, [fetchAllPredictions]);
-  
   // Function to fetch ALL predictions (for admin/user dashboards)
   const fetchAllPredictionsComplete = useCallback(async () => {
     setLoading(true);
@@ -173,6 +146,31 @@ export function useHybridPredictions() {
     }
   }, [fetchRedisPredictions]);
 
+  // Transform predictions when Redis data changes
+  useEffect(() => {
+    if (redisPredictions.length > 0) {
+      const transformed = transformPredictions(redisPredictions);
+      setPredictions(transformed);
+    }
+  }, [redisPredictions, transformPredictions]);
+  
+  // Fetch predictions on mount
+  useEffect(() => {
+    // Always fetch ALL predictions on mount (for dashboards compatibility)
+    fetchAllPredictionsComplete();
+  }, [fetchAllPredictionsComplete]); // Add dependency
+  
+  // Fetch predictions when wallet connects for immediate live data (only once)
+  useEffect(() => {
+    if (address) {
+      console.log('🔄 Wallet connected, fetching live predictions...');
+      fetchAllPredictionsComplete();
+    }
+  }, [address, fetchAllPredictionsComplete]);
+  
+  // No auto-refresh interval - only refresh on mount and after transactions
+  // Auto-refresh was causing unnecessary flickering and API calls
+  
   // Debug log when predictions change
   useEffect(() => {
     console.log('🔍 DEBUG: useHybridPredictions predictions changed:', {
