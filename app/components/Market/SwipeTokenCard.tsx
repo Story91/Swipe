@@ -17,11 +17,13 @@ export function SwipeTokenCard() {
   const [isLoading, setIsLoading] = useState(false);
   const [transactionHash, setTransactionHash] = useState<`0x${string}` | null>(null);
   const [buyAmount, setBuyAmount] = useState("0.001");
+  const [buyAmountUsd, setBuyAmountUsd] = useState("");
   const [sellAmount, setSellAmount] = useState("10000");
   const [slippagePercent, setSlippagePercent] = useState(5);
   const [activeTab, setActiveTab] = useState<"buy" | "sell">("buy");
   const [ethPrice, setEthPrice] = useState<number | null>(null);
   const [priceLoading, setPriceLoading] = useState(true);
+  const [inputMode, setInputMode] = useState<"eth" | "usd">("eth");
   
   // Signature state for Permit2
   const { data: signature, signTypedData } = useSignTypedData();
@@ -53,6 +55,35 @@ export function SwipeTokenCard() {
     const usdValue = parseFloat(ethAmount) * ethPrice;
     return usdValue.toFixed(2);
   }, [ethPrice]);
+
+  // Calculate ETH value from USD
+  const calculateEthValue = useCallback((usdAmount: string) => {
+    if (!ethPrice || !usdAmount) return null;
+    const ethValue = parseFloat(usdAmount) / ethPrice;
+    return ethValue.toFixed(6);
+  }, [ethPrice]);
+
+  // Handle ETH amount change
+  const handleEthAmountChange = useCallback((value: string) => {
+    setBuyAmount(value);
+    if (ethPrice && value) {
+      const usdValue = calculateUsdValue(value);
+      setBuyAmountUsd(usdValue || "");
+    } else {
+      setBuyAmountUsd("");
+    }
+  }, [ethPrice, calculateUsdValue]);
+
+  // Handle USD amount change
+  const handleUsdAmountChange = useCallback((value: string) => {
+    setBuyAmountUsd(value);
+    if (ethPrice && value) {
+      const ethValue = calculateEthValue(value);
+      setBuyAmount(ethValue || "");
+    } else {
+      setBuyAmount("");
+    }
+  }, [ethPrice, calculateEthValue]);
   
   // Initialize Flaunch SDK
   const flaunchSDK = useMemo(() => {
@@ -272,8 +303,8 @@ export function SwipeTokenCard() {
       {address && swipeBalance !== undefined && (
         <div className="bg-gradient-to-r from-gray-800 to-gray-900 rounded-xl p-4 mb-6 border border-gray-700">
           <div className="text-sm text-[#d4ff00] mb-1">Your Balance</div>
-          <div className="text-2xl font-bold text-white">
-            {formatEther(swipeBalance as bigint)} SWIPE
+          <div className="text-lg font-bold text-white">
+            {formatEther(swipeBalance as bigint)}
           </div>
           <div className="text-xs text-gray-400 mt-1">
             Token: {SWIPE_TOKEN.address.slice(0, 6)}...{SWIPE_TOKEN.address.slice(-4)}
@@ -387,9 +418,9 @@ export function SwipeTokenCard() {
 
           {/* Custom Amount */}
           <div className="mb-6">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-3">
               <label className="block text-sm font-medium text-[#d4ff00]">
-                Custom ETH Amount
+                Custom Amount
               </label>
               {ethPrice && (
                 <span className="text-xs text-gray-400">
@@ -397,20 +428,56 @@ export function SwipeTokenCard() {
                 </span>
               )}
             </div>
+            
+            {/* Input Mode Toggle */}
+            <div className="flex mb-3 bg-gray-900 rounded-lg p-1 border border-gray-700">
+              <button
+                onClick={() => setInputMode("eth")}
+                className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all ${
+                  inputMode === "eth"
+                    ? "bg-[#d4ff00] text-black"
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                ETH
+              </button>
+              <button
+                onClick={() => setInputMode("usd")}
+                className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all ${
+                  inputMode === "usd"
+                    ? "bg-[#d4ff00] text-black"
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                USD
+              </button>
+            </div>
+
             <div className="flex gap-2">
               <div className="flex-1">
                 <input
                   type="number"
-                  step="0.0001"
-                  value={buyAmount}
-                  onChange={(e) => setBuyAmount(e.target.value)}
+                  step={inputMode === "eth" ? "0.0001" : "0.01"}
+                  value={inputMode === "eth" ? buyAmount : buyAmountUsd}
+                  onChange={(e) => {
+                    if (inputMode === "eth") {
+                      handleEthAmountChange(e.target.value);
+                    } else {
+                      handleUsdAmountChange(e.target.value);
+                    }
+                  }}
                   className="w-full px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-[#d4ff00] focus:border-[#d4ff00] text-white placeholder-gray-400"
-                  placeholder="0.001"
+                  placeholder={inputMode === "eth" ? "0.001" : "4.46"}
                   disabled={isLoading}
                 />
-                {buyAmount && ethPrice && (
+                {inputMode === "eth" && buyAmount && ethPrice && (
                   <div className="text-xs text-gray-400 mt-1">
                     ≈ ${calculateUsdValue(buyAmount)} USD
+                  </div>
+                )}
+                {inputMode === "usd" && buyAmountUsd && ethPrice && (
+                  <div className="text-xs text-gray-400 mt-1">
+                    ≈ {calculateEthValue(buyAmountUsd)} ETH
                   </div>
                 )}
               </div>

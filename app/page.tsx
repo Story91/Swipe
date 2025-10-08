@@ -73,7 +73,7 @@ export default function App() {
   return (
     <div className="flex flex-col min-h-screen font-sans text-[var(--app-foreground)] mini-app-theme from-[var(--app-background)] to-[var(--app-gray)]">
       <div className="w-full max-w-[424px] mx-auto px-4 py-3">
-        {/* Wallet Connection and Admin - Top */}
+        {/* Wallet Connection and Admin/Help - Top */}
         <div className="flex justify-between items-center mb-3">
           <Wallet className="z-10">
             <ConnectWallet>
@@ -90,15 +90,23 @@ export default function App() {
             </WalletDropdown>
           </Wallet>
           
-          {/* Admin Button - Top Right */}
-          {isAdmin && (
+          {/* Admin or Help Button - Top Right */}
+          <div className="flex gap-2">
+            {isAdmin && (
+              <button
+                onClick={() => setActiveDashboard('admin')}
+                className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3 py-1 rounded-full font-medium transition-colors"
+              >
+                🔧 Admin
+              </button>
+            )}
             <button
-              onClick={() => setActiveDashboard('admin')}
-              className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3 py-1 rounded-full font-medium transition-colors"
+              onClick={() => setActiveDashboard('help-faq')}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded-full font-medium transition-colors"
             >
-              🔧 Admin
+              ❓ Help
             </button>
-          )}
+          </div>
         </div>
 
         {/* Menu Bar - Right after Wallet */}
@@ -106,11 +114,14 @@ export default function App() {
           <Menubar className="mini-app-menu">
             <MenubarMenu>
               <MenubarTrigger className="menubar-trigger" onClick={() => setActiveDashboard('tinder')}>
-                Swipe
+                Bets
               </MenubarTrigger>
             </MenubarMenu>
             <MenubarMenu>
-              <MenubarTrigger className="menubar-trigger" onClick={() => setActiveDashboard('swipe-token')}>
+              <MenubarTrigger 
+                className="menubar-trigger animate-pulse bg-gradient-to-r from-[#d4ff00] to-yellow-300 text-black font-bold hover:from-yellow-300 hover:to-[#d4ff00]" 
+                onClick={() => setActiveDashboard('swipe-token')}
+              >
                 $SWIPE
               </MenubarTrigger>
             </MenubarMenu>
@@ -133,11 +144,6 @@ export default function App() {
                   Create Prediction
                 </MenubarItem>
               </MenubarContent>
-            </MenubarMenu>
-            <MenubarMenu>
-              <MenubarTrigger className="menubar-trigger" onClick={() => setActiveDashboard('help-faq')}>
-                Help
-              </MenubarTrigger>
             </MenubarMenu>
           </Menubar>
         </div>
