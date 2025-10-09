@@ -135,6 +135,8 @@ export function AdminPanel({ defaultTab = 'dashboard' }: AdminPanelProps) {
   // Check permissions
   const isAdmin = address && process.env.NEXT_PUBLIC_ADMIN_1?.toLowerCase() === address.toLowerCase();
   const isApprover = address && (process.env.NEXT_PUBLIC_APPROVER_1?.toLowerCase() === address.toLowerCase() ||
+                               process.env.NEXT_PUBLIC_APPROVER_2?.toLowerCase() === address.toLowerCase() ||
+                               process.env.NEXT_PUBLIC_APPROVER_3?.toLowerCase() === address.toLowerCase() ||
                                process.env.NEXT_PUBLIC_ADMIN_1?.toLowerCase() === address.toLowerCase());
 
   if (!isAdmin && !isApprover) {

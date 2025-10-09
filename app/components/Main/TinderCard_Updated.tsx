@@ -544,10 +544,16 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
 
   if (activeDashboard === 'approver') {
     // Sprawdź czy użytkownik ma uprawnienia approver lub admina
-    const envApprover = process.env.NEXT_PUBLIC_APPROVER_1?.toLowerCase();
+    const envApprover1 = process.env.NEXT_PUBLIC_APPROVER_1?.toLowerCase();
+    const envApprover2 = process.env.NEXT_PUBLIC_APPROVER_2?.toLowerCase();
+    const envApprover3 = process.env.NEXT_PUBLIC_APPROVER_3?.toLowerCase();
     const envAdmin = process.env.NEXT_PUBLIC_ADMIN_1?.toLowerCase();
 
-    const isEnvApprover = address && envApprover === address.toLowerCase();
+    const isEnvApprover = address && (
+      envApprover1 === address.toLowerCase() ||
+      envApprover2 === address.toLowerCase() ||
+      envApprover3 === address.toLowerCase()
+    );
     const isEnvAdmin = address && envAdmin === address.toLowerCase();
 
     // TODO: Add contract check for approver role

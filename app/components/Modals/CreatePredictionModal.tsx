@@ -121,9 +121,11 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
   // Check if user is an approved creator via environment variables
   const approver1 = process.env.NEXT_PUBLIC_APPROVER_1?.toLowerCase();
   const approver2 = process.env.NEXT_PUBLIC_APPROVER_2?.toLowerCase();
+  const approver3 = process.env.NEXT_PUBLIC_APPROVER_3?.toLowerCase();
   const isApprovedCreator = address && (
     approver1 === address.toLowerCase() || 
-    approver2 === address.toLowerCase()
+    approver2 === address.toLowerCase() ||
+    approver3 === address.toLowerCase()
   );
 
   const { data: contractOwner } = useReadContract({
