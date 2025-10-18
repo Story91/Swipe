@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category');
     const status = searchParams.get('status');
     const creator = searchParams.get('creator');
+    const adminEssential = searchParams.get('admin_essential'); // New parameter for admin optimization
     
     // If ID is provided, return single prediction
     if (id) {
@@ -29,7 +30,23 @@ export async function GET(request: NextRequest) {
     
     let predictions: RedisPrediction[] = [];
     
-    if (category) {
+    if (adminEssential === 'true') {
+      // Admin essential: only active + expired predictions (fast loading)
+      console.log('🚀 Admin essential mode: loading only active + expired predictions');
+      const allPredictions = await redisHelpers.getAllPredictions();
+      const currentTime = Date.now() / 1000;
+      
+      predictions = allPredictions.filter(p => {
+        // Include active predictions
+        const isActive = !p.resolved && !p.cancelled && p.deadline > currentTime;
+        // Include expired predictions (need resolution)
+        const isExpired = !p.resolved && !p.cancelled && p.deadline <= currentTime;
+        
+        return isActive || isExpired;
+      });
+      
+      console.log(`✅ Admin essential: ${predictions.length} predictions (active + expired only)`);
+    } else if (category) {
       predictions = await redisHelpers.getPredictionsByCategory(category);
     } else if (status === 'active') {
       predictions = await redisHelpers.getActivePredictions();

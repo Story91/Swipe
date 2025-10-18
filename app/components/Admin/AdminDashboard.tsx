@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useReadContract, usePublicClient, useWriteContract } from 'wagmi';
 import { CONTRACTS, getV2Contract } from '../../../lib/contract';
-import { useRedisPredictions } from '../../../lib/hooks/useRedisPredictions';
+import { useAdminPredictions } from '../../../lib/hooks/useAdminPredictions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 
 interface Prediction {
@@ -51,13 +51,16 @@ export function AdminDashboard({
   // Filter state
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
   
-  // Use Redis predictions hook to get ALL predictions (not just active ones)
-  const { predictions: redisPredictions, loading: predictionsLoading, error: predictionsError, refreshData, fetchPredictions } = useRedisPredictions();
-  
-  // Fetch ALL predictions (not just active) when admin dashboard loads
-  useEffect(() => {
-    fetchPredictions(); // No filter - get all predictions
-  }, []); // Only run once on mount
+  // Use optimized admin predictions hook - loads only essential data by default
+  const { 
+    predictions: redisPredictions, 
+    loading: predictionsLoading, 
+    error: predictionsError, 
+    refreshData, 
+    fetchByCategory,
+    loadedAll,
+    fetchAllPredictions
+  } = useAdminPredictions();
   
   // Filter out duplicate predictions - only keep synced ones (pred_v1_, pred_v2_) and exclude pure Redis ones (pred_*)
   const filteredRedisPredictions = redisPredictions.filter(p => 
@@ -95,15 +98,9 @@ export function AdminDashboard({
     functionName: 'nextPredictionId',
   });
 
-  // Fetch real predictions data
-  const [realPredictions, setRealPredictions] = React.useState<Prediction[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
-
-  // Categorize predictions
-  // Use Redis predictions (which include all data) instead of blockchain-only data
-  // This prevents duplicates and ensures we have the most up-to-date information
-  const displayPredictions = predictions.length > 0 ? predictions : realPredictions;
+  // Use Redis predictions as the primary data source
+  // This is much faster than fetching from blockchain and always up-to-date
+  const displayPredictions = predictions;
 
   
   // Helper function to check if prediction needs resolution
@@ -121,6 +118,17 @@ export function AdminDashboard({
     return Date.now() / 1000 > prediction.resolutionDeadline;
   };
   
+  // Enhanced filter logic with lazy loading
+  const handleFilterChange = useCallback(async (newFilter: string) => {
+    setSelectedFilter(newFilter);
+    
+    // Load additional data if needed
+    if (!loadedAll && (newFilter === 'resolved' || newFilter === 'cancelled' || newFilter === 'all')) {
+      console.log(`🔄 Loading ${newFilter} predictions on demand...`);
+      await fetchByCategory(newFilter as any);
+    }
+  }, [loadedAll, fetchByCategory]);
+
   // Filter predictions based on selected filter
   const getFilteredPredictions = () => {
     const currentTime = Date.now() / 1000;
@@ -162,102 +170,9 @@ export function AdminDashboard({
     refreshData();
   }, [refreshData]);
 
-  React.useEffect(() => {
-    const fetchPredictions = async () => {
-      if (!totalPredictions || Number(totalPredictions) <= 1) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        setError(null);
-
-        const predictions: Prediction[] = [];
-
-        for (let i = 1; i < Number(totalPredictions); i++) {
-          try {
-            if (!publicClient) {
-              throw new Error('Public client not available');
-            }
-
-            // Pobierz podstawowe informacje o predykcji
-            const basicResult = await publicClient.readContract({
-              address: CONTRACTS.V2.address as `0x${string}`,
-              abi: CONTRACTS.V2.abi,
-              functionName: 'getPredictionBasic',
-              args: [BigInt(i)],
-            }) as {
-              question: string;
-              description: string;
-              category: string;
-              yesTotalAmount: bigint;
-              noTotalAmount: bigint;
-              deadline: bigint;
-              resolved: boolean;
-              outcome: boolean;
-              approved: boolean;
-              creator: string;
-            };
-
-            // Pobierz rozszerzone informacje
-            const extendedResult = await publicClient.readContract({
-              address: CONTRACTS.V2.address as `0x${string}`,
-              abi: CONTRACTS.V2.abi,
-              functionName: 'getPredictionExtended',
-              args: [BigInt(i)],
-            }) as [string, bigint, boolean, bigint, boolean, boolean, bigint];
-
-            // Pobierz statystyki rynku
-            const marketStats = await publicClient.readContract({
-              address: CONTRACTS.V2.address as `0x${string}`,
-              abi: CONTRACTS.V2.abi,
-              functionName: 'getMarketStats',
-              args: [BigInt(i)],
-            }) as {
-              totalPool: bigint;
-              participantsCount: bigint;
-              yesPercentage: bigint;
-              noPercentage: bigint;
-              timeLeft: bigint;
-            };
-
-            const prediction: Prediction = {
-              id: i,
-              question: basicResult.question,
-              description: basicResult.description,
-              category: basicResult.category,
-              yesTotalAmount: Number(basicResult.yesTotalAmount) / 1e18,
-              noTotalAmount: Number(basicResult.noTotalAmount) / 1e18,
-              deadline: Number(basicResult.deadline),
-              resolved: basicResult.resolved,
-              outcome: basicResult.outcome,
-              cancelled: extendedResult[2],
-              participants: Number(marketStats.participantsCount),
-              resolutionDeadline: Number(basicResult.deadline) + (10 * 24 * 60 * 60), // 10 days after deadline
-              needsApproval: false, // Default to false for blockchain data
-              approved: basicResult.approved,
-              verified: false, // Default to false for blockchain data
-              creator: basicResult.creator,
-            };
-
-            predictions.push(prediction);
-          } catch (error) {
-            console.error(`Error fetching prediction ${i}:`, error);
-          }
-        }
-
-        setRealPredictions(predictions);
-      } catch (err) {
-        console.error('❌ Failed to fetch predictions:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch predictions');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPredictions();
-  }, [totalPredictions]);
+  // REMOVED: Slow blockchain fetch loop that was causing performance issues
+  // Now using Redis data exclusively, which is always up-to-date and much faster
+  // Contract stats (contractStats, totalPredictions) are still fetched from blockchain for admin info
 
   // Calculate real stats (use displayPredictions for total stats, filteredPredictions for current view)
   const stats = {
@@ -461,22 +376,23 @@ export function AdminDashboard({
   const predictionsNeedingResolution = filteredPredictions.filter(p => needsResolution(p));
   const livePredictions = filteredPredictions.filter(p => !p.resolved && !p.cancelled && !needsResolution(p));
 
-  if (loading) {
+  // Show loading only for Redis predictions, not blockchain data
+  if (predictionsLoading) {
     return (
       <div className="admin-dashboard">
         <div style={{ textAlign: 'center', padding: '40px' }}>
-          <div>Loading admin data...</div>
+          <div>Loading predictions from Redis...</div>
         </div>
       </div>
     );
   }
 
-  if (error) {
+  if (predictionsError) {
     return (
       <div className="admin-dashboard">
         <div style={{ textAlign: 'center', padding: '40px', color: 'red' }}>
-          <div>❌ Failed to load admin data</div>
-          <div style={{ fontSize: '14px', marginTop: '10px' }}>{error}</div>
+          <div>❌ Failed to load predictions from Redis</div>
+          <div style={{ fontSize: '14px', marginTop: '10px' }}>{predictionsError}</div>
         </div>
       </div>
     );
@@ -492,7 +408,7 @@ export function AdminDashboard({
             <label htmlFor="prediction-filter" style={{ fontSize: '12px', fontWeight: '500', whiteSpace: 'nowrap' }}>
               Filter:
             </label>
-            <Select value={selectedFilter} onValueChange={setSelectedFilter}>
+            <Select value={selectedFilter} onValueChange={handleFilterChange}>
               <SelectTrigger style={{ width: '150px', fontSize: '12px' }}>
                 <SelectValue placeholder="Select filter" />
               </SelectTrigger>
@@ -507,6 +423,9 @@ export function AdminDashboard({
                 <SelectItem value="v2">V2 Contract</SelectItem>
               </SelectContent>
             </Select>
+            <div style={{ fontSize: '10px', color: loadedAll ? '#4CAF50' : '#FF9800', fontWeight: '600' }}>
+              {loadedAll ? '📊 All Data' : '⚡ Essential Only'}
+            </div>
           </div>
         </div>
         {/* V2 Sync Controls - Mobile Optimized */}
@@ -540,6 +459,35 @@ export function AdminDashboard({
           >
             🔄 Refresh
           </button>
+          
+          {!loadedAll && (
+            <button 
+              onClick={async () => {
+                console.log('📊 Loading all predictions for admin...');
+                await fetchAllPredictions();
+              }}
+              className="load-all-btn mobile-sync-btn"
+              style={{
+                background: '#FF9800',
+                color: 'white',
+                border: 'none',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '600',
+                margin: '2px',
+                whiteSpace: 'nowrap',
+                minHeight: '44px',
+                minWidth: '100px',
+                touchAction: 'manipulation',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              📊 Load All
+            </button>
+          )}
           
           <button 
             onClick={async () => {
