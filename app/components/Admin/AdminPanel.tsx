@@ -1,21 +1,14 @@
 "use client";
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useAccount, useWriteContract } from 'wagmi';
 import { CONTRACTS, getV2Contract } from '../../../lib/contract';
 import { AdminDashboard } from './AdminDashboard';
-import { ApproverDashboard } from '../Approver/ApproverDashboard';
-import { ClaimsDashboard } from './ClaimsDashboard';
 import './AdminPanel.css';
 
-export type AdminTab = 'dashboard' | 'approver' | 'claims';
+interface AdminPanelProps {}
 
-interface AdminPanelProps {
-  defaultTab?: AdminTab;
-}
-
-export function AdminPanel({ defaultTab = 'dashboard' }: AdminPanelProps) {
-  const [activeTab, setActiveTab] = useState<AdminTab>(defaultTab);
+export function AdminPanel({}: AdminPanelProps) {
   const { address } = useAccount();
   const { writeContract } = useWriteContract();
 
@@ -106,32 +99,6 @@ export function AdminPanel({ defaultTab = 'dashboard' }: AdminPanelProps) {
     }
   };
 
-  const handleApprovePrediction = async (predictionId: number) => {
-    try {
-      writeContract({
-        address: CONTRACTS.V2.address as `0x${string}`,
-        abi: CONTRACTS.V2.abi,
-        functionName: 'approvePrediction',
-        args: [BigInt(predictionId)],
-      });
-    } catch (error) {
-      console.error('Failed to approve prediction:', error);
-    }
-  };
-
-  const handleRejectPrediction = async (predictionId: number, reason: string) => {
-    try {
-      writeContract({
-        address: CONTRACTS.V2.address as `0x${string}`,
-        abi: CONTRACTS.V2.abi,
-        functionName: 'rejectPrediction',
-        args: [BigInt(predictionId), reason],
-      });
-    } catch (error) {
-      console.error('Failed to reject prediction:', error);
-    }
-  };
-
   // Check permissions
   const isAdmin = address && process.env.NEXT_PUBLIC_ADMIN_1?.toLowerCase() === address.toLowerCase();
   const isApprover = address && (process.env.NEXT_PUBLIC_APPROVER_1?.toLowerCase() === address.toLowerCase() ||
@@ -151,78 +118,22 @@ export function AdminPanel({ defaultTab = 'dashboard' }: AdminPanelProps) {
     );
   }
 
-  const tabs = [
-    { id: 'dashboard' as AdminTab, label: 'Dashboard', icon: '📊', adminOnly: false },
-    { id: 'approver' as AdminTab, label: 'Approver', icon: '✅', adminOnly: false },
-    { id: 'claims' as AdminTab, label: 'Claims', icon: '💰', adminOnly: true }
-  ];
-
   const renderTabContent = () => {
-    switch (activeTab) {
-      case 'dashboard':
-        return (
-          <AdminDashboard
-            predictions={[]} // AdminDashboard fetches its own real data
-            onResolvePrediction={handleResolvePrediction}
-            onCancelPrediction={handleCancelPrediction}
-            onCreatePrediction={() => console.log('Create prediction')}
-            onManageApprovers={() => console.log('Manage approvers')}
-            onWithdrawFees={handleWithdrawFees}
-            onPauseContract={() => handlePauseContract(true)}
-          />
-        );
-      case 'approver':
-        return (
-          <ApproverDashboard
-            predictions={[]} // ApproverDashboard fetches its own real data
-            onApprovePrediction={handleApprovePrediction}
-            onRejectPrediction={handleRejectPrediction}
-          />
-        );
-      case 'claims':
-        if (!isAdmin) {
-          return (
-            <div className="access-denied">
-              <h2>🔒 Admin Only</h2>
-              <p>This feature is only available to administrators.</p>
-            </div>
-          );
-        }
-        return <ClaimsDashboard />;
-      default:
-        return (
-          <AdminDashboard
-            predictions={[]} // AdminDashboard fetches its own real data
-            onResolvePrediction={handleResolvePrediction}
-            onCancelPrediction={handleCancelPrediction}
-            onCreatePrediction={() => console.log('Create prediction')}
-            onManageApprovers={() => console.log('Manage approvers')}
-            onWithdrawFees={handleWithdrawFees}
-            onPauseContract={() => handlePauseContract(true)}
-          />
-        );
-    }
+    return (
+      <AdminDashboard
+        predictions={[]} // AdminDashboard fetches its own real data
+        onResolvePrediction={handleResolvePrediction}
+        onCancelPrediction={handleCancelPrediction}
+        onCreatePrediction={() => console.log('Create prediction')}
+        onManageApprovers={() => console.log('Manage approvers')}
+        onWithdrawFees={handleWithdrawFees}
+        onPauseContract={() => handlePauseContract(true)}
+      />
+    );
   };
 
   return (
     <div className="admin-panel">
-
-      <div className="admin-tabs">
-        {tabs
-          .filter(tab => !tab.adminOnly || isAdmin)
-          .map((tab) => (
-            <button
-              key={tab.id}
-              className={`admin-tab ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              <span className="tab-icon">{tab.icon}</span>
-              <span className="tab-label">{tab.label}</span>
-              {tab.adminOnly && <span className="admin-badge">ADMIN</span>}
-            </button>
-          ))}
-      </div>
-
       <div className="admin-content">
         {renderTabContent()}
       </div>

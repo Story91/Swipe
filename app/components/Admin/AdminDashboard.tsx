@@ -261,6 +261,13 @@ export function AdminDashboard({
     return `${hours} hours`;
   };
 
+  // Format ETH values the same way as TinderCard.tsx
+  const formatETH = (value: number) => {
+    // Convert from wei to ETH (same as TinderCard.tsx)
+    const ethValue = value / 1e18;
+    return ethValue > 0 ? ethValue.toFixed(5) : '0.00000';
+  };
+
   // Enhanced resolve function with auto-sync (replaces both handleResolve and handleDirectResolve)
   const handleDirectResolve = async (predictionId: string | number, outcome: boolean) => {
     const side = outcome ? 'YES' : 'NO';
@@ -400,16 +407,32 @@ export function AdminDashboard({
 
   return (
     <div className="admin-dashboard">
-      {/* Header with Filter and Refresh Button */}
+      {/* Header with Filter */}
       <div className="admin-header" style={{ marginBottom: '20px' }}>
-        {/* Filter Row */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '15px' }}>
-          <div className="filter-section" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <label htmlFor="prediction-filter" style={{ fontSize: '12px', fontWeight: '500', whiteSpace: 'nowrap' }}>
-              Filter:
+        {/* Filter Section - Clean */}
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          marginBottom: '20px'
+        }}>
+          <div className="filter-section" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <label htmlFor="prediction-filter" style={{ 
+              fontSize: '14px', 
+              fontWeight: '600', 
+              whiteSpace: 'nowrap',
+              color: 'rgba(0, 0, 0, 0.8)'
+            }}>
+              📊 Filter:
             </label>
             <Select value={selectedFilter} onValueChange={handleFilterChange}>
-              <SelectTrigger style={{ width: '150px', fontSize: '12px' }}>
+              <SelectTrigger style={{ 
+                width: '200px', 
+                fontSize: '13px',
+                background: 'rgba(255, 255, 255, 0.9)',
+                border: '1px solid rgba(0, 0, 0, 0.1)',
+                borderRadius: '8px'
+              }}>
                 <SelectValue placeholder="Select filter" />
               </SelectTrigger>
               <SelectContent>
@@ -423,38 +446,37 @@ export function AdminDashboard({
                 <SelectItem value="v2">V2 Contract</SelectItem>
               </SelectContent>
             </Select>
-            <div style={{ fontSize: '10px', color: loadedAll ? '#4CAF50' : '#FF9800', fontWeight: '600' }}>
-              {loadedAll ? '📊 All Data' : '⚡ Essential Only'}
-            </div>
           </div>
         </div>
-        {/* V2 Sync Controls - Mobile Optimized */}
-        <div className="v2-sync-controls" style={{ 
-          display: 'flex', 
-          gap: '8px', 
-          flexWrap: 'wrap', 
-          justifyContent: 'flex-end',
-          marginBottom: '10px'
+        {/* Sync Controls - Ultra Compact Grid Layout */}
+        <div className="sync-controls-grid" style={{ 
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+          gap: '6px',
+          marginBottom: '20px',
+          maxWidth: '100%'
         }}>
           <button 
             onClick={handleRefresh}
-            className="refresh-btn mobile-sync-btn"
+            className="refresh-btn ultra-compact-btn"
             style={{
               background: '#4CAF50',
               color: 'white',
               border: 'none',
-              padding: '12px 16px',
-              borderRadius: '8px',
+              padding: '6px 8px',
+              borderRadius: '6px',
               cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '600',
-              margin: '2px',
+              fontSize: '9px',
+              fontWeight: '500',
               whiteSpace: 'nowrap',
-              minHeight: '44px',
-              minWidth: '80px',
+              minHeight: '28px',
               touchAction: 'manipulation',
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px'
             }}
           >
             🔄 Refresh
@@ -466,23 +488,25 @@ export function AdminDashboard({
                 console.log('📊 Loading all predictions for admin...');
                 await fetchAllPredictions();
               }}
-              className="load-all-btn mobile-sync-btn"
+              className="load-all-btn ultra-compact-btn"
               style={{
                 background: '#FF9800',
                 color: 'white',
                 border: 'none',
-                padding: '12px 16px',
-                borderRadius: '8px',
+                padding: '6px 8px',
+                borderRadius: '6px',
                 cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '600',
-                margin: '2px',
+                fontSize: '9px',
+                fontWeight: '500',
                 whiteSpace: 'nowrap',
-                minHeight: '44px',
-                minWidth: '100px',
+                minHeight: '28px',
                 touchAction: 'manipulation',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                transition: 'all 0.2s ease'
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '3px'
               }}
             >
               📊 Load All
@@ -508,26 +532,28 @@ export function AdminDashboard({
                 }
               }
             }}
-            className="sync-btn mobile-sync-btn"
+            className="sync-btn ultra-compact-btn"
             style={{
               background: '#2196F3',
               color: 'white',
               border: 'none',
-              padding: '12px 16px',
-              borderRadius: '8px',
+              padding: '6px 8px',
+              borderRadius: '6px',
               cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '600',
-              margin: '2px',
+              fontSize: '9px',
+              fontWeight: '500',
               whiteSpace: 'nowrap',
-              minHeight: '44px',
-              minWidth: '100px',
+              minHeight: '28px',
               touchAction: 'manipulation',
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px'
             }}
           >
-            🚀 V2 Full Sync
+            🚀 V2 Full
           </button>
           
           <button 
@@ -549,26 +575,28 @@ export function AdminDashboard({
                 }
               }
             }}
-            className="sync-btn mobile-sync-btn"
+            className="sync-btn ultra-compact-btn"
             style={{
               background: '#4CAF50',
               color: 'white',
               border: 'none',
-              padding: '12px 16px',
-              borderRadius: '8px',
+              padding: '6px 8px',
+              borderRadius: '6px',
               cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '600',
-              margin: '2px',
+              fontSize: '9px',
+              fontWeight: '500',
               whiteSpace: 'nowrap',
-              minHeight: '44px',
-              minWidth: '100px',
+              minHeight: '28px',
               touchAction: 'manipulation',
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px'
             }}
           >
-            ⚡ V2 Incremental Sync
+            ⚡ V2 Incremental
           </button>
           
           <button 
@@ -590,26 +618,28 @@ export function AdminDashboard({
                 }
               }
             }}
-            className="sync-btn mobile-sync-btn"
+            className="sync-btn ultra-compact-btn"
             style={{
               background: '#4CAF50',
               color: 'white',
               border: 'none',
-              padding: '12px 16px',
-              borderRadius: '8px',
+              padding: '6px 8px',
+              borderRadius: '6px',
               cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '600',
-              margin: '2px',
+              fontSize: '9px',
+              fontWeight: '500',
               whiteSpace: 'nowrap',
-              minHeight: '44px',
-              minWidth: '120px',
+              minHeight: '28px',
               touchAction: 'manipulation',
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px'
             }}
           >
-            ⚡ V2 Active Sync
+            ⚡ V2 Active
           </button>
           
           <button 
@@ -631,26 +661,28 @@ export function AdminDashboard({
                 }
               }
             }}
-            className="sync-btn mobile-sync-btn"
+            className="sync-btn ultra-compact-btn"
             style={{
               background: '#FF9800',
               color: 'white',
               border: 'none',
-              padding: '12px 16px',
-              borderRadius: '8px',
+              padding: '6px 8px',
+              borderRadius: '6px',
               cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '600',
-              margin: '2px',
+              fontSize: '9px',
+              fontWeight: '500',
               whiteSpace: 'nowrap',
-              minHeight: '44px',
-              minWidth: '120px',
+              minHeight: '28px',
               touchAction: 'manipulation',
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px'
             }}
           >
-            💰 V2 Resolved Sync
+            💰 V2 Resolved
           </button>
           
           <button 
@@ -672,26 +704,28 @@ export function AdminDashboard({
                 }
               }
             }}
-            className="sync-btn mobile-sync-btn"
+            className="sync-btn ultra-compact-btn"
             style={{
               background: '#9C27B0',
               color: 'white',
               border: 'none',
-              padding: '12px 16px',
-              borderRadius: '8px',
+              padding: '6px 8px',
+              borderRadius: '6px',
               cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '600',
-              margin: '2px',
+              fontSize: '9px',
+              fontWeight: '500',
               whiteSpace: 'nowrap',
-              minHeight: '44px',
-              minWidth: '120px',
+              minHeight: '28px',
               touchAction: 'manipulation',
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px'
             }}
           >
-            🔍 V2 Claims Sync
+            🔍 V2 Claims
           </button>
           
           <button 
@@ -748,26 +782,28 @@ export function AdminDashboard({
                 alert('❌ Invalid wallet address. Must start with 0x');
               }
             }}
-            className="sync-btn mobile-sync-btn"
+            className="sync-btn ultra-compact-btn"
             style={{
               background: '#E91E63',
               color: 'white',
               border: 'none',
-              padding: '12px 16px',
-              borderRadius: '8px',
+              padding: '6px 8px',
+              borderRadius: '6px',
               cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '600',
-              margin: '2px',
+              fontSize: '9px',
+              fontWeight: '500',
               whiteSpace: 'nowrap',
-              minHeight: '44px',
-              minWidth: '140px',
+              minHeight: '28px',
               touchAction: 'manipulation',
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px'
             }}
           >
-            👤 User Blockchain Sync
+            👤 User Sync
           </button>
           
           <button 
@@ -804,26 +840,28 @@ export function AdminDashboard({
                 }
               }
             }}
-            className="sync-btn mobile-sync-btn"
+            className="sync-btn ultra-compact-btn"
             style={{
               background: '#FF5722',
               color: 'white',
               border: 'none',
-              padding: '12px 16px',
-              borderRadius: '8px',
+              padding: '6px 8px',
+              borderRadius: '6px',
               cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '600',
-              margin: '2px',
+              fontSize: '9px',
+              fontWeight: '500',
               whiteSpace: 'nowrap',
-              minHeight: '44px',
-              minWidth: '160px',
+              minHeight: '28px',
               touchAction: 'manipulation',
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px'
             }}
           >
-            🌍 All Users Transactions Sync
+            🌍 All Users
           </button>
           
           <button 
@@ -865,26 +903,28 @@ export function AdminDashboard({
                 alert('❌ Failed to check active swipers. Check console for details.');
               }
             }}
-            className="sync-btn mobile-sync-btn"
+            className="sync-btn ultra-compact-btn"
             style={{
               background: '#00BCD4',
               color: 'white',
               border: 'none',
-              padding: '12px 16px',
-              borderRadius: '8px',
+              padding: '6px 8px',
+              borderRadius: '6px',
               cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '600',
-              margin: '2px',
+              fontSize: '9px',
+              fontWeight: '500',
               whiteSpace: 'nowrap',
-              minHeight: '44px',
-              minWidth: '140px',
+              minHeight: '28px',
               touchAction: 'manipulation',
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px'
             }}
           >
-            📊 Check Active Swipers
+            📊 Active Swipers
           </button>
           
           <button 
@@ -930,26 +970,28 @@ export function AdminDashboard({
                 alert('❌ Failed to get predictions breakdown. Check console for details.');
               }
             }}
-            className="sync-btn mobile-sync-btn"
+            className="sync-btn ultra-compact-btn"
             style={{
               background: '#673AB7',
               color: 'white',
               border: 'none',
-              padding: '12px 16px',
-              borderRadius: '8px',
+              padding: '6px 8px',
+              borderRadius: '6px',
               cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '600',
-              margin: '2px',
+              fontSize: '9px',
+              fontWeight: '500',
               whiteSpace: 'nowrap',
-              minHeight: '44px',
-              minWidth: '140px',
+              minHeight: '28px',
               touchAction: 'manipulation',
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px'
             }}
           >
-            📈 Predictions Breakdown
+            📈 Breakdown
           </button>
           
           
@@ -1070,46 +1112,135 @@ export function AdminDashboard({
           const yesPercentage = totalPool > 0 ? (prediction.yesTotalAmount / totalPool) * 100 : 0;
 
           return (
-            <div key={prediction.id} className="prediction-card">
-              <div className="card-header">
-                <span className="category-badge">{prediction.category}</span>
+            <div key={prediction.id} className="prediction-card" style={{
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(10px)',
+              borderRadius: '12px',
+              padding: '16px',
+              marginBottom: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+              maxWidth: '100%',
+              overflow: 'hidden'
+            }}>
+              <div className="card-header" style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                marginBottom: '12px',
+                flexWrap: 'wrap',
+                gap: '8px'
+              }}>
+                <span className="category-badge" style={{
+                  background: '#e3f2fd',
+                  color: '#1976d2',
+                  padding: '4px 8px',
+                  borderRadius: '12px',
+                  fontSize: '10px',
+                  fontWeight: '600',
+                  textTransform: 'uppercase'
+                }}>{prediction.category}</span>
                 {getStatusBadge(prediction)}
               </div>
-              <div className="prediction-question">{prediction.question}</div>
+              
+              <div className="prediction-question" style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#333',
+                marginBottom: '12px',
+                lineHeight: '1.4',
+                wordWrap: 'break-word'
+              }}>{prediction.question}</div>
 
-              <div className="prediction-stats">
-                <div className="stat-item">
-                  <div className="stat-value">{totalPool.toFixed(1)} ETH</div>
-                  <div>Total Pool</div>
+              <div className="prediction-stats" style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '12px',
+                marginBottom: '12px'
+              }}>
+                <div className="stat-item" style={{ textAlign: 'center' }}>
+                  <div className="stat-value" style={{
+                    fontSize: '16px',
+                    fontWeight: '700',
+                    color: '#2563eb',
+                    marginBottom: '2px'
+                  }}>{formatETH(totalPool)} ETH</div>
+                  <div style={{ fontSize: '10px', color: '#666', fontWeight: '500' }}>Total Pool</div>
                 </div>
-                <div className="stat-item">
-                  <div className="stat-value">{prediction.participants}</div>
-                  <div>Participants</div>
+                <div className="stat-item" style={{ textAlign: 'center' }}>
+                  <div className="stat-value" style={{
+                    fontSize: '16px',
+                    fontWeight: '700',
+                    color: '#059669',
+                    marginBottom: '2px'
+                  }}>{prediction.participants}</div>
+                  <div style={{ fontSize: '10px', color: '#666', fontWeight: '500' }}>Participants</div>
                 </div>
               </div>
 
-              <div className="odds-bar">
-                <div className="odds-visual">
-                  <div className="yes-bar" style={{ width: `${yesPercentage}%` }}></div>
-                  <div className="no-bar" style={{ width: `${100 - yesPercentage}%` }}></div>
+              <div className="odds-bar" style={{ marginBottom: '12px' }}>
+                <div className="odds-visual" style={{
+                  height: '8px',
+                  borderRadius: '4px',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  marginBottom: '6px'
+                }}>
+                  <div className="yes-bar" style={{ 
+                    width: `${yesPercentage}%`,
+                    background: 'linear-gradient(90deg, #4caf50, #66bb6a)',
+                    height: '100%'
+                  }}></div>
+                  <div className="no-bar" style={{ 
+                    width: `${100 - yesPercentage}%`,
+                    background: 'linear-gradient(90deg, #f44336, #ef5350)',
+                    height: '100%'
+                  }}></div>
                 </div>
-                <div className="odds-labels">
-                  <span>YES {yesPercentage.toFixed(1)}%</span>
-                  <span>NO {(100 - yesPercentage).toFixed(1)}%</span>
+                <div className="odds-labels" style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: '11px',
+                  fontWeight: '600'
+                }}>
+                  <span style={{ color: '#4caf50' }}>YES {yesPercentage.toFixed(1)}%</span>
+                  <span style={{ color: '#f44336' }}>NO {(100 - yesPercentage).toFixed(1)}%</span>
                 </div>
               </div>
 
-              <div className="time-remaining">⏰ {getTimeRemaining(prediction.deadline)}</div>
+              <div className="time-remaining" style={{
+                textAlign: 'center',
+                fontSize: '12px',
+                color: '#ff9800',
+                fontWeight: '600',
+                marginBottom: '12px',
+                padding: '6px',
+                background: 'rgba(255, 152, 0, 0.1)',
+                borderRadius: '6px'
+              }}>⏰ {getTimeRemaining(prediction.deadline)}</div>
 
-              <div className="action-buttons">
+              <div className="action-buttons" style={{
+                display: 'flex',
+                justifyContent: 'center'
+              }}>
                 <button
                   className="btn btn-cancel"
                   onClick={() => handleCancel(prediction.id)}
+                  style={{
+                    background: '#f44336',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    transition: 'all 0.2s ease'
+                  }}
                 >
                   🚫 Emergency Cancel
                 </button>
               </div>
-
             </div>
           );
         })}
@@ -1120,47 +1251,134 @@ export function AdminDashboard({
           const yesPercentage = totalPool > 0 ? (prediction.yesTotalAmount / totalPool) * 100 : 0;
 
           return (
-            <div key={prediction.id} className="prediction-card">
-              <div className="card-header">
-                <span className="category-badge">{prediction.category}</span>
+            <div key={prediction.id} className="prediction-card" style={{
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(10px)',
+              borderRadius: '12px',
+              padding: '16px',
+              marginBottom: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+              maxWidth: '100%',
+              overflow: 'hidden'
+            }}>
+              <div className="card-header" style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                marginBottom: '12px',
+                flexWrap: 'wrap',
+                gap: '8px'
+              }}>
+                <span className="category-badge" style={{
+                  background: '#e3f2fd',
+                  color: '#1976d2',
+                  padding: '4px 8px',
+                  borderRadius: '12px',
+                  fontSize: '10px',
+                  fontWeight: '600',
+                  textTransform: 'uppercase'
+                }}>{prediction.category}</span>
                 {getStatusBadge(prediction)}
               </div>
-              <div className="prediction-question">{prediction.question}</div>
+              
+              <div className="prediction-question" style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#333',
+                marginBottom: '12px',
+                lineHeight: '1.4',
+                wordWrap: 'break-word'
+              }}>{prediction.question}</div>
 
-              <div className="prediction-stats">
-                <div className="stat-item">
-                  <div className="stat-value">{totalPool.toFixed(1)} ETH</div>
-                  <div>Total Pool</div>
+              <div className="prediction-stats" style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '12px',
+                marginBottom: '12px'
+              }}>
+                <div className="stat-item" style={{ textAlign: 'center' }}>
+                  <div className="stat-value" style={{
+                    fontSize: '16px',
+                    fontWeight: '700',
+                    color: '#2563eb',
+                    marginBottom: '2px'
+                  }}>{formatETH(totalPool)} ETH</div>
+                  <div style={{ fontSize: '10px', color: '#666', fontWeight: '500' }}>Total Pool</div>
                 </div>
-                <div className="stat-item">
-                  <div className="stat-value">{prediction.participants}</div>
-                  <div>Participants</div>
+                <div className="stat-item" style={{ textAlign: 'center' }}>
+                  <div className="stat-value" style={{
+                    fontSize: '16px',
+                    fontWeight: '700',
+                    color: '#059669',
+                    marginBottom: '2px'
+                  }}>{prediction.participants}</div>
+                  <div style={{ fontSize: '10px', color: '#666', fontWeight: '500' }}>Participants</div>
                 </div>
               </div>
 
-              <div className="odds-bar">
-                <div className="odds-visual">
-                  <div className="yes-bar" style={{ width: `${yesPercentage}%` }}></div>
-                  <div className="no-bar" style={{ width: `${100 - yesPercentage}%` }}></div>
+              <div className="odds-bar" style={{ marginBottom: '12px' }}>
+                <div className="odds-visual" style={{
+                  height: '8px',
+                  borderRadius: '4px',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  marginBottom: '6px'
+                }}>
+                  <div className="yes-bar" style={{ 
+                    width: `${yesPercentage}%`,
+                    background: 'linear-gradient(90deg, #4caf50, #66bb6a)',
+                    height: '100%'
+                  }}></div>
+                  <div className="no-bar" style={{ 
+                    width: `${100 - yesPercentage}%`,
+                    background: 'linear-gradient(90deg, #f44336, #ef5350)',
+                    height: '100%'
+                  }}></div>
                 </div>
-                <div className="odds-labels">
-                  <span>YES {yesPercentage.toFixed(1)}% {prediction.outcome === true ? '✅ WON' : '❌ LOST'}</span>
-                  <span>NO {(100 - yesPercentage).toFixed(1)}% {prediction.outcome === false ? '✅ WON' : '❌ LOST'}</span>
+                <div className="odds-labels" style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: '11px',
+                  fontWeight: '600'
+                }}>
+                  <span style={{ color: '#4caf50' }}>YES {yesPercentage.toFixed(1)}% {prediction.outcome === true ? '✅ WON' : '❌ LOST'}</span>
+                  <span style={{ color: '#f44336' }}>NO {(100 - yesPercentage).toFixed(1)}% {prediction.outcome === false ? '✅ WON' : '❌ LOST'}</span>
                 </div>
               </div>
 
-              <div className="resolution-success">
+              <div className="resolution-success" style={{
+                textAlign: 'center',
+                fontSize: '12px',
+                color: '#4caf50',
+                fontWeight: '600',
+                marginBottom: '12px',
+                padding: '8px',
+                background: 'rgba(76, 175, 80, 0.1)',
+                borderRadius: '6px'
+              }}>
                 <strong>✅ Resolved as {prediction.outcome ? 'YES' : 'NO'}</strong><br />
-                <small>Platform Fee: {(totalPool * 0.01).toFixed(4)} ETH (1% of {(prediction.outcome ? prediction.noTotalAmount : prediction.yesTotalAmount).toFixed(1)} ETH profit)</small><br />
-                <small>Participants can now claim their rewards</small>
+                <small style={{ fontSize: '10px', color: '#666' }}>Platform Fee: {formatETH(totalPool * 0.01)} ETH (1% of {formatETH(prediction.outcome ? prediction.noTotalAmount : prediction.yesTotalAmount)} ETH profit)</small><br />
+                <small style={{ fontSize: '10px', color: '#666' }}>Participants can now claim their rewards</small>
               </div>
 
-              <div className="action-buttons">
-                <button className="btn" style={{ background: 'gray', cursor: 'not-allowed' }}>
+              <div className="action-buttons" style={{
+                display: 'flex',
+                justifyContent: 'center'
+              }}>
+                <button className="btn" style={{ 
+                  background: '#e0e0e0', 
+                  color: '#666',
+                  cursor: 'not-allowed',
+                  border: 'none',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  fontSize: '11px',
+                  fontWeight: '600'
+                }}>
                   Resolved ✅
                 </button>
               </div>
-
             </div>
           );
         })}
@@ -1171,44 +1389,134 @@ export function AdminDashboard({
           const yesPercentage = totalPool > 0 ? (prediction.yesTotalAmount / totalPool) * 100 : 0;
 
           return (
-            <div key={prediction.id} className="prediction-card">
-              <div className="card-header">
-                <span className="category-badge">{prediction.category}</span>
+            <div key={prediction.id} className="prediction-card" style={{
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(10px)',
+              borderRadius: '12px',
+              padding: '16px',
+              marginBottom: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+              maxWidth: '100%',
+              overflow: 'hidden'
+            }}>
+              <div className="card-header" style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                marginBottom: '12px',
+                flexWrap: 'wrap',
+                gap: '8px'
+              }}>
+                <span className="category-badge" style={{
+                  background: '#e3f2fd',
+                  color: '#1976d2',
+                  padding: '4px 8px',
+                  borderRadius: '12px',
+                  fontSize: '10px',
+                  fontWeight: '600',
+                  textTransform: 'uppercase'
+                }}>{prediction.category}</span>
                 {getStatusBadge(prediction)}
               </div>
-              <div className="prediction-question">{prediction.question}</div>
+              
+              <div className="prediction-question" style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#333',
+                marginBottom: '12px',
+                lineHeight: '1.4',
+                wordWrap: 'break-word'
+              }}>{prediction.question}</div>
 
-              <div className="prediction-stats">
-                <div className="stat-item">
-                  <div className="stat-value">{totalPool.toFixed(1)} ETH</div>
-                  <div>Total Pool</div>
+              <div className="prediction-stats" style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '12px',
+                marginBottom: '12px'
+              }}>
+                <div className="stat-item" style={{ textAlign: 'center' }}>
+                  <div className="stat-value" style={{
+                    fontSize: '16px',
+                    fontWeight: '700',
+                    color: '#2563eb',
+                    marginBottom: '2px'
+                  }}>{formatETH(totalPool)} ETH</div>
+                  <div style={{ fontSize: '10px', color: '#666', fontWeight: '500' }}>Total Pool</div>
                 </div>
-                <div className="stat-item">
-                  <div className="stat-value">{prediction.participants}</div>
-                  <div>Participants</div>
+                <div className="stat-item" style={{ textAlign: 'center' }}>
+                  <div className="stat-value" style={{
+                    fontSize: '16px',
+                    fontWeight: '700',
+                    color: '#059669',
+                    marginBottom: '2px'
+                  }}>{prediction.participants}</div>
+                  <div style={{ fontSize: '10px', color: '#666', fontWeight: '500' }}>Participants</div>
                 </div>
               </div>
 
-              <div className="odds-bar">
-                <div className="odds-visual">
-                  <div className="yes-bar" style={{ width: `${yesPercentage}%` }}></div>
-                  <div className="no-bar" style={{ width: `${100 - yesPercentage}%` }}></div>
+              <div className="odds-bar" style={{ marginBottom: '12px' }}>
+                <div className="odds-visual" style={{
+                  height: '8px',
+                  borderRadius: '4px',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  marginBottom: '6px'
+                }}>
+                  <div className="yes-bar" style={{ 
+                    width: `${yesPercentage}%`,
+                    background: 'linear-gradient(90deg, #4caf50, #66bb6a)',
+                    height: '100%'
+                  }}></div>
+                  <div className="no-bar" style={{ 
+                    width: `${100 - yesPercentage}%`,
+                    background: 'linear-gradient(90deg, #f44336, #ef5350)',
+                    height: '100%'
+                  }}></div>
                 </div>
-                <div className="odds-labels">
-                  <span>YES {yesPercentage.toFixed(1)}% ({prediction.yesTotalAmount.toFixed(1)} ETH)</span>
-                  <span>NO {(100 - yesPercentage).toFixed(1)}% ({prediction.noTotalAmount.toFixed(1)} ETH)</span>
+                <div className="odds-labels" style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: '11px',
+                  fontWeight: '600'
+                }}>
+                  <span style={{ color: '#4caf50' }}>YES {yesPercentage.toFixed(1)}% ({formatETH(prediction.yesTotalAmount)} ETH)</span>
+                  <span style={{ color: '#f44336' }}>NO {(100 - yesPercentage).toFixed(1)}% ({formatETH(prediction.noTotalAmount)} ETH)</span>
                 </div>
               </div>
 
-              <div className="resolution-notice">
+              <div className="resolution-notice" style={{
+                textAlign: 'center',
+                fontSize: '12px',
+                color: '#f44336',
+                fontWeight: '600',
+                marginBottom: '12px',
+                padding: '8px',
+                background: 'rgba(244, 67, 54, 0.1)',
+                borderRadius: '6px'
+              }}>
                 <strong>🚫 CANCELLED</strong><br />
-                <small>This prediction was cancelled and stakes will be refunded</small>
+                <small style={{ fontSize: '10px', color: '#666' }}>This prediction was cancelled and stakes will be refunded</small>
               </div>
 
-              <div className="action-buttons">
+              <div className="action-buttons" style={{
+                display: 'flex',
+                justifyContent: 'center'
+              }}>
                 <button 
                   className="btn btn-info"
                   onClick={() => alert(`Prediction ${prediction.id} was cancelled. Stakes will be refunded to participants.`)}
+                  style={{
+                    background: '#2196f3',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    transition: 'all 0.2s ease'
+                  }}
                 >
                   ℹ️ Info
                 </button>
@@ -1223,61 +1531,174 @@ export function AdminDashboard({
           const yesPercentage = totalPool > 0 ? (prediction.yesTotalAmount / totalPool) * 100 : 0;
 
           return (
-            <div key={prediction.id} className="prediction-card">
-              <div className="card-header">
-                <span className="category-badge">{prediction.category}</span>
+            <div key={prediction.id} className="prediction-card" style={{
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(10px)',
+              borderRadius: '12px',
+              padding: '16px',
+              marginBottom: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+              maxWidth: '100%',
+              overflow: 'hidden'
+            }}>
+              <div className="card-header" style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                marginBottom: '12px',
+                flexWrap: 'wrap',
+                gap: '8px'
+              }}>
+                <span className="category-badge" style={{
+                  background: '#e3f2fd',
+                  color: '#1976d2',
+                  padding: '4px 8px',
+                  borderRadius: '12px',
+                  fontSize: '10px',
+                  fontWeight: '600',
+                  textTransform: 'uppercase'
+                }}>{prediction.category}</span>
                 {getStatusBadge(prediction)}
               </div>
-              <div className="prediction-question">{prediction.question}</div>
+              
+              <div className="prediction-question" style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#333',
+                marginBottom: '12px',
+                lineHeight: '1.4',
+                wordWrap: 'break-word'
+              }}>{prediction.question}</div>
 
-              <div className="prediction-stats">
-                <div className="stat-item">
-                  <div className="stat-value">{totalPool.toFixed(1)} ETH</div>
-                  <div>Total Pool</div>
+              <div className="prediction-stats" style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '12px',
+                marginBottom: '12px'
+              }}>
+                <div className="stat-item" style={{ textAlign: 'center' }}>
+                  <div className="stat-value" style={{
+                    fontSize: '16px',
+                    fontWeight: '700',
+                    color: '#2563eb',
+                    marginBottom: '2px'
+                  }}>{formatETH(totalPool)} ETH</div>
+                  <div style={{ fontSize: '10px', color: '#666', fontWeight: '500' }}>Total Pool</div>
                 </div>
-                <div className="stat-item">
-                  <div className="stat-value">{prediction.participants}</div>
-                  <div>Participants</div>
+                <div className="stat-item" style={{ textAlign: 'center' }}>
+                  <div className="stat-value" style={{
+                    fontSize: '16px',
+                    fontWeight: '700',
+                    color: '#059669',
+                    marginBottom: '2px'
+                  }}>{prediction.participants}</div>
+                  <div style={{ fontSize: '10px', color: '#666', fontWeight: '500' }}>Participants</div>
                 </div>
               </div>
 
-              <div className="odds-bar">
-                <div className="odds-visual">
-                  <div className="yes-bar" style={{ width: `${yesPercentage}%` }}></div>
-                  <div className="no-bar" style={{ width: `${100 - yesPercentage}%` }}></div>
+              <div className="odds-bar" style={{ marginBottom: '12px' }}>
+                <div className="odds-visual" style={{
+                  height: '8px',
+                  borderRadius: '4px',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  marginBottom: '6px'
+                }}>
+                  <div className="yes-bar" style={{ 
+                    width: `${yesPercentage}%`,
+                    background: 'linear-gradient(90deg, #4caf50, #66bb6a)',
+                    height: '100%'
+                  }}></div>
+                  <div className="no-bar" style={{ 
+                    width: `${100 - yesPercentage}%`,
+                    background: 'linear-gradient(90deg, #f44336, #ef5350)',
+                    height: '100%'
+                  }}></div>
                 </div>
-                <div className="odds-labels">
-                  <span>YES {yesPercentage.toFixed(1)}% ({prediction.yesTotalAmount.toFixed(1)} ETH)</span>
-                  <span>NO {(100 - yesPercentage).toFixed(1)}% ({prediction.noTotalAmount.toFixed(1)} ETH)</span>
+                <div className="odds-labels" style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: '11px',
+                  fontWeight: '600'
+                }}>
+                  <span style={{ color: '#4caf50' }}>YES {yesPercentage.toFixed(1)}% ({formatETH(prediction.yesTotalAmount)} ETH)</span>
+                  <span style={{ color: '#f44336' }}>NO {(100 - yesPercentage).toFixed(1)}% ({formatETH(prediction.noTotalAmount)} ETH)</span>
                 </div>
               </div>
 
-              <div className="resolution-notice">
+              <div className="resolution-notice" style={{
+                textAlign: 'center',
+                fontSize: '12px',
+                color: '#ff9800',
+                fontWeight: '600',
+                marginBottom: '12px',
+                padding: '8px',
+                background: 'rgba(255, 152, 0, 0.1)',
+                borderRadius: '6px'
+              }}>
                 <strong>⏰ EXPIRED</strong><br />
-                <small>Deadline passed - needs resolution</small>
+                <small style={{ fontSize: '10px', color: '#666' }}>Deadline passed - needs resolution</small>
               </div>
 
-              <div className="action-buttons">
+              <div className="action-buttons" style={{
+                display: 'flex',
+                justifyContent: 'center',
+                gap: '8px',
+                flexWrap: 'wrap'
+              }}>
                 <button 
                   className="btn btn-success"
                   onClick={() => handleResolve(prediction.id, true)}
+                  style={{
+                    background: '#4caf50',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '10px',
+                    fontWeight: '600',
+                    transition: 'all 0.2s ease'
+                  }}
                 >
-                  ✅ Resolve YES
+                  ✅ YES
                 </button>
                 <button 
                   className="btn btn-danger"
                   onClick={() => handleResolve(prediction.id, false)}
+                  style={{
+                    background: '#f44336',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '10px',
+                    fontWeight: '600',
+                    transition: 'all 0.2s ease'
+                  }}
                 >
-                  ❌ Resolve NO
+                  ❌ NO
                 </button>
                 <button 
                   className="btn btn-warning"
                   onClick={() => handleCancel(prediction.id)}
+                  style={{
+                    background: '#ff9800',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '10px',
+                    fontWeight: '600',
+                    transition: 'all 0.2s ease'
+                  }}
                 >
                   🚫 Cancel
                 </button>
               </div>
-
             </div>
           );
         })}
