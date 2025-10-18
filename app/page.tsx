@@ -37,7 +37,7 @@ import { PlatformAnalytics } from "./components/Admin/PlatformAnalytics";
 import { SystemSettings } from "./components/Admin/SystemSettings";
 import { AuditLogs } from "./components/Admin/AuditLogs";
 import { HelpAndFaq } from "./components/Support/HelpAndFaq";
-import { Leaderboard } from "./components/Support/Leaderboard";
+import { Leaderboard } from "./components/Market/Leaderboard";
 import { RecentActivity } from "./components/Support/RecentActivity";
 import { CreatePredictionModal } from "./components/Modals/CreatePredictionModal";
 import AIAssistant from "./components/AIAssistant/AIAssistant";
@@ -92,21 +92,30 @@ export default function App() {
             </WalletDropdown>
           </Wallet>
           
-          {/* Admin or Help Button - Top Right */}
+          {/* Admin, Leaderboard or Help Button - Top Right */}
           <div className="flex gap-2">
             {isAdmin && (
               <button
                 onClick={() => setActiveDashboard('admin')}
-                className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3 py-1 rounded-full font-medium transition-colors"
+                className="bg-purple-600 hover:bg-purple-700 text-white text-sm px-3 py-2 rounded-full font-bold transition-colors"
+                title="Admin Dashboard"
               >
-                🔧 Admin
+                A
               </button>
             )}
             <button
-              onClick={() => setActiveDashboard('help-faq')}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded-full font-medium transition-colors"
+              onClick={() => setActiveDashboard('leaderboard')}
+              className="bg-yellow-600 hover:bg-yellow-700 text-white text-sm px-3 py-2 rounded-full font-medium transition-colors"
+              title="Leaderboard"
             >
-              ❓ Help
+              🏆
+            </button>
+            <button
+              onClick={() => setActiveDashboard('help-faq')}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-2 rounded-full font-medium transition-colors"
+              title="Help & FAQ"
+            >
+              ❓
             </button>
           </div>
         </div>
@@ -168,7 +177,7 @@ export default function App() {
 
           {activeDashboard === 'admin' && <AdminPanel />}
 
-          {activeDashboard === 'approver' && <AdminPanel defaultTab="approver" />}
+          {activeDashboard === 'approver' && <AdminPanel />}
 
           {/* SWIPE Token Card */}
           {activeDashboard === 'swipe-token' && <SwipeTokenCard />}

@@ -22,64 +22,90 @@ export async function POST(request: NextRequest) {
     try {
       const profiles = [];
       
-      // Use Neynar's bulk-by-address API to get real Farcaster profiles
-      const addressesParam = addresses.join(',');
-      const neynarUrl = `https://api.neynar.com/v2/farcaster/user/bulk-by-address?addresses=${addressesParam}`;
-      
-      console.log(`🔍 Fetching Farcaster profiles for addresses: ${addressesParam}`);
-      
-      const response = await fetch(neynarUrl, {
-        method: 'GET',
-        headers: {
-          'accept': 'application/json',
-          'api_key': process.env.NEYNAR_API_KEY
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Neynar API error: ${response.status} ${response.statusText}`);
+      // Split addresses into chunks of 10 to avoid API limits
+      const chunkSize = 10;
+      const addressChunks = [];
+      for (let i = 0; i < addresses.length; i += chunkSize) {
+        addressChunks.push(addresses.slice(i, i + chunkSize));
       }
       
-      const data = await response.json();
-      console.log(`✅ Neynar API response:`, data);
+      console.log(`🔍 Fetching Farcaster profiles for ${addresses.length} addresses in ${addressChunks.length} chunks`);
       
-      // Process each address
-      for (const address of addresses) {
-        const addressLower = address.toLowerCase();
-        const userData = data[addressLower];
+      // Process each chunk
+      for (let chunkIndex = 0; chunkIndex < addressChunks.length; chunkIndex++) {
+        const chunk = addressChunks[chunkIndex];
+        const addressesParam = chunk.join(',');
+        const neynarUrl = `https://api.neynar.com/v2/farcaster/user/bulk-by-address?addresses=${addressesParam}`;
         
-        if (userData && userData.length > 0) {
-          // Found real Farcaster profile
-          const user = userData[0]; // Take the first user if multiple found
-          profiles.push({
-            fid: user.fid.toString(),
-            address: address,
-            username: user.username,
-            display_name: user.display_name,
-            pfp_url: user.pfp_url,
-            verified_addresses: user.verified_addresses,
-            isBaseVerified: false
+        console.log(`🔍 Fetching chunk ${chunkIndex + 1}/${addressChunks.length}: ${chunk.length} addresses`);
+        
+        try {
+          const response = await fetch(neynarUrl, {
+            method: 'GET',
+            headers: {
+              'accept': 'application/json',
+              'api_key': process.env.NEYNAR_API_KEY
+            }
           });
-          console.log(`✅ Found Farcaster profile for ${address}: ${user.display_name} (@${user.username}) - FID: ${user.fid}`);
-        } else {
-          // No Farcaster profile found - return wallet info with Base verification check
-          profiles.push({
-            fid: null,
-            address: address,
-            username: null,
-            display_name: null,
-            pfp_url: null,
-            verified_addresses: {
-              eth_addresses: [address],
-              sol_addresses: []
-            },
-            isBaseVerified: false, // We'll check this separately
-            isWalletOnly: true
-          });
-          console.log(`⚠️ No Farcaster profile found for ${address}, will show wallet avatar`);
+          
+          if (!response.ok) {
+            console.warn(`⚠️ Neynar API error for chunk ${chunkIndex + 1}: ${response.status} ${response.statusText}`);
+            continue; // Skip this chunk and continue with next
+          }
+          
+          const data = await response.json();
+          console.log(`✅ Neynar API response for chunk ${chunkIndex + 1}:`, data);
+          
+          // Process each address in this chunk
+          for (const address of chunk) {
+            const addressLower = address.toLowerCase();
+            const userData = data[addressLower];
+        
+            if (userData && userData.length > 0) {
+              // Found real Farcaster profile
+              const user = userData[0]; // Take the first user if multiple found
+              profiles.push({
+                fid: user.fid.toString(),
+                address: address,
+                username: user.username,
+                display_name: user.display_name,
+                pfp_url: user.pfp_url,
+                verified_addresses: user.verified_addresses,
+                isBaseVerified: false
+              });
+              console.log(`✅ Found Farcaster profile for ${address}: ${user.display_name} (@${user.username}) - FID: ${user.fid}`);
+            } else {
+              // No Farcaster profile found - return wallet info with Base verification check
+              profiles.push({
+                fid: null,
+                address: address,
+                username: null,
+                display_name: null,
+                pfp_url: null,
+                verified_addresses: {
+                  eth_addresses: [address],
+                  sol_addresses: []
+                },
+                isBaseVerified: false, // We'll check this separately
+                isWalletOnly: true
+              });
+              console.log(`⚠️ No Farcaster profile found for ${address}, will show wallet avatar`);
+            }
+          }
+          
+          // Add delay between chunks to avoid rate limiting
+          if (chunkIndex < addressChunks.length - 1) {
+            console.log(`⏳ Waiting 1 second before next chunk...`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        } catch (chunkError) {
+          console.warn(`⚠️ Error processing chunk ${chunkIndex + 1}:`, chunkError);
+          continue; // Skip this chunk and continue with next
         }
       }
-
+      
+      console.log(`✅ Processed ${addressChunks.length} chunks, found ${profiles.length} profiles`);
+      
       return NextResponse.json({
         success: true,
         profiles: profiles

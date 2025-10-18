@@ -35,6 +35,7 @@ export const REDIS_KEYS = {
   USER_TRANSACTIONS: (userId: string) => `user_transactions:${userId}`,
   MARKET_STATS: 'market:stats',
   COMPACT_STATS: 'market:compact_stats',
+  REAL_LEADERBOARD: 'leaderboard:real_data',
   USER_PORTFOLIO: (userId: string) => `user:portfolio:${userId}`,
 } as const;
 
@@ -303,6 +304,37 @@ export const redisHelpers = {
       return null;
     } catch (error) {
       console.error('❌ Failed to get market stats from Redis:', error);
+      return null;
+    }
+  },
+
+  // Save real leaderboard data
+  async saveRealLeaderboardData(data: any): Promise<void> {
+    try {
+      const leaderboardData = {
+        ...data,
+        lastUpdated: Date.now(),
+        timestamp: new Date().toISOString()
+      };
+      
+      await redis.set(REDIS_KEYS.REAL_LEADERBOARD, JSON.stringify(leaderboardData));
+      console.log('💾 Real leaderboard data saved to Redis');
+    } catch (error) {
+      console.error('❌ Failed to save real leaderboard data to Redis:', error);
+      throw error;
+    }
+  },
+
+  // Get real leaderboard data
+  async getRealLeaderboardData(): Promise<any | null> {
+    try {
+      const data = await redis.get(REDIS_KEYS.REAL_LEADERBOARD);
+      if (!data) return null;
+      
+      const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+      return parsed;
+    } catch (error) {
+      console.error('❌ Failed to get real leaderboard data from Redis:', error);
       return null;
     }
   },

@@ -303,6 +303,112 @@
   background: linear-gradient(90deg, #d4ff00, #b8e600);
 }
 
+/* Largest Stakes Leaderboard */
+.largest-stakes-leaderboard {
+  margin-bottom: 32px;
+}
+
+.largest-stakes-leaderboard h2 {
+  font-size: 24px;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 24px;
+  text-align: center;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.leaderboard-list {
+  display: grid;
+  gap: 16px;
+}
+
+.leaderboard-item {
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  transition: all 0.3s ease;
+}
+
+.leaderboard-item:hover {
+  border-color: rgba(212, 255, 0, 0.2);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
+}
+
+.leaderboard-rank {
+  font-size: 20px;
+  font-weight: 800;
+  color: #d4ff00;
+  min-width: 50px;
+  text-align: center;
+}
+
+.leaderboard-user {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.leaderboard-avatar {
+  width: 48px;
+  height: 48px;
+  border: 2px solid rgba(212, 255, 0, 0.2);
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.leaderboard-user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.leaderboard-username {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+  margin-bottom: 4px;
+  word-break: break-word;
+}
+
+.leaderboard-user-handle {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.leaderboard-stats {
+  display: flex;
+  gap: 24px;
+  min-width: 200px;
+}
+
+.leaderboard-stat {
+  text-align: center;
+  flex: 1;
+}
+
+.leaderboard-stat .stat-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #d4ff00;
+  margin-bottom: 4px;
+}
+
+.leaderboard-stat .stat-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 /* Mobile Responsive */
 @media (max-width: 768px) {
   .market-stats {
@@ -379,6 +485,42 @@
 
   .prediction-stats {
     gap: 12px;
+  }
+
+  .leaderboard-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 16px;
+  }
+
+  .leaderboard-rank {
+    align-self: flex-start;
+  }
+
+  .leaderboard-user {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .leaderboard-avatar {
+    width: 40px;
+    height: 40px;
+  }
+
+  .leaderboard-stats {
+    width: 100%;
+    justify-content: space-between;
+    min-width: unset;
+    gap: 16px;
+  }
+
+  .leaderboard-stat .stat-value {
+    font-size: 14px;
+  }
+
+  .leaderboard-stat .stat-label {
+    font-size: 11px;
   }
 }
 

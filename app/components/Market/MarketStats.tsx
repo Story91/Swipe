@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { Avatar, AvatarFallback, AvatarImage } from '../../../components/ui/avatar';
+import { useFarcasterProfiles } from '../../../lib/hooks/useFarcasterProfiles';
 import './MarketStats.css';
 
 interface MarketStatsData {
@@ -20,11 +22,25 @@ interface MarketStatsData {
   }>;
 }
 
+interface LargestStakesUser {
+  rank: number;
+  address: string;
+  totalStaked: number;
+  totalStakedETH: number;
+  predictionsParticipated: number;
+  avgStakePerPrediction: number;
+}
+
 export function MarketStats() {
   const [selectedTimeframe, setSelectedTimeframe] = useState<'1H' | '24H' | '7D' | '30D'>('24H');
   const [marketData, setMarketData] = useState<MarketStatsData | null>(null);
+  const [largestStakes, setLargestStakes] = useState<LargestStakesUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Get Farcaster profiles for largest stakes users
+  const largestStakesAddresses = largestStakes.map(user => user.address);
+  const { profiles: largestStakesProfiles } = useFarcasterProfiles(largestStakesAddresses);
 
   useEffect(() => {
     const fetchMarketStats = async () => {
@@ -102,6 +118,15 @@ export function MarketStats() {
           }
         } else {
           throw new Error(result.error || 'Failed to fetch market stats');
+        }
+
+        // Fetch largest stakes data
+        const largestStakesResponse = await fetch('/api/market/largest-stakes?limit=10');
+        if (largestStakesResponse.ok) {
+          const largestStakesResult = await largestStakesResponse.json();
+          if (largestStakesResult.success) {
+            setLargestStakes(largestStakesResult.data);
+          }
         }
       } catch (err) {
         console.error('❌ Failed to fetch market stats:', err);
@@ -253,6 +278,83 @@ export function MarketStats() {
         </div>
       </div>
 
+      {/* Largest Stakes Leaderboard */}
+      <div className="largest-stakes-leaderboard">
+        <h2>🏆 Largest Stakes</h2>
+        <div className="leaderboard-list">
+          {largestStakes.map((user) => {
+            const profile = largestStakesProfiles.find(p => p.address === user.address);
+            const hasFarcasterProfile = profile && profile.fid;
+            
+            // Generate avatar color based on address
+            const getAvatarColor = (addr: string) => {
+              const colors = [
+                'bg-blue-500',
+                'bg-green-500', 
+                'bg-purple-500',
+                'bg-pink-500',
+                'bg-yellow-500',
+                'bg-red-500',
+                'bg-indigo-500',
+                'bg-teal-500'
+              ];
+              const hash = addr.split('').reduce((a, b) => {
+                a = ((a << 5) - a) + b.charCodeAt(0);
+                return a & a;
+              }, 0);
+              return colors[Math.abs(hash) % colors.length];
+            };
+
+            // Get initials from profile or address
+            const getInitials = () => {
+              if (profile?.display_name) {
+                return profile.display_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+              }
+              return user.address.slice(2, 4).toUpperCase();
+            };
+
+            return (
+              <div key={user.address} className="leaderboard-item">
+                <div className="leaderboard-rank">#{user.rank}</div>
+
+                <div className="leaderboard-user">
+                  <Avatar className="leaderboard-avatar">
+                    <AvatarImage 
+                      src={hasFarcasterProfile ? (profile?.pfp_url || undefined) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.address.slice(2, 8)}`} 
+                      alt={hasFarcasterProfile ? (profile?.display_name || `User ${user.address.slice(2, 6)}`) : `Wallet ${user.address.slice(2, 6)}`}
+                    />
+                    <AvatarFallback className={getAvatarColor(user.address)}>
+                      <span className="text-white text-xs font-semibold">
+                        {getInitials()}
+                      </span>
+                    </AvatarFallback>
+                  </Avatar>
+                  
+                  <div className="leaderboard-user-info">
+                    <div className="leaderboard-username">
+                      {hasFarcasterProfile ? (profile?.display_name || `User ${user.address.slice(2, 6)}`) : `Wallet ${user.address.slice(2, 6)}`}
+                    </div>
+                    <div className="leaderboard-user-handle">
+                      {hasFarcasterProfile ? `@${profile?.username}` : `${user.address.slice(0, 6)}...${user.address.slice(-4)}`}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="leaderboard-stats">
+                  <div className="leaderboard-stat">
+                    <div className="stat-value">{user.totalStakedETH.toFixed(4)} ETH</div>
+                    <div className="stat-label">Total Staked</div>
+                  </div>
+                  <div className="leaderboard-stat">
+                    <div className="stat-value">{user.predictionsParticipated}</div>
+                    <div className="stat-label">Predictions</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
     </div>
   );

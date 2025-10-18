@@ -1,0 +1,272 @@
+/* Leaderboard Page Styles */
+.leaderboard-page {
+  padding: 16px;
+  max-width: 424px;
+  margin: 0 auto;
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0f0f0f 100%);
+  min-height: 100vh;
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Header */
+.leaderboard-header {
+  text-align: center;
+  margin-bottom: 24px;
+  padding: 20px 0;
+}
+
+.leaderboard-header h1 {
+  font-size: 24px;
+  color: #d4ff00;
+  margin-bottom: 8px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.leaderboard-header p {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0;
+  font-weight: 500;
+}
+
+/* Tab Selector */
+.tab-selector {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 4px;
+}
+
+.tab-button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.tab-button.active {
+  background: rgba(212, 255, 0, 0.1);
+  color: #d4ff00;
+  box-shadow: 0 2px 8px rgba(212, 255, 0, 0.2);
+}
+
+.tab-button:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.tab-icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* Leaderboard Container */
+.leaderboard-container {
+  margin-bottom: 24px;
+}
+
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.leaderboard-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: all 0.3s ease;
+}
+
+.leaderboard-item:hover {
+  border-color: rgba(212, 255, 0, 0.2);
+  background: rgba(212, 255, 0, 0.02);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.leaderboard-rank {
+  font-size: 18px;
+  font-weight: 800;
+  color: #d4ff00;
+  min-width: 40px;
+  text-align: center;
+}
+
+.leaderboard-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.leaderboard-avatar {
+  width: 40px;
+  height: 40px;
+  border: 2px solid rgba(212, 255, 0, 0.2);
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.leaderboard-user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.leaderboard-username {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+  margin-bottom: 2px;
+  word-break: break-word;
+}
+
+.leaderboard-user-handle {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.leaderboard-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 80px;
+  text-align: right;
+}
+
+.leaderboard-stat .stat-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: #d4ff00;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  line-height: 1.2;
+  max-width: 100px;
+}
+
+/* Amount text styling */
+.leaderboard-stat .stat-value .amount-text {
+  font-size: 11px;
+  font-weight: 700;
+  color: #d4ff00;
+}
+
+.stat-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.leaderboard-stat .stat-label {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* Footer */
+.leaderboard-footer {
+  text-align: center;
+  padding: 20px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.leaderboard-footer p {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 4px 0;
+  font-weight: 500;
+}
+
+/* Mobile Responsive */
+@media (max-width: 375px) {
+  .leaderboard-page {
+    padding: 12px;
+  }
+  
+  .leaderboard-header h1 {
+    font-size: 20px;
+  }
+  
+  .leaderboard-header p {
+    font-size: 13px;
+  }
+  
+  .tab-button {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+  
+  .tab-icon {
+    width: 14px;
+    height: 14px;
+  }
+  
+  .leaderboard-item {
+    padding: 12px;
+    gap: 12px;
+  }
+  
+  .leaderboard-rank {
+    font-size: 16px;
+    min-width: 35px;
+  }
+  
+  .leaderboard-avatar {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .leaderboard-username {
+    font-size: 13px;
+  }
+  
+  .leaderboard-user-handle {
+    font-size: 11px;
+  }
+  
+  .leaderboard-stats {
+    min-width: 70px;
+  }
+  
+  .leaderboard-stat .stat-value {
+    font-size: 12px;
+  }
+  
+  .stat-icon {
+    width: 10px;
+    height: 10px;
+  }
+  
+  .leaderboard-stat .stat-label {
+    font-size: 9px;
+  }
+}

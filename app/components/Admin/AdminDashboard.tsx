@@ -170,6 +170,58 @@ export function AdminDashboard({
     refreshData();
   }, [refreshData]);
 
+  // Refresh largest stakes cache function
+  const handleRefreshLargestStakesCache = useCallback(async () => {
+    try {
+      console.log('🔄 Refreshing largest stakes cache...');
+      const response = await fetch('/api/admin/refresh-largest-stakes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        console.log('✅ Largest stakes cache refreshed successfully');
+        alert('Largest stakes cache refreshed successfully!');
+      } else {
+        console.error('❌ Failed to refresh largest stakes cache:', result.error);
+        alert('Failed to refresh largest stakes cache: ' + result.error);
+      }
+    } catch (error) {
+      console.error('❌ Error refreshing largest stakes cache:', error);
+      alert('Error refreshing largest stakes cache: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
+  }, []);
+
+  // Handle collecting real leaderboard data
+  const handleCollectRealLeaderboardData = useCallback(async () => {
+    try {
+      console.log('🔍 Collecting real leaderboard data...');
+      
+      const response = await fetch('/api/debug/leaderboard-data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Real leaderboard data collected:', data);
+        
+        // Show success notification
+        alert(`✅ Real Data Collected!\nFound ${data.data.totalUsers} users with ${data.data.totalPredictions} predictions.\nCheck Leaderboard page!`);
+      } else {
+        throw new Error(`Failed to collect data: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('❌ Failed to collect real leaderboard data:', error);
+      alert('❌ Collection Failed: Failed to collect real leaderboard data');
+    }
+  }, []);
+
   // REMOVED: Slow blockchain fetch loop that was causing performance issues
   // Now using Redis data exclusively, which is always up-to-date and much faster
   // Contract stats (contractStats, totalPredictions) are still fetched from blockchain for admin info
@@ -480,6 +532,83 @@ export function AdminDashboard({
             }}
           >
             🔄 Refresh
+          </button>
+
+          <button 
+            onClick={handleRefreshLargestStakesCache}
+            className="refresh-leaderboard-btn ultra-compact-btn"
+            style={{
+              background: '#9C27B0',
+              color: 'white',
+              border: 'none',
+              padding: '6px 8px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '9px',
+              fontWeight: '500',
+              whiteSpace: 'nowrap',
+              minHeight: '28px',
+              touchAction: 'manipulation',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px'
+            }}
+          >
+            🏆 Refresh Leaderboard
+          </button>
+          
+          <button 
+            onClick={async () => {
+              if (confirm('🔍 COLLECT REAL LEADERBOARD DATA\n\nThis will collect real stakes data from all predictions and fetch Farcaster profiles.\nThis may take a few minutes.\n\nContinue?')) {
+                try {
+                  console.log('🔍 Starting real leaderboard data collection...');
+                  const response = await fetch('/api/debug/leaderboard-data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                  });
+                  
+                  if (response.ok) {
+                    const result = await response.json();
+                    console.log('✅ Real leaderboard data collected:', result);
+                    
+                    // Show summary
+                    const summary = result.data.summary;
+                    alert(`✅ Real Leaderboard Data Collected!\n\n📊 Summary:\n• ${result.data.totalUsers} users\n• ${result.data.totalPredictions} predictions\n• ${summary.totalETHStaked.toFixed(4)} ETH staked\n• ${summary.totalSWIPEStaked.toFixed(0)} SWIPE staked\n• ${summary.totalPredictionsParticipated} total participations\n\n🏆 ETH Top 3:\n${result.data.ethLeaderboard.slice(0, 3).map((u: any, i: number) => `${i+1}. ${u.address.slice(0,6)}...${u.address.slice(-4)}: ${u.totalStakedETH.toFixed(4)} ETH`).join('\n')}\n\n🏆 SWIPE Top 3:\n${result.data.swipeLeaderboard.slice(0, 3).map((u: any, i: number) => `${i+1}. ${u.address.slice(0,6)}...${u.address.slice(-4)}: ${u.totalStakedSWIPE.toFixed(0)} SWIPE`).join('\n')}\n\n🔍 Farcaster Profiles: ${result.data.farcasterProfiles.length} found\n\nCheck console for full data!`);
+                  } else {
+                    const error = await response.json();
+                    alert(`❌ Failed to collect leaderboard data: ${error.error}`);
+                  }
+                } catch (error) {
+                  console.error('❌ Error collecting leaderboard data:', error);
+                  alert(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                }
+              }
+            }}
+            className="collect-leaderboard-btn ultra-compact-btn"
+            style={{
+              background: '#E91E63',
+              color: 'white',
+              border: 'none',
+              padding: '6px 8px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '9px',
+              fontWeight: '500',
+              whiteSpace: 'nowrap',
+              minHeight: '28px',
+              touchAction: 'manipulation',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px'
+            }}
+          >
+            🔍 Collect Real Data
           </button>
           
           {!loadedAll && (

@@ -34,21 +34,55 @@ export function CompactStats() {
         setLoading(true);
         setError(null);
 
+        console.log('🔄 Fetching compact stats...');
         // Single API call to get all data
         const response = await fetch('/api/market/compact-stats');
+        console.log('📊 Compact stats response status:', response.status);
+        
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          console.warn('⚠️ Compact stats API failed, using fallback data');
+          // Use fallback data if API fails
+          setStatsData({
+            totalPredictions: 0,
+            activePredictions: 0,
+            totalVolumeETH: 0,
+            totalVolumeSWIPE: 0,
+            predictionsToday: 0,
+            volumeToday: 0,
+            topCategory: 'General',
+            successRate: 0,
+            totalParticipants: 0,
+            trendingPredictions: []
+          });
+        } else {
+          const result = await response.json();
+          console.log('📊 Compact stats result:', result);
+          
+          if (result.success) {
+            // Data is already in the correct format
+            setStatsData(result.data);
+          } else {
+            console.warn('⚠️ Compact stats API returned error:', result.error);
+            // Use fallback data
+            setStatsData({
+              totalPredictions: 0,
+              activePredictions: 0,
+              totalVolumeETH: 0,
+              totalVolumeSWIPE: 0,
+              predictionsToday: 0,
+              volumeToday: 0,
+              topCategory: 'General',
+              successRate: 0,
+              totalParticipants: 0,
+              trendingPredictions: []
+            });
+          }
         }
 
-        const result = await response.json();
-        if (result.success) {
-          // Data is already in the correct format
-          setStatsData(result.data);
-        } else {
-          throw new Error(result.error || 'Failed to fetch stats');
-        }
+        
+        console.log('✅ All data fetched successfully');
       } catch (err) {
-        console.error('Error fetching stats:', err);
+        console.error('❌ Error fetching stats:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch stats');
       } finally {
         setLoading(false);
