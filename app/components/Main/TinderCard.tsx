@@ -721,16 +721,16 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     // Send Farcaster notification about successful stake
     try {
       const userFid = await getUserFid();
-      if (userFid && lastStakedPrediction) {
-        const stakeAmount = stakeModal.stakeAmount || '0.001';
-        const outcome = stakeModal.isYes ? 'YES' : 'NO';
+      if (userFid && lastStakedPrediction && stakeAmount !== null && stakeToken && stakeIsYes !== null) {
+        const stakeAmountStr = stakeAmount.toString();
+        const outcome = stakeIsYes ? 'YES' : 'NO';
         
         await notifyStakeSuccess(
           userFid,
           lastStakedPrediction.title,
-          stakeAmount,
+          stakeAmountStr,
           outcome,
-          stakeModal.selectedToken
+          stakeToken
         );
       }
     } catch (error) {
@@ -771,7 +771,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
 
   // Function to share prediction after stake
   const shareStakedPrediction = async (type: 'achievement' | 'challenge' | 'prediction' = 'achievement') => {
-    if (!lastStakedPrediction) return;
+    if (!lastStakedPrediction || stakeAmount === null || !stakeToken) return;
     
     try {
       let shareText = '';
@@ -779,13 +779,13 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       
       switch (type) {
         case 'achievement':
-          shareText = `🎉 I just staked on: ${lastStakedPrediction.title}\n\n💰 Stake: ${lastStakedPrediction.price} ETH\n\nDo you dare predict the future? 🔮`;
+          shareText = `🎉 I just staked on: ${lastStakedPrediction.title}\n\n💰 Stake: ${stakeAmount} ${stakeToken}\n\nDo you dare predict the future? 🔮`;
           break;
         case 'challenge':
-          shareText = `🏆 Challenge: Can you predict: ${lastStakedPrediction.title}?\n\n💰 Stake: ${lastStakedPrediction.price} ETH\n\nTry to beat my prediction! 🎯`;
+          shareText = `🏆 Challenge: Can you predict: ${lastStakedPrediction.title}?\n\n💰 Stake: ${stakeAmount} ${stakeToken}\n\nTry to beat my prediction! 🎯`;
           break;
         default:
-          shareText = `🔮 I predict: ${lastStakedPrediction.title}\n💰 Stake: ${lastStakedPrediction.price} ETH\n\nJoin the game and create your own prediction! 🎯`;
+          shareText = `🔮 I predict: ${lastStakedPrediction.title}\n💰 Stake: ${stakeAmount} ${stakeToken}\n\nJoin the game and create your own prediction! 🎯`;
       }
       
       await composeCast({
