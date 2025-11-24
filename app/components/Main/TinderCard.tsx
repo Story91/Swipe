@@ -5,6 +5,7 @@ import { ethers } from 'ethers';
 import { CONTRACTS, SWIPE_TOKEN, getV2Contract, getContractForAction } from '../../../lib/contract';
 import { calculateApprovalAmount } from '../../../lib/constants/approval';
 import { useViewProfile, useComposeCast, useMiniKit } from '@coinbase/onchainkit/minikit';
+import sdk from '@farcaster/miniapp-sdk';
 import './TinderCard.css';
 import './Dashboards.css';
 import { NotificationSystem, showNotification, UserDashboard } from '../Portfolio/UserDashboard';
@@ -118,6 +119,8 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   // Show share prompt after successful stake
   const [showSharePrompt, setShowSharePrompt] = useState(false);
   const [lastStakedPrediction, setLastStakedPrediction] = useState<PredictionData | null>(null);
+  // Track if we've tried to add Mini App (only once after first predictions load)
+  const [hasTriedAddMiniApp, setHasTriedAddMiniApp] = useState(false);
   
   // State for tracking stake transactions
   const [stakeTransactionHash, setStakeTransactionHash] = useState<`0x${string}` | null>(null);
@@ -200,6 +203,50 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   // No auto-refresh interval - only refresh on mount and after transactions
   // Auto-refresh was causing unnecessary flickering and API calls
 
+  // Wywołaj addMiniApp() po pierwszym załadowaniu predykcji
+  useEffect(() => {
+    const promptAddMiniApp = async () => {
+      // Wywołaj tylko raz, gdy predykcje się załadowały po raz pierwszy
+      if (hasTriedAddMiniApp || predictionsLoading || !hybridPredictions || hybridPredictions.length === 0) return;
+      
+      try {
+        const isInMiniApp = await sdk.isInMiniApp();
+        if (!isInMiniApp) {
+          console.log('Not in Mini App, skipping addMiniApp');
+          return;
+        }
+
+        console.log('📱 Prompting user to add Mini App after predictions loaded...');
+        setHasTriedAddMiniApp(true);
+        
+        // Poczekaj chwilę żeby portfel się ustabilizował
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        try {
+          const result = await sdk.actions.addMiniApp();
+          console.log('✅ Add Mini App result:', result);
+          
+          if (result.notificationDetails) {
+            console.log('✅ Notifications enabled!');
+          } else {
+            console.log('⚠️ Mini App added but notifications not enabled');
+          }
+        } catch (error: any) {
+          console.error('❌ Add Mini App failed:', error);
+          
+          if (error?.name === 'AddMiniApp.InvalidDomainManifest') {
+            console.error('❌ Invalid domain manifest - check your .well-known/farcaster.json');
+          } else if (error?.name === 'AddMiniApp.RejectedByUser') {
+            console.log('User rejected add Mini App prompt');
+          }
+        }
+      } catch (error) {
+        console.error('Error checking Mini App status:', error);
+      }
+    };
+
+    promptAddMiniApp();
+  }, [predictionsLoading, hybridPredictions, hasTriedAddMiniApp]);
 
   // Auto-refresh SWIPE allowance when modal is open and using SWIPE
   useEffect(() => {
