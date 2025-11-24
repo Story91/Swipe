@@ -3,6 +3,7 @@
 import {
   useMiniKit,
 } from "@coinbase/onchainkit/minikit";
+import sdk from "@farcaster/miniapp-sdk";
 import {
   Name,
   Identity,
@@ -51,12 +52,62 @@ export default function App() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { address } = useAccount();
   const tinderCardRef = useRef<{ refresh: () => void } | null>(null);
+  const [hasTriedAddMiniApp, setHasTriedAddMiniApp] = useState(false);
 
   useEffect(() => {
     if (!isFrameReady) {
       setFrameReady();
     }
   }, [setFrameReady, isFrameReady]);
+
+  // Wywołaj addMiniApp() po ready i połączeniu portfela (z większym opóźnieniem dla Farcastera)
+  useEffect(() => {
+    const promptAddMiniApp = async () => {
+      if (hasTriedAddMiniApp || !isFrameReady || !address) return;
+      
+      try {
+        const isInMiniApp = await sdk.isInMiniApp();
+        if (!isInMiniApp) {
+          console.log('Not in Mini App, skipping addMiniApp');
+          return;
+        }
+
+        console.log('📱 Prompting user to add Mini App...');
+        setHasTriedAddMiniApp(true);
+        
+        // Dłuższe opóźnienie dla Farcastera, żeby portfel się ustabilizował
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        try {
+          const result = await sdk.actions.addMiniApp();
+          console.log('✅ Add Mini App result:', result);
+          
+          if (result.notificationDetails) {
+            console.log('✅ Notifications enabled!');
+          } else {
+            console.log('⚠️ Mini App added but notifications not enabled');
+          }
+        } catch (error: any) {
+          console.error('❌ Add Mini App failed:', error);
+          
+          if (error?.name === 'AddMiniApp.InvalidDomainManifest') {
+            console.error('❌ Invalid domain manifest - check your .well-known/farcaster.json');
+          } else if (error?.name === 'AddMiniApp.RejectedByUser') {
+            console.log('User rejected add Mini App prompt');
+          }
+        }
+      } catch (error) {
+        console.error('Error checking Mini App status:', error);
+      }
+    };
+
+    // Wywołaj z opóźnieniem, żeby portfel się połączył
+    const timer = setTimeout(() => {
+      promptAddMiniApp();
+    }, 2000);
+    
+    return () => clearTimeout(timer);
+  }, [isFrameReady, address, hasTriedAddMiniApp]);
 
 
   // Check permissions

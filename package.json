@@ -19,6 +19,7 @@
   "dependencies": {
     "@coinbase/cdp-sdk": "^1.36.0",
     "@coinbase/onchainkit": "^0.38.19",
+    "@farcaster/miniapp-node": "^0.1.11",
     "@farcaster/miniapp-sdk": "^0.1.9",
     "@flaunch/sdk": "^0.9.4",
     "@neynar/nodejs-sdk": "^3.34.0",
