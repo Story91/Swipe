@@ -9,8 +9,13 @@ import { redis } from "@/lib/redis";
 const appUrl = process.env.NEXT_PUBLIC_URL || "";
 const neynarApiKey = process.env.NEYNAR_API_KEY;
 const USE_NEYNAR_API = process.env.USE_NEYNAR_API !== "false"; // Default to true if not set
+const neynarWebhookUrl = process.env.NEYNAR_WEBHOOK_URL;
 const notificationServiceKey =
   process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME ?? "minikit";
+
+// Check if webhook is configured for Neynar
+// Neynar API requires webhook to be set to https://api.neynar.com/f/app/<client_id>/event
+const isNeynarWebhookConfigured = neynarWebhookUrl?.includes('api.neynar.com/f/app/');
 
 type SendFrameNotificationResult =
   | {
@@ -96,6 +101,7 @@ async function sendViaBaseAPI({
 /**
  * Send notification using Neynar API
  * Neynar manages tokens automatically, we just need to send FIDs
+ * Neynar API sends to ALL Farcaster clients where user has enabled notifications
  */
 async function sendViaNeynarAPI({
   fid,
@@ -116,9 +122,23 @@ async function sendViaNeynarAPI({
       target_url: appUrl,
     },
   };
+  
+  // Note: Neynar API sends notifications to ALL Farcaster clients where the user
+  // has enabled notifications for your mini app. If a user only added the mini app
+  // in Base app (appFid: 309857), they will only receive notifications in Base app.
+  // To receive notifications in other clients (e.g., Warpcast), users need to add
+  // the mini app in those clients as well.
+
+  console.log('Sending notification via Neynar API:', {
+    endpoint: 'https://api.neynar.com/v2/farcaster/frame/notifications/',
+    targetFids: targetFids.length > 10 ? `${targetFids.length} FIDs` : targetFids,
+    title: requestBody.notification.title,
+    body: requestBody.notification.body.substring(0, 50) + '...',
+    target_url: requestBody.notification.target_url,
+  });
 
   try {
-    const response = await fetch('https://api.neynar.com/v2/farcaster/frame/notifications', {
+    const response = await fetch('https://api.neynar.com/v2/farcaster/frame/notifications/', {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -128,15 +148,24 @@ async function sendViaNeynarAPI({
     });
 
     const responseJson = await response.json();
+    
+    console.log('Neynar API response:', {
+      status: response.status,
+      statusText: response.statusText,
+      body: responseJson,
+    });
 
     if (response.status === 200) {
+      console.log('✅ Neynar API notification sent successfully');
       return { state: "success" };
     }
 
     if (response.status === 429) {
+      console.warn('⚠️ Neynar API rate limit exceeded');
       return { state: "rate_limit" };
     }
 
+    console.error('❌ Neynar API error:', responseJson);
     return { state: "error", error: responseJson };
   } catch (error) {
     return { 
@@ -183,20 +212,84 @@ export async function sendFrameNotification({
   }
 
   // Strategy selection:
-  // 1. If multiple FIDs or broadcast -> use Neynar API (easier, no token management)
-  // 2. If single FID and Neynar available -> prefer Neynar API
-  // 3. If single FID and no Neynar or USE_NEYNAR_API=false -> use Base API with tokens
-  // 4. Fallback to Base API if Neynar fails
-
-  const shouldUseNeynar = USE_NEYNAR_API && neynarApiKey && (isMultipleFids || !appFid);
+  // If using Neynar webhook (isNeynarWebhookConfigured):
+  //   - Neynar manages tokens automatically
+  //   - ALWAYS use Neynar API for all notifications (single or multiple FIDs)
+  // If using own webhook:
+  //   - You manage tokens in Redis
+  //   - Use Base API with tokens from Redis
+  //   - For multiple FIDs, can try Neynar API if available (but tokens still in Redis)
+  
+  // IMPORTANT: If webhook is set to Neynar URL, Neynar manages tokens
+  // and we MUST use Neynar API. Base API won't work because we don't have tokens.
+  
+  const shouldUseNeynar = USE_NEYNAR_API && neynarApiKey && isNeynarWebhookConfigured;
+  
+  if (isNeynarWebhookConfigured && (!neynarApiKey || !USE_NEYNAR_API)) {
+    console.warn('⚠️ Webhook is configured for Neynar but Neynar API is not enabled. Set NEYNAR_API_KEY and USE_NEYNAR_API=true to use Neynar API.');
+  }
+  
+  if (USE_NEYNAR_API && neynarApiKey && !isNeynarWebhookConfigured) {
+    console.log('ℹ️ Using own webhook - tokens managed in Redis. For broadcast, can use Neynar API if available.');
+  }
 
   if (shouldUseNeynar) {
-    console.log('Using Neynar API for notification');
+    console.log('Using Neynar API for notification (webhook configured for Neynar)');
     try {
-      return await sendViaNeynarAPI({ fid, title, body });
+      const result = await sendViaNeynarAPI({ fid, title, body });
+      
+      // If Neynar API succeeded, return success
+      if (result.state === "success") {
+        return result;
+      }
+      
+      // If Neynar API failed (e.g., user not found in Neynar), try Base API with Redis tokens
+      // This handles users who added mini app before webhook was changed to Neynar
+      console.log('⚠️ Neynar API returned:', result.state, '- trying Base API with Redis tokens as fallback');
+      
+      // For single FID, try Base API if we have token in Redis
+      if (!isMultipleFids && appFid) {
+        const tokenData = await getUserNotificationDetails(targetFids[0], appFid);
+        if (tokenData) {
+          console.log('✅ Found token in Redis, using Base API as fallback');
+          return await sendViaBaseAPI({
+            fid: targetFids[0],
+            appFid,
+            title,
+            body,
+            notificationDetails: tokenData,
+          });
+        }
+      }
+      
+      // If no token in Redis either, return Neynar error
+      return result;
     } catch (error) {
-      console.warn('Neynar API failed, falling back to Base API:', error);
-      // Fall through to Base API
+      console.error('❌ Neynar API failed with exception:', error);
+      
+      // Try Base API as fallback if we have tokens in Redis
+      if (!isMultipleFids && appFid) {
+        const tokenData = await getUserNotificationDetails(targetFids[0], appFid);
+        if (tokenData) {
+          console.log('✅ Found token in Redis, using Base API as fallback after Neynar exception');
+          try {
+            return await sendViaBaseAPI({
+              fid: targetFids[0],
+              appFid,
+              title,
+              body,
+              notificationDetails: tokenData,
+            });
+          } catch (baseError) {
+            console.error('❌ Base API fallback also failed:', baseError);
+          }
+        }
+      }
+      
+      return { 
+        state: "error", 
+        error: { message: error instanceof Error ? error.message : "Neynar API failed" } 
+      };
     }
   }
 
