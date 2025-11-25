@@ -200,7 +200,6 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   // No auto-refresh interval - only refresh on mount and after transactions
   // Auto-refresh was causing unnecessary flickering and API calls
 
-  // Removed addMiniApp() call from here - moved back to page.tsx to prevent wallet disconnection on Farcaster
 
   // Auto-refresh SWIPE allowance when modal is open and using SWIPE
   useEffect(() => {

@@ -1,10 +1,10 @@
-import { sendFrameNotification, sendFrameNotificationToAllApps } from "@/lib/notification-client";
+import { sendFrameNotification } from "@/lib/notification-client";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
   try {
-    const { fid, appFid, title, body, type } = await request.json();
-    console.log('Notification API called with:', { fid, appFid, title, body, type });
+    const { fid, title, body, type } = await request.json();
+    console.log('Notification API called with:', { fid, title, body, type });
 
     if (!fid || !title || !body) {
       console.log('Missing required fields');
@@ -14,22 +14,13 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log('Sending frame notification to FID:', fid, 'appFid:', appFid);
-    
-    // If appFid is provided, send to specific app
-    // Otherwise, try all known apps (Base, Farcaster, etc.)
-    const result = appFid
-      ? await sendFrameNotification({
-          fid: parseInt(fid),
-          appFid: parseInt(appFid),
-          title,
-          body,
-        })
-      : (await sendFrameNotificationToAllApps({
-          fid: parseInt(fid),
-          title,
-          body,
-        })).results[0]?.result || { state: "no_token" as const };
+    console.log('Sending frame notification to FID:', fid);
+    // Send notification to user
+    const result = await sendFrameNotification({
+      fid: parseInt(fid),
+      title,
+      body,
+    });
     
     console.log('Frame notification result:', result);
 

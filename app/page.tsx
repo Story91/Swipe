@@ -60,10 +60,10 @@ export default function App() {
     }
   }, [setFrameReady, isFrameReady]);
 
-  // Wywołaj addMiniApp() po ready i połączeniu portfela (z większym opóźnieniem dla Farcastera)
+  // Wywołaj addMiniApp() zaraz po ready (po włączeniu aplikacji)
   useEffect(() => {
     const promptAddMiniApp = async () => {
-      if (hasTriedAddMiniApp || !isFrameReady || !address) return;
+      if (hasTriedAddMiniApp || !isFrameReady) return;
       
       try {
         const isInMiniApp = await sdk.isInMiniApp();
@@ -72,11 +72,8 @@ export default function App() {
           return;
         }
 
-        console.log('📱 Prompting user to add Mini App...');
+        console.log('📱 Prompting user to add Mini App after ready...');
         setHasTriedAddMiniApp(true);
-        
-        // Dłuższe opóźnienie dla Farcastera, żeby portfel się ustabilizował
-        await new Promise(resolve => setTimeout(resolve, 3000));
         
         try {
           const result = await sdk.actions.addMiniApp();
@@ -101,14 +98,15 @@ export default function App() {
       }
     };
 
-    // Wywołaj z opóźnieniem, żeby portfel się połączył
-    const timer = setTimeout(() => {
-      promptAddMiniApp();
-    }, 2000);
-    
-    return () => clearTimeout(timer);
-  }, [isFrameReady, address, hasTriedAddMiniApp]);
-
+    // Wywołaj po krótkim opóźnieniu, żeby upewnić się że ready jest kompletne
+    if (isFrameReady) {
+      const timer = setTimeout(() => {
+        promptAddMiniApp();
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isFrameReady, hasTriedAddMiniApp]);
 
   // Check permissions
   const isAdmin = address && process.env.NEXT_PUBLIC_ADMIN_1?.toLowerCase() === address.toLowerCase();
