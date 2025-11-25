@@ -62,8 +62,16 @@ export async function POST(request: NextRequest) {
           );
           // Save notification details if available (for tracking purposes)
           if (event.notificationDetails) {
+            console.log("💾 Saving notification details to Redis:", {
+              fid,
+              appFid,
+              url: event.notificationDetails.url,
+              token: event.notificationDetails.token.substring(0, 10) + "...",
+            });
             await setUserNotificationDetails(fid, appFid, event.notificationDetails);
+            console.log("✅ Notification details saved successfully");
           } else {
+            console.log("⚠️ No notificationDetails in event, deleting if exists");
             await deleteUserNotificationDetails(fid, appFid);
           }
           // IMPORTANT: Base app waits for webhook response before activating tokens
@@ -97,7 +105,14 @@ export async function POST(request: NextRequest) {
           );
           // Save new notification details (for tracking purposes)
           if (event.notificationDetails) {
+            console.log("💾 Saving notification details to Redis:", {
+              fid,
+              appFid,
+              url: event.notificationDetails.url,
+              token: event.notificationDetails.token.substring(0, 10) + "...",
+            });
             await setUserNotificationDetails(fid, appFid, event.notificationDetails);
+            console.log("✅ Notification details saved successfully");
           }
           // IMPORTANT: Base app waits for webhook response before activating tokens
           // Send notification asynchronously AFTER returning response to avoid timeout

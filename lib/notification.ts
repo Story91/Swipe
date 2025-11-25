@@ -10,6 +10,11 @@ function getUserNotificationDetailsKey(fid: number, appFid: number): string {
   return `${notificationServiceKey}:user:${fid}:app:${appFid}`;
 }
 
+function getUserNotificationDetailsKeyOld(fid: number): string {
+  // Old format without appFid (for backward compatibility)
+  return `${notificationServiceKey}:user:${fid}`;
+}
+
 export async function getUserNotificationDetails(
   fid: number,
   appFid: number,
@@ -21,12 +26,27 @@ export async function getUserNotificationDetails(
     return null;
   }
 
-  const key = getUserNotificationDetailsKey(fid, appFid);
-  console.log('Looking for notification details with key:', key);
+  // First try new format with appFid
+  const newKey = getUserNotificationDetailsKey(fid, appFid);
+  console.log('Looking for notification details with new key:', newKey);
+  let result = await redis.get<MiniAppNotificationDetails>(newKey);
   
-  const result = await redis.get<MiniAppNotificationDetails>(key);
-  console.log('Redis result:', result);
+  // If not found, try old format (backward compatibility)
+  if (!result) {
+    const oldKey = getUserNotificationDetailsKeyOld(fid);
+    console.log('Not found in new format, trying old key:', oldKey);
+    result = await redis.get<MiniAppNotificationDetails>(oldKey);
+    
+    // If found in old format, migrate to new format
+    if (result) {
+      console.log('Found in old format, migrating to new format...');
+      await setUserNotificationDetails(fid, appFid, result);
+      // Optionally delete old key (uncomment if you want to clean up)
+      // await redis.del(oldKey);
+    }
+  }
   
+  console.log('Redis result:', result ? 'Found' : 'Not found');
   return result;
 }
 
@@ -65,13 +85,13 @@ export async function getAllAppFidsForUser(
   }
 
   try {
-    // Search for all keys matching the pattern: {notificationServiceKey}:user:{fid}:app:*
-    const pattern = `${notificationServiceKey}:user:${fid}:app:*`;
-    const keys = await redis.keys(pattern);
-    
     const results: Array<{ appFid: number; notificationDetails: MiniAppNotificationDetails }> = [];
     
-    for (const key of keys) {
+    // Search for new format: {notificationServiceKey}:user:{fid}:app:*
+    const newPattern = `${notificationServiceKey}:user:${fid}:app:*`;
+    const newKeys = await redis.keys(newPattern);
+    
+    for (const key of newKeys) {
       // Extract appFid from key: {notificationServiceKey}:user:{fid}:app:{appFid}
       const match = key.match(new RegExp(`${notificationServiceKey}:user:${fid}:app:(\\d+)`));
       if (match && match[1]) {
@@ -81,6 +101,17 @@ export async function getAllAppFidsForUser(
           results.push({ appFid, notificationDetails });
         }
       }
+    }
+    
+    // Also check old format: {notificationServiceKey}:user:{fid} (without :app:)
+    const oldKey = getUserNotificationDetailsKeyOld(fid);
+    const oldData = await redis.get<MiniAppNotificationDetails>(oldKey);
+    
+    if (oldData && typeof oldData === 'object' && 'url' in oldData && 'token' in oldData) {
+      // Found in old format - use appFid 0 as default (or try to detect from context)
+      // For old format, we don't know appFid, so we'll use 0 or try Base app FID (309857)
+      const defaultAppFid = 309857; // Base app FID
+      results.push({ appFid: defaultAppFid, notificationDetails: oldData });
     }
     
     return results;
@@ -100,18 +131,38 @@ export async function getAllUsersWithNotifications(): Promise<number[]> {
   }
 
   try {
-    // Search for all keys matching the pattern: {notificationServiceKey}:user:*:app:*
-    const pattern = `${notificationServiceKey}:user:*:app:*`;
-    const keys = await redis.keys(pattern);
-    
     const fids = new Set<number>();
     
-    for (const key of keys) {
+    // Search for new format: {notificationServiceKey}:user:*:app:*
+    const newPattern = `${notificationServiceKey}:user:*:app:*`;
+    const newKeys = await redis.keys(newPattern);
+    
+    for (const key of newKeys) {
       // Extract fid from key: {notificationServiceKey}:user:{fid}:app:{appFid}
       const match = key.match(new RegExp(`${notificationServiceKey}:user:(\\d+):app:\\d+`));
       if (match && match[1]) {
         const fid = parseInt(match[1], 10);
         fids.add(fid);
+      }
+    }
+    
+    // Also search for old format: {notificationServiceKey}:user:* (without :app:)
+    const oldPattern = `${notificationServiceKey}:user:*`;
+    const oldKeys = await redis.keys(oldPattern);
+    
+    for (const key of oldKeys) {
+      // Skip keys that have :app: (already counted above)
+      if (key.includes(":app:")) continue;
+      
+      // Extract fid from key: {notificationServiceKey}:user:{fid}
+      const match = key.match(new RegExp(`${notificationServiceKey}:user:(\\d+)`));
+      if (match && match[1]) {
+        // Check if it's actually a notification token (has url and token)
+        const data = await redis.get(key);
+        if (data && typeof data === 'object' && 'url' in data && 'token' in data) {
+          const fid = parseInt(match[1], 10);
+          fids.add(fid);
+        }
       }
     }
     

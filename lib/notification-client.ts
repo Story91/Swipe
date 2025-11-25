@@ -4,10 +4,13 @@ import {
   sendNotificationResponseSchema,
 } from "@farcaster/frame-sdk";
 import { getUserNotificationDetails } from "@/lib/notification";
+import { redis } from "@/lib/redis";
 
 const appUrl = process.env.NEXT_PUBLIC_URL || "";
 const neynarApiKey = process.env.NEYNAR_API_KEY;
 const USE_NEYNAR_API = process.env.USE_NEYNAR_API !== "false"; // Default to true if not set
+const notificationServiceKey =
+  process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME ?? "minikit";
 
 type SendFrameNotificationResult =
   | {
@@ -202,15 +205,33 @@ export async function sendFrameNotification({
     // For multiple FIDs with Base API, we need to send individually
     console.log('Sending multiple notifications via Base API (individual requests)');
     const results = await Promise.allSettled(
-      targetFids.map((singleFid) => 
-        sendViaBaseAPI({
+      targetFids.map(async (singleFid) => {
+        // Try to get token (new format or old format)
+        let tokenData = notificationDetails;
+        let tokenAppFid = appFid || 309857; // Default to Base app FID
+        
+        if (!tokenData) {
+          // Try new format first
+          tokenData = await getUserNotificationDetails(singleFid, tokenAppFid);
+          
+          // If not found, try old format
+          if (!tokenData && redis) {
+            const oldKey = `${notificationServiceKey}:user:${singleFid}`;
+            const oldData = await redis.get<MiniAppNotificationDetails>(oldKey);
+            if (oldData && typeof oldData === 'object' && 'url' in oldData && 'token' in oldData) {
+              tokenData = oldData;
+            }
+          }
+        }
+        
+        return sendViaBaseAPI({
           fid: singleFid,
-          appFid: appFid || 0, // Default appFid if not provided
+          appFid: tokenAppFid,
           title,
           body,
-          notificationDetails,
-        })
-      )
+          notificationDetails: tokenData,
+        });
+      })
     );
 
     const successCount = results.filter(
@@ -228,11 +249,34 @@ export async function sendFrameNotification({
   }
 
   // Single FID with Base API
+  // If appFid not provided, try to get token from old format (backward compatibility)
   if (!appFid) {
-    console.warn('appFid not provided, cannot use Base API. Trying Neynar...');
+    console.warn('appFid not provided, trying to get token from old format...');
+    
+    // Try to get from old format (without appFid)
+    if (redis) {
+      const oldKey = `${notificationServiceKey}:user:${targetFids[0]}`;
+      const oldData = await redis.get<MiniAppNotificationDetails>(oldKey);
+      
+      if (oldData && typeof oldData === 'object' && 'url' in oldData && 'token' in oldData) {
+        console.log('Found token in old format, using Base API with default appFid');
+        // Use Base app FID as default (309857) for old format tokens
+        return await sendViaBaseAPI({
+          fid: targetFids[0],
+          appFid: 309857, // Base app FID
+          title,
+          body,
+          notificationDetails: oldData,
+        });
+      }
+    }
+    
+    // If no token found, try Neynar API
     if (neynarApiKey) {
+      console.log('No token found, trying Neynar API...');
       return await sendViaNeynarAPI({ fid: targetFids[0], title, body });
     }
+    
     return { 
       state: "error", 
       error: { message: "Either appFid (for Base API) or NEYNAR_API_KEY (for Neynar API) is required" } 
