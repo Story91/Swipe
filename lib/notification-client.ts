@@ -1,11 +1,5 @@
-import {
-  MiniAppNotificationDetails,
-  type SendNotificationRequest,
-  sendNotificationResponseSchema,
-} from "@farcaster/frame-sdk";
-import { getUserNotificationDetails } from "@/lib/notification";
-
 const appUrl = process.env.NEXT_PUBLIC_URL || "";
+const neynarApiKey = process.env.NEYNAR_API_KEY;
 
 type SendFrameNotificationResult =
   | {
@@ -16,34 +10,39 @@ type SendFrameNotificationResult =
   | { state: "rate_limit" }
   | { state: "success" };
 
+/**
+ * Send notification using Neynar API
+ * According to Neynar docs: https://docs.neynar.com/docs/send-notifications-to-mini-app-users
+ * Neynar manages tokens automatically, we just need to send FIDs
+ * 
+ * @param fid - Single FID or array of FIDs to send notification to
+ * @param appFid - Not used by Neynar API, kept for compatibility
+ * @param title - Notification title (max 32 chars)
+ * @param body - Notification body (max 128 chars)
+ */
 export async function sendFrameNotification({
   fid,
   appFid,
   title,
   body,
-  notificationDetails,
 }: {
-  fid: number;
-  appFid: number;
+  fid: number | number[];
+  appFid?: number;
   title: string;
   body: string;
-  notificationDetails?: MiniAppNotificationDetails | null;
 }): Promise<SendFrameNotificationResult> {
-  console.log('sendFrameNotification called for FID:', fid, 'appFid:', appFid, 'title:', title);
-  
-  if (!notificationDetails) {
-    console.log('Fetching notification details for FID:', fid, 'appFid:', appFid);
-    notificationDetails = await getUserNotificationDetails(fid, appFid);
-  }
-  
-  console.log('Notification details:', notificationDetails);
-  
-  if (!notificationDetails) {
-    console.log('No notification details found for FID:', fid, 'appFid:', appFid);
-    return { state: "no_token" };
+  const targetFids = Array.isArray(fid) ? fid : [fid];
+  console.log('sendFrameNotification called for FIDs:', targetFids, 'title:', title);
+
+  // Validate required environment variables
+  if (!neynarApiKey) {
+    console.error('NEYNAR_API_KEY is not set! Cannot send notification.');
+    return { 
+      state: "error", 
+      error: { message: "NEYNAR_API_KEY environment variable is not configured" } 
+    };
   }
 
-  // Validate appUrl is set
   if (!appUrl) {
     console.error('NEXT_PUBLIC_URL is not set! Cannot send notification.');
     return { 
@@ -52,36 +51,46 @@ export async function sendFrameNotification({
     };
   }
 
-  // Validate targetUrl is on the same domain as mini app (Base requirement)
-  try {
-    const targetUrlObj = new URL(appUrl);
-    const notificationUrlObj = new URL(notificationDetails.url);
-    // Note: This is a basic check - Base may have stricter requirements
-    console.log('Target URL domain:', targetUrlObj.hostname);
-    console.log('Notification URL domain:', notificationUrlObj.hostname);
-  } catch (urlError) {
-    console.error('Invalid URL format:', urlError);
+  // Validate title and body length (Base requirements)
+  if (title.length > 32) {
+    console.warn('Title exceeds 32 characters, truncating:', title);
+    title = title.substring(0, 32);
+  }
+  if (body.length > 128) {
+    console.warn('Body exceeds 128 characters, truncating:', body);
+    body = body.substring(0, 128);
+  }
+
+  // Validate target URL length (Base requirement: max 1024 chars)
+  if (appUrl.length > 1024) {
+    console.error('targetUrl exceeds 1024 characters!');
+    return { 
+      state: "error", 
+      error: { message: "targetUrl exceeds maximum length of 1024 characters" } 
+    };
   }
 
   const requestBody = {
-    notificationId: crypto.randomUUID(),
-    title,
-    body,
-    targetUrl: appUrl,
-    tokens: [notificationDetails.token],
-  } satisfies SendNotificationRequest;
+    target_fids: targetFids,
+    notification: {
+      title,
+      body,
+      target_url: appUrl,
+    },
+  };
 
-  console.log('Sending notification request to:', notificationDetails.url);
+  console.log('Sending notification via Neynar API');
   console.log('Request body:', JSON.stringify(requestBody, null, 2));
 
   let response: Response;
   let responseJson: unknown;
 
   try {
-    response = await fetch(notificationDetails.url, {
+    response = await fetch('https://api.neynar.com/v2/farcaster/frame/notifications', {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "x-api-key": neynarApiKey,
       },
       body: JSON.stringify(requestBody),
     });
@@ -100,7 +109,7 @@ export async function sendFrameNotification({
       return { 
         state: "error", 
         error: { 
-          message: "Invalid JSON response from notification service",
+          message: "Invalid JSON response from Neynar API",
           status: response.status,
           body: responseText
         } 
@@ -118,40 +127,31 @@ export async function sendFrameNotification({
   }
 
   if (response.status === 200) {
-    const responseBody = sendNotificationResponseSchema.safeParse(responseJson);
-    if (responseBody.success === false) {
-      console.error('Invalid response schema:', responseBody.error.errors);
-      return { state: "error", error: responseBody.error.errors };
+    // Neynar API returns success response
+    const responseData = responseJson as { success?: boolean; message?: string };
+    if (responseData.success !== false) {
+      console.log('Notification sent successfully via Neynar');
+      return { state: "success" };
+    } else {
+      console.error('Neynar API returned error:', responseData);
+      return { 
+        state: "error", 
+        error: responseData 
+      };
     }
-
-    // Check for invalid tokens
-    if (responseBody.data.result.invalidTokens.length > 0) {
-      console.warn('Invalid tokens detected:', responseBody.data.result.invalidTokens);
-      // These tokens should be deleted from storage
-      if (responseBody.data.result.invalidTokens.includes(notificationDetails.token)) {
-        console.log('Deleting invalid token from storage for FID:', fid, 'appFid:', appFid);
-        const { deleteUserNotificationDetails } = await import("@/lib/notification");
-        await deleteUserNotificationDetails(fid, appFid).catch((err) => {
-          console.error('Failed to delete invalid token:', err);
-        });
-      }
-    }
-
-    if (responseBody.data.result.rateLimitedTokens.length > 0) {
-      console.warn('Rate limited tokens:', responseBody.data.result.rateLimitedTokens);
-      return { state: "rate_limit" };
-    }
-
-    console.log('Notification sent successfully');
-    return { state: "success" };
   }
 
   // Handle non-200 status codes
-  console.error('Notification API error:', {
+  console.error('Neynar API error:', {
     status: response.status,
     statusText: response.statusText,
     body: responseJson
   });
+
+  // Check for rate limit (429)
+  if (response.status === 429) {
+    return { state: "rate_limit" };
+  }
 
   return { 
     state: "error", 

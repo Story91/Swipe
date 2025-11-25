@@ -1,5 +1,4 @@
 import { sendFrameNotification } from "@/lib/notification-client";
-import { getAllAppFidsForUser } from "@/lib/notification";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
@@ -17,91 +16,52 @@ export async function POST(request: Request) {
 
     const fidNumber = parseInt(fid, 10);
     
-    // If appFid is provided, send to that specific client
-    if (appFid) {
-      console.log('Sending frame notification to FID:', fidNumber, 'appFid:', appFid);
-      const result = await sendFrameNotification({
-        fid: fidNumber,
-        appFid: parseInt(appFid, 10),
-        title,
-        body,
-      });
-      
-      console.log('Frame notification result:', result);
+    // Neynar API automatically filters users who haven't enabled notifications
+    // We can send to single FID or array of FIDs
+    const targetFids = Array.isArray(fid) ? fid.map((f: string | number) => parseInt(String(f), 10)) : [fidNumber];
+    
+    console.log('Sending notification via Neynar API to FIDs:', targetFids);
+    
+    // Send notification via Neynar API
+    // Note: appFid is not needed when using Neynar API - they manage tokens automatically
+    const result = await sendFrameNotification({
+      fid: fidNumber, // Primary FID for logging
+      appFid: appFid ? parseInt(appFid, 10) : 0, // Not used by Neynar API but kept for compatibility
+      title,
+      body,
+    });
+    
+    console.log('Neynar notification result:', result);
 
-      switch (result.state) {
-        case "success":
-          return NextResponse.json({ 
-            success: true, 
-            message: "Notification sent successfully" 
-          });
-        
-        case "no_token":
-          return NextResponse.json(
-            { error: "User has not enabled notifications" },
-            { status: 403 }
-          );
-        
-        case "rate_limit":
-          return NextResponse.json(
-            { error: "Rate limit exceeded" },
-            { status: 429 }
-          );
-        
-        case "error":
-          return NextResponse.json(
-            { error: "Failed to send notification", details: result.error },
-            { status: 500 }
-          );
-        
-        default:
-          return NextResponse.json(
-            { error: "Unknown error" },
-            { status: 500 }
-          );
-      }
-    } else {
-      // If appFid is not provided, send to all clients where user has the mini app
-      console.log('No appFid provided, sending to all clients for FID:', fidNumber);
-      const allClients = await getAllAppFidsForUser(fidNumber);
+    switch (result.state) {
+      case "success":
+        return NextResponse.json({ 
+          success: true, 
+          message: "Notification sent successfully via Neynar API" 
+        });
       
-      if (allClients.length === 0) {
+      case "rate_limit":
         return NextResponse.json(
-          { error: "User has not enabled notifications in any client" },
-          { status: 403 }
+          { error: "Rate limit exceeded" },
+          { status: 429 }
         );
-      }
-
-      const results = await Promise.allSettled(
-        allClients.map(({ appFid: clientAppFid }) =>
-          sendFrameNotification({
-            fid: fidNumber,
-            appFid: clientAppFid,
-            title,
-            body,
-          })
-        )
-      );
-
-      const successCount = results.filter(
-        (r) => r.status === "fulfilled" && r.value.state === "success"
-      ).length;
-      const failedCount = results.length - successCount;
-
-      return NextResponse.json({
-        success: successCount > 0,
-        message: `Notifications sent to ${successCount} out of ${results.length} clients`,
-        stats: {
-          total: results.length,
-          success: successCount,
-          failed: failedCount,
-        },
-      });
+      
+      case "error":
+        return NextResponse.json(
+          { error: "Failed to send notification", details: result.error },
+          { status: 500 }
+        );
+      
+      default:
+        return NextResponse.json(
+          { error: "Unknown error" },
+          { status: 500 }
+        );
     }
   } catch (error) {
     console.error("Notification API error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error", details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }
