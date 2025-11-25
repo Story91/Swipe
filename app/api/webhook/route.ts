@@ -1,124 +1,124 @@
 import {
+  parseWebhookEvent,
+  verifyAppKeyWithNeynar,
+} from "@farcaster/miniapp-node";
+import {
   setUserNotificationDetails,
   deleteUserNotificationDetails,
 } from "@/lib/notification";
 import { sendFrameNotification } from "@/lib/notification-client";
-import { http } from "viem";
-import { createPublicClient } from "viem";
-import { optimism } from "viem/chains";
+import { NextRequest } from "next/server";
 
-const appName = process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME;
-
-const KEY_REGISTRY_ADDRESS = "0x00000000Fc1237824fb747aBDE0FF18990E59b7e";
-
-const KEY_REGISTRY_ABI = [
-  {
-    inputs: [
-      { name: "fid", type: "uint256" },
-      { name: "key", type: "bytes" },
-    ],
-    name: "keyDataOf",
-    outputs: [
-      {
-        components: [
-          { name: "state", type: "uint8" },
-          { name: "keyType", type: "uint32" },
-        ],
-        name: "",
-        type: "tuple",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-] as const;
-
-async function verifyFidOwnership(fid: number, appKey: `0x${string}`) {
-  const client = createPublicClient({
-    chain: optimism,
-    transport: http(),
-  });
-
+export async function POST(request: NextRequest) {
   try {
-    const result = await client.readContract({
-      address: KEY_REGISTRY_ADDRESS,
-      abi: KEY_REGISTRY_ABI,
-      functionName: "keyDataOf",
-      args: [BigInt(fid), appKey],
-    });
+    const requestJson = await request.json();
 
-    return result.state === 1 && result.keyType === 1;
+    // Parse and verify the webhook event
+    let data;
+    try {
+      data = await parseWebhookEvent(requestJson, verifyAppKeyWithNeynar);
+      // Events are signed by the app key of a user with a JSON Farcaster Signature.
+    } catch (e: unknown) {
+      console.error("Webhook verification error:", e);
+      // Handle verification errors (invalid data, invalid app key, etc.)
+      // Return appropriate error responses with status codes 400, 401, or 500
+      if (e instanceof Error) {
+        if (e.message.includes("invalid") || e.message.includes("Invalid")) {
+          return Response.json(
+            { success: false, error: "Invalid webhook data" },
+            { status: 400 },
+          );
+        }
+        if (e.message.includes("unauthorized") || e.message.includes("Unauthorized")) {
+          return Response.json(
+            { success: false, error: "Unauthorized" },
+            { status: 401 },
+          );
+        }
+      }
+      return Response.json(
+        { success: false, error: "Webhook verification failed" },
+        { status: 500 },
+      );
+    }
+
+    // Extract webhook data
+    const fid = data.fid;
+    const appFid = data.appFid; // The FID of the client app that the user added the Mini App to
+    const event = data.event;
+
+    // Handle different event types
+    try {
+      switch (event.event) {
+        case "miniapp_added":
+          console.log(
+            "miniapp_added",
+            "fid:",
+            fid,
+            "appFid:",
+            appFid,
+            "notificationDetails:",
+            event.notificationDetails,
+          );
+          if (event.notificationDetails) {
+            await setUserNotificationDetails(fid, appFid, event.notificationDetails);
+            await sendFrameNotification({
+              fid,
+              appFid,
+              title: `👋 Welcome to Swipe!`,
+              body: `Thank you for joining our prediction platform! Good luck predicting the future! 🔮`,
+            });
+          } else {
+            await deleteUserNotificationDetails(fid, appFid);
+          }
+          break;
+
+        case "miniapp_removed":
+          console.log("miniapp_removed", "fid:", fid, "appFid:", appFid);
+          // Delete notification details
+          await deleteUserNotificationDetails(fid, appFid);
+          break;
+
+        case "notifications_enabled":
+          console.log(
+            "notifications_enabled",
+            "fid:",
+            fid,
+            "appFid:",
+            appFid,
+            "notificationDetails:",
+            event.notificationDetails,
+          );
+          // Save new notification details and send confirmation
+          await setUserNotificationDetails(fid, appFid, event.notificationDetails);
+          await sendFrameNotification({
+            fid,
+            appFid,
+            title: `🔔 Notifications Enabled!`,
+            body: `Thank you for enabling notifications for Swipe. You'll receive updates about your stakes and achievements!`,
+          });
+          break;
+
+        case "notifications_disabled":
+          console.log("notifications_disabled", "fid:", fid, "appFid:", appFid);
+          // Delete notification details
+          await deleteUserNotificationDetails(fid, appFid);
+          break;
+      }
+    } catch (error) {
+      console.error("Error processing webhook:", error);
+      return Response.json(
+        { success: false, error: "Error processing webhook event" },
+        { status: 500 },
+      );
+    }
+
+    return Response.json({ success: true });
   } catch (error) {
-    console.error("Key Registry verification failed:", error);
-    return false;
-  }
-}
-
-function decode(encoded: string) {
-  return JSON.parse(Buffer.from(encoded, "base64url").toString("utf-8"));
-}
-
-export async function POST(request: Request) {
-  const requestJson = await request.json();
-
-  const { header: encodedHeader, payload: encodedPayload } = requestJson;
-
-  const headerData = decode(encodedHeader);
-  const event = decode(encodedPayload);
-
-  const { fid, key } = headerData;
-
-  const valid = await verifyFidOwnership(fid, key);
-
-  if (!valid) {
+    console.error("Webhook handler error:", error);
     return Response.json(
-      { success: false, error: "Invalid FID ownership" },
-      { status: 401 },
+      { success: false, error: "Internal server error" },
+      { status: 500 },
     );
   }
-
-  switch (event.event) {
-    case "frame_added":
-      console.log(
-        "frame_added",
-        "event.notificationDetails",
-        event.notificationDetails,
-      );
-      if (event.notificationDetails) {
-        await setUserNotificationDetails(fid, event.notificationDetails);
-        await sendFrameNotification({
-          fid,
-          title: `👋 Welcome to Swipe!`,
-          body: `Thank you for joining our prediction platform! Good luck predicting the future! 🔮`,
-        });
-      } else {
-        await deleteUserNotificationDetails(fid);
-      }
-
-      break;
-    case "frame_removed": {
-      console.log("frame_removed");
-      await deleteUserNotificationDetails(fid);
-      break;
-    }
-    case "notifications_enabled": {
-      console.log("notifications_enabled", event.notificationDetails);
-      await setUserNotificationDetails(fid, event.notificationDetails);
-      await sendFrameNotification({
-        fid,
-        title: `🔔 Notifications Enabled!`,
-        body: `Thank you for enabling notifications for Swipe. You'll receive updates about your stakes and achievements!`,
-      });
-
-      break;
-    }
-    case "notifications_disabled": {
-      console.log("notifications_disabled");
-      await deleteUserNotificationDetails(fid);
-
-      break;
-    }
-  }
-
-  return Response.json({ success: true });
 }

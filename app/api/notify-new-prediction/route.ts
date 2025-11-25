@@ -1,5 +1,4 @@
 import { sendBatchNotifications, notificationTemplates } from "@/lib/notification-helpers";
-import { getUserNotificationDetails } from "@/lib/notification";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
