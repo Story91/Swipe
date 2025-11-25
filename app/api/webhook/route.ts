@@ -66,19 +66,17 @@ export async function POST(request: NextRequest) {
           } else {
             await deleteUserNotificationDetails(fid, appFid);
           }
-          // Send welcome notification via Neynar API (doesn't require notificationDetails)
-          // Neynar manages tokens automatically
-          try {
-            await sendFrameNotification({
-              fid,
-              appFid,
-              title: `👋 Welcome to Swipe!`,
-              body: `Thank you for joining our prediction platform! Good luck predicting the future! 🔮`,
-            });
-          } catch (error) {
+          // IMPORTANT: Base app waits for webhook response before activating tokens
+          // Send notification asynchronously AFTER returning response to avoid timeout
+          // Don't await - let it run in background
+          sendFrameNotification({
+            fid,
+            appFid,
+            title: `👋 Welcome to Swipe!`,
+            body: `Thank you for joining our prediction platform! Good luck predicting the future! 🔮`,
+          }).catch((error) => {
             console.error("Failed to send welcome notification:", error);
-            // Don't fail the webhook if notification fails
-          }
+          });
           break;
 
         case "miniapp_removed":
@@ -101,18 +99,17 @@ export async function POST(request: NextRequest) {
           if (event.notificationDetails) {
             await setUserNotificationDetails(fid, appFid, event.notificationDetails);
           }
-          // Send confirmation notification via Neynar API
-          try {
-            await sendFrameNotification({
-              fid,
-              appFid,
-              title: `🔔 Notifications Enabled!`,
-              body: `Thank you for enabling notifications for Swipe. You'll receive updates about your stakes and achievements!`,
-            });
-          } catch (error) {
+          // IMPORTANT: Base app waits for webhook response before activating tokens
+          // Send notification asynchronously AFTER returning response to avoid timeout
+          // Don't await - let it run in background
+          sendFrameNotification({
+            fid,
+            appFid,
+            title: `🔔 Notifications Enabled!`,
+            body: `Thank you for enabling notifications for Swipe. You'll receive updates about your stakes and achievements!`,
+          }).catch((error) => {
             console.error("Failed to send notification enabled confirmation:", error);
-            // Don't fail the webhook if notification fails
-          }
+          });
           break;
 
         case "notifications_disabled":
