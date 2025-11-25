@@ -89,3 +89,35 @@ export async function getAllAppFidsForUser(
     return [];
   }
 }
+
+/**
+ * Get all FIDs of users who have enabled notifications
+ * Returns unique FIDs (one per user, regardless of how many clients they use)
+ */
+export async function getAllUsersWithNotifications(): Promise<number[]> {
+  if (!redis) {
+    return [];
+  }
+
+  try {
+    // Search for all keys matching the pattern: {notificationServiceKey}:user:*:app:*
+    const pattern = `${notificationServiceKey}:user:*:app:*`;
+    const keys = await redis.keys(pattern);
+    
+    const fids = new Set<number>();
+    
+    for (const key of keys) {
+      // Extract fid from key: {notificationServiceKey}:user:{fid}:app:{appFid}
+      const match = key.match(new RegExp(`${notificationServiceKey}:user:(\\d+):app:\\d+`));
+      if (match && match[1]) {
+        const fid = parseInt(match[1], 10);
+        fids.add(fid);
+      }
+    }
+    
+    return Array.from(fids);
+  } catch (error) {
+    console.error('Error getting all users with notifications:', error);
+    return [];
+  }
+}
