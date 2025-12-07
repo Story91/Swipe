@@ -235,3 +235,23 @@ button, .btn {
     opacity: 0;
   }
 }
+
+/* Custom ConnectWallet button styles */
+[data-testid="ockConnectWallet_Container"] button,
+.ock-connect-wallet-button {
+  background: linear-gradient(to bottom right, #000000, #d4ff00, #000000) !important;
+  color: #000000 !important;
+  border: 2px solid #000000 !important;
+  font-weight: 600 !important;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1) !important;
+}
+
+[data-testid="ockConnectWallet_Container"] button:hover,
+.ock-connect-wallet-button:hover {
+  background: linear-gradient(to bottom right, #1a1a1a, #c4ef00, #1a1a1a) !important;
+}
+
+[data-testid="ockConnectWallet_Container"] button span,
+.ock-connect-wallet-button span {
+  color: #000000 !important;
+}

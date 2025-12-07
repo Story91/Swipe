@@ -24,6 +24,8 @@ import {
   MenubarMenu,
   MenubarTrigger,
 } from "@/components/ui/menubar";
+import { Button } from "@/components/ui/button";
+import { Trophy, HelpCircle, Settings } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useState, useEffect, useRef } from "react";
 import TinderCardComponent from "./components/Main/TinderCard";
@@ -128,8 +130,8 @@ export default function App() {
         {/* Wallet Connection and Admin/Help - Top */}
         <div className="flex justify-between items-center mb-3">
           <Wallet className="z-10">
-            <ConnectWallet>
-              <Name className="text-inherit text-sm" />
+            <ConnectWallet className="!px-4 !py-2 !text-sm !min-w-0 !text-black !border-2 !border-black !font-semibold !shadow-md" text="Sign In">
+              <Name className="text-inherit text-xs" />
             </ConnectWallet>
             <WalletDropdown>
               <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
@@ -145,28 +147,31 @@ export default function App() {
           {/* Admin, Leaderboard or Help Button - Top Right */}
           <div className="flex gap-2">
             {isAdmin && (
-              <button
+              <Button
+                variant="swipe"
+                size="icon"
                 onClick={() => setActiveDashboard('admin')}
-                className="bg-purple-600 hover:bg-purple-700 text-white text-sm px-3 py-2 rounded-full font-bold transition-colors"
                 title="Admin Dashboard"
               >
-                A
-              </button>
+                <Settings className="h-4 w-4" />
+              </Button>
             )}
-            <button
+            <Button
+              variant="swipe"
+              size="icon"
               onClick={() => setActiveDashboard('leaderboard')}
-              className="bg-yellow-600 hover:bg-yellow-700 text-white text-sm px-3 py-2 rounded-full font-medium transition-colors"
               title="Leaderboard"
             >
-              🏆
-            </button>
-            <button
+              <Trophy className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="swipe"
+              size="icon"
               onClick={() => setActiveDashboard('help-faq')}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-2 rounded-full font-medium transition-colors"
               title="Help & FAQ"
             >
-              ❓
-            </button>
+              <HelpCircle className="h-4 w-4" />
+            </Button>
           </div>
         </div>
 
