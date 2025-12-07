@@ -195,16 +195,35 @@ button, .btn {
   font-weight: 500;
   font-size: 0.75rem;
   letter-spacing: 0.025em;
+  background: #000000 !important;
+  border: 2px solid #d4ff00 !important;
+  border-radius: 0.5rem;
+  padding: 0.25rem;
+  box-shadow: 0 0 15px rgba(212, 255, 0, 0.3), 0 4px 6px -1px rgb(0 0 0 / 0.3);
 }
 
 .mini-app-menu .menubar-trigger {
   font-family: "Orbitron", sans-serif;
-  font-weight: 500;
+  font-weight: 600;
   font-size: 0.75rem;
   letter-spacing: 0.025em;
-  padding: 0.25rem 0.5rem;
+  padding: 0.5rem 0.75rem;
   min-width: auto;
   white-space: nowrap;
+  color: #d4ff00 !important;
+  background: transparent !important;
+  border-radius: 0.375rem;
+  transition: all 0.2s ease;
+}
+
+.mini-app-menu .menubar-trigger:hover {
+  background: rgba(212, 255, 0, 0.15) !important;
+  text-shadow: 0 0 8px rgba(212, 255, 0, 0.5);
+}
+
+.mini-app-menu .menubar-trigger[data-state="open"] {
+  background: rgba(212, 255, 0, 0.2) !important;
+  text-shadow: 0 0 10px rgba(212, 255, 0, 0.6);
 }
 
 .animate-fade-in {

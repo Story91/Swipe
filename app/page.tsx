@@ -185,7 +185,7 @@ export default function App() {
             </MenubarMenu>
             <MenubarMenu>
               <MenubarTrigger 
-                className="menubar-trigger animate-pulse bg-gradient-to-r from-[#d4ff00] to-yellow-300 text-black font-bold hover:from-yellow-300 hover:to-[#d4ff00]" 
+                className="menubar-trigger animate-pulse !bg-[#d4ff00] !text-black !font-bold hover:!bg-[#c4ef00]" 
                 onClick={() => setActiveDashboard('swipe-token')}
               >
                 $SWIPE
