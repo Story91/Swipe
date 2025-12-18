@@ -2347,7 +2347,7 @@ KEY USER-FACING CHANGES: V1 → V2
 
       {/* Professional Stake Modal with shadcn */}
       <Dialog open={stakeModal.isOpen} onOpenChange={(open) => !open && handleCloseStakeModal()}>
-        <DialogContent className="stake-dialog sm:max-w-[480px] max-h-[90vh] overflow-y-auto bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 border-zinc-700/50 text-white p-0 gap-0">
+        <DialogContent className="stake-dialog sm:max-w-[480px] bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 border-zinc-700/50 text-white p-0 gap-0 overflow-hidden">
           {/* Animated Header */}
           <div className="relative overflow-hidden">
             <div className={`absolute inset-0 ${stakeModal.isYes ? 'bg-gradient-to-r from-emerald-500/20 via-emerald-400/10 to-transparent' : 'bg-gradient-to-r from-rose-500/20 via-rose-400/10 to-transparent'}`} />
@@ -2436,8 +2436,8 @@ KEY USER-FACING CHANGES: V1 → V2
                         </div>
                       </div>
                       
-                      {/* Quick Amount Buttons - OUTSIDE input area */}
-                      <div className="grid grid-cols-4 gap-2 mb-4">
+                      {/* Quick Amount Buttons */}
+                      <div className="grid grid-cols-4 gap-2">
                         {ethInputMode === 'eth' 
                           ? ['0.00001', '0.0001', '0.001', '0.01'].map((amount) => (
                               <button
@@ -2465,54 +2465,6 @@ KEY USER-FACING CHANGES: V1 → V2
                               </button>
                             ))
                         }
-                      </div>
-
-                      {/* Range Slider */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-xs text-zinc-500">
-                          <span>{ethInputMode === 'eth' ? '0.00001 ETH' : '$0.03'}</span>
-                          <span>{ethInputMode === 'eth' ? '1 ETH' : '$3,000'}</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0"
-                          max="1000"
-                          step="1"
-                          value={ethInputMode === 'eth' 
-                            ? Math.round(((parseFloat(stakeModal.stakeAmount) || 0.00001) - 0.00001) / (1 - 0.00001) * 1000)
-                            : Math.round(((getUsdValue(parseFloat(stakeModal.stakeAmount) || 0, 'ETH') || 0.03) - 0.03) / (3000 - 0.03) * 1000)
-                          }
-                          onChange={(e) => {
-                            const sliderValue = parseInt(e.target.value);
-                            if (ethInputMode === 'eth') {
-                              // Convert slider 0-1000 to ETH 0.00001-1
-                              const ethValue = 0.00001 + (sliderValue / 1000) * (1 - 0.00001);
-                              handleStakeAmountChange(ethValue.toFixed(5));
-                            } else {
-                              // Convert slider 0-1000 to USD 0.03-3000
-                              const usdValue = 0.03 + (sliderValue / 1000) * (3000 - 0.03);
-                              const ethPrice = getUsdValue(1, 'ETH');
-                              if (ethPrice) {
-                                const ethAmount = usdValue / ethPrice;
-                                handleStakeAmountChange(ethAmount.toFixed(6));
-                              }
-                            }
-                          }}
-                          className="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer slider-eth"
-                          style={{
-                            background: ethInputMode === 'eth'
-                              ? `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${
-                                  ((parseFloat(stakeModal.stakeAmount || "0.00001") - 0.00001) / (1 - 0.00001)) * 100
-                                }%, #3f3f46 ${
-                                  ((parseFloat(stakeModal.stakeAmount || "0.00001") - 0.00001) / (1 - 0.00001)) * 100
-                                }%, #3f3f46 100%)`
-                              : `linear-gradient(to right, #22c55e 0%, #22c55e ${
-                                  (((getUsdValue(parseFloat(stakeModal.stakeAmount) || 0, 'ETH') || 0.03) - 0.03) / (3000 - 0.03)) * 100
-                                }%, #3f3f46 ${
-                                  (((getUsdValue(parseFloat(stakeModal.stakeAmount) || 0, 'ETH') || 0.03) - 0.03) / (3000 - 0.03)) * 100
-                                }%, #3f3f46 100%)`
-                          }}
-                        />
                       </div>
 
                       {/* Manual Input - Full width, no spinners */}

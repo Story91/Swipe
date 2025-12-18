@@ -2684,23 +2684,6 @@ html, body {
 /* Professional Stake Dialog Styles */
 .stake-dialog {
   animation: dialogSlideIn 0.3s ease-out;
-  max-height: 90vh;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* Mobile specific styles for dialog */
-@media (max-width: 640px) {
-  .stake-dialog {
-    max-height: 85vh;
-    margin: 16px;
-    width: calc(100% - 32px) !important;
-    max-width: none !important;
-  }
-  
-  .stake-dialog [data-radix-dialog-content] {
-    max-height: 85vh;
-  }
 }
 
 /* Hide number input spinners */
