@@ -2347,7 +2347,7 @@ KEY USER-FACING CHANGES: V1 → V2
 
       {/* Professional Stake Modal with shadcn */}
       <Dialog open={stakeModal.isOpen} onOpenChange={(open) => !open && handleCloseStakeModal()}>
-        <DialogContent className="stake-dialog sm:max-w-[480px] bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 border-zinc-700/50 text-white p-0 gap-0 overflow-hidden">
+        <DialogContent className="stake-dialog sm:max-w-[480px] max-h-[90vh] overflow-y-auto bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 border-zinc-700/50 text-white p-0 gap-0">
           {/* Animated Header */}
           <div className="relative overflow-hidden">
             <div className={`absolute inset-0 ${stakeModal.isYes ? 'bg-gradient-to-r from-emerald-500/20 via-emerald-400/10 to-transparent' : 'bg-gradient-to-r from-rose-500/20 via-rose-400/10 to-transparent'}`} />
