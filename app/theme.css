@@ -193,27 +193,43 @@ button, .btn {
 .mini-app-menu {
   font-family: "Orbitron", sans-serif;
   font-weight: 500;
-  font-size: 0.75rem;
-  letter-spacing: 0.025em;
+  font-size: 0.7rem;
+  letter-spacing: 0.01em;
   background: #000000 !important;
   border: 2px solid #d4ff00 !important;
   border-radius: 0.5rem;
-  padding: 0.25rem;
+  padding: 0.15rem;
   box-shadow: 0 0 15px rgba(212, 255, 0, 0.3), 0 4px 6px -1px rgb(0 0 0 / 0.3);
+  display: flex !important;
+  justify-content: stretch !important;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Force equal width for all menu items */
+.mini-app-menu > * {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  max-width: none !important;
 }
 
 .mini-app-menu .menubar-trigger {
   font-family: "Orbitron", sans-serif;
-  font-weight: 600;
-  font-size: 0.75rem;
-  letter-spacing: 0.025em;
-  padding: 0.5rem 0.75rem;
-  min-width: auto;
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0;
+  padding: 0.5rem 0.2rem !important;
+  min-width: 0 !important;
+  width: 100% !important;
   white-space: nowrap;
   color: #d4ff00 !important;
   background: transparent !important;
   border-radius: 0.375rem;
   transition: all 0.2s ease;
+  text-align: center;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
 }
 
 .mini-app-menu .menubar-trigger:hover {
@@ -224,6 +240,30 @@ button, .btn {
 .mini-app-menu .menubar-trigger[data-state="open"] {
   background: rgba(212, 255, 0, 0.2) !important;
   text-shadow: 0 0 10px rgba(212, 255, 0, 0.6);
+}
+
+/* Responsive Menu for Mini App */
+@media (max-width: 424px) {
+  .mini-app-menu {
+    font-size: 0.7rem;
+    padding: 0.1rem;
+  }
+  
+  .mini-app-menu .menubar-trigger {
+    font-size: 0.7rem;
+    padding: 0.4rem 0.1rem !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .mini-app-menu {
+    font-size: 0.65rem;
+  }
+  
+  .mini-app-menu .menubar-trigger {
+    font-size: 0.65rem;
+    padding: 0.35rem 0.05rem !important;
+  }
 }
 
 .animate-fade-in {

@@ -1888,11 +1888,6 @@ KEY USER-FACING CHANGES: V1 → V2
       {/* Terminal Header */}
       <div className="cyber-terminal mb-4">
         <div className="terminal-header">
-          <div className="terminal-dots">
-            <span className="dot red"></span>
-            <span className="dot yellow"></span>
-            <span className="dot green"></span>
-          </div>
           <div className="terminal-title">
             <span className="text-[#1a1a1a] font-mono text-xs font-bold">swipe@prediction</span>
             <span className="text-[#444] font-mono text-xs">:~$</span>

@@ -126,7 +126,7 @@ export default function App() {
 
   return (
     <div className="flex flex-col min-h-screen font-sans text-[var(--app-foreground)] mini-app-theme from-[var(--app-background)] to-[var(--app-gray)]">
-      <div className="w-full max-w-[424px] mx-auto px-4 py-3">
+      <div className="w-full max-w-[424px] mx-auto px-2 sm:px-4 py-3 overflow-x-hidden">
         {/* Wallet Connection and Admin/Help - Top */}
         <div className="flex justify-between items-center mb-3">
           <Wallet className="z-10">
@@ -176,7 +176,7 @@ export default function App() {
         </div>
 
         {/* Menu Bar - Right after Wallet */}
-        <div className="mb-4">
+        <div className="mb-4 overflow-hidden">
           <Menubar className="mini-app-menu">
             <MenubarMenu>
               <MenubarTrigger className="menubar-trigger" onClick={() => setActiveDashboard('tinder')}>
