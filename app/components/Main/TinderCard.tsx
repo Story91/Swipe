@@ -26,6 +26,7 @@ import SharePredictionButton from '../Actions/SharePredictionButton';
 import { notifyPredictionShared, notifyStakeSuccess } from '../../../lib/notification-helpers';
 import { generateTransactionId, generateBasescanUrl } from '../../../lib/utils/redis-utils';
 import { useTokenPrices } from '../../../lib/hooks/useTokenPrices';
+import { Bot, Loader2, Sparkles, X, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
 
 interface PredictionData {
   id: number;
@@ -135,6 +136,44 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   const [stakeToken, setStakeToken] = useState<'ETH' | 'SWIPE' | null>(null);
   const [stakeIsYes, setStakeIsYes] = useState<boolean | null>(null);
   const [ethInputMode, setEthInputMode] = useState<'eth' | 'usd'>('eth');
+  
+  // AI Analysis Modal State
+  const [aiModal, setAiModal] = useState<{
+    isOpen: boolean;
+    isLoading: boolean;
+    analysis: string | null;
+    recommendation: 'YES' | 'NO' | 'SKIP' | null;
+    confidence: 'LOW' | 'MEDIUM' | 'HIGH' | null;
+    aiProbability: { yes: number | null; no: number | null } | null;
+    error: string | null;
+  }>({
+    isOpen: false,
+    isLoading: false,
+    analysis: null,
+    recommendation: null,
+    confidence: null,
+    aiProbability: null,
+    error: null
+  });
+  
+  // AI Typing animation state
+  const [aiTypingStep, setAiTypingStep] = useState(0);
+  
+  // Reset typing animation when analysis changes
+  useEffect(() => {
+    if (aiModal.analysis && aiModal.isOpen) {
+      setAiTypingStep(0);
+      // Animate through sections: 0=probability, 1=analysis, 2=value, 3=recommendation, 4=risks
+      const timers = [
+        setTimeout(() => setAiTypingStep(1), 300),
+        setTimeout(() => setAiTypingStep(2), 800),
+        setTimeout(() => setAiTypingStep(3), 1300),
+        setTimeout(() => setAiTypingStep(4), 1800),
+        setTimeout(() => setAiTypingStep(5), 2300),
+      ];
+      return () => timers.forEach(t => clearTimeout(t));
+    }
+  }, [aiModal.analysis, aiModal.isOpen]);
   
   const { address } = useAccount();
   const { writeContract } = useWriteContract();
@@ -790,6 +829,83 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     } catch (error) {
       console.error('Error getting user FID:', error);
       return null;
+    }
+  };
+
+  // Function to analyze prediction with AI
+  const analyzeWithAI = async () => {
+    if (!currentCard || currentCard.id === 0) return;
+    
+    // Find the current prediction data
+    const currentPrediction = transformedPredictions[currentIndex];
+    if (!currentPrediction) return;
+    
+    // Open modal and start loading
+    setAiModal({
+      isOpen: true,
+      isLoading: true,
+      analysis: null,
+      recommendation: null,
+      confidence: null,
+      aiProbability: null,
+      error: null
+    });
+    
+    try {
+      // Calculate pool data
+      const yesETH = (currentPrediction.yesTotalAmount || 0) / 1e18;
+      const noETH = (currentPrediction.noTotalAmount || 0) / 1e18;
+      const totalETH = yesETH + noETH;
+      const yesSWIPE = (currentPrediction.swipeYesTotalAmount || 0) / 1e18;
+      const noSWIPE = (currentPrediction.swipeNoTotalAmount || 0) / 1e18;
+      const totalSWIPE = yesSWIPE + noSWIPE;
+      
+      const yesPercentage = totalETH > 0 ? (yesETH / totalETH) * 100 : 50;
+      const noPercentage = totalETH > 0 ? (noETH / totalETH) * 100 : 50;
+      
+      const response = await fetch('/api/ai-assistant/analyze-prediction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          predictionId: currentPrediction.id,
+          question: currentCard.prediction,
+          description: currentCard.description,
+          category: currentCard.category,
+          yesPercentage,
+          noPercentage,
+          totalPoolETH: totalETH,
+          totalPoolSWIPE: totalSWIPE,
+          participantsCount: currentCardParticipants.length,
+          deadline: currentPrediction.deadline,
+          selectedCrypto: currentPrediction.selectedCrypto
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setAiModal(prev => ({
+          ...prev,
+          isLoading: false,
+          analysis: data.analysis,
+          recommendation: data.recommendation,
+          confidence: data.confidence,
+          aiProbability: data.aiProbability
+        }));
+      } else {
+        setAiModal(prev => ({
+          ...prev,
+          isLoading: false,
+          error: data.error || 'Failed to analyze prediction'
+        }));
+      }
+    } catch (error) {
+      console.error('AI Analysis error:', error);
+      setAiModal(prev => ({
+        ...prev,
+        isLoading: false,
+        error: 'Failed to connect to AI service'
+      }));
     }
   };
 
@@ -1892,6 +2008,18 @@ KEY USER-FACING CHANGES: V1 → V2
       >
         SKIP
       </button>
+      
+      <div className="or-text">OR</div>
+      
+      <button
+        className="ai-analyze-button"
+        onClick={analyzeWithAI}
+        disabled={aiModal.isLoading}
+      >
+        <Bot className="w-4 h-4" />
+        <span>{aiModal.isLoading ? 'Analyzing...' : 'Ask AI'}</span>
+        <Sparkles className="w-3 h-3" />
+      </button>
     </div>
 
     {/* Prediction Details - Hacker/Cyberpunk Style */}
@@ -2547,6 +2675,295 @@ KEY USER-FACING CHANGES: V1 → V2
                   )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Analysis Modal */}
+      <Dialog open={aiModal.isOpen} onOpenChange={(open) => !open && setAiModal(prev => ({ ...prev, isOpen: false }))}>
+        <DialogContent className="sm:max-w-[500px] bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 border-zinc-700/50 text-white p-0 gap-0 overflow-hidden max-h-[85vh]">
+          {/* Header */}
+          <div className="relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 via-blue-500/10 to-transparent" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/5 via-transparent to-transparent" />
+            
+            <DialogHeader className="relative p-5 pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-gradient-to-br from-purple-500 to-blue-600 shadow-lg shadow-purple-500/30">
+                    <Bot className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-lg font-bold text-white flex items-center gap-2">
+                      Swiper AI
+                      <Sparkles className="w-4 h-4 text-yellow-400" />
+                    </DialogTitle>
+                    <DialogDescription className="text-zinc-400 text-xs">
+                      Real-time prediction analysis
+                    </DialogDescription>
+                  </div>
+                </div>
+                {aiModal.recommendation && !aiModal.isLoading && (
+                  <Badge 
+                    variant="outline" 
+                    className={`px-3 py-1 text-sm font-semibold border-2 ${
+                      aiModal.recommendation === 'YES' 
+                        ? 'border-emerald-500/50 text-emerald-400 bg-emerald-500/10' 
+                        : aiModal.recommendation === 'NO'
+                        ? 'border-rose-500/50 text-rose-400 bg-rose-500/10'
+                        : 'border-amber-500/50 text-amber-400 bg-amber-500/10'
+                    }`}
+                  >
+                    {aiModal.recommendation === 'YES' ? '↑ BET YES' : aiModal.recommendation === 'NO' ? '↓ BET NO' : '⏸ SKIP'}
+                  </Badge>
+                )}
+              </div>
+            </DialogHeader>
+          </div>
+
+          <Separator className="bg-zinc-700/50" />
+
+          {/* Content */}
+          <div className="p-5 overflow-y-auto max-h-[60vh]">
+            {aiModal.isLoading ? (
+              <div className="flex flex-col items-center justify-center py-10 space-y-5">
+                {/* Spinning Logo */}
+                <div className="relative">
+                  <img 
+                    src="/splash.png" 
+                    alt="Swipe" 
+                    className="w-24 h-24 object-contain animate-pulse"
+                    style={{ animation: 'pulse 1.5s ease-in-out infinite' }}
+                  />
+                </div>
+                <div className="text-center space-y-2">
+                  <p className="text-[#d4ff00] font-bold text-lg">Analyzing...</p>
+                  <p className="text-zinc-400 text-sm">This may take a few moments</p>
+                  <p className="text-zinc-500 text-xs">Searching real-time data & news</p>
+                </div>
+              </div>
+            ) : aiModal.error ? (
+              <div className="flex flex-col items-center justify-center py-8 space-y-4">
+                <div className="w-14 h-14 rounded-full bg-rose-500/20 flex items-center justify-center">
+                  <AlertTriangle className="w-7 h-7 text-rose-400" />
+                </div>
+                <div className="text-center">
+                  <p className="text-rose-400 font-bold">Analysis Failed</p>
+                  <p className="text-zinc-500 text-sm mt-1">{aiModal.error}</p>
+                </div>
+                <Button 
+                  onClick={analyzeWithAI}
+                  className="mt-2 bg-zinc-700 hover:bg-zinc-600"
+                >
+                  Try Again
+                </Button>
+              </div>
+            ) : aiModal.analysis ? (
+              <div className="space-y-4">
+                {/* Step 1: AI Probability - appears first */}
+                {aiTypingStep >= 1 && aiModal.aiProbability?.yes !== null && (
+                  <div className="animate-fadeIn">
+                    <Card className="bg-zinc-800/50 border-zinc-700/50">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">🎯 AI Prediction</span>
+                          <Badge variant="outline" className={`text-xs font-bold ${
+                            aiModal.confidence === 'HIGH' ? 'border-emerald-500 text-emerald-400 bg-emerald-500/10' :
+                            aiModal.confidence === 'MEDIUM' ? 'border-amber-500 text-amber-400 bg-amber-500/10' :
+                            'border-zinc-500 text-zinc-400 bg-zinc-500/10'
+                          }`}>
+                            {aiModal.confidence}
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="text-center p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+                            <div className="flex items-center justify-center gap-1 mb-1">
+                              <TrendingUp className="w-4 h-4 text-emerald-400" />
+                              <span className="text-xs text-emerald-400 font-bold">YES</span>
+                            </div>
+                            <div className="text-3xl font-black text-emerald-400">
+                              {aiModal.aiProbability?.yes?.toFixed(0)}%
+                            </div>
+                          </div>
+                          <div className="text-center p-3 rounded-xl bg-rose-500/10 border border-rose-500/30">
+                            <div className="flex items-center justify-center gap-1 mb-1">
+                              <TrendingDown className="w-4 h-4 text-rose-400" />
+                              <span className="text-xs text-rose-400 font-bold">NO</span>
+                            </div>
+                            <div className="text-3xl font-black text-rose-400">
+                              {aiModal.aiProbability?.no?.toFixed(0)}%
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                {/* Parse analysis into sections */}
+                {(() => {
+                  const sections: { type: string; content: string[] }[] = [];
+                  let currentSection = { type: 'analysis', content: [] as string[] };
+                  
+                  aiModal.analysis?.split('\n').forEach(line => {
+                    if (!line.trim()) return;
+                    const cleanLine = line.replace(/\*\*/g, '').trim();
+                    
+                    if (line.includes('ANALYSIS') || line.includes('📊')) {
+                      currentSection = { type: 'analysis', content: [] };
+                      sections.push(currentSection);
+                    } else if (line.includes('AI PROBABILITY') || line.includes('🎯')) {
+                      // Skip - shown in card above
+                    } else if (line.includes('VALUE') || line.includes('💰')) {
+                      currentSection = { type: 'value', content: [] };
+                      sections.push(currentSection);
+                    } else if (line.includes('RECOMMENDATION') || line.includes('⚡')) {
+                      // Skip - we generate our own recommendation based on probability
+                      currentSection = { type: 'skip', content: [] };
+                    } else if (line.includes('RISK') || line.includes('⚠️')) {
+                      currentSection = { type: 'risk', content: [] };
+                      sections.push(currentSection);
+                    } else if (!line.match(/YES:\s*\d+.*NO:\s*\d+/i) && currentSection.type !== 'skip') {
+                      currentSection.content.push(cleanLine);
+                    }
+                  });
+                  
+                  const formatText = (text: string) => {
+                    return text
+                      .replace(/(https?:\/\/[^\s\)]+)/g, '<span class="text-cyan-400 underline text-xs">$1</span>')
+                      .replace(/\(Sources?:([^)]+)\)/gi, '<span class="text-cyan-400 text-xs">(Source:$1)</span>')
+                      .replace(/BET YES/gi, '<span class="text-emerald-400 font-bold">BET YES</span>')
+                      .replace(/BET NO/gi, '<span class="text-rose-400 font-bold">BET NO</span>')
+                      .replace(/SKIP/gi, '<span class="text-amber-400 font-bold">SKIP</span>');
+                  };
+                  
+                  return (
+                    <>
+                      {/* Step 2: Analysis */}
+                      {aiTypingStep >= 2 && sections.find(s => s.type === 'analysis') && (
+                        <div className="animate-fadeIn">
+                          <Card className="bg-zinc-800/50 border-zinc-700/50">
+                            <CardContent className="p-4">
+                              <p className="text-blue-400 font-bold text-sm mb-2">📊 ANALYSIS</p>
+                              {sections.find(s => s.type === 'analysis')?.content.map((line, i) => (
+                                <p key={i} className="text-zinc-300 text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: formatText(line) }} />
+                              ))}
+                            </CardContent>
+                          </Card>
+                        </div>
+                      )}
+                      
+                      {/* Step 3: Value */}
+                      {aiTypingStep >= 3 && sections.find(s => s.type === 'value') && (
+                        <div className="animate-fadeIn">
+                          <Card className="bg-zinc-800/50 border-zinc-700/50">
+                            <CardContent className="p-4">
+                              <p className="text-[#d4ff00] font-bold text-sm mb-2">💰 VALUE</p>
+                              {sections.find(s => s.type === 'value')?.content.map((line, i) => (
+                                <p key={i} className="text-zinc-300 text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: formatText(line) }} />
+                              ))}
+                            </CardContent>
+                          </Card>
+                        </div>
+                      )}
+                      
+                      {/* Step 4: Recommendation - ALWAYS based on AI probability, not text */}
+                      {aiTypingStep >= 4 && aiModal.aiProbability && (
+                        <div className="animate-fadeIn">
+                          <Card className={`border-2 ${
+                            aiModal.recommendation === 'YES' ? 'bg-emerald-500/10 border-emerald-500/50' :
+                            aiModal.recommendation === 'NO' ? 'bg-rose-500/10 border-rose-500/50' :
+                            'bg-amber-500/10 border-amber-500/50'
+                          }`}>
+                            <CardContent className="p-4">
+                              <p className={`font-bold text-sm mb-2 ${
+                                aiModal.recommendation === 'YES' ? 'text-emerald-400' :
+                                aiModal.recommendation === 'NO' ? 'text-rose-400' :
+                                'text-amber-400'
+                              }`}>⚡ RECOMMENDATION</p>
+                              
+                              {/* Show recommendation based on probability */}
+                              <div className={`text-lg font-bold mb-2 ${
+                                aiModal.recommendation === 'YES' ? 'text-emerald-400' :
+                                aiModal.recommendation === 'NO' ? 'text-rose-400' :
+                                'text-amber-400'
+                              }`}>
+                                {aiModal.recommendation === 'YES' 
+                                  ? `🟢 BET YES (${aiModal.aiProbability.yes?.toFixed(0)}% probability)`
+                                  : aiModal.recommendation === 'NO'
+                                  ? `🔴 BET NO (${aiModal.aiProbability.no?.toFixed(0)}% probability)`
+                                  : `🟡 SKIP (too close to call)`
+                                }
+                              </div>
+                              
+                              <p className="text-zinc-400 text-xs">
+                                {aiModal.confidence === 'HIGH' 
+                                  ? 'Strong signal - high confidence in this prediction'
+                                  : aiModal.confidence === 'MEDIUM'
+                                  ? 'Moderate signal - consider your risk tolerance'
+                                  : 'Weak signal - proceed with caution'
+                                }
+                              </p>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      )}
+                      
+                      {/* Step 5: Risks */}
+                      {aiTypingStep >= 5 && sections.find(s => s.type === 'risk') && (
+                        <div className="animate-fadeIn">
+                          <Card className="bg-rose-500/5 border-rose-500/20">
+                            <CardContent className="p-4">
+                              <p className="text-rose-400 font-bold text-sm mb-2">⚠️ RISKS</p>
+                              {sections.find(s => s.type === 'risk')?.content.map((line, i) => (
+                                <p key={i} className="text-zinc-400 text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: formatText(line) }} />
+                              ))}
+                            </CardContent>
+                          </Card>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+
+                {/* Quick Action Buttons - appear at the end */}
+                {aiTypingStep >= 5 && (
+                  <div className="animate-fadeIn grid grid-cols-2 gap-3 pt-2">
+                    <Button
+                      onClick={() => {
+                        setAiModal(prev => ({ ...prev, isOpen: false }));
+                        onSwipe('right', currentCard.id);
+                      }}
+                      className="h-12 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-bold text-base"
+                    >
+                      <TrendingUp className="w-5 h-5 mr-2" />
+                      BET YES
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setAiModal(prev => ({ ...prev, isOpen: false }));
+                        onSwipe('left', currentCard.id);
+                      }}
+                      className="h-12 bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white font-bold text-base"
+                    >
+                      <TrendingDown className="w-5 h-5 mr-2" />
+                      BET NO
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
+
+          {/* Footer */}
+          <div className="border-t border-zinc-700/50 p-3 bg-zinc-900/50">
+            <div className="flex items-center justify-between text-xs text-zinc-500">
+              <span className="flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-[#d4ff00]" />
+                <span className="text-zinc-400">Powered by AI</span>
+              </span>
+              <span className="text-zinc-600">#{currentCard.id}</span>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
