@@ -2671,3 +2671,62 @@ html, body {
     font-size: 13px;
   }
 }
+
+/* USD Equivalent Styles */
+.usd-equivalent {
+  font-size: 0.85em;
+  color: rgba(0, 0, 0, 0.6);
+  font-weight: 500;
+  margin-left: 4px;
+  opacity: 0.8;
+}
+
+.stat-value-badge .usd-equivalent {
+  display: block;
+  font-size: 0.75em;
+  color: rgba(0, 0, 0, 0.5);
+  margin-top: 2px;
+  margin-left: 0;
+}
+
+.amount-value .usd-equivalent {
+  display: block;
+  font-size: 0.8em;
+  color: rgba(0, 0, 0, 0.5);
+  margin-top: 2px;
+  margin-left: 0;
+}
+
+.usd-equivalent-display {
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: #d4ff00;
+  background: rgba(212, 255, 0, 0.1);
+  padding: 8px 16px;
+  border-radius: 8px;
+  margin: 8px 0;
+  border: 1px solid rgba(212, 255, 0, 0.2);
+}
+
+/* Dark mode adjustments for USD equivalent in modal */
+.modern-modal .usd-equivalent-display {
+  color: #d4ff00;
+  background: rgba(212, 255, 0, 0.15);
+  border-color: rgba(212, 255, 0, 0.3);
+}
+
+@media (max-width: 768px) {
+  .usd-equivalent {
+    font-size: 0.8em;
+  }
+  
+  .stat-value-badge .usd-equivalent {
+    font-size: 0.7em;
+  }
+  
+  .usd-equivalent-display {
+    font-size: 14px;
+    padding: 6px 12px;
+  }
+}

@@ -17,6 +17,7 @@ import { useFarcasterProfiles } from '../../../lib/hooks/useFarcasterProfiles';
 import SharePredictionButton from '../Actions/SharePredictionButton';
 import { notifyPredictionShared, notifyStakeSuccess } from '../../../lib/notification-helpers';
 import { generateTransactionId, generateBasescanUrl } from '../../../lib/utils/redis-utils';
+import { useTokenPrices } from '../../../lib/hooks/useTokenPrices';
 
 interface PredictionData {
   id: number;
@@ -130,6 +131,9 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   const { writeContract } = useWriteContract();
   const { composeCast } = useComposeCast();
   const { context } = useMiniKit();
+  
+  // Token prices for USD conversion
+  const { formatUsdValue, getUsdValue } = useTokenPrices();
   
   // Wait for stake transaction confirmation
   const { isLoading: isStakeConfirming, isSuccess: isStakeConfirmed } = useWaitForTransactionReceipt({
@@ -1892,15 +1896,19 @@ KEY USER-FACING CHANGES: V1 → V2
             <Badge variant="outline" className="stat-label-badge">ETH Staked 🔄</Badge>
             <Badge variant="secondary" className="stat-value-badge">{(() => {
               const total = ((transformedPredictions[currentIndex]?.yesTotalAmount || 0) + (transformedPredictions[currentIndex]?.noTotalAmount || 0)) / 1e18;
-              return total > 0 ? total.toFixed(5) : '0.00000';
-            })()} ETH</Badge>
+              const ethDisplay = total > 0 ? total.toFixed(5) : '0.00000';
+              const usdDisplay = formatUsdValue(total, 'ETH');
+              return <>{ethDisplay} ETH {usdDisplay && <span className="usd-equivalent">{usdDisplay}</span>}</>;
+            })()}</Badge>
           </div>
           <div className="stat">
             <Badge variant="outline" className="stat-label-badge">SWIPE Staked 🔄</Badge>
             <Badge variant="secondary" className="stat-value-badge">{(() => {
               const total = ((transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0) + (transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0)) / 1e18;
-              return total > 0 ? total.toFixed(0) : '0';
-            })()} SWIPE</Badge>
+              const swipeDisplay = total > 0 ? total.toFixed(0) : '0';
+              const usdDisplay = formatUsdValue(total, 'SWIPE');
+              return <>{swipeDisplay} SWIPE {usdDisplay && <span className="usd-equivalent">{usdDisplay}</span>}</>;
+            })()}</Badge>
           </div>
 
          </div>
@@ -2001,29 +2009,33 @@ KEY USER-FACING CHANGES: V1 → V2
            <div className="chart-item">
              <div className="chart-title">YES/NO Split</div>
              
-             {/* Real-time YES/NO amounts with equal styling */}
-             <div className="yes-no-amounts">
-               <div className="amount-item yes-amount">
-                 <span className="amount-label">YES</span>
-                 <span className="amount-value">
-                   {(() => {
-                     const pred = transformedPredictions[currentIndex];
-                     const ethAmount = (pred?.yesTotalAmount || 0) / 1e18;
-                     return ethAmount > 0 ? ethAmount.toFixed(5) : '0.00000';
-                   })()} ETH
-                 </span>
-               </div>
-               <div className="amount-item no-amount">
-                 <span className="amount-label">NO</span>
-                 <span className="amount-value">
-                   {(() => {
-                     const pred = transformedPredictions[currentIndex];
-                     const ethAmount = (pred?.noTotalAmount || 0) / 1e18;
-                     return ethAmount > 0 ? ethAmount.toFixed(5) : '0.00000';
-                   })()} ETH
-                 </span>
-               </div>
-             </div>
+            {/* Real-time YES/NO amounts with equal styling */}
+            <div className="yes-no-amounts">
+              <div className="amount-item yes-amount">
+                <span className="amount-label">YES</span>
+                <span className="amount-value">
+                  {(() => {
+                    const pred = transformedPredictions[currentIndex];
+                    const ethAmount = (pred?.yesTotalAmount || 0) / 1e18;
+                    const ethDisplay = ethAmount > 0 ? ethAmount.toFixed(5) : '0.00000';
+                    const usdDisplay = formatUsdValue(ethAmount, 'ETH');
+                    return <>{ethDisplay} ETH {usdDisplay && <span className="usd-equivalent">{usdDisplay}</span>}</>;
+                  })()}
+                </span>
+              </div>
+              <div className="amount-item no-amount">
+                <span className="amount-label">NO</span>
+                <span className="amount-value">
+                  {(() => {
+                    const pred = transformedPredictions[currentIndex];
+                    const ethAmount = (pred?.noTotalAmount || 0) / 1e18;
+                    const ethDisplay = ethAmount > 0 ? ethAmount.toFixed(5) : '0.00000';
+                    const usdDisplay = formatUsdValue(ethAmount, 'ETH');
+                    return <>{ethDisplay} ETH {usdDisplay && <span className="usd-equivalent">{usdDisplay}</span>}</>;
+                  })()}
+                </span>
+              </div>
+            </div>
              
              {/* Real proportional visualization */}
              <div className="proportional-chart">
@@ -2074,21 +2086,31 @@ KEY USER-FACING CHANGES: V1 → V2
            <div className="chart-item">
              <div className="chart-title">SWIPE Pool</div>
              
-             {/* SWIPE YES/NO amounts */}
-             <div className="yes-no-amounts">
-               <div className="amount-item yes-amount">
-                 <span className="amount-label">YES</span>
-                 <span className="amount-value">
-                   {((transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0) / 1e18).toFixed(0)} SWIPE
-                 </span>
-               </div>
-               <div className="amount-item no-amount">
-                 <span className="amount-label">NO</span>
-                 <span className="amount-value">
-                   {((transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0) / 1e18).toFixed(0)} SWIPE
-                 </span>
-               </div>
-             </div>
+            {/* SWIPE YES/NO amounts */}
+            <div className="yes-no-amounts">
+              <div className="amount-item yes-amount">
+                <span className="amount-label">YES</span>
+                <span className="amount-value">
+                  {(() => {
+                    const swipeAmount = (transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0) / 1e18;
+                    const swipeDisplay = swipeAmount.toFixed(0);
+                    const usdDisplay = formatUsdValue(swipeAmount, 'SWIPE');
+                    return <>{swipeDisplay} SWIPE {usdDisplay && <span className="usd-equivalent">{usdDisplay}</span>}</>;
+                  })()}
+                </span>
+              </div>
+              <div className="amount-item no-amount">
+                <span className="amount-label">NO</span>
+                <span className="amount-value">
+                  {(() => {
+                    const swipeAmount = (transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0) / 1e18;
+                    const swipeDisplay = swipeAmount.toFixed(0);
+                    const usdDisplay = formatUsdValue(swipeAmount, 'SWIPE');
+                    return <>{swipeDisplay} SWIPE {usdDisplay && <span className="usd-equivalent">{usdDisplay}</span>}</>;
+                  })()}
+                </span>
+              </div>
+            </div>
              
              {/* SWIPE proportional visualization */}
              <div className="proportional-chart">
@@ -2381,6 +2403,19 @@ KEY USER-FACING CHANGES: V1 → V2
                     />
                     <span className="amount-currency">{stakeModal.selectedToken}</span>
                   </div>
+                  {/* USD Equivalent Display */}
+                  {(() => {
+                    const amount = parseFloat(stakeModal.stakeAmount) || 0;
+                    const usdValue = getUsdValue(amount, stakeModal.selectedToken);
+                    if (usdValue !== null && amount > 0) {
+                      return (
+                        <div className="usd-equivalent-display">
+                          ≈ ${usdValue < 0.01 ? usdValue.toFixed(4) : usdValue < 1 ? usdValue.toFixed(3) : usdValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                   <div className="amount-description">
                     {stakeModal.selectedToken === 'ETH' 
                       ? 'Minimum: 0.00001 ETH, Maximum: 100 ETH'
