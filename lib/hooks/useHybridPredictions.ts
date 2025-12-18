@@ -50,6 +50,7 @@ export interface HybridPrediction {
 export function useHybridPredictions() {
   const [predictions, setPredictions] = useState<HybridPrediction[]>([]);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true); // Only true until first data load
   const [error, setError] = useState<string | null>(null);
   const { address } = useAccount();
   
@@ -151,6 +152,8 @@ export function useHybridPredictions() {
     if (redisPredictions.length > 0) {
       const transformed = transformPredictions(redisPredictions);
       setPredictions(transformed);
+      // Once we have data, initial loading is complete
+      setInitialLoading(false);
     }
   }, [redisPredictions, transformPredictions]);
   
@@ -213,7 +216,10 @@ export function useHybridPredictions() {
 
   return {
     predictions,
-    loading: loading || redisLoading,
+    // Only show loading spinner on initial load (when we have no data yet)
+    // Background refreshes won't show loading spinner
+    loading: initialLoading && (loading || redisLoading),
+    isRefreshing: loading || redisLoading, // For showing subtle refresh indicator if needed
     error: error || redisError,
     fetchPredictions: fetchAllPredictions, // Default: active only
     fetchAllPredictions: fetchAllPredictionsComplete, // All predictions
