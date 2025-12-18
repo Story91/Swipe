@@ -1900,24 +1900,22 @@ KEY USER-FACING CHANGES: V1 → V2
                {currentCard.timeframe}
              </Badge>
            </div>
-          <div className="stat">
-            <Badge variant="outline" className="stat-label-badge">ETH Staked 🔄</Badge>
-            <Badge variant="secondary" className="stat-value-badge">{(() => {
-              const total = ((transformedPredictions[currentIndex]?.yesTotalAmount || 0) + (transformedPredictions[currentIndex]?.noTotalAmount || 0)) / 1e18;
-              const ethDisplay = total > 0 ? total.toFixed(5) : '0.00000';
-              const usdDisplay = formatUsdValue(total, 'ETH');
-              return <>{ethDisplay} ETH {usdDisplay && <span className="usd-equivalent">{usdDisplay}</span>}</>;
-            })()}</Badge>
-          </div>
-          <div className="stat">
-            <Badge variant="outline" className="stat-label-badge">SWIPE Staked 🔄</Badge>
-            <Badge variant="secondary" className="stat-value-badge">{(() => {
-              const total = ((transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0) + (transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0)) / 1e18;
-              const swipeDisplay = total > 0 ? total.toFixed(0) : '0';
-              const usdDisplay = formatUsdValue(total, 'SWIPE');
-              return <>{swipeDisplay} SWIPE {usdDisplay && <span className="usd-equivalent">{usdDisplay}</span>}</>;
-            })()}</Badge>
-          </div>
+         <div className="stat">
+           <Badge variant="outline" className="stat-label-badge">ETH Staked 🔄</Badge>
+           <Badge variant="secondary" className="stat-value-badge">{(() => {
+             const total = ((transformedPredictions[currentIndex]?.yesTotalAmount || 0) + (transformedPredictions[currentIndex]?.noTotalAmount || 0)) / 1e18;
+             const ethDisplay = total > 0 ? total.toFixed(5) : '0.00000';
+             return <>{ethDisplay} ETH</>;
+           })()}</Badge>
+         </div>
+         <div className="stat">
+           <Badge variant="outline" className="stat-label-badge">SWIPE Staked 🔄</Badge>
+           <Badge variant="secondary" className="stat-value-badge">{(() => {
+             const total = ((transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0) + (transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0)) / 1e18;
+             const swipeDisplay = total > 0 ? total.toFixed(0) : '0';
+             return <>{swipeDisplay} SWIPE</>;
+           })()}</Badge>
+         </div>
 
          </div>
          
