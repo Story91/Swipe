@@ -15,11 +15,12 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
+import { Progress } from '@/components/ui/progress';
 import { useFarcasterProfiles } from '../../../lib/hooks/useFarcasterProfiles';
 import SharePredictionButton from '../Actions/SharePredictionButton';
 import { notifyPredictionShared, notifyStakeSuccess } from '../../../lib/notification-helpers';
@@ -1882,466 +1883,325 @@ KEY USER-FACING CHANGES: V1 → V2
       </button>
     </div>
 
-    {/* Prediction Details - Outside main card container */}
-    <div className="prediction-details">
-         <div className="details-header">
-           <h4>Prediction Analysis</h4>
-           <span className="card-number">ID: {currentCard.id} | {currentIndex + 1} / {cardItems.length}</span>
-         </div>
-         <p className="prediction-description">{currentCard.description}</p>
-         <div className="prediction-stats">
-           <div className="stat">
-             <Badge variant="outline" className="stat-label-badge">Category</Badge>
-             <Badge variant="secondary" className="stat-value-badge">{currentCard.category}</Badge>
-           </div>
-           <div className="stat">
-             <Badge variant="outline" className="stat-label-badge">Time Left</Badge>
-             <Badge variant="secondary" className={`stat-value-badge font-semibold ${getTimeUrgencyClass(transformedPredictions[currentIndex]?.deadline || 0)}`}>
-               {currentCard.timeframe}
-             </Badge>
-           </div>
-         <div className="stat">
-           <Badge variant="outline" className="stat-label-badge">ETH Staked 🔄</Badge>
-           <Badge variant="secondary" className="stat-value-badge">{(() => {
-             const total = ((transformedPredictions[currentIndex]?.yesTotalAmount || 0) + (transformedPredictions[currentIndex]?.noTotalAmount || 0)) / 1e18;
-             const ethDisplay = total > 0 ? total.toFixed(5) : '0.00000';
-             return <>{ethDisplay} ETH</>;
-           })()}</Badge>
-         </div>
-         <div className="stat">
-           <Badge variant="outline" className="stat-label-badge">SWIPE Staked 🔄</Badge>
-           <Badge variant="secondary" className="stat-value-badge">{(() => {
-             const total = ((transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0) + (transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0)) / 1e18;
-             const swipeDisplay = total > 0 ? total.toFixed(0) : '0';
-             return <>{swipeDisplay} SWIPE</>;
-           })()}</Badge>
-         </div>
-
-         </div>
-         
-         {/* New Charts and Diagrams Section */}
-         <div className="charts-section">
-           {/* Confidence Progress */}
-           <div className="chart-item">
-             <div className="chart-title">Confidence Level</div>
-             <div className="chart-value">{currentCard.confidence}%</div>
-             <div className="progress-bar">
-               <div 
-                 className="progress-fill" 
-                 style={{ width: `${currentCard.confidence}%` }}
-               ></div>
-             </div>
-             <div className="chart-subtitle">Success Probability</div>
-           </div>
-           
-           {/* Risk Assessment */}
-           <div className="chart-item">
-             <div className="chart-title">Risk Level</div>
-             <div className="chart-value">
-              {(() => {
-                const confidence = currentCard.confidence;
-                const totalStakedETH = ((transformedPredictions[currentIndex]?.yesTotalAmount || 0) + (transformedPredictions[currentIndex]?.noTotalAmount || 0)) / 1e18;
-                const totalStakedSWIPE = ((transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0) + (transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0)) / 1e18;
-                const participantCount = transformedPredictions[currentIndex]?.participants || 0;
-                
-                // Calculate risk based on multiple factors
-                let riskScore = 0;
-                let factors = [];
-                
-                // Confidence factor (lower confidence = higher risk)
-                const confidenceRisk = (100 - confidence) * 0.4;
-                riskScore += confidenceRisk;
-                factors.push(`Conf: ${confidenceRisk.toFixed(1)}`);
-                
-                // Liquidity factor (less staked = higher risk)
-                // Consider both ETH and SWIPE for liquidity assessment
-                const hasETHLiquidity = totalStakedETH >= 0.1;
-                const hasSWIPELiquidity = totalStakedSWIPE >= 100000;
-                let liquidityRisk = 0;
-                if (!hasETHLiquidity && !hasSWIPELiquidity) liquidityRisk = 30; // No liquidity in either
-                else if (totalStakedETH < 1 && totalStakedSWIPE < 50000) liquidityRisk = 15; // Low liquidity
-                else if (totalStakedETH < 5 && totalStakedSWIPE < 100000) liquidityRisk = 5; // Medium liquidity
-                // Good liquidity if either has high stakes
-                riskScore += liquidityRisk;
-                factors.push(`Liq: ${liquidityRisk}`);
-                 
-                 // Participation factor (fewer participants = higher risk)
-                 let participationRisk = 0;
-                 if (participantCount < 3) participationRisk = 20;
-                 else if (participantCount < 10) participationRisk = 10;
-                 riskScore += participationRisk;
-                 factors.push(`Part: ${participationRisk}`);
-                 
-                 // Time factor (less time = higher risk due to volatility)
-                 const now = Date.now() / 1000;
-                 const timeLeft = (transformedPredictions[currentIndex]?.deadline || 0) - now;
-                 let timeRisk = 0;
-                 if (timeLeft < 3600) timeRisk = 25; // Less than 1 hour
-                 else if (timeLeft < 86400) timeRisk = 15; // Less than 1 day
-                 riskScore += timeRisk;
-                 factors.push(`Time: ${timeRisk}`);
-                 
-                 // Determine risk level
-                 let riskLevel = 'Low';
-                 if (riskScore >= 60) riskLevel = 'High';
-                 else if (riskScore >= 30) riskLevel = 'Medium';
-                 
-                 return (
-                   <div className="risk-details">
-                     <div className="risk-level">{riskLevel}</div>
-                     <div className="risk-score">{Math.round(riskScore)} pts</div>
-                     <div className="risk-breakdown">{factors.join(' | ')}</div>
-                   </div>
-                 );
-               })()}
-             </div>
-             <div className="progress-bar">
-               <div 
-                 className="progress-fill" 
-                 style={{ 
-                   width: `${100 - currentCard.confidence}%`,
-                   background: currentCard.confidence > 80 ? 
-                     'linear-gradient(90deg, #10b981, #34d399)' : 
-                     currentCard.confidence > 60 ? 
-                     'linear-gradient(90deg, #f59e0b, #fbbf24)' : 
-                     'linear-gradient(90deg, #ef4444, #f87171)'
-                 }}
-               ></div>
-             </div>
-             <div className="chart-subtitle">Investment Risk</div>
-           </div>
-           
-           {/* YES/NO Breakdown */}
-           <div className="chart-item">
-             <div className="chart-title">YES/NO Split</div>
-             
-            {/* Real-time YES/NO amounts with equal styling */}
-            <div className="yes-no-amounts">
-              <div className="amount-item yes-amount">
-                <span className="amount-label">YES</span>
-                <span className="amount-value">
-                  {(() => {
-                    const pred = transformedPredictions[currentIndex];
-                    const ethAmount = (pred?.yesTotalAmount || 0) / 1e18;
-                    const ethDisplay = ethAmount > 0 ? ethAmount.toFixed(5) : '0.00000';
-                    const usdDisplay = formatUsdValue(ethAmount, 'ETH');
-                    return <>{ethDisplay} ETH {usdDisplay && <span className="usd-equivalent">{usdDisplay}</span>}</>;
-                  })()}
-                </span>
-              </div>
-              <div className="amount-item no-amount">
-                <span className="amount-label">NO</span>
-                <span className="amount-value">
-                  {(() => {
-                    const pred = transformedPredictions[currentIndex];
-                    const ethAmount = (pred?.noTotalAmount || 0) / 1e18;
-                    const ethDisplay = ethAmount > 0 ? ethAmount.toFixed(5) : '0.00000';
-                    const usdDisplay = formatUsdValue(ethAmount, 'ETH');
-                    return <>{ethDisplay} ETH {usdDisplay && <span className="usd-equivalent">{usdDisplay}</span>}</>;
-                  })()}
-                </span>
-              </div>
-            </div>
-             
-             {/* Real proportional visualization */}
-             <div className="proportional-chart">
-               {(() => {
-                 const yesAmount = (transformedPredictions[currentIndex]?.yesTotalAmount || 0);
-                 const noAmount = (transformedPredictions[currentIndex]?.noTotalAmount || 0);
-                 const totalAmount = yesAmount + noAmount;
-                 
-                 if (totalAmount === 0) {
-                   return (
-                     <div className="no-stakes">
-                       <div className="no-stakes-text">No stakes yet</div>
-                       <div className="no-stakes-bar">
-                         <div className="no-stakes-fill"></div>
-                       </div>
-                     </div>
-                   );
-                 }
-                 
-                 const yesPercentage = (yesAmount / totalAmount) * 100;
-                 const noPercentage = (noAmount / totalAmount) * 100;
-                 
-                 return (
-                   <div className="split-visualization">
-                     <div className="split-bar">
-                       <div 
-                         className="split-yes" 
-                         style={{ width: `${yesPercentage}%` }}
-                         title={`YES: ${yesPercentage.toFixed(1)}%`}
-                       ></div>
-                       <div 
-                         className="split-no" 
-                         style={{ width: `${noPercentage}%` }}
-                         title={`NO: ${noPercentage.toFixed(1)}%`}
-                       ></div>
-                     </div>
-                     <div className="split-percentages">
-                       <span className="yes-percentage">{yesPercentage.toFixed(1)}%</span>
-                       <span className="no-percentage">{noPercentage.toFixed(1)}%</span>
-                     </div>
-                   </div>
-                 );
-               })()}
-             </div>
-           </div>
-           
-           {/* SWIPE Pool */}
-           <div className="chart-item">
-             <div className="chart-title">SWIPE Pool</div>
-             
-            {/* SWIPE YES/NO amounts */}
-            <div className="yes-no-amounts">
-              <div className="amount-item yes-amount">
-                <span className="amount-label">YES</span>
-                <span className="amount-value">
-                  {(() => {
-                    const swipeAmount = (transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0) / 1e18;
-                    const swipeDisplay = swipeAmount.toFixed(0);
-                    const usdDisplay = formatUsdValue(swipeAmount, 'SWIPE');
-                    return <>{swipeDisplay} SWIPE {usdDisplay && <span className="usd-equivalent">{usdDisplay}</span>}</>;
-                  })()}
-                </span>
-              </div>
-              <div className="amount-item no-amount">
-                <span className="amount-label">NO</span>
-                <span className="amount-value">
-                  {(() => {
-                    const swipeAmount = (transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0) / 1e18;
-                    const swipeDisplay = swipeAmount.toFixed(0);
-                    const usdDisplay = formatUsdValue(swipeAmount, 'SWIPE');
-                    return <>{swipeDisplay} SWIPE {usdDisplay && <span className="usd-equivalent">{usdDisplay}</span>}</>;
-                  })()}
-                </span>
-              </div>
-            </div>
-             
-             {/* SWIPE proportional visualization */}
-             <div className="proportional-chart">
-               {(() => {
-                 const yesAmount = transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0;
-                 const noAmount = transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0;
-                 const totalAmount = yesAmount + noAmount;
-                 
-                 if (totalAmount === 0) {
-                   return (
-                     <div className="no-stakes">
-                       <div className="no-stakes-text">No SWIPE stakes yet</div>
-                       <div className="no-stakes-bar">
-                         <div className="no-stakes-fill"></div>
-                       </div>
-                     </div>
-                   );
-                 }
-                 
-                 const yesPercentage = (yesAmount / totalAmount) * 100;
-                 const noPercentage = (noAmount / totalAmount) * 100;
-                 
-                 return (
-                   <div className="split-visualization">
-                     <div className="split-bar">
-                       <div 
-                         className="split-yes" 
-                         style={{ width: `${yesPercentage}%` }}
-                         title={`YES: ${yesPercentage.toFixed(1)}%`}
-                       ></div>
-                       <div 
-                         className="split-no" 
-                         style={{ width: `${noPercentage}%` }}
-                         title={`NO: ${noPercentage.toFixed(1)}%`}
-                       ></div>
-                     </div>
-                     <div className="split-percentages">
-                       <span className="yes-percentage">{yesPercentage.toFixed(1)}%</span>
-                       <span className="no-percentage">{noPercentage.toFixed(1)}%</span>
-                     </div>
-                   </div>
-                 );
-               })()}
-             </div>
-           </div>
-
-           {/* Swipers */}
-           <div className="chart-item">
-             <div className="chart-title">Active Swipers</div>
-             {(() => {
-               const participantCount = currentCardParticipants.length;
-               
-               return (
-                 <>
-                   <div className="chart-value">
-                     {participantCount}
-                   </div>
-                   <div className="swipers-visualization">
-                     {participantCount === 0 ? (
-                       <div className="no-swipers">
-                         <div className="no-swipers-text">No swipers yet</div>
-                         <div className="no-swipers-bar">
-                           <div className="no-swipers-fill"></div>
-                         </div>
-                       </div>
-                     ) : (
-                       <>
-                         {/* Show actual swiper avatars based on real participants */}
-                         <div className="swipers-avatars-horizontal">
-                           {profilesLoading ? (
-                             <div className="loading-swipers">
-                               <div className="loading-logo-container">
-                                 <div className="loading-logo-spin"></div>
-                               </div>
-                               <div className="loading-text">Loading profiles...</div>
-                             </div>
-                           ) : (
-                            currentCardParticipants.map((participantAddress, i) => {
-                              const profile = profiles.find((p: any) => p && p.address === participantAddress);
-                              const hasFarcasterProfile = profile && profile.fid !== null && !profile.isWalletOnly;
-                               
-                               // Get initials from profile or address
-                               const getInitials = () => {
-                                 if (hasFarcasterProfile && profile?.display_name) {
-                                   return profile.display_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
-                                 }
-                                 return participantAddress.slice(2, 4).toUpperCase();
-                               };
-
-                               // Get avatar color based on address
-                               const getAvatarColor = (addr: string) => {
-                                 const colors = [
-                                   'bg-blue-500',
-                                   'bg-green-500', 
-                                   'bg-purple-500',
-                                   'bg-pink-500',
-                                   'bg-yellow-500',
-                                   'bg-red-500',
-                                   'bg-indigo-500',
-                                   'bg-teal-500'
-                                 ];
-                                 const hash = addr.split('').reduce((a, b) => {
-                                   a = ((a << 5) - a) + b.charCodeAt(0);
-                                   return a & a;
-                                 }, 0);
-                                 return colors[Math.abs(hash) % colors.length];
-                               };
-                               
-                               // Get user's vote from stakes
-                               const userVote = userStakes[participantAddress.toLowerCase()] || 'NONE';
-                               
-                               // Determine vote indicator styling
-                               const getVoteIndicatorClass = () => {
-                                 switch (userVote) {
-                                   case 'YES':
-                                     return 'vote-yes';
-                                   case 'NO':
-                                     return 'vote-no';
-                                   case 'BOTH':
-                                     return 'vote-both';
-                                   default:
-                                     return 'vote-none';
-                                 }
-                               };
-                               
-                               const getVoteIcon = () => {
-                                 switch (userVote) {
-                                   case 'YES':
-                                     return '✓';
-                                   case 'NO':
-                                     return '✗';
-                                   case 'BOTH':
-                                     return '±';
-                                   default:
-                                     return '';
-                                 }
-                               };
-                               
-                              return (
-                                <div key={`${participantAddress}-${i}`} className="relative">
-                                   <div className={`vote-indicator ${getVoteIndicatorClass()}`}>
-                                     <Avatar
-                                       className={hasFarcasterProfile 
-                                         ? "cursor-pointer hover:scale-110 transition-all duration-300 shadow-lg hover:shadow-xl border-2 border-white/20 hover:border-blue-400/60 ring-2 ring-blue-500/20 hover:ring-blue-400/40"
-                                         : "cursor-pointer hover:scale-105 transition-all duration-300 shadow-md border-2 border-gray-300 hover:border-gray-400"
-                                       }
-                                       onClick={() => {
-                                         if (!hasFarcasterProfile) {
-                                           // For wallet-only users, copy address to clipboard
-                                           navigator.clipboard.writeText(participantAddress);
-                                           console.log(`Copied wallet address: ${participantAddress}`);
-                                           
-                                           // Show copied animation
-                                           setCopiedAddresses(prev => new Set(prev).add(participantAddress));
-                                           setTimeout(() => {
-                                             setCopiedAddresses(prev => {
-                                               const newSet = new Set(prev);
-                                               newSet.delete(participantAddress);
-                                               return newSet;
-                                             });
-                                           }, 2000); // Hide after 2 seconds
-                                           return;
-                                         }
-                                         
-                                         console.log(`Clicked on swiper: ${participantAddress}`);
-                                         console.log(`Profile: ${profile.display_name} (@${profile.username})`);
-                                         
-                                         // Open Farcaster profile using OnchainKit
-                                         try {
-                                           if (profile.fid) {
-                                             const fidNumber = parseInt(profile.fid, 10);
-                                             console.log(`Opening Farcaster profile with FID: ${fidNumber}`);
-                                             viewProfile(fidNumber);
-                                           } else {
-                                             console.log(`No FID available for profile`);
-                                           }
-                                         } catch (error) {
-                                           console.error('Error opening Farcaster profile:', error);
-                                         }
-                                       }}
-                                     >
-                                       <AvatarImage 
-                                         src={hasFarcasterProfile ? (profile?.pfp_url || undefined) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${participantAddress.slice(2, 8)}`} 
-                                         alt={hasFarcasterProfile ? (profile?.display_name || `User ${participantAddress.slice(2, 6)}`) : `Wallet ${participantAddress.slice(2, 6)}`}
-                                       />
-                                       <AvatarFallback className={getAvatarColor(participantAddress)}>
-                                         <span className="text-white text-xs font-semibold">
-                                           {getInitials()}
-                                         </span>
-                                       </AvatarFallback>
-                                     </Avatar>
-                                     {/* Vote indicator */}
-                                     {userVote !== 'NONE' && (
-                                       <div className="vote-badge">
-                                         <span className="vote-icon">{getVoteIcon()}</span>
-                                       </div>
-                                     )}
-                                   </div>
-                                   {/* Base verification indicator */}
-                                   {hasFarcasterProfile && profile?.isBaseVerified && (
-                                     <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 rounded-full border-2 border-white flex items-center justify-center">
-                                       <span className="text-white text-xs font-bold">B</span>
-                                     </div>
-                                   )}
-                                   {/* Copied animation for wallet-only users */}
-                                   {!hasFarcasterProfile && copiedAddresses.has(participantAddress) && (
-                                     <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-500 text-white text-sm font-semibold px-4 py-2 rounded-full shadow-2xl animate-bounce z-[9999] border-2 border-white">
-                                       ✅ Copied!
-                                     </div>
-                                   )}
-                                 </div>
-                               );
-                            })
-                           )}
-                         </div>
-                       </>
-                     )}
-                   </div>
-                   <div className="chart-subtitle">Click avatars to view profiles</div>
-                 </>
-               );
-             })()}
-           </div>
-         </div>
+    {/* Prediction Details - Hacker/Cyberpunk Style */}
+    <div className="cyber-analysis px-4 pb-6">
+      {/* Terminal Header */}
+      <div className="cyber-terminal mb-4">
+        <div className="terminal-header">
+          <div className="terminal-dots">
+            <span className="dot red"></span>
+            <span className="dot yellow"></span>
+            <span className="dot green"></span>
+          </div>
+          <div className="terminal-title">
+            <span className="text-[#1a1a1a] font-mono text-xs font-bold">swipe@prediction</span>
+            <span className="text-[#444] font-mono text-xs">:~$</span>
+            <span className="text-[#0066cc] font-mono text-xs ml-1 font-semibold">analyze --id {currentCard.id}</span>
+          </div>
         </div>
+        <div className="terminal-body">
+          <p className="text-[#1a1a1a] font-mono text-xs leading-relaxed">{currentCard.description}</p>
+          <div className="terminal-cursor"></div>
+        </div>
+      </div>
+
+      {/* Stats Table - Hacker Style */}
+      <div className="cyber-table mb-4">
+        <div className="table-header">
+          <span className="text-[#1a1a1a] font-mono text-xs font-bold">[ SYSTEM_INFO ]</span>
+        </div>
+        <table className="w-full">
+          <tbody>
+            <tr className="cyber-row">
+              <td className="cyber-label">Category</td>
+              <td className="cyber-value text-[#0066cc] font-bold">{currentCard.category}</td>
+            </tr>
+            <tr className="cyber-row">
+              <td className="cyber-label">Time_Left</td>
+              <td className={`cyber-value font-bold ${getTimeUrgencyClass(transformedPredictions[currentIndex]?.deadline || 0)}`}>
+                {currentCard.timeframe}
+              </td>
+            </tr>
+            <tr className="cyber-row">
+              <td className="cyber-label">Confidence</td>
+              <td className="cyber-value">
+                <div className="flex items-center gap-2">
+                  <div className="cyber-progress-bar flex-1">
+                    <div className="cyber-progress-fill confidence" style={{ width: `${currentCard.confidence}%` }}></div>
+                  </div>
+                  <span className="text-[#1a1a1a] font-mono font-bold">{currentCard.confidence}%</span>
+                </div>
+              </td>
+            </tr>
+            {/* Risk Level - Full Width Section */}
+            <tr className="cyber-row">
+              <td colSpan={2} className="risk-full-section">
+                {(() => {
+                  const confidence = currentCard.confidence;
+                  const totalStakedETH = ((transformedPredictions[currentIndex]?.yesTotalAmount || 0) + (transformedPredictions[currentIndex]?.noTotalAmount || 0)) / 1e18;
+                  const totalStakedSWIPE = ((transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0) + (transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0)) / 1e18;
+                  const participantCount = transformedPredictions[currentIndex]?.participants || 0;
+                  const timeLeft = (transformedPredictions[currentIndex]?.deadline || 0) - Date.now() / 1000;
+                  
+                  // Calculate individual risk components
+                  const confRisk = (100 - confidence) * 0.4;
+                  let liqRisk = 0;
+                  if (totalStakedETH < 0.1 && totalStakedSWIPE < 100000) liqRisk = 30;
+                  else if (totalStakedETH < 1 && totalStakedSWIPE < 50000) liqRisk = 15;
+                  let partRisk = 0;
+                  if (participantCount < 3) partRisk = 20;
+                  else if (participantCount < 10) partRisk = 10;
+                  let timeRisk = 0;
+                  if (timeLeft < 3600) timeRisk = 25;
+                  else if (timeLeft < 86400) timeRisk = 15;
+                  
+                  const riskScore = confRisk + liqRisk + partRisk + timeRisk;
+                  
+                  let riskLevel = 'LOW';
+                  let riskColor = 'text-emerald-700';
+                  if (riskScore >= 60) { riskLevel = 'HIGH'; riskColor = 'text-red-600'; }
+                  else if (riskScore >= 30) { riskLevel = 'MEDIUM'; riskColor = 'text-amber-700'; }
+                  
+                  return (
+                    <div className="risk-container">
+                      <div className="risk-line-1">
+                        <span className="risk-label-main">RISK_LEVEL</span>
+                        <div className="cyber-progress-bar risk-bar">
+                          <div className={`cyber-progress-fill ${riskScore >= 60 ? 'danger' : riskScore >= 30 ? 'warning' : 'safe'}`} style={{ width: `${Math.min(riskScore, 100)}%` }}></div>
+                        </div>
+                        <span className={`risk-level-text ${riskColor}`}>{riskLevel}</span>
+                        <span className="risk-pts">{Math.round(riskScore)} pts</span>
+                      </div>
+                      <div className="risk-line-2">
+                        <span className="risk-detail">Conf: {confRisk.toFixed(1)}</span>
+                        <span className="risk-divider">|</span>
+                        <span className="risk-detail">Liq: {liqRisk}</span>
+                        <span className="risk-divider">|</span>
+                        <span className="risk-detail">Part: {partRisk}</span>
+                        <span className="risk-divider">|</span>
+                        <span className="risk-detail">Time: {timeRisk}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </td>
+            </tr>
+            <tr className="cyber-row">
+              <td className="cyber-label">Participants</td>
+              <td className="cyber-value text-[#7c3aed] font-bold">{currentCardParticipants.length} swipers</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* ETH Pool - Hacker Style */}
+      <div className="cyber-pool eth-pool mb-4">
+        <div className="pool-header">
+          <span className="pool-icon">⟠</span>
+          <span className="pool-title">ETH_POOL</span>
+          <span className="pool-total">
+            {(() => {
+              const total = ((transformedPredictions[currentIndex]?.yesTotalAmount || 0) + (transformedPredictions[currentIndex]?.noTotalAmount || 0)) / 1e18;
+              return total > 0 ? total.toFixed(5) : '0.00000';
+            })()} ETH
+          </span>
+        </div>
+        <div className="pool-grid">
+          <div className="pool-side yes">
+            <div className="side-label">YES</div>
+            <div className="side-amount">
+              {((transformedPredictions[currentIndex]?.yesTotalAmount || 0) / 1e18).toFixed(5)} ETH
+            </div>
+            <div className="side-usd">
+              {formatUsdValue((transformedPredictions[currentIndex]?.yesTotalAmount || 0) / 1e18, 'ETH')}
+            </div>
+          </div>
+          <div className="pool-side no">
+            <div className="side-label">NO</div>
+            <div className="side-amount">
+              {((transformedPredictions[currentIndex]?.noTotalAmount || 0) / 1e18).toFixed(5)} ETH
+            </div>
+            <div className="side-usd">
+              {formatUsdValue((transformedPredictions[currentIndex]?.noTotalAmount || 0) / 1e18, 'ETH')}
+            </div>
+          </div>
+        </div>
+        {/* Split Bar */}
+        {(() => {
+          const yesAmount = transformedPredictions[currentIndex]?.yesTotalAmount || 0;
+          const noAmount = transformedPredictions[currentIndex]?.noTotalAmount || 0;
+          const total = yesAmount + noAmount;
+          if (total === 0) return <div className="pool-empty">No ETH stakes yet</div>;
+          const yesPercent = (yesAmount / total) * 100;
+          return (
+            <div className="pool-bar-container">
+              <div className="pool-bar">
+                <div className="bar-yes" style={{ width: `${yesPercent}%` }}></div>
+                <div className="bar-no" style={{ width: `${100 - yesPercent}%` }}></div>
+              </div>
+              <div className="bar-labels">
+                <span className="label-yes">{yesPercent.toFixed(1)}%</span>
+                <span className="label-no">{(100 - yesPercent).toFixed(1)}%</span>
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+
+      {/* SWIPE Pool - Hacker Style */}
+      <div className="cyber-pool swipe-pool mb-4">
+        <div className="pool-header">
+          <span className="pool-icon">$</span>
+          <span className="pool-title">SWIPE_POOL</span>
+          <span className="pool-total">
+            {(() => {
+              const total = ((transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0) + (transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0)) / 1e18;
+              return total > 0 ? total.toLocaleString() : '0';
+            })()} SWIPE
+          </span>
+        </div>
+        <div className="pool-grid">
+          <div className="pool-side yes">
+            <div className="side-label">YES</div>
+            <div className="side-amount">
+              {((transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0) / 1e18).toLocaleString()} SWIPE
+            </div>
+            <div className="side-usd">
+              {formatUsdValue((transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0) / 1e18, 'SWIPE')}
+            </div>
+          </div>
+          <div className="pool-side no">
+            <div className="side-label">NO</div>
+            <div className="side-amount">
+              {((transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0) / 1e18).toLocaleString()} SWIPE
+            </div>
+            <div className="side-usd">
+              {formatUsdValue((transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0) / 1e18, 'SWIPE')}
+            </div>
+          </div>
+        </div>
+        {/* Split Bar */}
+        {(() => {
+          const yesAmount = transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0;
+          const noAmount = transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0;
+          const total = yesAmount + noAmount;
+          if (total === 0) return <div className="pool-empty">No SWIPE stakes yet</div>;
+          const yesPercent = (yesAmount / total) * 100;
+          return (
+            <div className="pool-bar-container">
+              <div className="pool-bar">
+                <div className="bar-yes" style={{ width: `${yesPercent}%` }}></div>
+                <div className="bar-no" style={{ width: `${100 - yesPercent}%` }}></div>
+              </div>
+              <div className="bar-labels">
+                <span className="label-yes">{yesPercent.toFixed(1)}%</span>
+                <span className="label-no">{(100 - yesPercent).toFixed(1)}%</span>
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+
+      {/* Active Swipers - Hacker Style */}
+      <div className="cyber-swipers">
+        <div className="swipers-header">
+          <span className="text-[#1a1a1a] font-mono text-xs font-bold">[ ACTIVE_SWIPERS ]</span>
+          <span className="text-[#d4ff00] font-mono text-sm font-bold">{currentCardParticipants.length}</span>
+        </div>
+        <div className="swipers-content">
+          {currentCardParticipants.length === 0 ? (
+            <div className="text-center text-zinc-500 font-mono text-xs py-4">No swipers yet...</div>
+          ) : (
+            <div className="flex flex-wrap gap-2 justify-center">
+              {profilesLoading ? (
+                <div className="text-xs text-[#1a1a1a] font-mono">Loading profiles...</div>
+              ) : (
+                currentCardParticipants.map((participantAddress, i) => {
+                  const profile = profiles.find((p: any) => p && p.address === participantAddress);
+                  const hasFarcasterProfile = profile && profile.fid !== null && !profile.isWalletOnly;
+                  
+                  const getInitials = () => {
+                    if (hasFarcasterProfile && profile?.display_name) {
+                      return profile.display_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+                    }
+                    return participantAddress.slice(2, 4).toUpperCase();
+                  };
+
+                  const getAvatarColor = (addr: string) => {
+                    const colors = ['bg-[#d4ff00]', 'bg-emerald-500', 'bg-purple-500', 'bg-pink-500', 'bg-amber-500', 'bg-red-500', 'bg-indigo-500', 'bg-teal-500'];
+                    const hash = addr.split('').reduce((a, b) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a; }, 0);
+                    return colors[Math.abs(hash) % colors.length];
+                  };
+                  
+                  const userVote = userStakes[participantAddress.toLowerCase()] || 'NONE';
+                  
+                  const getVoteIndicatorClass = () => {
+                    switch (userVote) {
+                      case 'YES': return 'ring-2 ring-emerald-400 shadow-emerald-400/50';
+                      case 'NO': return 'ring-2 ring-rose-400 shadow-rose-400/50';
+                      case 'BOTH': return 'ring-2 ring-amber-400 shadow-amber-400/50';
+                      default: return 'ring-1 ring-zinc-600';
+                    }
+                  };
+                  
+                  return (
+                    <div key={`${participantAddress}-${i}`} className="relative">
+                      <Avatar
+                        className={`cursor-pointer hover:scale-110 transition-all duration-300 shadow-lg ${getVoteIndicatorClass()}`}
+                        onClick={() => {
+                          if (!hasFarcasterProfile) {
+                            navigator.clipboard.writeText(participantAddress);
+                            setCopiedAddresses(prev => new Set(prev).add(participantAddress));
+                            setTimeout(() => {
+                              setCopiedAddresses(prev => {
+                                const newSet = new Set(prev);
+                                newSet.delete(participantAddress);
+                                return newSet;
+                              });
+                            }, 2000);
+                            return;
+                          }
+                          try {
+                            if (profile.fid) {
+                              viewProfile(parseInt(profile.fid, 10));
+                            }
+                          } catch (error) {
+                            console.error('Error opening Farcaster profile:', error);
+                          }
+                        }}
+                      >
+                        <AvatarImage 
+                          src={hasFarcasterProfile ? (profile?.pfp_url || undefined) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${participantAddress.slice(2, 8)}`} 
+                          alt={hasFarcasterProfile ? (profile?.display_name || `User ${participantAddress.slice(2, 6)}`) : `Wallet ${participantAddress.slice(2, 6)}`}
+                        />
+                        <AvatarFallback className={getAvatarColor(participantAddress)}>
+                          <span className="text-white text-xs font-semibold">{getInitials()}</span>
+                        </AvatarFallback>
+                      </Avatar>
+                      {userVote !== 'NONE' && (
+                        <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold ${
+                          userVote === 'YES' ? 'bg-emerald-500 text-white' : 
+                          userVote === 'NO' ? 'bg-rose-500 text-white' : 
+                          'bg-amber-500 text-black'
+                        }`}>
+                          {userVote === 'YES' ? '✓' : userVote === 'NO' ? '✗' : '±'}
+                        </div>
+                      )}
+                      {!hasFarcasterProfile && copiedAddresses.has(participantAddress) && (
+                        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-500 text-white text-sm font-semibold px-4 py-2 rounded-full shadow-2xl animate-bounce z-[9999] border-2 border-white">
+                          ✅ Copied!
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+          <div className="swipers-footer">Click avatars to view profiles</div>
+        </div>
+      </div>
+    </div>
 
       {/* Professional Stake Modal with shadcn */}
       <Dialog open={stakeModal.isOpen} onOpenChange={(open) => !open && handleCloseStakeModal()}>
