@@ -13,6 +13,13 @@ import { ApproverDashboard } from '../Approver/ApproverDashboard';
 import { useHybridPredictions } from '../../../lib/hooks/useHybridPredictions';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
 import { useFarcasterProfiles } from '../../../lib/hooks/useFarcasterProfiles';
 import SharePredictionButton from '../Actions/SharePredictionButton';
 import { notifyPredictionShared, notifyStakeSuccess } from '../../../lib/notification-helpers';
@@ -126,6 +133,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   const [stakeAmount, setStakeAmount] = useState<number | null>(null);
   const [stakeToken, setStakeToken] = useState<'ETH' | 'SWIPE' | null>(null);
   const [stakeIsYes, setStakeIsYes] = useState<boolean | null>(null);
+  const [ethInputMode, setEthInputMode] = useState<'eth' | 'usd'>('eth');
   
   const { address } = useAccount();
   const { writeContract } = useWriteContract();
@@ -614,8 +622,8 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
         return;
       }
     } else if (token === 'SWIPE') {
-      if (amount < 10000) {
-        alert('❌ Minimum stake is 10,000 SWIPE');
+      if (amount < 100000) {
+        alert('❌ Minimum stake is 100,000 SWIPE');
         return;
       }
       // SWIPE has unlimited maximum
@@ -1140,7 +1148,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     setStakeModal(prev => ({
       ...prev,
       selectedToken: token,
-      stakeAmount: token === 'ETH' ? '0.00001' : '10000'
+      stakeAmount: token === 'ETH' ? '0.00001' : '100000'
     }));
   };
 
@@ -1361,7 +1369,7 @@ KEY USER-FACING CHANGES: V1 → V2
 
 1. Stake with $SWIPE or ETH
 • Choose your token when placing bets
-• Different minimum stakes: ETH (0.00001) vs SWIPE (10,000)
+• Different minimum stakes: ETH (0.00001) vs SWIPE (100,000)
 
 2. Create Predictions with $SWIPE
 • Pay creation fee in ETH (0.0001) or SWIPE (200,000)
@@ -1950,7 +1958,7 @@ KEY USER-FACING CHANGES: V1 → V2
                 // Liquidity factor (less staked = higher risk)
                 // Consider both ETH and SWIPE for liquidity assessment
                 const hasETHLiquidity = totalStakedETH >= 0.1;
-                const hasSWIPELiquidity = totalStakedSWIPE >= 10000;
+                const hasSWIPELiquidity = totalStakedSWIPE >= 100000;
                 let liquidityRisk = 0;
                 if (!hasETHLiquidity && !hasSWIPELiquidity) liquidityRisk = 30; // No liquidity in either
                 else if (totalStakedETH < 1 && totalStakedSWIPE < 50000) liquidityRisk = 15; // Low liquidity
@@ -2337,143 +2345,394 @@ KEY USER-FACING CHANGES: V1 → V2
          </div>
         </div>
 
-      {/* Modern Prediction Modal */}
-      {stakeModal.isOpen && (
-        <div className="modern-modal-overlay" onClick={handleCloseStakeModal}>
-          <div className="modern-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modern-modal-header">
-              <div className="modal-title">
-                <span className="prediction-number">#{stakeModal.predictionId}</span>
-                <span className="modal-subtitle">Prediction Market</span>
-              </div>
-              <button className="modern-close-btn" onClick={handleCloseStakeModal}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
-            </div>
-
-            <div className="modern-modal-content">
-              <div className="prediction-choice">
-                <div className={`choice-badge ${stakeModal.isYes ? 'yes' : 'no'}`}>
-                  <span className="choice-icon">{stakeModal.isYes ? '↑' : '↓'}</span>
-                  <span className="choice-text">{stakeModal.isYes ? 'YES' : 'NO'}</span>
-                </div>
-              </div>
-
-              <div className="amount-section">
-                {/* Token Selection */}
-                <div className="token-selection">
-                  <div className="token-options">
-                    <button
-                      className={`token-option ${stakeModal.selectedToken === 'ETH' ? 'active' : ''}`}
-                      onClick={() => handleTokenChange('ETH')}
-                    >
-                      <div className="token-logo-container">
-                        <img src="/eth.png" alt="ETH" className="token-logo" />
-                      </div>
-                      <span className="token-name">ETH</span>
-                      <span className="token-limit">0.00001 - 100</span>
-                    </button>
-                    <button
-                      className={`token-option ${stakeModal.selectedToken === 'SWIPE' ? 'active' : ''}`}
-                      onClick={() => handleTokenChange('SWIPE')}
-                    >
-                      <div className="token-logo-container">
-                        <img src="/logo.png" alt="SWIPE" className="token-logo swipe-logo" />
-                      </div>
-                      <span className="token-name">$SWIPE</span>
-                      <span className="token-limit">10,000+</span>
-                    </button>
+      {/* Professional Stake Modal with shadcn */}
+      <Dialog open={stakeModal.isOpen} onOpenChange={(open) => !open && handleCloseStakeModal()}>
+        <DialogContent className="stake-dialog sm:max-w-[480px] bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 border-zinc-700/50 text-white p-0 gap-0 overflow-hidden">
+          {/* Animated Header */}
+          <div className="relative overflow-hidden">
+            <div className={`absolute inset-0 ${stakeModal.isYes ? 'bg-gradient-to-r from-emerald-500/20 via-emerald-400/10 to-transparent' : 'bg-gradient-to-r from-rose-500/20 via-rose-400/10 to-transparent'}`} />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/5 via-transparent to-transparent" />
+            
+            <DialogHeader className="relative p-6 pb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-bold shadow-lg ${stakeModal.isYes ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-emerald-500/30' : 'bg-gradient-to-br from-rose-500 to-rose-600 shadow-rose-500/30'}`}>
+                    {stakeModal.isYes ? '↑' : '↓'}
+                  </div>
+                  <div>
+                    <DialogTitle className="text-xl font-bold text-white">
+                      Prediction #{stakeModal.predictionId}
+                    </DialogTitle>
+                    <DialogDescription className="text-zinc-400 text-sm">
+                      You're betting <span className={`font-semibold ${stakeModal.isYes ? 'text-emerald-400' : 'text-rose-400'}`}>{stakeModal.isYes ? 'YES' : 'NO'}</span>
+                    </DialogDescription>
                   </div>
                 </div>
-
-                {/* Amount Input */}
-                <div className="amount-input-section">
-                  <div className="amount-display">
-                    <input
-                      type="number"
-                      className="amount-input"
-                      value={stakeModal.stakeAmount}
-                      onChange={(e) => handleStakeAmountChange(e.target.value)}
-                      min={stakeModal.selectedToken === 'ETH' ? '0.00001' : '10000'}
-                      step={stakeModal.selectedToken === 'ETH' ? '0.00001' : '1000'}
-                      placeholder={stakeModal.selectedToken === 'ETH' ? '0.00001' : '10000'}
-                    />
-                    <span className="amount-currency">{stakeModal.selectedToken}</span>
-                  </div>
-                  {/* USD Equivalent Display */}
-                  {(() => {
-                    const amount = parseFloat(stakeModal.stakeAmount) || 0;
-                    const usdValue = getUsdValue(amount, stakeModal.selectedToken);
-                    if (usdValue !== null && amount > 0) {
-                      return (
-                        <div className="usd-equivalent-display">
-                          ≈ ${usdValue < 0.01 ? usdValue.toFixed(4) : usdValue < 1 ? usdValue.toFixed(3) : usdValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
-                  <div className="amount-description">
-                    {stakeModal.selectedToken === 'ETH' 
-                      ? 'Minimum: 0.00001 ETH, Maximum: 100 ETH'
-                      : 'Minimum: 10,000 SWIPE, Maximum: Unlimited'
-                    }
-                  </div>
-                </div>
+                <Badge variant="outline" className={`px-3 py-1 text-sm font-semibold border-2 ${stakeModal.isYes ? 'border-emerald-500/50 text-emerald-400 bg-emerald-500/10' : 'border-rose-500/50 text-rose-400 bg-rose-500/10'}`}>
+                  {stakeModal.isYes ? 'BULLISH' : 'BEARISH'}
+                </Badge>
               </div>
-
-              <div className="modal-actions">
-                <button className="modern-cancel-btn" onClick={handleCloseStakeModal} disabled={isTransactionLoading}>
-                  Cancel
-                </button>
-                <button
-                  className={`modern-confirm-btn ${isTransactionLoading ? 'loading' : ''}`}
-                  onClick={handleConfirmStake}
-                  disabled={isTransactionLoading}
-                >
-                  {isTransactionLoading ? (
-                    <>
-                      <div className="modern-spinner"></div>
-                      Processing...
-                    </>
-                  ) : (
-                    (() => {
-                      // Check if SWIPE needs approval
-                      if (stakeModal.selectedToken === 'SWIPE') {
-                        const amount = parseFloat(stakeModal.stakeAmount);
-                        const amountWei = BigInt(Math.floor(amount * 10**18));
-                        let currentAllowance = BigInt(0);
-                        
-                        try {
-                          if (swipeAllowance !== undefined && swipeAllowance !== null) {
-                            currentAllowance = BigInt(swipeAllowance.toString());
-                          }
-                        } catch (e) {
-                          currentAllowance = BigInt(0);
-                        }
-                        
-                        console.log('=== BUTTON TEXT DEBUG ===');
-                        console.log('Amount:', amount);
-                        console.log('AmountWei:', amountWei.toString());
-                        console.log('CurrentAllowance:', currentAllowance.toString());
-                        console.log('Needs approval?', currentAllowance < amountWei);
-                        console.log('========================');
-                        
-                        // TEMPORARY: Always show approve for SWIPE to test
-                        return `Approve ${amount} SWIPE`;
-                      }
-                      return 'Confirm Stake';
-                    })()
-                  )}
-                </button>
-              </div>
-            </div>
+            </DialogHeader>
           </div>
-        </div>
-      )}
+
+          <Separator className="bg-zinc-700/50" />
+
+          {/* Token Selection Tabs */}
+          <div className="p-6 pt-4">
+            <Tabs 
+              value={stakeModal.selectedToken} 
+              onValueChange={(value) => handleTokenChange(value as 'ETH' | 'SWIPE')}
+              className="w-full"
+            >
+              <TabsList className="grid w-full grid-cols-2 bg-zinc-800/50 p-1 h-14 rounded-xl">
+                <TabsTrigger 
+                  value="ETH" 
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-blue-500/25 rounded-lg h-12 transition-all duration-300"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">⟠</span>
+                    <span className="font-semibold">ETH</span>
+                  </div>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="SWIPE" 
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#d4ff00] data-[state=active]:to-[#a8cc00] data-[state=active]:text-black data-[state=active]:shadow-lg data-[state=active]:shadow-[#d4ff00]/25 rounded-lg h-12 transition-all duration-300"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">$SWIPE</span>
+                  </div>
+                </TabsTrigger>
+              </TabsList>
+
+              {/* ETH Content */}
+              <TabsContent value="ETH" className="mt-4 space-y-4">
+                <Card className="bg-zinc-800/30 border-zinc-700/50">
+                  <CardContent className="p-4">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm text-zinc-400 font-medium">Bet Amount</label>
+                        {/* Input Mode Toggle */}
+                        <div className="flex bg-zinc-800 rounded-lg p-0.5 border border-zinc-700">
+                          <button
+                            onClick={() => setEthInputMode('eth')}
+                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                              ethInputMode === 'eth'
+                                ? 'bg-blue-500 text-white'
+                                : 'text-zinc-400 hover:text-white'
+                            }`}
+                          >
+                            ETH
+                          </button>
+                          <button
+                            onClick={() => setEthInputMode('usd')}
+                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                              ethInputMode === 'usd'
+                                ? 'bg-green-500 text-white'
+                                : 'text-zinc-400 hover:text-white'
+                            }`}
+                          >
+                            USD
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {/* Quick Amount Buttons - OUTSIDE input area */}
+                      <div className="grid grid-cols-4 gap-2 mb-4">
+                        {ethInputMode === 'eth' 
+                          ? ['0.00001', '0.0001', '0.001', '0.01'].map((amount) => (
+                              <button
+                                key={amount}
+                                onClick={() => handleStakeAmountChange(amount)}
+                                className="py-2.5 px-1 rounded-lg border-2 border-blue-500 bg-transparent text-white font-semibold text-[10px] hover:bg-blue-500/20 transition-all duration-200"
+                              >
+                                {amount}
+                              </button>
+                            ))
+                          : ['1', '5', '10', '50'].map((amount) => (
+                              <button
+                                key={amount}
+                                onClick={() => {
+                                  const usdAmount = parseFloat(amount);
+                                  const ethPrice = getUsdValue(1, 'ETH');
+                                  if (ethPrice) {
+                                    const ethAmount = usdAmount / ethPrice;
+                                    handleStakeAmountChange(ethAmount.toFixed(6));
+                                  }
+                                }}
+                                className="py-2.5 px-3 rounded-lg border-2 border-green-500 bg-transparent text-white font-semibold text-sm hover:bg-green-500/20 transition-all duration-200"
+                              >
+                                ${amount}
+                              </button>
+                            ))
+                        }
+                      </div>
+
+                      {/* Range Slider */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs text-zinc-500">
+                          <span>{ethInputMode === 'eth' ? '0.00001 ETH' : '$0.03'}</span>
+                          <span>{ethInputMode === 'eth' ? '1 ETH' : '$3,000'}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1000"
+                          step="1"
+                          value={ethInputMode === 'eth' 
+                            ? Math.round(((parseFloat(stakeModal.stakeAmount) || 0.00001) - 0.00001) / (1 - 0.00001) * 1000)
+                            : Math.round(((getUsdValue(parseFloat(stakeModal.stakeAmount) || 0, 'ETH') || 0.03) - 0.03) / (3000 - 0.03) * 1000)
+                          }
+                          onChange={(e) => {
+                            const sliderValue = parseInt(e.target.value);
+                            if (ethInputMode === 'eth') {
+                              // Convert slider 0-1000 to ETH 0.00001-1
+                              const ethValue = 0.00001 + (sliderValue / 1000) * (1 - 0.00001);
+                              handleStakeAmountChange(ethValue.toFixed(5));
+                            } else {
+                              // Convert slider 0-1000 to USD 0.03-3000
+                              const usdValue = 0.03 + (sliderValue / 1000) * (3000 - 0.03);
+                              const ethPrice = getUsdValue(1, 'ETH');
+                              if (ethPrice) {
+                                const ethAmount = usdValue / ethPrice;
+                                handleStakeAmountChange(ethAmount.toFixed(6));
+                              }
+                            }
+                          }}
+                          className="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer slider-eth"
+                          style={{
+                            background: ethInputMode === 'eth'
+                              ? `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${
+                                  ((parseFloat(stakeModal.stakeAmount || "0.00001") - 0.00001) / (1 - 0.00001)) * 100
+                                }%, #3f3f46 ${
+                                  ((parseFloat(stakeModal.stakeAmount || "0.00001") - 0.00001) / (1 - 0.00001)) * 100
+                                }%, #3f3f46 100%)`
+                              : `linear-gradient(to right, #22c55e 0%, #22c55e ${
+                                  (((getUsdValue(parseFloat(stakeModal.stakeAmount) || 0, 'ETH') || 0.03) - 0.03) / (3000 - 0.03)) * 100
+                                }%, #3f3f46 ${
+                                  (((getUsdValue(parseFloat(stakeModal.stakeAmount) || 0, 'ETH') || 0.03) - 0.03) / (3000 - 0.03)) * 100
+                                }%, #3f3f46 100%)`
+                          }}
+                        />
+                      </div>
+
+                      {/* Manual Input - Full width, no spinners */}
+                      <div className="mt-4">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={ethInputMode === 'eth' 
+                            ? stakeModal.stakeAmount 
+                            : (getUsdValue(parseFloat(stakeModal.stakeAmount) || 0, 'ETH')?.toFixed(2) || '')
+                          }
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/[^0-9.]/g, '');
+                            if (ethInputMode === 'eth') {
+                              handleStakeAmountChange(value);
+                            } else {
+                              const usdAmount = parseFloat(value);
+                              const ethPrice = getUsdValue(1, 'ETH');
+                              if (ethPrice && usdAmount) {
+                                const ethAmount = usdAmount / ethPrice;
+                                handleStakeAmountChange(ethAmount.toFixed(6));
+                              }
+                            }
+                          }}
+                          placeholder={ethInputMode === 'eth' ? '0.00001' : '10.00'}
+                          className="w-full h-14 text-2xl font-bold bg-zinc-900/50 border border-zinc-600 rounded-lg text-white text-center placeholder:text-zinc-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
+                          style={{ 
+                            WebkitAppearance: 'none', 
+                            MozAppearance: 'textfield',
+                          }}
+                        />
+                        <div className="text-center mt-1 text-zinc-400 text-sm font-medium">
+                          {ethInputMode === 'eth' ? 'ETH' : 'USD'}
+                        </div>
+                      </div>
+                      
+                      {/* Conversion Display */}
+                      {(() => {
+                        const amount = parseFloat(stakeModal.stakeAmount) || 0;
+                        const usdValue = getUsdValue(amount, 'ETH');
+                        if (usdValue !== null && amount > 0) {
+                          return (
+                            <div className="flex items-center justify-center gap-2 py-2 px-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                              {ethInputMode === 'eth' ? (
+                                <>
+                                  <span className="text-blue-400 font-semibold text-lg">
+                                    ≈ ${usdValue < 0.01 ? usdValue.toFixed(4) : usdValue < 1 ? usdValue.toFixed(3) : usdValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </span>
+                                  <span className="text-zinc-500 text-sm">USD</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="text-blue-400 font-semibold text-lg">
+                                    ≈ {amount.toFixed(6)}
+                                  </span>
+                                  <span className="text-zinc-500 text-sm">ETH</span>
+                                </>
+                              )}
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
+
+                    <Separator className="my-4 bg-zinc-700/30" />
+
+                    {/* Info Table */}
+                    <Table>
+                      <TableBody>
+                        <TableRow className="border-zinc-700/30 hover:bg-zinc-800/30">
+                          <TableCell className="text-zinc-400 py-2">Min Bet</TableCell>
+                          <TableCell className="text-right text-white font-medium py-2">0.00001 ETH</TableCell>
+                        </TableRow>
+                        <TableRow className="border-zinc-700/30 hover:bg-zinc-800/30">
+                          <TableCell className="text-zinc-400 py-2">Max Bet</TableCell>
+                          <TableCell className="text-right text-white font-medium py-2">100 ETH</TableCell>
+                        </TableRow>
+                        <TableRow className="border-zinc-700/30 hover:bg-zinc-800/30">
+                          <TableCell className="text-zinc-400 py-2">Network</TableCell>
+                          <TableCell className="text-right py-2">
+                            <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">Base</Badge>
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* SWIPE Content */}
+              <TabsContent value="SWIPE" className="mt-4 space-y-4">
+                <Card className="bg-zinc-800/30 border-zinc-700/50">
+                  <CardContent className="p-4">
+                    <div className="space-y-4">
+                      <label className="text-sm text-zinc-400 font-medium">Bet Amount</label>
+                      
+                      {/* Range Slider */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs text-zinc-500">
+                          <span>100K</span>
+                          <span>100M SWIPE</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="100000"
+                          max="100000000"
+                          step="100000"
+                          value={stakeModal.stakeAmount || "100000"}
+                          onChange={(e) => handleStakeAmountChange(e.target.value)}
+                          className="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer slider-swipe"
+                          style={{
+                            background: `linear-gradient(to right, #d4ff00 0%, #d4ff00 ${
+                              ((parseFloat(stakeModal.stakeAmount || "100000") - 100000) / (100000000 - 100000)) * 100
+                            }%, #3f3f46 ${
+                              ((parseFloat(stakeModal.stakeAmount || "100000") - 100000) / (100000000 - 100000)) * 100
+                            }%, #3f3f46 100%)`
+                          }}
+                        />
+                        <div className="text-center">
+                          <span className="text-2xl font-bold text-white">{parseInt(stakeModal.stakeAmount || "100000").toLocaleString()}</span>
+                          <span className="text-zinc-400 ml-2">SWIPE</span>
+                        </div>
+                      </div>
+                      
+                      {/* USD Equivalent */}
+                      {(() => {
+                        const amount = parseFloat(stakeModal.stakeAmount) || 0;
+                        const usdValue = getUsdValue(amount, 'SWIPE');
+                        if (usdValue !== null && amount > 0) {
+                          return (
+                            <div className="flex items-center justify-center gap-2 py-2 px-4 bg-[#d4ff00]/10 rounded-lg border border-[#d4ff00]/20">
+                              <span className="text-[#d4ff00] font-semibold text-lg">
+                                ≈ ${usdValue < 0.01 ? usdValue.toFixed(4) : usdValue < 1 ? usdValue.toFixed(3) : usdValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                              <span className="text-zinc-500 text-sm">USD</span>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+
+                      {/* Quick Amount Buttons */}
+                      <div className="grid grid-cols-4 gap-2">
+                        {['100000', '500000', '1000000', '5000000'].map((amount) => (
+                          <button
+                            key={amount}
+                            onClick={() => handleStakeAmountChange(amount)}
+                            className="py-2 px-2 rounded-lg border-2 border-[#d4ff00] bg-transparent text-white font-semibold text-xs hover:bg-[#d4ff00]/20 transition-all duration-200"
+                          >
+                            {parseInt(amount) >= 1000000 ? `${parseInt(amount) / 1000000}M` : `${parseInt(amount) / 1000}K`}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <Separator className="my-4 bg-zinc-700/30" />
+
+                    {/* Info Table */}
+                    <Table>
+                      <TableBody>
+                        <TableRow className="border-zinc-700/30 hover:bg-zinc-800/30">
+                          <TableCell className="text-zinc-400 py-2">Min Bet</TableCell>
+                          <TableCell className="text-right text-white font-medium py-2">100,000 SWIPE</TableCell>
+                        </TableRow>
+                        <TableRow className="border-zinc-700/30 hover:bg-zinc-800/30">
+                          <TableCell className="text-zinc-400 py-2">Max Bet</TableCell>
+                          <TableCell className="text-right text-white font-medium py-2">Unlimited ∞</TableCell>
+                        </TableRow>
+                        <TableRow className="border-zinc-700/30 hover:bg-zinc-800/30">
+                          <TableCell className="text-zinc-400 py-2">Token</TableCell>
+                          <TableCell className="text-right py-2">
+                            <Badge className="bg-[#d4ff00]/20 text-[#d4ff00] border-[#d4ff00]/30">$SWIPE</Badge>
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          {/* Footer Actions */}
+          <DialogFooter className="p-6 pt-2 gap-3 sm:gap-3">
+            <Button
+              variant="outline"
+              onClick={handleCloseStakeModal}
+              disabled={isTransactionLoading}
+              className="flex-1 h-12 bg-zinc-800/50 border-zinc-600 hover:bg-zinc-700 text-white"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmStake}
+              disabled={isTransactionLoading}
+              className={`flex-1 h-12 font-semibold text-base transition-all duration-300 ${
+                stakeModal.selectedToken === 'ETH' 
+                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg shadow-blue-500/25' 
+                  : 'bg-gradient-to-r from-[#d4ff00] to-[#a8cc00] hover:from-[#c4ef00] hover:to-[#98bc00] text-black shadow-lg shadow-[#d4ff00]/25'
+              }`}
+            >
+              {isTransactionLoading ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  <span>Processing...</span>
+                </div>
+              ) : (
+                (() => {
+                  if (stakeModal.selectedToken === 'SWIPE') {
+                    const amount = parseFloat(stakeModal.stakeAmount);
+                    return `Approve & Bet ${amount.toLocaleString()} SWIPE`;
+                  }
+                  return 'Confirm Bet';
+                })()
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Global Notification System */}
       <NotificationSystem />

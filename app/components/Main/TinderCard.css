@@ -2681,6 +2681,140 @@ html, body {
   opacity: 0.8;
 }
 
+/* Professional Stake Dialog Styles */
+.stake-dialog {
+  animation: dialogSlideIn 0.3s ease-out;
+}
+
+/* Hide number input spinners */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+input[type="text"][inputmode="decimal"]::-webkit-inner-spin-button,
+input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Range Slider Styles for ETH */
+.slider-eth::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 24px;
+  width: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  cursor: pointer;
+  border: 3px solid #fff;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  transition: all 0.2s ease;
+}
+
+.slider-eth::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5);
+}
+
+.slider-eth::-moz-range-thumb {
+  height: 24px;
+  width: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  cursor: pointer;
+  border: 3px solid #fff;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+/* Range Slider Styles for SWIPE */
+.slider-swipe::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 24px;
+  width: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #d4ff00 0%, #a8cc00 100%);
+  cursor: pointer;
+  border: 3px solid #000;
+  box-shadow: 0 4px 12px rgba(212, 255, 0, 0.4);
+  transition: all 0.2s ease;
+}
+
+.slider-swipe::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(212, 255, 0, 0.5);
+}
+
+.slider-swipe::-moz-range-thumb {
+  height: 24px;
+  width: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #d4ff00 0%, #a8cc00 100%);
+  cursor: pointer;
+  border: 3px solid #000;
+  box-shadow: 0 4px 12px rgba(212, 255, 0, 0.4);
+}
+
+@keyframes dialogSlideIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -48%) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.stake-dialog [data-radix-dialog-overlay] {
+  backdrop-filter: blur(8px);
+}
+
+/* Tab animations */
+.stake-dialog [role="tabpanel"] {
+  animation: tabFadeIn 0.2s ease-out;
+}
+
+@keyframes tabFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Quick amount button hover effects */
+.stake-dialog button[variant="outline"]:hover {
+  transform: translateY(-1px);
+}
+
+/* Input glow effect */
+.stake-dialog input:focus {
+  box-shadow: 0 0 0 3px rgba(212, 255, 0, 0.1);
+}
+
+/* Card hover effect */
+.stake-dialog .bg-zinc-800\/30:hover {
+  background: rgba(39, 39, 42, 0.4);
+}
+
+/* Table row hover */
+.stake-dialog tr:hover td {
+  background: rgba(39, 39, 42, 0.3);
+}
+
 .stat-value-badge .usd-equivalent {
   display: block;
   font-size: 0.75em;
