@@ -144,6 +144,17 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   // Token prices for USD conversion
   const { formatUsdValue, getUsdValue } = useTokenPrices();
   
+  // Format large SWIPE numbers to K/M format
+  const formatSwipeAmount = (amount: number): string => {
+    if (amount >= 1000000) {
+      return (amount / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    }
+    if (amount >= 1000) {
+      return (amount / 1000).toFixed(0) + 'K';
+    }
+    return amount.toLocaleString();
+  };
+  
   // Wait for stake transaction confirmation
   const { isLoading: isStakeConfirming, isSuccess: isStakeConfirmed } = useWaitForTransactionReceipt({
     hash: stakeTransactionHash || undefined,
@@ -1892,19 +1903,19 @@ KEY USER-FACING CHANGES: V1 → V2
             <span className="text-[#1a1a1a] font-mono text-xs font-bold">swipe@prediction</span>
             <span className="text-[#444] font-mono text-xs">:~$</span>
             <span className="text-[#0066cc] font-mono text-xs ml-1 font-semibold">analyze --id {currentCard.id}</span>
-          </div>
-        </div>
+         </div>
+           </div>
         <div className="terminal-body">
           <p className="text-[#1a1a1a] font-mono text-xs leading-relaxed">{currentCard.description}</p>
           <div className="terminal-cursor"></div>
-        </div>
-      </div>
+           </div>
+          </div>
 
       {/* Stats Table - Hacker Style */}
       <div className="cyber-table mb-4">
         <div className="table-header">
           <span className="text-[#1a1a1a] font-mono text-xs font-bold">[ SYSTEM_INFO ]</span>
-        </div>
+         </div>
         <table className="w-full">
           <tbody>
             <tr className="cyber-row">
@@ -1923,19 +1934,19 @@ KEY USER-FACING CHANGES: V1 → V2
                 <div className="flex items-center gap-2">
                   <div className="cyber-progress-bar flex-1">
                     <div className="cyber-progress-fill confidence" style={{ width: `${currentCard.confidence}%` }}></div>
-                  </div>
+             </div>
                   <span className="text-[#1a1a1a] font-mono font-bold">{currentCard.confidence}%</span>
-                </div>
+           </div>
               </td>
             </tr>
             {/* Risk Level - Full Width Section */}
             <tr className="cyber-row">
               <td colSpan={2} className="risk-full-section">
-                {(() => {
-                  const confidence = currentCard.confidence;
-                  const totalStakedETH = ((transformedPredictions[currentIndex]?.yesTotalAmount || 0) + (transformedPredictions[currentIndex]?.noTotalAmount || 0)) / 1e18;
-                  const totalStakedSWIPE = ((transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0) + (transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0)) / 1e18;
-                  const participantCount = transformedPredictions[currentIndex]?.participants || 0;
+              {(() => {
+                const confidence = currentCard.confidence;
+                const totalStakedETH = ((transformedPredictions[currentIndex]?.yesTotalAmount || 0) + (transformedPredictions[currentIndex]?.noTotalAmount || 0)) / 1e18;
+                const totalStakedSWIPE = ((transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0) + (transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0)) / 1e18;
+                const participantCount = transformedPredictions[currentIndex]?.participants || 0;
                   const timeLeft = (transformedPredictions[currentIndex]?.deadline || 0) - Date.now() / 1000;
                   
                   // Calculate individual risk components
@@ -1946,7 +1957,7 @@ KEY USER-FACING CHANGES: V1 → V2
                   let partRisk = 0;
                   if (participantCount < 3) partRisk = 20;
                   else if (participantCount < 10) partRisk = 10;
-                  let timeRisk = 0;
+                 let timeRisk = 0;
                   if (timeLeft < 3600) timeRisk = 25;
                   else if (timeLeft < 86400) timeRisk = 15;
                   
@@ -1956,17 +1967,17 @@ KEY USER-FACING CHANGES: V1 → V2
                   let riskColor = 'text-emerald-700';
                   if (riskScore >= 60) { riskLevel = 'HIGH'; riskColor = 'text-red-600'; }
                   else if (riskScore >= 30) { riskLevel = 'MEDIUM'; riskColor = 'text-amber-700'; }
-                  
-                  return (
+                 
+                 return (
                     <div className="risk-container">
                       <div className="risk-line-1">
                         <span className="risk-label-main">RISK_LEVEL</span>
                         <div className="cyber-progress-bar risk-bar">
                           <div className={`cyber-progress-fill ${riskScore >= 60 ? 'danger' : riskScore >= 30 ? 'warning' : 'safe'}`} style={{ width: `${Math.min(riskScore, 100)}%` }}></div>
-                        </div>
+                   </div>
                         <span className={`risk-level-text ${riskColor}`}>{riskLevel}</span>
                         <span className="risk-pts">{Math.round(riskScore)} pts</span>
-                      </div>
+             </div>
                       <div className="risk-line-2">
                         <span className="risk-detail">Conf: {confRisk.toFixed(1)}</span>
                         <span className="risk-divider">|</span>
@@ -1975,7 +1986,7 @@ KEY USER-FACING CHANGES: V1 → V2
                         <span className="risk-detail">Part: {partRisk}</span>
                         <span className="risk-divider">|</span>
                         <span className="risk-detail">Time: {timeRisk}</span>
-                      </div>
+             </div>
                     </div>
                   );
                 })()}
@@ -1987,35 +1998,35 @@ KEY USER-FACING CHANGES: V1 → V2
             </tr>
           </tbody>
         </table>
-      </div>
-
+           </div>
+           
       {/* ETH Pool - Hacker Style */}
       <div className="cyber-pool eth-pool mb-4">
         <div className="pool-header">
-          <span className="pool-icon">⟠</span>
+          <img src="/Ethereum-icon-purple.svg" alt="ETH" className="pool-logo" />
           <span className="pool-title">ETH_POOL</span>
           <span className="pool-total">
-            {(() => {
+                   {(() => {
               const total = ((transformedPredictions[currentIndex]?.yesTotalAmount || 0) + (transformedPredictions[currentIndex]?.noTotalAmount || 0)) / 1e18;
               return total > 0 ? total.toFixed(5) : '0.00000';
-            })()} ETH
-          </span>
-        </div>
+                   })()} ETH
+                 </span>
+               </div>
         <div className="pool-grid">
           <div className="pool-side yes">
             <div className="side-label">YES</div>
             <div className="side-amount">
-              {((transformedPredictions[currentIndex]?.yesTotalAmount || 0) / 1e18).toFixed(5)} ETH
-            </div>
+              {((transformedPredictions[currentIndex]?.yesTotalAmount || 0) / 1e18).toFixed(5)}
+               </div>
             <div className="side-usd">
               {formatUsdValue((transformedPredictions[currentIndex]?.yesTotalAmount || 0) / 1e18, 'ETH')}
-            </div>
-          </div>
+             </div>
+                       </div>
           <div className="pool-side no">
             <div className="side-label">NO</div>
             <div className="side-amount">
-              {((transformedPredictions[currentIndex]?.noTotalAmount || 0) / 1e18).toFixed(5)} ETH
-            </div>
+              {((transformedPredictions[currentIndex]?.noTotalAmount || 0) / 1e18).toFixed(5)}
+                     </div>
             <div className="side-usd">
               {formatUsdValue((transformedPredictions[currentIndex]?.noTotalAmount || 0) / 1e18, 'ETH')}
             </div>
@@ -2028,47 +2039,47 @@ KEY USER-FACING CHANGES: V1 → V2
           const total = yesAmount + noAmount;
           if (total === 0) return <div className="pool-empty">No ETH stakes yet</div>;
           const yesPercent = (yesAmount / total) * 100;
-          return (
+                 return (
             <div className="pool-bar-container">
               <div className="pool-bar">
                 <div className="bar-yes" style={{ width: `${yesPercent}%` }}></div>
                 <div className="bar-no" style={{ width: `${100 - yesPercent}%` }}></div>
-              </div>
+                     </div>
               <div className="bar-labels">
                 <span className="label-yes">{yesPercent.toFixed(1)}%</span>
                 <span className="label-no">{(100 - yesPercent).toFixed(1)}%</span>
-              </div>
-            </div>
-          );
-        })()}
-      </div>
-
+                     </div>
+                   </div>
+                 );
+               })()}
+           </div>
+           
       {/* SWIPE Pool - Hacker Style */}
       <div className="cyber-pool swipe-pool mb-4">
         <div className="pool-header">
-          <span className="pool-icon">$</span>
+          <img src="/icon.png" alt="SWIPE" className="pool-logo" />
           <span className="pool-title">SWIPE_POOL</span>
           <span className="pool-total">
             {(() => {
               const total = ((transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0) + (transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0)) / 1e18;
               return total > 0 ? total.toLocaleString() : '0';
-            })()} SWIPE
-          </span>
-        </div>
+            })()}
+                 </span>
+               </div>
         <div className="pool-grid">
           <div className="pool-side yes">
             <div className="side-label">YES</div>
             <div className="side-amount">
-              {((transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0) / 1e18).toLocaleString()} SWIPE
-            </div>
+              {((transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0) / 1e18).toLocaleString()}
+               </div>
             <div className="side-usd">
               {formatUsdValue((transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0) / 1e18, 'SWIPE')}
-            </div>
+             </div>
           </div>
           <div className="pool-side no">
             <div className="side-label">NO</div>
             <div className="side-amount">
-              {((transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0) / 1e18).toLocaleString()} SWIPE
+              {((transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0) / 1e18).toLocaleString()}
             </div>
             <div className="side-usd">
               {formatUsdValue((transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0) / 1e18, 'SWIPE')}
@@ -2076,127 +2087,127 @@ KEY USER-FACING CHANGES: V1 → V2
           </div>
         </div>
         {/* Split Bar */}
-        {(() => {
-          const yesAmount = transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0;
-          const noAmount = transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0;
+               {(() => {
+                 const yesAmount = transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0;
+                 const noAmount = transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0;
           const total = yesAmount + noAmount;
           if (total === 0) return <div className="pool-empty">No SWIPE stakes yet</div>;
           const yesPercent = (yesAmount / total) * 100;
-          return (
+                   return (
             <div className="pool-bar-container">
               <div className="pool-bar">
                 <div className="bar-yes" style={{ width: `${yesPercent}%` }}></div>
                 <div className="bar-no" style={{ width: `${100 - yesPercent}%` }}></div>
-              </div>
+                       </div>
               <div className="bar-labels">
                 <span className="label-yes">{yesPercent.toFixed(1)}%</span>
                 <span className="label-no">{(100 - yesPercent).toFixed(1)}%</span>
-              </div>
-            </div>
-          );
-        })()}
-      </div>
+                     </div>
+                   </div>
+                 );
+               })()}
+           </div>
 
       {/* Active Swipers - Hacker Style */}
       <div className="cyber-swipers">
         <div className="swipers-header">
           <span className="text-[#1a1a1a] font-mono text-xs font-bold">[ ACTIVE_SWIPERS ]</span>
           <span className="text-[#d4ff00] font-mono text-sm font-bold">{currentCardParticipants.length}</span>
-        </div>
+                   </div>
         <div className="swipers-content">
           {currentCardParticipants.length === 0 ? (
             <div className="text-center text-zinc-500 font-mono text-xs py-4">No swipers yet...</div>
           ) : (
             <div className="flex flex-wrap gap-2 justify-center">
-              {profilesLoading ? (
+                           {profilesLoading ? (
                 <div className="text-xs text-[#1a1a1a] font-mono">Loading profiles...</div>
-              ) : (
-                currentCardParticipants.map((participantAddress, i) => {
-                  const profile = profiles.find((p: any) => p && p.address === participantAddress);
-                  const hasFarcasterProfile = profile && profile.fid !== null && !profile.isWalletOnly;
-                  
-                  const getInitials = () => {
-                    if (hasFarcasterProfile && profile?.display_name) {
-                      return profile.display_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
-                    }
-                    return participantAddress.slice(2, 4).toUpperCase();
-                  };
+                           ) : (
+                            currentCardParticipants.map((participantAddress, i) => {
+                              const profile = profiles.find((p: any) => p && p.address === participantAddress);
+                              const hasFarcasterProfile = profile && profile.fid !== null && !profile.isWalletOnly;
+                               
+                               const getInitials = () => {
+                                 if (hasFarcasterProfile && profile?.display_name) {
+                                   return profile.display_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+                                 }
+                                 return participantAddress.slice(2, 4).toUpperCase();
+                               };
 
-                  const getAvatarColor = (addr: string) => {
+                               const getAvatarColor = (addr: string) => {
                     const colors = ['bg-[#d4ff00]', 'bg-emerald-500', 'bg-purple-500', 'bg-pink-500', 'bg-amber-500', 'bg-red-500', 'bg-indigo-500', 'bg-teal-500'];
                     const hash = addr.split('').reduce((a, b) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a; }, 0);
-                    return colors[Math.abs(hash) % colors.length];
-                  };
-                  
-                  const userVote = userStakes[participantAddress.toLowerCase()] || 'NONE';
-                  
-                  const getVoteIndicatorClass = () => {
-                    switch (userVote) {
+                                 return colors[Math.abs(hash) % colors.length];
+                               };
+                               
+                               const userVote = userStakes[participantAddress.toLowerCase()] || 'NONE';
+                               
+                               const getVoteIndicatorClass = () => {
+                                 switch (userVote) {
                       case 'YES': return 'ring-2 ring-emerald-400 shadow-emerald-400/50';
                       case 'NO': return 'ring-2 ring-rose-400 shadow-rose-400/50';
                       case 'BOTH': return 'ring-2 ring-amber-400 shadow-amber-400/50';
                       default: return 'ring-1 ring-zinc-600';
-                    }
-                  };
-                  
-                  return (
-                    <div key={`${participantAddress}-${i}`} className="relative">
-                      <Avatar
+                                 }
+                               };
+                               
+                              return (
+                                <div key={`${participantAddress}-${i}`} className="relative">
+                                     <Avatar
                         className={`cursor-pointer hover:scale-110 transition-all duration-300 shadow-lg ${getVoteIndicatorClass()}`}
-                        onClick={() => {
-                          if (!hasFarcasterProfile) {
-                            navigator.clipboard.writeText(participantAddress);
-                            setCopiedAddresses(prev => new Set(prev).add(participantAddress));
-                            setTimeout(() => {
-                              setCopiedAddresses(prev => {
-                                const newSet = new Set(prev);
-                                newSet.delete(participantAddress);
-                                return newSet;
-                              });
+                                       onClick={() => {
+                                         if (!hasFarcasterProfile) {
+                                           navigator.clipboard.writeText(participantAddress);
+                                           setCopiedAddresses(prev => new Set(prev).add(participantAddress));
+                                           setTimeout(() => {
+                                             setCopiedAddresses(prev => {
+                                               const newSet = new Set(prev);
+                                               newSet.delete(participantAddress);
+                                               return newSet;
+                                             });
                             }, 2000);
-                            return;
-                          }
-                          try {
-                            if (profile.fid) {
+                                           return;
+                                         }
+                                         try {
+                                           if (profile.fid) {
                               viewProfile(parseInt(profile.fid, 10));
-                            }
-                          } catch (error) {
-                            console.error('Error opening Farcaster profile:', error);
-                          }
-                        }}
-                      >
-                        <AvatarImage 
-                          src={hasFarcasterProfile ? (profile?.pfp_url || undefined) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${participantAddress.slice(2, 8)}`} 
-                          alt={hasFarcasterProfile ? (profile?.display_name || `User ${participantAddress.slice(2, 6)}`) : `Wallet ${participantAddress.slice(2, 6)}`}
-                        />
-                        <AvatarFallback className={getAvatarColor(participantAddress)}>
+                                           }
+                                         } catch (error) {
+                                           console.error('Error opening Farcaster profile:', error);
+                                         }
+                                       }}
+                                     >
+                                       <AvatarImage 
+                                         src={hasFarcasterProfile ? (profile?.pfp_url || undefined) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${participantAddress.slice(2, 8)}`} 
+                                         alt={hasFarcasterProfile ? (profile?.display_name || `User ${participantAddress.slice(2, 6)}`) : `Wallet ${participantAddress.slice(2, 6)}`}
+                                       />
+                                       <AvatarFallback className={getAvatarColor(participantAddress)}>
                           <span className="text-white text-xs font-semibold">{getInitials()}</span>
-                        </AvatarFallback>
-                      </Avatar>
-                      {userVote !== 'NONE' && (
+                                       </AvatarFallback>
+                                     </Avatar>
+                                     {userVote !== 'NONE' && (
                         <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold ${
                           userVote === 'YES' ? 'bg-emerald-500 text-white' : 
                           userVote === 'NO' ? 'bg-rose-500 text-white' : 
                           'bg-amber-500 text-black'
                         }`}>
                           {userVote === 'YES' ? '✓' : userVote === 'NO' ? '✗' : '±'}
-                        </div>
-                      )}
-                      {!hasFarcasterProfile && copiedAddresses.has(participantAddress) && (
-                        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-500 text-white text-sm font-semibold px-4 py-2 rounded-full shadow-2xl animate-bounce z-[9999] border-2 border-white">
-                          ✅ Copied!
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
+                                       </div>
+                                     )}
+                                   {!hasFarcasterProfile && copiedAddresses.has(participantAddress) && (
+                                     <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-500 text-white text-sm font-semibold px-4 py-2 rounded-full shadow-2xl animate-bounce z-[9999] border-2 border-white">
+                                       ✅ Copied!
+                                     </div>
+                                   )}
+                                 </div>
+                               );
+                            })
+                           )}
+                         </div>
           )}
           <div className="swipers-footer">Click avatars to view profiles</div>
+           </div>
+         </div>
         </div>
-      </div>
-    </div>
 
       {/* Professional Stake Modal with shadcn */}
       <Dialog open={stakeModal.isOpen} onOpenChange={(open) => !open && handleCloseStakeModal()}>
@@ -2211,7 +2222,7 @@ KEY USER-FACING CHANGES: V1 → V2
                 <div className="flex items-center gap-3">
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-bold shadow-lg ${stakeModal.isYes ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-emerald-500/30' : 'bg-gradient-to-br from-rose-500 to-rose-600 shadow-rose-500/30'}`}>
                     {stakeModal.isYes ? '↑' : '↓'}
-                  </div>
+              </div>
                   <div>
                     <DialogTitle className="text-xl font-bold text-white">
                       Prediction #{stakeModal.predictionId}
@@ -2226,7 +2237,7 @@ KEY USER-FACING CHANGES: V1 → V2
                 </Badge>
               </div>
             </DialogHeader>
-          </div>
+            </div>
 
           <Separator className="bg-zinc-700/50" />
 
@@ -2245,7 +2256,7 @@ KEY USER-FACING CHANGES: V1 → V2
                   <div className="flex items-center gap-2">
                     <span className="text-lg">⟠</span>
                     <span className="font-semibold">ETH</span>
-                  </div>
+                </div>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="SWIPE" 
@@ -2253,7 +2264,7 @@ KEY USER-FACING CHANGES: V1 → V2
                 >
                   <div className="flex items-center gap-2">
                     <span className="font-semibold">$SWIPE</span>
-                  </div>
+              </div>
                 </TabsTrigger>
               </TabsList>
 
@@ -2266,7 +2277,7 @@ KEY USER-FACING CHANGES: V1 → V2
                         <label className="text-sm text-zinc-400 font-medium">Bet Amount</label>
                         {/* Input Mode Toggle */}
                         <div className="flex bg-zinc-800 rounded-lg p-0.5 border border-zinc-700">
-                          <button
+                    <button
                             onClick={() => setEthInputMode('eth')}
                             className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
                               ethInputMode === 'eth'
@@ -2275,8 +2286,8 @@ KEY USER-FACING CHANGES: V1 → V2
                             }`}
                           >
                             ETH
-                          </button>
-                          <button
+                    </button>
+                    <button
                             onClick={() => setEthInputMode('usd')}
                             className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
                               ethInputMode === 'usd'
@@ -2286,7 +2297,7 @@ KEY USER-FACING CHANGES: V1 → V2
                           >
                             USD
                           </button>
-                        </div>
+                      </div>
                       </div>
                       
                       {/* Quick Amount Buttons */}
@@ -2299,7 +2310,7 @@ KEY USER-FACING CHANGES: V1 → V2
                                 className="py-2.5 px-1 rounded-lg border-2 border-blue-500 bg-transparent text-white font-semibold text-[10px] hover:bg-blue-500/20 transition-all duration-200"
                               >
                                 {amount}
-                              </button>
+                    </button>
                             ))
                           : ['1', '5', '10', '50'].map((amount) => (
                               <button
@@ -2351,9 +2362,9 @@ KEY USER-FACING CHANGES: V1 → V2
                         />
                         <div className="text-center mt-1 text-zinc-400 text-sm font-medium">
                           {ethInputMode === 'eth' ? 'ETH' : 'USD'}
-                        </div>
-                      </div>
-                      
+                  </div>
+                </div>
+
                       {/* Conversion Display */}
                       {(() => {
                         const amount = parseFloat(stakeModal.stakeAmount) || 0;
@@ -2421,13 +2432,13 @@ KEY USER-FACING CHANGES: V1 → V2
                           <span>100K</span>
                           <span>100M SWIPE</span>
                         </div>
-                        <input
+                    <input
                           type="range"
                           min="100000"
                           max="100000000"
                           step="100000"
                           value={stakeModal.stakeAmount || "100000"}
-                          onChange={(e) => handleStakeAmountChange(e.target.value)}
+                      onChange={(e) => handleStakeAmountChange(e.target.value)}
                           className="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer slider-swipe"
                           style={{
                             background: `linear-gradient(to right, #d4ff00 0%, #d4ff00 ${
@@ -2440,7 +2451,7 @@ KEY USER-FACING CHANGES: V1 → V2
                         <div className="text-center">
                           <span className="text-2xl font-bold text-white">{parseInt(stakeModal.stakeAmount || "100000").toLocaleString()}</span>
                           <span className="text-zinc-400 ml-2">SWIPE</span>
-                        </div>
+                  </div>
                       </div>
                       
                       {/* USD Equivalent */}
@@ -2471,8 +2482,8 @@ KEY USER-FACING CHANGES: V1 → V2
                             {parseInt(amount) >= 1000000 ? `${parseInt(amount) / 1000000}M` : `${parseInt(amount) / 1000}K`}
                           </button>
                         ))}
-                      </div>
-                    </div>
+                  </div>
+                </div>
 
                     <Separator className="my-4 bg-zinc-700/30" />
 
@@ -2499,7 +2510,7 @@ KEY USER-FACING CHANGES: V1 → V2
                 </Card>
               </TabsContent>
             </Tabs>
-          </div>
+              </div>
 
           {/* Footer Actions */}
           <DialogFooter className="p-6 pt-2 gap-3 sm:gap-3">
@@ -2509,31 +2520,31 @@ KEY USER-FACING CHANGES: V1 → V2
               disabled={isTransactionLoading}
               className="flex-1 h-12 bg-zinc-800/50 border-zinc-600 hover:bg-zinc-700 text-white"
             >
-              Cancel
+                  Cancel
             </Button>
             <Button
-              onClick={handleConfirmStake}
-              disabled={isTransactionLoading}
+                  onClick={handleConfirmStake}
+                  disabled={isTransactionLoading}
               className={`flex-1 h-12 font-semibold text-base transition-all duration-300 ${
                 stakeModal.selectedToken === 'ETH' 
                   ? 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg shadow-blue-500/25' 
                   : 'bg-gradient-to-r from-[#d4ff00] to-[#a8cc00] hover:from-[#c4ef00] hover:to-[#98bc00] text-black shadow-lg shadow-[#d4ff00]/25'
               }`}
-            >
-              {isTransactionLoading ? (
+                >
+                  {isTransactionLoading ? (
                 <div className="flex items-center gap-2">
                   <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                   <span>Processing...</span>
                 </div>
-              ) : (
-                (() => {
-                  if (stakeModal.selectedToken === 'SWIPE') {
-                    const amount = parseFloat(stakeModal.stakeAmount);
+                  ) : (
+                    (() => {
+                      if (stakeModal.selectedToken === 'SWIPE') {
+                        const amount = parseFloat(stakeModal.stakeAmount);
                     return `Approve & Bet ${amount.toLocaleString()} SWIPE`;
                   }
                   return 'Confirm Bet';
-                })()
-              )}
+                    })()
+                  )}
             </Button>
           </DialogFooter>
         </DialogContent>

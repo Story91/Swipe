@@ -25,7 +25,7 @@ import {
   MenubarTrigger,
 } from "@/components/ui/menubar";
 import { Button } from "@/components/ui/button";
-import { Trophy, HelpCircle, Settings } from "lucide-react";
+import { Trophy, HelpCircle, Settings, Bot } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useState, useEffect, useRef } from "react";
 import TinderCardComponent from "./components/Main/TinderCard";
@@ -52,6 +52,7 @@ export default function App() {
   const { setFrameReady, isFrameReady } = useMiniKit();
   const [activeDashboard, setActiveDashboard] = useState<DashboardType>('tinder');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false);
   const { address } = useAccount();
   const tinderCardRef = useRef<{ refresh: () => void } | null>(null);
   const [hasTriedAddMiniApp, setHasTriedAddMiniApp] = useState(false);
@@ -144,7 +145,7 @@ export default function App() {
             </WalletDropdown>
           </Wallet>
           
-          {/* Admin, Leaderboard or Help Button - Top Right */}
+          {/* Admin, Leaderboard, AI or Help Button - Top Right */}
           <div className="flex gap-2">
             {isAdmin && (
               <Button
@@ -163,6 +164,14 @@ export default function App() {
               title="Leaderboard"
             >
               <Trophy className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="swipe"
+              size="icon"
+              onClick={() => setIsAIAssistantOpen(true)}
+              title="AI Assistant"
+            >
+              <Bot className="h-4 w-4" />
             </Button>
             <Button
               variant="swipe"
@@ -283,7 +292,7 @@ export default function App() {
       />
 
       {/* AI Assistant */}
-      <AIAssistant />
+      <AIAssistant isOpen={isAIAssistantOpen} onClose={() => setIsAIAssistantOpen(false)} />
     </div>
   );
 }

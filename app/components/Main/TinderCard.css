@@ -3158,6 +3158,19 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 .eth-pool .pool-icon { color: #0066cc !important; }
 .swipe-pool .pool-icon { color: #7c3aed !important; }
 
+/* Pool Logo */
+.pool-logo {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.swipe-pool .pool-logo {
+  width: 24px;
+  height: 24px;
+}
+
 .pool-title {
   font-size: 12px;
   font-weight: 700;
