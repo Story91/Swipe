@@ -1999,9 +1999,13 @@ KEY USER-FACING CHANGES: V1 → V2
         onClick={analyzeWithAI}
         disabled={aiModal.isLoading}
       >
-        <Bot className="w-4 h-4" />
-        <span>{aiModal.isLoading ? 'Analyzing...' : 'Ask AI'}</span>
-        <Sparkles className="w-3 h-3" />
+        <GradientText 
+          colors={['#d4ff00', '#00ff88', '#d4ff00', '#88ff00', '#d4ff00']}
+          animationSpeed={3}
+          showBorder={false}
+        >
+          <span className="font-bold text-sm">{aiModal.isLoading ? 'Analyzing...' : 'Ask AI'}</span>
+        </GradientText>
       </button>
       
       <div className="or-text">OR</div>
@@ -2010,7 +2014,13 @@ KEY USER-FACING CHANGES: V1 → V2
         className="skip-button"
         onClick={() => handleSkip(currentCard.id)}
       >
-        SKIP
+        <GradientText 
+          colors={['#1a1a1a', '#333333', '#1a1a1a', '#444444', '#1a1a1a']}
+          animationSpeed={3}
+          showBorder={false}
+        >
+          <span className="font-black text-base tracking-wide">SKIP</span>
+        </GradientText>
       </button>
     </div>
 
