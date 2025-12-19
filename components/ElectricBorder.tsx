@@ -1,13 +1,33 @@
-import { useEffect, useId, useLayoutEffect, useRef } from 'react';
+'use client';
+
+import { useEffect, useId, useLayoutEffect, useRef, ReactNode, CSSProperties } from 'react';
 
 import './ElectricBorder.css';
 
-const ElectricBorder = ({ children, color = '#5227FF', speed = 1, chaos = 1, thickness = 2, className, style }) => {
+interface ElectricBorderProps {
+  children?: ReactNode;
+  color?: string;
+  speed?: number;
+  chaos?: number;
+  thickness?: number;
+  className?: string;
+  style?: CSSProperties;
+}
+
+const ElectricBorder = ({ 
+  children, 
+  color = '#5227FF', 
+  speed = 1, 
+  chaos = 1, 
+  thickness = 2, 
+  className, 
+  style 
+}: ElectricBorderProps) => {
   const rawId = useId().replace(/[:]/g, '');
   const filterId = `turbulent-displace-${rawId}`;
-  const svgRef = useRef(null);
-  const rootRef = useRef(null);
-  const strokeRef = useRef(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const strokeRef = useRef<HTMLDivElement>(null);
 
   const updateAnim = () => {
     const svg = svgRef.current;
@@ -50,9 +70,10 @@ const ElectricBorder = ({ children, color = '#5227FF', speed = 1, chaos = 1, thi
 
     requestAnimationFrame(() => {
       [...dyAnims, ...dxAnims].forEach(a => {
-        if (typeof a.beginElement === 'function') {
+        const animElement = a as SVGAnimateElement;
+        if (typeof animElement.beginElement === 'function') {
           try {
-            a.beginElement();
+            animElement.beginElement();
           } catch {
             console.warn('ElectricBorder: beginElement failed, this may be due to a browser limitation.');
           }
@@ -75,32 +96,32 @@ const ElectricBorder = ({ children, color = '#5227FF', speed = 1, chaos = 1, thi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const vars = {
-    ['--electric-border-color']: color,
-    ['--eb-border-width']: `${thickness}px`
+  const vars: Record<string, string> = {
+    '--electric-border-color': color,
+    '--eb-border-width': `${thickness}px`
   };
 
   return (
     <div ref={rootRef} className={`electric-border ${className ?? ''}`} style={{ ...vars, ...style }}>
-      <svg ref={svgRef} className="eb-svg" aria-hidden focusable="false">
+      <svg ref={svgRef} className="eb-svg" aria-hidden="true" focusable="false">
         <defs>
           <filter id={filterId} colorInterpolationFilters="sRGB" x="-20%" y="-20%" width="140%" height="140%">
-            <feTurbulence type="turbulence" baseFrequency="0.02" numOctaves="10" result="noise1" seed="1" />
+            <feTurbulence type="turbulence" baseFrequency="0.02" numOctaves={10} result="noise1" seed={1} />
             <feOffset in="noise1" dx="0" dy="0" result="offsetNoise1">
               <animate attributeName="dy" values="700; 0" dur="6s" repeatCount="indefinite" calcMode="linear" />
             </feOffset>
 
-            <feTurbulence type="turbulence" baseFrequency="0.02" numOctaves="10" result="noise2" seed="1" />
+            <feTurbulence type="turbulence" baseFrequency="0.02" numOctaves={10} result="noise2" seed={1} />
             <feOffset in="noise2" dx="0" dy="0" result="offsetNoise2">
               <animate attributeName="dy" values="0; -700" dur="6s" repeatCount="indefinite" calcMode="linear" />
             </feOffset>
 
-            <feTurbulence type="turbulence" baseFrequency="0.02" numOctaves="10" result="noise1" seed="2" />
+            <feTurbulence type="turbulence" baseFrequency="0.02" numOctaves={10} result="noise1" seed={2} />
             <feOffset in="noise1" dx="0" dy="0" result="offsetNoise3">
               <animate attributeName="dx" values="490; 0" dur="6s" repeatCount="indefinite" calcMode="linear" />
             </feOffset>
 
-            <feTurbulence type="turbulence" baseFrequency="0.02" numOctaves="10" result="noise2" seed="2" />
+            <feTurbulence type="turbulence" baseFrequency="0.02" numOctaves={10} result="noise2" seed={2} />
             <feOffset in="noise2" dx="0" dy="0" result="offsetNoise4">
               <animate attributeName="dx" values="0; -490" dur="6s" repeatCount="indefinite" calcMode="linear" />
             </feOffset>
@@ -111,7 +132,7 @@ const ElectricBorder = ({ children, color = '#5227FF', speed = 1, chaos = 1, thi
             <feDisplacementMap
               in="SourceGraphic"
               in2="combinedNoise"
-              scale="30"
+              scale={30}
               xChannelSelector="R"
               yChannelSelector="B"
             />
@@ -132,3 +153,4 @@ const ElectricBorder = ({ children, color = '#5227FF', speed = 1, chaos = 1, thi
 };
 
 export default ElectricBorder;
+

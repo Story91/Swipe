@@ -1,6 +1,15 @@
+'use client';
+
 import './ShinyText.css';
 
-const ShinyText = ({ text, disabled = false, speed = 5, className = '' }) => {
+interface ShinyTextProps {
+  text: string;
+  disabled?: boolean;
+  speed?: number;
+  className?: string;
+}
+
+const ShinyText = ({ text, disabled = false, speed = 5, className = '' }: ShinyTextProps) => {
   const animationDuration = `${speed}s`;
 
   return (
@@ -11,3 +20,4 @@ const ShinyText = ({ text, disabled = false, speed = 5, className = '' }) => {
 };
 
 export default ShinyText;
+
