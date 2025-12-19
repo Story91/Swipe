@@ -27,6 +27,10 @@ import { notifyPredictionShared, notifyStakeSuccess } from '../../../lib/notific
 import { generateTransactionId, generateBasescanUrl } from '../../../lib/utils/redis-utils';
 import { useTokenPrices } from '../../../lib/hooks/useTokenPrices';
 import { Bot, Loader2, Sparkles, X, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
+import ElectricBorder from '@/components/ElectricBorder';
+import ShinyText from '@/components/ShinyText';
+import GradientText from '@/components/GradientText';
+import TextType from '@/components/TextType';
 
 interface PredictionData {
   id: number;
@@ -1988,16 +1992,16 @@ KEY USER-FACING CHANGES: V1 → V2
 
     </div>
 
-    {/* Action Buttons - moved above Prediction Details */}
+    {/* Action Buttons - ASK AI and SKIP only */}
     <div className="action-buttons-section">
       <button
-        className="tutorial-button"
-        disabled
+        className="ai-analyze-button"
+        onClick={analyzeWithAI}
+        disabled={aiModal.isLoading}
       >
-        <div className="swipe-animation">
-          <div className="swipe-icon">👈</div>
-          <div className="swipe-icon">👉</div>
-        </div>
+        <Bot className="w-4 h-4" />
+        <span>{aiModal.isLoading ? 'Analyzing...' : 'Ask AI'}</span>
+        <Sparkles className="w-3 h-3" />
       </button>
       
       <div className="or-text">OR</div>
@@ -2007,18 +2011,6 @@ KEY USER-FACING CHANGES: V1 → V2
         onClick={() => handleSkip(currentCard.id)}
       >
         SKIP
-      </button>
-      
-      <div className="or-text">OR</div>
-      
-      <button
-        className="ai-analyze-button"
-        onClick={analyzeWithAI}
-        disabled={aiModal.isLoading}
-      >
-        <Bot className="w-4 h-4" />
-        <span>{aiModal.isLoading ? 'Analyzing...' : 'Ask AI'}</span>
-        <Sparkles className="w-3 h-3" />
       </button>
     </div>
 
@@ -2680,63 +2672,68 @@ KEY USER-FACING CHANGES: V1 → V2
 
       {/* AI Analysis Modal */}
       <Dialog open={aiModal.isOpen} onOpenChange={(open) => !open && setAiModal(prev => ({ ...prev, isOpen: false }))}>
-        <DialogContent className="sm:max-w-[500px] bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 border-zinc-700/50 text-white p-0 gap-0 overflow-hidden max-h-[85vh]">
-          {/* Header */}
-          <div className="relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 via-blue-500/10 to-transparent" />
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/5 via-transparent to-transparent" />
-            
-            <DialogHeader className="relative p-5 pb-3">
-              <div className="flex items-center justify-between">
+        <ElectricBorder 
+          color="#d4ff00" 
+          speed={1.5} 
+          chaos={0.8} 
+          thickness={2}
+          className="rounded-2xl"
+          style={{}}
+        >
+          <DialogContent className="sm:max-w-[500px] bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 border-none text-white p-0 gap-0 overflow-hidden max-h-[85vh] rounded-2xl">
+            {/* Header */}
+            <div className="relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-[#d4ff00]/10 via-[#d4ff00]/5 to-transparent" />
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#d4ff00]/10 via-transparent to-transparent" />
+              
+              <DialogHeader className="relative p-4 pb-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-gradient-to-br from-purple-500 to-blue-600 shadow-lg shadow-purple-500/30">
-                    <Bot className="w-6 h-6 text-white" />
+                  {/* Swiper Avatar on black background */}
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-[#d4ff00]/20 blur-xl rounded-full" />
+                    <div className="relative w-14 h-14 rounded-xl flex items-center justify-center bg-black border border-[#d4ff00]/20 shadow-lg shadow-[#d4ff00]/10 overflow-hidden">
+                      <img 
+                        src="/swiper1.png" 
+                        alt="Swiper AI" 
+                        className="w-12 h-12 object-contain"
+                      />
+                    </div>
                   </div>
                   <div>
                     <DialogTitle className="text-lg font-bold text-white flex items-center gap-2">
-                      Swiper AI
-                      <Sparkles className="w-4 h-4 text-yellow-400" />
+                      <span className="bg-gradient-to-r from-[#d4ff00] to-[#a8cc00] bg-clip-text text-transparent">
+                        Swiper AI
+                      </span>
+                      <Sparkles className="w-4 h-4 text-[#d4ff00] animate-pulse" />
                     </DialogTitle>
                     <DialogDescription className="text-zinc-400 text-xs">
                       Real-time prediction analysis
                     </DialogDescription>
                   </div>
                 </div>
-                {aiModal.recommendation && !aiModal.isLoading && (
-                  <Badge 
-                    variant="outline" 
-                    className={`px-3 py-1 text-sm font-semibold border-2 ${
-                      aiModal.recommendation === 'YES' 
-                        ? 'border-emerald-500/50 text-emerald-400 bg-emerald-500/10' 
-                        : aiModal.recommendation === 'NO'
-                        ? 'border-rose-500/50 text-rose-400 bg-rose-500/10'
-                        : 'border-amber-500/50 text-amber-400 bg-amber-500/10'
-                    }`}
-                  >
-                    {aiModal.recommendation === 'YES' ? '↑ BET YES' : aiModal.recommendation === 'NO' ? '↓ BET NO' : '⏸ SKIP'}
-                  </Badge>
-                )}
-              </div>
-            </DialogHeader>
-          </div>
+              </DialogHeader>
+            </div>
 
-          <Separator className="bg-zinc-700/50" />
+          <Separator className="bg-gradient-to-r from-transparent via-[#d4ff00]/30 to-transparent h-px" />
 
           {/* Content */}
           <div className="p-5 overflow-y-auto max-h-[60vh]">
             {aiModal.isLoading ? (
               <div className="flex flex-col items-center justify-center py-10 space-y-5">
-                {/* Spinning Logo */}
+                {/* Animated Logo with glow */}
                 <div className="relative">
-                  <img 
-                    src="/splash.png" 
-                    alt="Swipe" 
-                    className="w-24 h-24 object-contain animate-pulse"
-                    style={{ animation: 'pulse 1.5s ease-in-out infinite' }}
-                  />
+                  <div className="absolute inset-0 bg-[#d4ff00]/40 blur-2xl rounded-full animate-pulse" />
+                  <div className="relative w-24 h-24 rounded-2xl flex items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-900 border border-[#d4ff00]/30 shadow-lg shadow-[#d4ff00]/30">
+                    <img 
+                      src="/splash.png" 
+                      alt="Swipe" 
+                      className="w-16 h-16 object-contain"
+                      style={{ animation: 'pulse 1.5s ease-in-out infinite' }}
+                    />
+                  </div>
                 </div>
                 <div className="text-center space-y-2">
-                  <p className="text-[#d4ff00] font-bold text-lg">Analyzing...</p>
+                  <p className="text-[#d4ff00] font-bold text-lg animate-pulse">Analyzing...</p>
                   <p className="text-zinc-400 text-sm">This may take a few moments</p>
                   <p className="text-zinc-500 text-xs">Searching real-time data & news</p>
                 </div>
@@ -2759,43 +2756,75 @@ KEY USER-FACING CHANGES: V1 → V2
               </div>
             ) : aiModal.analysis ? (
               <div className="space-y-4">
-                {/* Step 1: AI Probability - appears first */}
+                {/* Step 1: AI Probability - Modern glassmorphism design */}
                 {aiTypingStep >= 1 && aiModal.aiProbability?.yes !== null && (
                   <div className="animate-fadeIn">
-                    <Card className="bg-zinc-800/50 border-zinc-700/50">
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">🎯 AI Prediction</span>
-                          <Badge variant="outline" className={`text-xs font-bold ${
-                            aiModal.confidence === 'HIGH' ? 'border-emerald-500 text-emerald-400 bg-emerald-500/10' :
-                            aiModal.confidence === 'MEDIUM' ? 'border-amber-500 text-amber-400 bg-amber-500/10' :
-                            'border-zinc-500 text-zinc-400 bg-zinc-500/10'
+                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-800/80 via-zinc-900/90 to-black/80 backdrop-blur-xl border border-white/10 shadow-2xl">
+                      {/* Subtle animated gradient background */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 via-transparent to-rose-500/5 animate-pulse" />
+                      
+                      <div className="relative p-5">
+                        {/* Header with confidence badge */}
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-[#d4ff00] animate-pulse shadow-lg shadow-[#d4ff00]/50" />
+                            <ShinyText 
+                              text="AI PREDICTION" 
+                              className="text-xs font-bold tracking-[0.2em] text-zinc-300"
+                              speed={3}
+                            />
+                          </div>
+                          <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider backdrop-blur-sm ${
+                            aiModal.confidence === 'HIGH' 
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-lg shadow-emerald-500/20' 
+                              : aiModal.confidence === 'MEDIUM' 
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-lg shadow-amber-500/20' 
+                              : 'bg-zinc-500/20 text-zinc-300 border border-zinc-500/30'
                           }`}>
                             {aiModal.confidence}
-                          </Badge>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="text-center p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
-                            <div className="flex items-center justify-center gap-1 mb-1">
-                              <TrendingUp className="w-4 h-4 text-emerald-400" />
-                              <span className="text-xs text-emerald-400 font-bold">YES</span>
-                            </div>
-                            <div className="text-3xl font-black text-emerald-400">
-                              {aiModal.aiProbability?.yes?.toFixed(0)}%
-                            </div>
-                          </div>
-                          <div className="text-center p-3 rounded-xl bg-rose-500/10 border border-rose-500/30">
-                            <div className="flex items-center justify-center gap-1 mb-1">
-                              <TrendingDown className="w-4 h-4 text-rose-400" />
-                              <span className="text-xs text-rose-400 font-bold">NO</span>
-                            </div>
-                            <div className="text-3xl font-black text-rose-400">
-                              {aiModal.aiProbability?.no?.toFixed(0)}%
-                            </div>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
+                        
+                        {/* Probability display - modern style */}
+                        <div className="grid grid-cols-2 gap-4">
+                          {/* YES */}
+                          <div className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border border-emerald-500/20 p-4 transition-all duration-300 hover:border-emerald-500/40 hover:shadow-lg hover:shadow-emerald-500/10">
+                            <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition-colors" />
+                            <div className="relative">
+                              <div className="flex items-center gap-1.5 mb-2">
+                                <TrendingUp className="w-4 h-4 text-emerald-400" />
+                                <span className="text-xs font-semibold text-emerald-400/80 uppercase tracking-wider">Yes</span>
+                              </div>
+                              <GradientText 
+                                colors={['#34d399', '#10b981', '#34d399']} 
+                                animationSpeed={4}
+                                className="text-4xl font-black"
+                              >
+                                {aiModal.aiProbability?.yes?.toFixed(0)}%
+                              </GradientText>
+                            </div>
+                          </div>
+                          
+                          {/* NO */}
+                          <div className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-rose-500/10 to-rose-600/5 border border-rose-500/20 p-4 transition-all duration-300 hover:border-rose-500/40 hover:shadow-lg hover:shadow-rose-500/10">
+                            <div className="absolute top-0 right-0 w-20 h-20 bg-rose-500/10 rounded-full blur-2xl group-hover:bg-rose-500/20 transition-colors" />
+                            <div className="relative">
+                              <div className="flex items-center gap-1.5 mb-2">
+                                <TrendingDown className="w-4 h-4 text-rose-400" />
+                                <span className="text-xs font-semibold text-rose-400/80 uppercase tracking-wider">No</span>
+                              </div>
+                              <GradientText 
+                                colors={['#fb7185', '#f43f5e', '#fb7185']} 
+                                animationSpeed={4}
+                                className="text-4xl font-black"
+                              >
+                                {aiModal.aiProbability?.no?.toFixed(0)}%
+                              </GradientText>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -2838,116 +2867,172 @@ KEY USER-FACING CHANGES: V1 → V2
                   
                   return (
                     <>
-                      {/* Step 2: Analysis */}
+                      {/* Step 2: Analysis - Modern glassmorphism with TextType */}
                       {aiTypingStep >= 2 && sections.find(s => s.type === 'analysis') && (
                         <div className="animate-fadeIn">
-                          <Card className="bg-zinc-800/50 border-zinc-700/50">
-                            <CardContent className="p-4">
-                              <p className="text-blue-400 font-bold text-sm mb-2">📊 ANALYSIS</p>
-                              {sections.find(s => s.type === 'analysis')?.content.map((line, i) => (
-                                <p key={i} className="text-zinc-300 text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: formatText(line) }} />
-                              ))}
-                            </CardContent>
-                          </Card>
+                          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-500/5 via-zinc-900/50 to-zinc-900/80 backdrop-blur-sm border border-blue-500/10">
+                            <div className="absolute top-0 left-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
+                            <div className="relative p-4">
+                              <div className="flex items-center gap-2 mb-3">
+                                <div className="w-1 h-4 rounded-full bg-gradient-to-b from-blue-400 to-blue-600" />
+                                <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">Analysis</span>
+                              </div>
+                              <TextType 
+                                text={sections.find(s => s.type === 'analysis')?.content.join(' ') || ''}
+                                className="text-zinc-300/90 text-sm leading-relaxed font-light"
+                                typingSpeed={15}
+                                showCursor={true}
+                                cursorCharacter="▋"
+                                cursorClassName="text-blue-400/50"
+                                loop={false}
+                              />
+                            </div>
+                          </div>
                         </div>
                       )}
                       
-                      {/* Step 3: Value */}
+                      {/* Step 3: Value - With accent glow and TextType */}
                       {aiTypingStep >= 3 && sections.find(s => s.type === 'value') && (
                         <div className="animate-fadeIn">
-                          <Card className="bg-zinc-800/50 border-zinc-700/50">
-                            <CardContent className="p-4">
-                              <p className="text-[#d4ff00] font-bold text-sm mb-2">💰 VALUE</p>
-                              {sections.find(s => s.type === 'value')?.content.map((line, i) => (
-                                <p key={i} className="text-zinc-300 text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: formatText(line) }} />
-                              ))}
-                            </CardContent>
-                          </Card>
+                          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-[#d4ff00]/5 via-zinc-900/50 to-zinc-900/80 backdrop-blur-sm border border-[#d4ff00]/20">
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-[#d4ff00]/10 rounded-full blur-2xl" />
+                            <div className="relative p-4">
+                              <div className="flex items-center gap-2 mb-3">
+                                <div className="w-1 h-4 rounded-full bg-gradient-to-b from-[#d4ff00] to-[#a8cc00]" />
+                                <ShinyText text="VALUE" className="text-xs font-bold text-[#d4ff00] uppercase tracking-wider" speed={2} />
+                              </div>
+                              <TextType 
+                                text={sections.find(s => s.type === 'value')?.content.join(' ') || ''}
+                                className="text-zinc-300/90 text-sm leading-relaxed font-light"
+                                typingSpeed={15}
+                                showCursor={true}
+                                cursorCharacter="▋"
+                                cursorClassName="text-[#d4ff00]/50"
+                                loop={false}
+                              />
+                            </div>
+                          </div>
                         </div>
                       )}
                       
-                      {/* Step 4: Recommendation - ALWAYS based on AI probability, not text */}
+                      {/* Step 4: Recommendation - Prominent card with glow */}
                       {aiTypingStep >= 4 && aiModal.aiProbability && (
                         <div className="animate-fadeIn">
-                          <Card className={`border-2 ${
-                            aiModal.recommendation === 'YES' ? 'bg-emerald-500/10 border-emerald-500/50' :
-                            aiModal.recommendation === 'NO' ? 'bg-rose-500/10 border-rose-500/50' :
-                            'bg-amber-500/10 border-amber-500/50'
+                          <div className={`relative overflow-hidden rounded-xl backdrop-blur-sm border-2 transition-all duration-500 ${
+                            aiModal.recommendation === 'YES' 
+                              ? 'bg-gradient-to-br from-emerald-500/10 via-emerald-600/5 to-transparent border-emerald-500/40 shadow-lg shadow-emerald-500/10' 
+                              : aiModal.recommendation === 'NO'
+                              ? 'bg-gradient-to-br from-rose-500/10 via-rose-600/5 to-transparent border-rose-500/40 shadow-lg shadow-rose-500/10'
+                              : 'bg-gradient-to-br from-amber-500/10 via-amber-600/5 to-transparent border-amber-500/40 shadow-lg shadow-amber-500/10'
                           }`}>
-                            <CardContent className="p-4">
-                              <p className={`font-bold text-sm mb-2 ${
-                                aiModal.recommendation === 'YES' ? 'text-emerald-400' :
-                                aiModal.recommendation === 'NO' ? 'text-rose-400' :
-                                'text-amber-400'
-                              }`}>⚡ RECOMMENDATION</p>
-                              
-                              {/* Show recommendation based on probability */}
-                              <div className={`text-lg font-bold mb-2 ${
-                                aiModal.recommendation === 'YES' ? 'text-emerald-400' :
-                                aiModal.recommendation === 'NO' ? 'text-rose-400' :
-                                'text-amber-400'
-                              }`}>
-                                {aiModal.recommendation === 'YES' 
-                                  ? `🟢 BET YES (${aiModal.aiProbability.yes?.toFixed(0)}% probability)`
-                                  : aiModal.recommendation === 'NO'
-                                  ? `🔴 BET NO (${aiModal.aiProbability.no?.toFixed(0)}% probability)`
-                                  : `🟡 SKIP (too close to call)`
-                                }
+                            {/* Animated glow */}
+                            <div className={`absolute inset-0 opacity-30 ${
+                              aiModal.recommendation === 'YES' ? 'bg-gradient-to-r from-emerald-500/20 via-transparent to-emerald-500/20' :
+                              aiModal.recommendation === 'NO' ? 'bg-gradient-to-r from-rose-500/20 via-transparent to-rose-500/20' :
+                              'bg-gradient-to-r from-amber-500/20 via-transparent to-amber-500/20'
+                            } animate-pulse`} />
+                            
+                            <div className="relative p-4">
+                              <div className="flex items-center gap-2 mb-3">
+                                <div className={`w-2 h-2 rounded-full animate-pulse shadow-lg ${
+                                  aiModal.recommendation === 'YES' ? 'bg-emerald-400 shadow-emerald-400/50' :
+                                  aiModal.recommendation === 'NO' ? 'bg-rose-400 shadow-rose-400/50' :
+                                  'bg-amber-400 shadow-amber-400/50'
+                                }`} />
+                                <span className={`text-xs font-bold uppercase tracking-wider ${
+                                  aiModal.recommendation === 'YES' ? 'text-emerald-400' :
+                                  aiModal.recommendation === 'NO' ? 'text-rose-400' :
+                                  'text-amber-400'
+                                }`}>Recommendation</span>
                               </div>
                               
-                              <p className="text-zinc-400 text-xs">
+                              <GradientText 
+                                colors={
+                                  aiModal.recommendation === 'YES' 
+                                    ? ['#34d399', '#10b981', '#34d399'] 
+                                    : aiModal.recommendation === 'NO'
+                                    ? ['#fb7185', '#f43f5e', '#fb7185']
+                                    : ['#fbbf24', '#f59e0b', '#fbbf24']
+                                } 
+                                animationSpeed={3}
+                                className="text-xl font-black mb-2"
+                              >
+                                {aiModal.recommendation === 'YES' 
+                                  ? `BET YES · ${aiModal.aiProbability.yes?.toFixed(0)}%`
+                                  : aiModal.recommendation === 'NO'
+                                  ? `BET NO · ${aiModal.aiProbability.no?.toFixed(0)}%`
+                                  : `SKIP · Too Close`
+                                }
+                              </GradientText>
+                              
+                              <p className="text-zinc-500 text-xs font-light">
                                 {aiModal.confidence === 'HIGH' 
-                                  ? 'Strong signal - high confidence in this prediction'
+                                  ? 'Strong signal — high confidence'
                                   : aiModal.confidence === 'MEDIUM'
-                                  ? 'Moderate signal - consider your risk tolerance'
-                                  : 'Weak signal - proceed with caution'
+                                  ? 'Moderate signal — consider risk tolerance'
+                                  : 'Weak signal — proceed with caution'
                                 }
                               </p>
-                            </CardContent>
-                          </Card>
+                            </div>
+                          </div>
                         </div>
                       )}
                       
-                      {/* Step 5: Risks */}
+                      {/* Step 5: Risks - Subtle warning style with TextType */}
                       {aiTypingStep >= 5 && sections.find(s => s.type === 'risk') && (
                         <div className="animate-fadeIn">
-                          <Card className="bg-rose-500/5 border-rose-500/20">
-                            <CardContent className="p-4">
-                              <p className="text-rose-400 font-bold text-sm mb-2">⚠️ RISKS</p>
-                              {sections.find(s => s.type === 'risk')?.content.map((line, i) => (
-                                <p key={i} className="text-zinc-400 text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: formatText(line) }} />
-                              ))}
-                            </CardContent>
-                          </Card>
+                          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-rose-500/5 via-zinc-900/50 to-zinc-900/80 backdrop-blur-sm border border-rose-500/10">
+                            <div className="relative p-4">
+                              <div className="flex items-center gap-2 mb-3">
+                                <AlertTriangle className="w-3.5 h-3.5 text-rose-400/70" />
+                                <span className="text-xs font-bold text-rose-400/80 uppercase tracking-wider">Risks</span>
+                              </div>
+                              <TextType 
+                                text={sections.find(s => s.type === 'risk')?.content.join(' ') || ''}
+                                className="text-zinc-400/80 text-sm leading-relaxed font-light"
+                                typingSpeed={12}
+                                showCursor={true}
+                                cursorCharacter="▋"
+                                cursorClassName="text-rose-400/50"
+                                loop={false}
+                              />
+                            </div>
+                          </div>
                         </div>
                       )}
                     </>
                   );
                 })()}
 
-                {/* Quick Action Buttons - appear at the end */}
+                {/* Quick Action Buttons - Modern glassmorphism style */}
                 {aiTypingStep >= 5 && (
-                  <div className="animate-fadeIn grid grid-cols-2 gap-3 pt-2">
-                    <Button
+                  <div className="animate-fadeIn grid grid-cols-2 gap-3 pt-3">
+                    <button
                       onClick={() => {
                         setAiModal(prev => ({ ...prev, isOpen: false }));
                         onSwipe('right', currentCard.id);
                       }}
-                      className="h-12 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-bold text-base"
+                      className="group relative h-14 overflow-hidden rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/30 backdrop-blur-sm transition-all duration-300 hover:border-emerald-400/60 hover:shadow-lg hover:shadow-emerald-500/20 hover:scale-[1.02] active:scale-[0.98]"
                     >
-                      <TrendingUp className="w-5 h-5 mr-2" />
-                      BET YES
-                    </Button>
-                    <Button
+                      <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-emerald-500/10 to-emerald-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+                      <div className="relative flex items-center justify-center gap-2">
+                        <TrendingUp className="w-5 h-5 text-emerald-400" />
+                        <span className="font-bold text-emerald-300 tracking-wide">BET YES</span>
+                      </div>
+                    </button>
+                    <button
                       onClick={() => {
                         setAiModal(prev => ({ ...prev, isOpen: false }));
                         onSwipe('left', currentCard.id);
                       }}
-                      className="h-12 bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white font-bold text-base"
+                      className="group relative h-14 overflow-hidden rounded-xl bg-gradient-to-br from-rose-500/20 to-rose-600/10 border border-rose-500/30 backdrop-blur-sm transition-all duration-300 hover:border-rose-400/60 hover:shadow-lg hover:shadow-rose-500/20 hover:scale-[1.02] active:scale-[0.98]"
                     >
-                      <TrendingDown className="w-5 h-5 mr-2" />
-                      BET NO
-                    </Button>
+                      <div className="absolute inset-0 bg-gradient-to-r from-rose-500/0 via-rose-500/10 to-rose-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+                      <div className="relative flex items-center justify-center gap-2">
+                        <TrendingDown className="w-5 h-5 text-rose-400" />
+                        <span className="font-bold text-rose-300 tracking-wide">BET NO</span>
+                      </div>
+                    </button>
                   </div>
                 )}
               </div>
@@ -2955,16 +3040,14 @@ KEY USER-FACING CHANGES: V1 → V2
           </div>
 
           {/* Footer */}
-          <div className="border-t border-zinc-700/50 p-3 bg-zinc-900/50">
-            <div className="flex items-center justify-between text-xs text-zinc-500">
-              <span className="flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-[#d4ff00]" />
-                <span className="text-zinc-400">Powered by AI</span>
-              </span>
-              <span className="text-zinc-600">#{currentCard.id}</span>
+          <div className="border-t border-[#d4ff00]/20 p-3 bg-zinc-900/80">
+            <div className="flex items-center justify-center text-xs">
+              <span className="text-zinc-500">Powered by </span>
+              <span className="text-[#d4ff00] font-bold ml-1">Swipe</span>
             </div>
           </div>
         </DialogContent>
+        </ElectricBorder>
       </Dialog>
 
       {/* Global Notification System */}

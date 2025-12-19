@@ -25,7 +25,7 @@ import {
   MenubarTrigger,
 } from "@/components/ui/menubar";
 import { Button } from "@/components/ui/button";
-import { Trophy, HelpCircle, Settings, Bot } from "lucide-react";
+import { Trophy, HelpCircle, Settings } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useState, useEffect, useRef } from "react";
 import TinderCardComponent from "./components/Main/TinderCard";
@@ -43,7 +43,6 @@ import { HelpAndFaq } from "./components/Support/HelpAndFaq";
 import { Leaderboard } from "./components/Market/Leaderboard";
 import { RecentActivity } from "./components/Support/RecentActivity";
 import { CreatePredictionModal } from "./components/Modals/CreatePredictionModal";
-import AIAssistant from "./components/AIAssistant/AIAssistant";
 import { SwipeTokenCard } from "./components/Market/SwipeTokenCard";
 
 type DashboardType = 'tinder' | 'user' | 'admin' | 'approver' | 'market-stats' | 'analytics' | 'settings' | 'audit-logs' | 'my-portfolio' | 'active-bets' | 'bet-history' | 'help-faq' | 'leaderboard' | 'recent-activity' | 'swipe-token';
@@ -52,7 +51,6 @@ export default function App() {
   const { setFrameReady, isFrameReady } = useMiniKit();
   const [activeDashboard, setActiveDashboard] = useState<DashboardType>('tinder');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false);
   const { address } = useAccount();
   const tinderCardRef = useRef<{ refresh: () => void } | null>(null);
   const [hasTriedAddMiniApp, setHasTriedAddMiniApp] = useState(false);
@@ -164,14 +162,6 @@ export default function App() {
               title="Leaderboard"
             >
               <Trophy className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="swipe"
-              size="icon"
-              onClick={() => setIsAIAssistantOpen(true)}
-              title="AI Assistant"
-            >
-              <Bot className="h-4 w-4" />
             </Button>
             <Button
               variant="swipe"
@@ -291,8 +281,6 @@ export default function App() {
         }}
       />
 
-      {/* AI Assistant */}
-      <AIAssistant isOpen={isAIAssistantOpen} onClose={() => setIsAIAssistantOpen(false)} />
     </div>
   );
 }
