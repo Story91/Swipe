@@ -2030,14 +2030,12 @@ KEY USER-FACING CHANGES: V1 → V2
       <div className="cyber-terminal mb-4">
         <div className="terminal-header">
           <div className="terminal-title">
-            <span className="text-[#1a1a1a] font-mono text-xs font-bold">swipe@prediction</span>
-            <span className="text-[#444] font-mono text-xs">:~$</span>
-            <span className="text-[#0066cc] font-mono text-xs ml-1 font-semibold">analyze --id {currentCard.id}</span>
+            <span className="text-[#1a1a1a] font-mono text-xs font-bold">[ DESCRIPTION ]</span>
+            <span className="text-[#666] font-mono text-xs ml-2">--id {currentCard.id}</span>
          </div>
            </div>
         <div className="terminal-body">
           <p className="text-[#1a1a1a] font-mono text-xs leading-relaxed">{currentCard.description}</p>
-          <div className="terminal-cursor"></div>
            </div>
           </div>
 
