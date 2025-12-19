@@ -17,6 +17,11 @@ export async function GET() {
   const URL = process.env.NEXT_PUBLIC_URL;
   const NEYNAR_WEBHOOK_URL = process.env.NEYNAR_WEBHOOK_URL;
 
+  // Parse screenshot URLs from env (comma-separated)
+  const screenshotUrls = process.env.NEXT_PUBLIC_APP_SCREENSHOT_URLS
+    ? process.env.NEXT_PUBLIC_APP_SCREENSHOT_URLS.split(',').map(url => url.trim())
+    : [];
+
   return Response.json({
     accountAssociation: {
       header: process.env.FARCASTER_HEADER,
@@ -28,7 +33,7 @@ export async function GET() {
       name: process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME,
       subtitle: process.env.NEXT_PUBLIC_APP_SUBTITLE,
       description: process.env.NEXT_PUBLIC_APP_DESCRIPTION,
-      screenshotUrls: [],
+      screenshotUrls,
       iconUrl: process.env.NEXT_PUBLIC_APP_ICON,
       splashImageUrl: process.env.NEXT_PUBLIC_APP_SPLASH_IMAGE,
       splashBackgroundColor: process.env.NEXT_PUBLIC_SPLASH_BACKGROUND_COLOR,
