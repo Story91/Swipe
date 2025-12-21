@@ -43,6 +43,7 @@ import { HelpAndFaq } from "./components/Support/HelpAndFaq";
 import { Leaderboard } from "./components/Market/Leaderboard";
 import { RecentActivity } from "./components/Support/RecentActivity";
 import { CreatePredictionModal } from "./components/Modals/CreatePredictionModal";
+import { HowToPlayModal } from "./components/Modals/HowToPlayModal";
 import { SwipeTokenCard } from "./components/Market/SwipeTokenCard";
 
 type DashboardType = 'tinder' | 'user' | 'admin' | 'approver' | 'market-stats' | 'analytics' | 'settings' | 'audit-logs' | 'my-portfolio' | 'active-bets' | 'bet-history' | 'help-faq' | 'leaderboard' | 'recent-activity' | 'swipe-token';
@@ -51,6 +52,7 @@ export default function App() {
   const { setFrameReady, isFrameReady } = useMiniKit();
   const [activeDashboard, setActiveDashboard] = useState<DashboardType>('tinder');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isHowToPlayOpen, setIsHowToPlayOpen] = useState(false);
   const { address } = useAccount();
   const tinderCardRef = useRef<{ refresh: () => void } | null>(null);
   const [hasTriedAddMiniApp, setHasTriedAddMiniApp] = useState(false);
@@ -162,6 +164,13 @@ export default function App() {
               title="Leaderboard"
             >
               <Trophy className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="swipe"
+              onClick={() => setIsHowToPlayOpen(true)}
+              className="!px-3 !py-2 !text-xs !font-semibold"
+            >
+              How to Play
             </Button>
             <Button
               variant="swipe"
@@ -279,6 +288,12 @@ export default function App() {
             }
           }, 5000); // Wait 5 seconds for data to propagate (3s auto-sync + 2s buffer)
         }}
+      />
+
+      {/* How to Play Modal */}
+      <HowToPlayModal
+        isOpen={isHowToPlayOpen}
+        onClose={() => setIsHowToPlayOpen(false)}
       />
 
     </div>
