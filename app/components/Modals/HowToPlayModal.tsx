@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import Stepper, { Step } from "@/components/Stepper";
 import { TrendingUp, Wallet, Trophy, CheckCircle2, Sparkles, X } from "lucide-react";
 import "@/components/Stepper.css";
-import { useState } from "react";
 
 interface HowToPlayModalProps {
   isOpen: boolean;
@@ -13,8 +12,6 @@ interface HowToPlayModalProps {
 }
 
 export function HowToPlayModal({ isOpen, onClose }: HowToPlayModalProps) {
-  const [currentStep, setCurrentStep] = useState(1);
-
   const handleSkip = () => {
     onClose();
   };
@@ -39,7 +36,6 @@ export function HowToPlayModal({ isOpen, onClose }: HowToPlayModalProps) {
           
           <Stepper
             initialStep={1}
-            onStepChange={setCurrentStep}
             onFinalStepCompleted={onClose}
             stepCircleContainerClassName="!border-0 !shadow-none !bg-transparent !max-w-none"
             stepContainerClassName="!p-3 !pb-0"
