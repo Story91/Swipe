@@ -67,21 +67,21 @@ export async function GET(request: NextRequest) {
     
     // SwipeClaim contract deployment block (approximate - adjust if needed)
     // You can find this from contract deployment transaction
-    const SWIPE_CLAIM_DEPLOY_BLOCK = 0n; // Set actual deployment block if known
+    const SWIPE_CLAIM_DEPLOY_BLOCK = BigInt(0); // Set actual deployment block if known
     
     // Get all SwipeClaimed events for this user
-    const MAX_BLOCKS_PER_REQUEST = 1000n;
+    const MAX_BLOCKS_PER_REQUEST = BigInt(1000);
     const allEvents: any[] = [];
     let fromBlock = SWIPE_CLAIM_DEPLOY_BLOCK;
     
     // If we don't know deployment block, start from 30 days ago
-    if (fromBlock === 0n) {
-      const blocks30DaysAgo = currentBlock > 1300000n ? currentBlock - 1300000n : 0n;
+    if (fromBlock === BigInt(0)) {
+      const blocks30DaysAgo = currentBlock > BigInt(1300000) ? currentBlock - BigInt(1300000) : BigInt(0);
       fromBlock = blocks30DaysAgo;
     }
 
     while (fromBlock < currentBlock) {
-      const toBlock = fromBlock + MAX_BLOCKS_PER_REQUEST - 1n;
+      const toBlock = fromBlock + MAX_BLOCKS_PER_REQUEST - BigInt(1);
       const actualToBlock = toBlock > currentBlock ? currentBlock : toBlock;
 
       try {
@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
         console.error(`❌ Error fetching events from ${fromBlock} to ${actualToBlock}:`, error.message);
       }
 
-      fromBlock = actualToBlock + 1n;
+      fromBlock = actualToBlock + BigInt(1);
 
       if (fromBlock < currentBlock) {
         await new Promise(resolve => setTimeout(resolve, 100));

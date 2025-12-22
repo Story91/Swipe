@@ -113,26 +113,26 @@ export function SwipeClaim() {
       ? BigInt(redisBetCount) 
       : userClaimInfo 
         ? (userClaimInfo as [boolean, bigint, bigint])[1]
-        : 0n;
+        : BigInt(0);
 
-    let rewardAmount = 0n;
+    let rewardAmount = BigInt(0);
     let eligible = false;
 
-    if (effectiveBetCount >= 100n) {
+    if (effectiveBetCount >= BigInt(100)) {
       rewardAmount = BigInt(25_000_000 * 10**18);
       eligible = true;
-    } else if (effectiveBetCount >= 50n) {
+    } else if (effectiveBetCount >= BigInt(50)) {
       rewardAmount = BigInt(15_000_000 * 10**18);
       eligible = true;
-    } else if (effectiveBetCount >= 25n) {
+    } else if (effectiveBetCount >= BigInt(25)) {
       rewardAmount = BigInt(10_000_000 * 10**18);
       eligible = true;
-    } else if (effectiveBetCount >= 10n) {
+    } else if (effectiveBetCount >= BigInt(10)) {
       rewardAmount = BigInt(1_000_000 * 10**18);
       eligible = true;
     }
 
-    if (effectiveBetCount > 0n || userClaimInfo) {
+    if (effectiveBetCount > BigInt(0) || userClaimInfo) {
       setClaimInfo({ eligible, betCount: effectiveBetCount, rewardAmount });
     }
 

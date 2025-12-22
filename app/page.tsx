@@ -47,7 +47,7 @@ import { HowToPlayModal } from "./components/Modals/HowToPlayModal";
 import { SwipeTokenCard } from "./components/Market/SwipeTokenCard";
 import { SwipeClaim } from "./components/Portfolio/SwipeClaim";
 
-type DashboardType = 'tinder' | 'user' | 'admin' | 'approver' | 'market-stats' | 'analytics' | 'settings' | 'audit-logs' | 'my-portfolio' | 'active-bets' | 'bet-history' | 'help-faq' | 'leaderboard' | 'recent-activity' | 'swipe-token';
+type DashboardType = 'tinder' | 'user' | 'admin' | 'approver' | 'market-stats' | 'analytics' | 'settings' | 'audit-logs' | 'my-portfolio' | 'active-bets' | 'bet-history' | 'help-faq' | 'leaderboard' | 'recent-activity' | 'swipe-token' | 'claim';
 
 export default function App() {
   const { setFrameReady, isFrameReady } = useMiniKit();
