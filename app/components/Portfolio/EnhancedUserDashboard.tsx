@@ -237,7 +237,7 @@ export function EnhancedUserDashboard() {
   };
   
   // Hybrid predictions hook (includes both Redis and blockchain data)
-  const { predictions: allPredictions, loading: predictionsLoading, error: predictionsError, refresh: refreshPredictions, fetchAllPredictions: fetchAllPredictionsComplete } = useHybridPredictions();
+  const { predictions: allPredictions, loading: predictionsLoading, error: predictionsError, refresh: refreshPredictions, fetchAllPredictions: fetchAllPredictionsComplete, allPredictionsLoaded } = useHybridPredictions();
 
   // Fetch user transactions with cache
   const fetchUserTransactions = useCallback(async (forceRefresh: boolean = false) => {
@@ -387,14 +387,18 @@ export function EnhancedUserDashboard() {
             const stakesByToken: { [key: string]: any } = {};
             
           for (const userStake of predictionStakes) {
-            if (userStake.yesAmount > 0 || userStake.noAmount > 0) {
+            // Ensure amounts are numbers (in case they come as strings from Redis)
+            const yesAmount = Number(userStake.yesAmount) || 0;
+            const noAmount = Number(userStake.noAmount) || 0;
+            
+            if (yesAmount > 0 || noAmount > 0) {
                 const tokenType = userStake.tokenType || 'ETH'; // Default to ETH for V1 stakes
               
               let potentialPayout = 0;
               let potentialProfit = 0;
               let canClaim = false;
               let isWinner = false;
-              const userStakeAmount = userStake.yesAmount + userStake.noAmount;
+              const userStakeAmount = yesAmount + noAmount;
 
               // Get the correct pools based on token type
               const isSwipeStake = tokenType === 'SWIPE';
@@ -408,16 +412,16 @@ export function EnhancedUserDashboard() {
                 const platformFee = losersPool * 0.01; // 1% platform fee
                 const netLosersPool = losersPool - platformFee;
 
-                if (prediction.outcome && userStake.yesAmount > 0) {
+                if (prediction.outcome && yesAmount > 0) {
                   // User bet YES and won
                   isWinner = true;
-                  potentialPayout = userStakeAmount + (userStake.yesAmount / winnersPool) * netLosersPool;
+                  potentialPayout = userStakeAmount + (yesAmount / winnersPool) * netLosersPool;
                   potentialProfit = potentialPayout - userStakeAmount;
                   canClaim = !userStake.claimed; // Can claim if not already claimed
-                } else if (!prediction.outcome && userStake.noAmount > 0) {
+                } else if (!prediction.outcome && noAmount > 0) {
                   // User bet NO and won
                   isWinner = true;
-                  potentialPayout = userStakeAmount + (userStake.noAmount / winnersPool) * netLosersPool;
+                  potentialPayout = userStakeAmount + (noAmount / winnersPool) * netLosersPool;
                   potentialProfit = potentialPayout - userStakeAmount;
                   canClaim = !userStake.claimed; // Can claim if not already claimed
                 } else {
@@ -436,20 +440,20 @@ export function EnhancedUserDashboard() {
               } else if (!prediction.resolved && !prediction.cancelled && prediction.deadline > Date.now() / 1000) {
                 // Active prediction - calculate potential payout based on current pool
                 
-                if (userStake.yesAmount > 0) {
+                if (yesAmount > 0) {
                   // User bet YES - calculate potential payout if YES wins
                   if (yesPool > 0) {
                     const platformFee = noPool * 0.01; // 1% platform fee from losers
                     const netNoPool = noPool - platformFee;
-                    potentialPayout = userStakeAmount + (userStake.yesAmount / yesPool) * netNoPool;
+                    potentialPayout = userStakeAmount + (yesAmount / yesPool) * netNoPool;
                     potentialProfit = potentialPayout - userStakeAmount;
                   }
-                } else if (userStake.noAmount > 0) {
+                } else if (noAmount > 0) {
                   // User bet NO - calculate potential payout if NO wins
                   if (noPool > 0) {
                     const platformFee = yesPool * 0.01; // 1% platform fee from losers
                     const netYesPool = yesPool - platformFee;
-                    potentialPayout = userStakeAmount + (userStake.noAmount / noPool) * netYesPool;
+                    potentialPayout = userStakeAmount + (noAmount / noPool) * netYesPool;
                     potentialProfit = potentialPayout - userStakeAmount;
                   }
                 }
@@ -465,8 +469,8 @@ export function EnhancedUserDashboard() {
 
                 stakesByToken[tokenType] = {
                   predictionId: userStake.predictionId,
-                  yesAmount: userStake.yesAmount,
-                  noAmount: userStake.noAmount,
+                  yesAmount: yesAmount,
+                  noAmount: noAmount,
                   claimed: userStake.claimed,
                 potentialPayout,
                 potentialProfit,
@@ -795,14 +799,16 @@ export function EnhancedUserDashboard() {
     }
   }, [address, allPredictions.length, predictionsLoading, fetchAllPredictionsComplete]);
 
-  // Fetch all user predictions when predictions are loaded
+  // Fetch all user predictions when ALL predictions are loaded (not just active)
+  // Wait for allPredictionsLoaded flag to ensure we have all predictions including resolved ones
   useEffect(() => {
-    if (allPredictions && allPredictions.length > 0 && address && allUserPredictions.length === 0) {
-      console.log('🔄 Predictions loaded, fetching all user predictions...');
+    if (allPredictions && allPredictions.length > 0 && address && allUserPredictions.length === 0 && !predictionsLoading && allPredictionsLoaded) {
+      console.log('🔄 ALL predictions loaded, fetching all user predictions...');
+      console.log(`📊 allPredictions count: ${allPredictions.length} (allPredictionsLoaded: ${allPredictionsLoaded})`);
       calculateStats(); // Calculate statistics first
       fetchAllUserPredictions(false); // Fetch all user predictions for statistics
     }
-  }, [allPredictions, address, calculateStats, fetchAllUserPredictions, allUserPredictions.length]);
+  }, [allPredictions, address, calculateStats, fetchAllUserPredictions, allUserPredictions.length, predictionsLoading, allPredictionsLoaded]);
   
   // No auto-refresh - only manual refresh when needed
   // useEffect(() => {
