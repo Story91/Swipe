@@ -545,12 +545,15 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
         // Save transaction to user history
         try {
           console.log('💾 Saving stake transaction to user history...');
+          // Convert amount to wei for consistent storage
+          const amountInWei = stakeAmount ? stakeAmount * Math.pow(10, 18) : 0;
           const transactionData = {
             id: generateTransactionId(),
             type: 'stake' as const,
             predictionId: `pred_v2_${stakePredictionId}`,
             predictionQuestion,
-            amount: stakeAmount,
+            amount: amountInWei,
+            tokenType: stakeToken || 'ETH',
             txHash: stakeTransactionHash,
             basescanUrl: generateBasescanUrl(stakeTransactionHash),
             timestamp: Date.now(),

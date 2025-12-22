@@ -90,6 +90,10 @@ export function EnhancedUserDashboard() {
   const [modalType, setModalType] = useState<'claim' | 'success' | 'error'>('claim');
   const [modalData, setModalData] = useState<{txHash?: string, basescanUrl?: string, message?: string}>({});
 
+  // Transaction pagination state
+  const [transactionPage, setTransactionPage] = useState(1);
+  const transactionsPerPage = 10;
+
   // Convert wei to ETH
   const weiToEth = (wei: number): number => {
     return wei / Math.pow(10, 18);
@@ -145,6 +149,29 @@ export function EnhancedUserDashboard() {
     const eth = weiToEth(wei);
     if (eth === 0) return '0.0000';
     return eth.toFixed(6); // Always use decimal format with 6 decimal places
+  };
+
+  // Format SWIPE for display with K/M suffixes
+  const formatSwipe = (wei: number): string => {
+    const swipe = weiToEth(wei);
+    if (swipe === 0) return '0';
+    
+    const absSwipe = Math.abs(swipe);
+    const sign = swipe < 0 ? '-' : '';
+    
+    if (absSwipe >= 1000000) {
+      // Millions
+      return `${sign}${(absSwipe / 1000000).toFixed(2)}M`;
+    } else if (absSwipe >= 1000) {
+      // Thousands
+      return `${sign}${(absSwipe / 1000).toFixed(2)}K`;
+    } else if (absSwipe >= 1) {
+      // Regular numbers
+      return `${sign}${absSwipe.toFixed(2)}`;
+    } else {
+      // Small numbers
+      return `${sign}${absSwipe.toFixed(4)}`;
+    }
   };
 
   // Cache management functions
@@ -988,7 +1015,9 @@ export function EnhancedUserDashboard() {
               txHash: txHash,
               basescanUrl: generateBasescanUrl(txHash),
               timestamp: Date.now(),
-              status: 'pending'
+              status: 'pending',
+              tokenType: tokenType || 'ETH',
+              amount: stake?.potentialPayout || 0
             };
 
             await fetch('/api/user-transactions', {
@@ -1384,50 +1413,66 @@ export function EnhancedUserDashboard() {
 
   return (
     <div className="enhanced-user-dashboard">
-      {/* Summary Stats */}
-      <div className="summary-stats">
-        {/* ETH Stats */}
-        <div className="stat-card eth-card">
-          <h3>ETH Total<br/>Staked</h3>
-          <p className="stat-value-total">{formatEth(ethTotalStaked)} ETH</p>
-        </div>
-        <div className="stat-card eth-card">
-          <h3>ETH Potential<br/>Payout</h3>
-          <p className="stat-value-payout">{formatEth(ethTotalPotentialPayout)} ETH</p>
-        </div>
-        <div className="stat-card eth-card">
-          <h3>ETH Potential<br/>Profit</h3>
-          <p className={`stat-value-profit ${ethTotalPotentialProfit >= 0 ? 'profit' : 'loss'}`}>
-            {ethTotalPotentialProfit >= 0 ? '+' : ''}{formatEth(ethTotalPotentialProfit)} ETH
-          </p>
-        </div>
+      {/* Summary Stats Table */}
+      <div className="stats-table-container">
+        <table className="stats-table">
+          <thead>
+            <tr>
+              <th className="token-header">Token</th>
+              <th>Total Staked</th>
+              <th>Potential Payout</th>
+              <th>Potential Profit</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="eth-row">
+              <td className="token-cell">
+                <img src="/eth.png" alt="ETH" className="token-logo" />
+              </td>
+              <td className="value-cell">
+                <span className="stat-value-total">{formatEth(ethTotalStaked)}</span>
+              </td>
+              <td className="value-cell">
+                <span className="stat-value-payout">{formatEth(ethTotalPotentialPayout)}</span>
+              </td>
+              <td className="value-cell">
+                <span className={`stat-value-profit ${ethTotalPotentialProfit >= 0 ? 'profit' : 'loss'}`}>
+                  {ethTotalPotentialProfit >= 0 ? '+' : ''}{formatEth(ethTotalPotentialProfit)}
+                </span>
+              </td>
+            </tr>
+            <tr className="swipe-row">
+              <td className="token-cell">
+                <img src="/splash.png" alt="SWIPE" className="token-logo" />
+              </td>
+              <td className="value-cell">
+                <span className="stat-value-total">{formatSwipe(swipeTotalStaked)}</span>
+              </td>
+              <td className="value-cell">
+                <span className="stat-value-payout">{formatSwipe(swipeTotalPotentialPayout)}</span>
+              </td>
+              <td className="value-cell">
+                <span className={`stat-value-profit ${swipeTotalPotentialProfit >= 0 ? 'profit' : 'loss'}`}>
+                  {swipeTotalPotentialProfit >= 0 ? '+' : ''}{formatSwipe(swipeTotalPotentialProfit)}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
         
-        {/* SWIPE Stats */}
-        <div className="stat-card swipe-card">
-          <h3>SWIPE Total<br/>Staked</h3>
-          <p className="stat-value-total">{formatEth(swipeTotalStaked)} SWIPE</p>
-        </div>
-        <div className="stat-card swipe-card">
-          <h3>SWIPE Potential<br/>Payout</h3>
-          <p className="stat-value-payout">{formatEth(swipeTotalPotentialPayout)} SWIPE</p>
-        </div>
-        <div className="stat-card swipe-card">
-          <h3>SWIPE Potential<br/>Profit</h3>
-          <p className={`stat-value-profit ${swipeTotalPotentialProfit >= 0 ? 'profit' : 'loss'}`}>
-            {swipeTotalPotentialProfit >= 0 ? '+' : ''}{formatEth(swipeTotalPotentialProfit)} SWIPE
-          </p>
-        </div>
-        
-        {/* General Stats */}
-        <div className="stat-card general-card">
-          <h3>Ready to<br/>Claim</h3>
-          <p className="stat-value-claim">{canClaimCount} predictions</p>
+        {/* Ready to Claim Badge */}
+        <div className="claim-badge-container">
+          <div className="claim-badge">
+            <span className="claim-icon">🎉</span>
+            <span className="claim-count">{canClaimCount}</span>
+            <span className="claim-label">Ready to Claim</span>
+          </div>
         </div>
       </div>
 
-      {/* Filter */}
-      <div className="filter-section">
-        <div className="filter-container">
+      {/* Filter Section - combined with message when no predictions */}
+      <div className={`filter-section ${filteredPredictions.length === 0 ? 'with-message' : ''}`}>
+        <div className={`filter-container ${filteredPredictions.length === 0 ? 'has-message' : ''}`}>
           <label htmlFor="prediction-filter" className="filter-label">
             Filter Predictions:
           </label>
@@ -1446,8 +1491,50 @@ export function EnhancedUserDashboard() {
               <SelectItem value="all">📊 All Predictions</SelectItem>
             </SelectContent>
           </Select>
-          
         </div>
+        
+        {/* No predictions message - inline when no results */}
+        {filteredPredictions.length === 0 && (
+          <div className="no-predictions-inline">
+            {selectedFilter === 'ready-to-claim' ? (
+              <>
+                <h3>🎉 No Rewards to Claim</h3>
+                <p>You don't have any predictions ready to claim right now.</p>
+                <p className="cta-text">Win some predictions to earn rewards!</p>
+              </>
+            ) : selectedFilter === 'active' ? (
+              <>
+                <h3>⏳ No Active Predictions</h3>
+                <p>There are no active predictions at the moment.</p>
+                <p className="cta-text">Check back soon for new predictions!</p>
+              </>
+            ) : selectedFilter === 'won' ? (
+              <>
+                <h3>🏆 No Wins Yet</h3>
+                <p>You haven't won any predictions yet.</p>
+                <p className="cta-text">Keep predicting to score your first win!</p>
+              </>
+            ) : selectedFilter === 'lost' ? (
+              <>
+                <h3>💔 No Losses</h3>
+                <p>Great news! You haven't lost any predictions.</p>
+                <p className="cta-text">Keep up the winning streak!</p>
+              </>
+            ) : selectedFilter === 'claimed' ? (
+              <>
+                <h3>✅ No Claimed Rewards</h3>
+                <p>You haven't claimed any rewards yet.</p>
+                <p className="cta-text">Win predictions and claim your rewards!</p>
+              </>
+            ) : (
+              <>
+                <h3>📝 No Predictions Found</h3>
+                <p>You haven't participated in any predictions yet.</p>
+                <p className="cta-text">Start by swiping on some predictions to place your stakes!</p>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Filtered Predictions Section */}
@@ -1494,85 +1581,151 @@ export function EnhancedUserDashboard() {
         </div>
       )}
 
-      {/* No predictions message */}
-      {userPredictions.length === 0 && (
-        <div className="no-predictions">
-          <h3>📝 No Predictions Found</h3>
-          <p>You haven't participated in any predictions yet.</p>
-          <p>Start by swiping on some predictions to place your stakes!</p>
-        </div>
-      )}
-
       {/* Transaction History */}
       <div className="section">
-        <h3>📊 Transaction History</h3>
+        <h3>🔄 Transaction History</h3>
         {loadingTransactions ? (
           <div className="loading-container">
             <div className="loading-spinner"></div>
             <p>Loading transaction history...</p>
           </div>
         ) : userTransactions.length > 0 ? (
-          <div className="transactions-list">
-                         {userTransactions.map((transaction, index) => {
-              // Determine the actual status to display
-              let displayStatus = transaction.status;
-              if (transaction.txHash && transaction.txHash !== 'undefined' && transaction.txHash.length > 10) {
-                // If we have a valid transaction hash, assume it's successful
-                displayStatus = 'success';
-              }
-              
-              // Create unique key combining index, id, and hash to avoid React duplicate key warnings
-              const uniqueKey = `${transaction.id}_${index}_${transaction.txHash || transaction.timestamp || ''}`;
-              
-              return (
-                <div key={uniqueKey} className="transaction-card">
-                   <div className="transaction-header">
-                     <div className="transaction-type">
-                       <span className={`type-badge ${transaction.type}`}>
-                         {transaction.type === 'claim' && '💰'}
-                         {transaction.type === 'stake' && '🎯'}
-                         {transaction.type === 'resolve' && '✅'}
-                         {transaction.type === 'cancel' && '🚫'}
-                         {transaction.type.toUpperCase()}
-                       </span>
-                       <span className={`status-badge ${displayStatus}`}>
-                         {displayStatus === 'pending' && '⏳'}
-                         {displayStatus === 'success' && '✅'}
-                         {displayStatus === 'failed' && '❌'}
-                         {displayStatus.toUpperCase()}
-                       </span>
-                     </div>
-                     <div className="transaction-time">
-                       {new Date(transaction.timestamp).toLocaleString()}
-                     </div>
-                   </div>
-                <div className="transaction-details">
-                  <p><strong>Prediction:</strong> {transaction.predictionQuestion}</p>
-                  <p><strong>Transaction Hash:</strong> 
-                    {transaction.txHash ? (
-                      <a 
-                        href={transaction.basescanUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="basescan-link"
-                      >
-                        {transaction.txHash.substring(0, 10)}...{transaction.txHash.substring(transaction.txHash.length - 8)}
-                      </a>
-                    ) : (
-                      <span>Pending...</span>
-                    )}
-                  </p>
-                  {transaction.amount && (
-                    <p><strong>Amount:</strong> {formatEth(transaction.amount)} ETH</p>
-                  )}
-                  {transaction.blockNumber && (
-                    <p><strong>Block:</strong> {transaction.blockNumber}</p>
-                  )}
-                </div>
+          <>
+            <div className="transactions-list">
+              {userTransactions
+                .sort((a, b) => b.timestamp - a.timestamp) // Sort by newest first
+                .slice((transactionPage - 1) * transactionsPerPage, transactionPage * transactionsPerPage)
+                .map((transaction, index) => {
+                  // Determine the actual status to display
+                  let displayStatus = transaction.status;
+                  if (transaction.txHash && transaction.txHash !== 'undefined' && transaction.txHash.length > 10) {
+                    // If we have a valid transaction hash, assume it's successful
+                    displayStatus = 'success';
+                  }
+                  
+                  // Create unique key combining index, id, and hash to avoid React duplicate key warnings
+                  const uniqueKey = `${transaction.id}_${index}_${transaction.txHash || transaction.timestamp || ''}`;
+                  
+                  // Determine token type
+                  // If tokenType is not set, try to guess based on amount
+                  // ETH stakes are typically small (< 1 ETH), SWIPE stakes are large (1000+)
+                  let tokenType = transaction.tokenType || 'ETH';
+                  
+                  // Auto-detect SWIPE for old transactions without tokenType
+                  // If amount is already converted (not in wei) and > 100, it's likely SWIPE
+                  if (!transaction.tokenType && transaction.amount) {
+                    const amountValue = transaction.amount;
+                    // If amount is small (likely already in ETH units) but > 100, it's SWIPE
+                    if (amountValue > 100 && amountValue < 1000000) {
+                      tokenType = 'SWIPE';
+                    }
+                    // If amount is huge (in wei) and when converted > 100, it's SWIPE
+                    if (amountValue > 1000000) {
+                      const converted = amountValue / Math.pow(10, 18);
+                      if (converted > 100) {
+                        tokenType = 'SWIPE';
+                      }
+                    }
+                  }
+                  
+                  const isSwipe = tokenType === 'SWIPE';
+                  
+                  return (
+                    <div key={uniqueKey} className="transaction-card">
+                      <div className="transaction-header">
+                        <div className="transaction-type">
+                          <span className={`type-badge ${transaction.type}`}>
+                            {transaction.type === 'claim' && '💰'}
+                            {transaction.type === 'stake' && '🎯'}
+                            {transaction.type === 'resolve' && '✅'}
+                            {transaction.type === 'cancel' && '🚫'}
+                            {transaction.type.toUpperCase()}
+                          </span>
+                          <span className={`token-type-badge ${tokenType.toLowerCase()}`}>
+                            {isSwipe ? (
+                              <img src="/splash.png" alt="SWIPE" className="token-badge-icon" />
+                            ) : (
+                              <img src="/eth.png" alt="ETH" className="token-badge-icon" />
+                            )}
+                            {tokenType}
+                          </span>
+                          <span className={`status-badge ${displayStatus}`}>
+                            {displayStatus === 'pending' && '⏳'}
+                            {displayStatus === 'success' && '✅'}
+                            {displayStatus === 'failed' && '❌'}
+                            {displayStatus.toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="transaction-time">
+                          {new Date(transaction.timestamp).toLocaleString()}
+                        </div>
+                      </div>
+                      <div className="transaction-details">
+                        <p><strong>Prediction:</strong> {transaction.predictionQuestion}</p>
+                        <p><strong>Transaction Hash:</strong> 
+                          {transaction.txHash ? (
+                            <a 
+                              href={transaction.basescanUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="basescan-link"
+                            >
+                              {transaction.txHash.substring(0, 10)}...{transaction.txHash.substring(transaction.txHash.length - 8)}
+                            </a>
+                          ) : (
+                            <span>Pending...</span>
+                          )}
+                        </p>
+                        {transaction.amount && transaction.amount > 0 && (
+                          <p className="transaction-amount">
+                            <strong>Amount:</strong>{' '}
+                            <span className={`amount-value ${tokenType.toLowerCase()}`}>
+                              {(() => {
+                                // Check if amount is in wei (very large number) or already in token units
+                                // If amount > 1000000, it's likely in wei and needs conversion
+                                const isWei = transaction.amount > 1000000;
+                                if (isSwipe) {
+                                  return isWei ? formatSwipe(transaction.amount) : `${transaction.amount.toLocaleString()}`;
+                                } else {
+                                  return isWei ? formatEth(transaction.amount) : transaction.amount.toFixed(6);
+                                }
+                              })()} {tokenType}
+                            </span>
+                          </p>
+                        )}
+                        {transaction.blockNumber && (
+                          <p><strong>Block:</strong> {transaction.blockNumber}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+            
+            {/* Pagination */}
+            {userTransactions.length > transactionsPerPage && (
+              <div className="transaction-pagination">
+                <button 
+                  className="pagination-btn"
+                  onClick={() => setTransactionPage(prev => Math.max(1, prev - 1))}
+                  disabled={transactionPage === 1}
+                >
+                  ← Previous
+                </button>
+                <span className="pagination-info">
+                  Page {transactionPage} of {Math.ceil(userTransactions.length / transactionsPerPage)}
+                  <span className="pagination-total">({userTransactions.length} total)</span>
+                </span>
+                <button 
+                  className="pagination-btn"
+                  onClick={() => setTransactionPage(prev => Math.min(Math.ceil(userTransactions.length / transactionsPerPage), prev + 1))}
+                  disabled={transactionPage >= Math.ceil(userTransactions.length / transactionsPerPage)}
+                >
+                  Next →
+                </button>
               </div>
-               );
-             })}
-          </div>
+            )}
+          </>
         ) : (
           <div className="no-transactions">
             <p>No transactions found. Your transaction history will appear here.</p>

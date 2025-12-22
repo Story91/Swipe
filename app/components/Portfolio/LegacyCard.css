@@ -1,19 +1,19 @@
 /* Legacy Card Styles - V1 Predictions */
 
 .legacy-card {
-  background: linear-gradient(135deg, #2a2a2a, #1a1a1a);
-  border: 2px solid rgba(255, 165, 0, 0.3);
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0a0a0a 100%);
+  border: 2px solid rgba(212, 255, 0, 0.4);
   border-radius: 16px;
   padding: 20px;
   margin-bottom: 20px;
   position: relative;
-  box-shadow: 0 8px 32px rgba(255, 165, 0, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   transition: all 0.3s ease;
 }
 
 .legacy-card:hover {
-  border-color: rgba(255, 165, 0, 0.5);
-  box-shadow: 0 12px 40px rgba(255, 165, 0, 0.15);
+  border-color: rgba(212, 255, 0, 0.7);
+  box-shadow: 0 12px 40px rgba(212, 255, 0, 0.2);
   transform: translateY(-2px);
 }
 
@@ -22,7 +22,7 @@
   position: absolute;
   top: -10px;
   right: 20px;
-  background: linear-gradient(135deg, #ffa500, #ff8c00);
+  background: linear-gradient(135deg, #d4ff00, #c8f000);
   color: #000;
   padding: 6px 12px;
   border-radius: 20px;
@@ -31,7 +31,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  box-shadow: 0 4px 12px rgba(255, 165, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(212, 255, 0, 0.3);
 }
 
 .legacy-icon {
@@ -108,7 +108,7 @@
   padding: 8px 12px;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 8px;
-  border: 1px solid rgba(255, 165, 0, 0.2);
+  border: 1px solid rgba(212, 255, 0, 0.2);
 }
 
 .legacy-meta-label {
@@ -140,9 +140,9 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px;
-  background: rgba(255, 165, 0, 0.1);
+  background: rgba(212, 255, 0, 0.05);
   border-radius: 8px;
-  border: 1px solid rgba(255, 165, 0, 0.3);
+  border: 1px solid rgba(212, 255, 0, 0.3);
 }
 
 .legacy-pool-label {
@@ -153,7 +153,7 @@
 
 .legacy-pool-value {
   font-size: 14px;
-  color: #ffa500;
+  color: #d4ff00;
   font-weight: 700;
 }
 
@@ -209,8 +209,8 @@
 
 /* Stake Info */
 .legacy-stake-info {
-  background: rgba(255, 165, 0, 0.05);
-  border: 1px solid rgba(255, 165, 0, 0.2);
+  background: rgba(212, 255, 0, 0.03);
+  border: 1px solid rgba(212, 255, 0, 0.2);
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 16px;
@@ -226,7 +226,7 @@
 .legacy-stake-title {
   font-size: 16px;
   font-weight: 700;
-  color: #ffa500;
+  color: #d4ff00;
   margin: 0;
 }
 
@@ -314,8 +314,8 @@
 }
 
 .legacy-claimable {
-  color: #ffa500;
-  background: rgba(255, 165, 0, 0.1);
+  color: #d4ff00;
+  background: rgba(212, 255, 0, 0.1);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -338,7 +338,7 @@
 }
 
 .legacy-claim-btn {
-  background: linear-gradient(135deg, #ffa500, #ff8c00);
+  background: linear-gradient(135deg, #d4ff00, #c8f000);
   color: #000;
   border: none;
   padding: 12px 24px;
@@ -353,13 +353,13 @@
 }
 
 .legacy-claim-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #ff8c00, #ff7700);
+  background: linear-gradient(135deg, #e0ff33, #d4ff00);
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(255, 165, 0, 0.3);
+  box-shadow: 0 6px 20px rgba(212, 255, 0, 0.4);
 }
 
 .legacy-claim-btn:disabled {
-  background: rgba(255, 165, 0, 0.3);
+  background: rgba(212, 255, 0, 0.3);
   color: rgba(0, 0, 0, 0.5);
   cursor: not-allowed;
   transform: none;
