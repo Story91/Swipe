@@ -1559,6 +1559,9 @@ KEY USER-FACING CHANGES: V1 → V2
   const [userStakes, setUserStakes] = useState<{[userId: string]: UserStakeData}>({});
   const [stakesLoading, setStakesLoading] = useState(false);
   
+  // State for earnings pagination
+  const [earningsPage, setEarningsPage] = useState(0);
+  
   // State for copied addresses animation
   const [copiedAddresses, setCopiedAddresses] = useState<Set<string>>(new Set());
   
@@ -1587,6 +1590,8 @@ KEY USER-FACING CHANGES: V1 → V2
       setStakesLoading(true);
       // Clear previous stakes when switching predictions
       setUserStakes({});
+      // Reset earnings pagination
+      setEarningsPage(0);
       
       try {
         console.log(`🔍 Fetching stakes for prediction: ${predictionId}`);
@@ -2456,6 +2461,98 @@ KEY USER-FACING CHANGES: V1 → V2
                 return <div className="text-center text-zinc-400 font-mono text-xs py-4">No stakes data available</div>;
               }
 
+              // Find current user's stake (if connected)
+              const myStake = address ? stakersWithEarnings.find(s => s.address.toLowerCase() === address.toLowerCase()) : null;
+              
+              // Get other stakers (excluding current user)
+              const allOtherStakers = stakersWithEarnings
+                .filter(s => !address || s.address.toLowerCase() !== address.toLowerCase());
+              
+              // Pagination
+              const ITEMS_PER_PAGE = 10;
+              const totalPages = Math.ceil(allOtherStakers.length / ITEMS_PER_PAGE);
+              const startIdx = earningsPage * ITEMS_PER_PAGE;
+              const endIdx = startIdx + ITEMS_PER_PAGE;
+              const otherStakers = allOtherStakers.slice(startIdx, endIdx);
+
+              // Helper to render a staker row
+              const renderStakerRow = (staker: typeof stakersWithEarnings[0], idx: number, isCurrentUser: boolean) => {
+                const hasEthYes = staker.yesAmount > 0;
+                const hasEthNo = staker.noAmount > 0;
+                const hasSwipeYes = staker.swipeYesAmount > 0;
+                const hasSwipeNo = staker.swipeNoAmount > 0;
+                
+                return (
+                  <div 
+                    key={staker.address} 
+                    className={`grid grid-cols-12 gap-1 items-center px-2 py-2 rounded-lg ${
+                      isCurrentUser 
+                        ? 'bg-[#d4ff00]/15 border border-[#d4ff00]/40' 
+                        : idx % 2 === 0 ? 'bg-zinc-800/50' : 'bg-zinc-900/30'
+                    }`}
+                  >
+                    {/* User info */}
+                    <div className="col-span-4 flex items-center gap-1.5 overflow-hidden">
+                      <Avatar className={`w-5 h-5 flex-shrink-0 ${isCurrentUser ? 'ring-2 ring-[#d4ff00]' : ''}`}>
+                        <AvatarImage src={staker.pfp || undefined} />
+                        <AvatarFallback className={`text-[8px] ${isCurrentUser ? 'bg-[#d4ff00] text-black font-bold' : 'bg-zinc-600 text-white'}`}>
+                          {isCurrentUser ? 'ME' : staker.displayName.slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className={`text-[10px] font-mono truncate font-medium ${isCurrentUser ? 'text-[#d4ff00]' : 'text-white'}`}>
+                        {isCurrentUser ? '👉 YOU' : (staker.displayName.length > 8 ? staker.displayName.slice(0, 8) + '...' : staker.displayName)}
+                      </span>
+                    </div>
+                    
+                    {/* If YES wins */}
+                    <div className="col-span-4 text-center">
+                      {(hasEthYes || hasSwipeYes) ? (
+                        <div className="space-y-0.5">
+                          {hasEthYes && (
+                            <div className={`text-[10px] font-mono font-bold ${isCurrentUser ? 'text-emerald-300' : 'text-emerald-400'}`}>
+                              +{(staker.ethYesEarnings / 1e18).toFixed(4)} ETH
+                            </div>
+                          )}
+                          {hasSwipeYes && (
+                            <div className="text-[10px] font-mono text-[#d4ff00] font-bold">
+                              +{formatSwipeAmount(staker.swipeYesEarnings / 1e18)} $SWIPE
+                            </div>
+                          )}
+                          <div className={`text-[8px] font-mono ${isCurrentUser ? 'text-emerald-200' : 'text-emerald-300'}`}>
+                            +{(hasEthYes ? staker.ethYesProfitPercent : staker.swipeYesProfitPercent).toFixed(0)}%
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-zinc-500">—</span>
+                      )}
+                    </div>
+                    
+                    {/* If NO wins */}
+                    <div className="col-span-4 text-center">
+                      {(hasEthNo || hasSwipeNo) ? (
+                        <div className="space-y-0.5">
+                          {hasEthNo && (
+                            <div className={`text-[10px] font-mono font-bold ${isCurrentUser ? 'text-rose-300' : 'text-rose-400'}`}>
+                              +{(staker.ethNoEarnings / 1e18).toFixed(4)} ETH
+                            </div>
+                          )}
+                          {hasSwipeNo && (
+                            <div className="text-[10px] font-mono text-[#d4ff00] font-bold">
+                              +{formatSwipeAmount(staker.swipeNoEarnings / 1e18)} $SWIPE
+                            </div>
+                          )}
+                          <div className={`text-[8px] font-mono ${isCurrentUser ? 'text-rose-200' : 'text-rose-300'}`}>
+                            +{(hasEthNo ? staker.ethNoProfitPercent : staker.swipeNoProfitPercent).toFixed(0)}%
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-zinc-500">—</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              };
+
               return (
                 <div className="space-y-2">
                   {/* Header row */}
@@ -2465,85 +2562,68 @@ KEY USER-FACING CHANGES: V1 → V2
                     <div className="col-span-4 text-center text-rose-400 font-bold">IF NO WINS</div>
                   </div>
                   
-                  {/* Staker rows */}
-                  {stakersWithEarnings.slice(0, 10).map((staker, idx) => {
-                    const hasEthYes = staker.yesAmount > 0;
-                    const hasEthNo = staker.noAmount > 0;
-                    const hasSwipeYes = staker.swipeYesAmount > 0;
-                    const hasSwipeNo = staker.swipeNoAmount > 0;
-                    
-                    return (
-                      <div 
-                        key={staker.address} 
-                        className={`grid grid-cols-12 gap-1 items-center px-2 py-2 rounded-lg ${
-                          idx % 2 === 0 ? 'bg-zinc-800/50' : 'bg-zinc-900/30'
+                  {/* Current user's stake - always first if they have one */}
+                  {myStake && renderStakerRow(myStake, 0, true)}
+                  
+                  {/* Separator between user and others */}
+                  {myStake && otherStakers.length > 0 && (
+                    <div className="border-t border-zinc-600/50 my-1 pt-1">
+                      <div className="text-[9px] font-mono text-zinc-500 px-2">TOP SWIPERS</div>
+                    </div>
+                  )}
+                  
+                  {/* Other stakers - paginated */}
+                  {otherStakers.map((staker, idx) => renderStakerRow(staker, idx, false))}
+                  
+                  {/* Pagination controls - only if more than 10 other stakers */}
+                  {allOtherStakers.length > ITEMS_PER_PAGE && (
+                    <div className="flex items-center justify-center gap-2 pt-2 border-t border-zinc-700/50 mt-2">
+                      <button
+                        onClick={() => setEarningsPage(p => Math.max(0, p - 1))}
+                        disabled={earningsPage === 0}
+                        className={`px-2 py-1 rounded text-[10px] font-mono font-bold transition-all ${
+                          earningsPage === 0 
+                            ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed' 
+                            : 'bg-zinc-700 text-white hover:bg-zinc-600'
                         }`}
                       >
-                        {/* User info */}
-                        <div className="col-span-4 flex items-center gap-1.5 overflow-hidden">
-                          <Avatar className="w-5 h-5 flex-shrink-0">
-                            <AvatarImage src={staker.pfp || undefined} />
-                            <AvatarFallback className="text-[8px] bg-zinc-600 text-white">
-                              {staker.displayName.slice(0, 2).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="text-[10px] font-mono text-white truncate font-medium">
-                            {staker.displayName.length > 8 ? staker.displayName.slice(0, 8) + '...' : staker.displayName}
-                          </span>
-                        </div>
-                        
-                        {/* If YES wins */}
-                        <div className="col-span-4 text-center">
-                          {(hasEthYes || hasSwipeYes) ? (
-                            <div className="space-y-0.5">
-                              {hasEthYes && (
-                                <div className="text-[10px] font-mono text-emerald-400 font-bold">
-                                  +{(staker.ethYesEarnings / 1e18).toFixed(4)} ETH
-                                </div>
-                              )}
-                              {hasSwipeYes && (
-                                <div className="text-[10px] font-mono text-[#d4ff00] font-bold">
-                                  +{formatSwipeAmount(staker.swipeYesEarnings / 1e18)} $SWIPE
-                                </div>
-                              )}
-                              <div className="text-[8px] font-mono text-emerald-300">
-                                +{(hasEthYes ? staker.ethYesProfitPercent : staker.swipeYesProfitPercent).toFixed(0)}%
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-[10px] text-zinc-500">—</span>
-                          )}
-                        </div>
-                        
-                        {/* If NO wins */}
-                        <div className="col-span-4 text-center">
-                          {(hasEthNo || hasSwipeNo) ? (
-                            <div className="space-y-0.5">
-                              {hasEthNo && (
-                                <div className="text-[10px] font-mono text-rose-400 font-bold">
-                                  +{(staker.ethNoEarnings / 1e18).toFixed(4)} ETH
-                                </div>
-                              )}
-                              {hasSwipeNo && (
-                                <div className="text-[10px] font-mono text-[#d4ff00] font-bold">
-                                  +{formatSwipeAmount(staker.swipeNoEarnings / 1e18)} $SWIPE
-                                </div>
-                              )}
-                              <div className="text-[8px] font-mono text-rose-300">
-                                +{(hasEthNo ? staker.ethNoProfitPercent : staker.swipeNoProfitPercent).toFixed(0)}%
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-[10px] text-zinc-500">—</span>
-                          )}
-                        </div>
+                        ◀ PREV
+                      </button>
+                      
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: totalPages }, (_, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setEarningsPage(i)}
+                            className={`w-6 h-6 rounded text-[10px] font-mono font-bold transition-all ${
+                              earningsPage === i 
+                                ? 'bg-[#d4ff00] text-black' 
+                                : 'bg-zinc-700 text-zinc-400 hover:bg-zinc-600 hover:text-white'
+                            }`}
+                          >
+                            {i + 1}
+                          </button>
+                        ))}
                       </div>
-                    );
-                  })}
+                      
+                      <button
+                        onClick={() => setEarningsPage(p => Math.min(totalPages - 1, p + 1))}
+                        disabled={earningsPage === totalPages - 1}
+                        className={`px-2 py-1 rounded text-[10px] font-mono font-bold transition-all ${
+                          earningsPage === totalPages - 1 
+                            ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed' 
+                            : 'bg-zinc-700 text-white hover:bg-zinc-600'
+                        }`}
+                      >
+                        NEXT ▶
+                      </button>
+                    </div>
+                  )}
                   
-                  {stakersWithEarnings.length > 10 && (
-                    <div className="text-center text-zinc-400 font-mono text-[10px] pt-1">
-                      +{stakersWithEarnings.length - 10} more swipers...
+                  {/* Total count info */}
+                  {allOtherStakers.length > ITEMS_PER_PAGE && (
+                    <div className="text-center text-zinc-500 font-mono text-[9px] pt-1">
+                      Showing {startIdx + 1}-{Math.min(endIdx, allOtherStakers.length)} of {allOtherStakers.length} swipers
                     </div>
                   )}
                 </div>
