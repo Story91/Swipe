@@ -195,7 +195,7 @@ export function AdminDashboard({
     }
   }, []);
 
-  // Handle collecting real leaderboard data
+  // Handle collecting real leaderboard data (simplified - divides stakes equally)
   const handleCollectRealLeaderboardData = useCallback(async () => {
     try {
       console.log('🔍 Collecting real leaderboard data...');
@@ -219,6 +219,38 @@ export function AdminDashboard({
     } catch (error) {
       console.error('❌ Failed to collect real leaderboard data:', error);
       alert('❌ Collection Failed: Failed to collect real leaderboard data');
+    }
+  }, []);
+
+  // Handle rescanning V2 contract for accurate leaderboard (reads actual stakes from blockchain)
+  const handleRescanV2Leaderboard = useCallback(async () => {
+    if (!confirm('🔄 Rescan V2 Contract?\n\nThis will:\n- Read actual user stakes from blockchain\n- Update Redis with accurate data\n- Update leaderboard cache\n\nThis may take a few minutes. Continue?')) {
+      return;
+    }
+
+    try {
+      console.log('🔄 Rescanning V2 contract for leaderboard...');
+      
+      const response = await fetch('/api/admin/rescan-v2-leaderboard', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ V2 contract rescanned:', data);
+        
+        // Show success notification
+        alert(`✅ V2 Contract Rescanned!\n\nFound ${data.data.totalUsers} users\n${data.data.totalV2Predictions} V2 predictions\n\nETH Leaderboard: ${data.data.ethLeaderboardCount} users\nSWIPE Leaderboard: ${data.data.swipeLeaderboardCount} users\n\nLeaderboard updated!`);
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to rescan: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('❌ Failed to rescan V2 leaderboard:', error);
+      alert(`❌ Rescan Failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }, []);
 
@@ -608,7 +640,14 @@ export function AdminDashboard({
               gap: '3px'
             }}
           >
-            🔍 Collect Real Data
+            🔍 Collect Real Data (Simplified)
+          </button>
+          <button
+            onClick={handleRescanV2Leaderboard}
+            className="admin-button"
+            style={{ marginLeft: '10px' }}
+          >
+            🔄 Rescan V2 Contract (Accurate)
           </button>
           
           {!loadedAll && (

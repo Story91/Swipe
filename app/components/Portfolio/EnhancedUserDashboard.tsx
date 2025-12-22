@@ -1378,7 +1378,6 @@ export function EnhancedUserDashboard() {
 
   return (
     <div className="enhanced-user-dashboard">
-
       {/* Summary Stats */}
       <div className="summary-stats">
         {/* ETH Stats */}

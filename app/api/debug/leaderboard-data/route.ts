@@ -8,17 +8,18 @@ export async function POST(request: NextRequest) {
   try {
     console.log('🔍 Starting leaderboard data collection...');
 
-    // Check cache first
-    const cacheKey = 'real_leaderboard_data';
+    // Check cache first - use same key as getRealLeaderboardData()
+    const cacheKey = 'leaderboard:real_data';
     const cachedData = await redis.get(cacheKey);
     
     if (cachedData) {
-      console.log('✅ Returning cached real leaderboard data');
+      console.log('✅ Returning cached real leaderboard data (skipping simplified collection)');
       const parsedCache = typeof cachedData === 'string' ? JSON.parse(cachedData) : cachedData;
       return NextResponse.json({
         success: true,
         data: parsedCache,
-        cached: true
+        cached: true,
+        message: 'Using cached data. Use "Rescan V2 Contract" for accurate blockchain data.'
       });
     }
 
@@ -208,10 +209,11 @@ export async function POST(request: NextRequest) {
     console.log('✅ Leaderboard data collection completed');
     console.log(`📊 Summary: ${result.data.summary.totalETHStaked.toFixed(4)} ETH, ${result.data.summary.totalSWIPEStaked.toFixed(0)} SWIPE staked`);
 
-    // Save real leaderboard data to Redis cache
+    // Save real leaderboard data to Redis cache (only if cache is empty or expired)
+    // Note: This uses simplified approach - use "Rescan V2 Contract" for accurate data
     try {
-      console.log('💾 Saving real leaderboard data to Redis...');
-      await redis.setex(cacheKey, 3600, JSON.stringify(result.data)); // Cache for 1 hour
+      console.log('💾 Saving simplified leaderboard data to Redis (24h cache)...');
+      await redis.setex(cacheKey, 86400, JSON.stringify(result.data)); // Cache for 24 hours
       console.log('💾 Real leaderboard data saved to Redis');
     } catch (error) {
       console.error('❌ Failed to save real leaderboard data to Redis:', error);

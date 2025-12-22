@@ -296,12 +296,22 @@ export function Leaderboard() {
                       {selectedTab === 'eth' ? (
                         <>
                           <img src="/eth.png" alt="ETH" className="stat-icon" />
-                          <span className="amount-text">{(user.totalStakedETH / 1e18).toFixed(4)}</span>
+                          <span className="amount-text">
+                            {/* Check if value is in wei (> 1e15) or already in ETH (< 1e15) */}
+                            {(user.totalStakedETH > 1e15 
+                              ? (user.totalStakedETH / 1e18).toFixed(4) 
+                              : user.totalStakedETH.toFixed(4))}
+                          </span>
                         </>
                       ) : (
                         <>
                           <img src="/logo.png" alt="SWIPE" className="stat-icon" />
-                          <span className="amount-text">{formatSWIPEAmount(user.totalStakedSWIPE)}</span>
+                          <span className="amount-text">
+                            {/* formatSWIPEAmount expects wei, so multiply if already in SWIPE */}
+                            {formatSWIPEAmount(user.totalStakedSWIPE > 1e15 
+                              ? user.totalStakedSWIPE 
+                              : user.totalStakedSWIPE * 1e18)}
+                          </span>
                         </>
                       )}
                     </div>

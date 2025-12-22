@@ -37,6 +37,7 @@ export const REDIS_KEYS = {
   COMPACT_STATS: 'market:compact_stats',
   REAL_LEADERBOARD: 'leaderboard:real_data',
   USER_PORTFOLIO: (userId: string) => `user:portfolio:${userId}`,
+  SWIPE_CLAIM_HISTORY: (userId: string) => `swipe_claim_history:${userId}`,
 } as const;
 
 // Import types from separate file

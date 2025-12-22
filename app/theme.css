@@ -216,9 +216,9 @@ button, .btn {
 .mini-app-menu .menubar-trigger {
   font-family: "Orbitron", sans-serif;
   font-weight: 700;
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   letter-spacing: 0;
-  padding: 0.5rem 0.2rem !important;
+  padding: 0.5rem 0.1rem !important;
   min-width: 0 !important;
   width: 100% !important;
   white-space: nowrap;
@@ -245,24 +245,24 @@ button, .btn {
 /* Responsive Menu for Mini App */
 @media (max-width: 424px) {
   .mini-app-menu {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     padding: 0.1rem;
   }
   
   .mini-app-menu .menubar-trigger {
-    font-size: 0.7rem;
-    padding: 0.4rem 0.1rem !important;
+    font-size: 0.65rem;
+    padding: 0.4rem 0.05rem !important;
   }
 }
 
 @media (max-width: 380px) {
   .mini-app-menu {
-    font-size: 0.65rem;
+    font-size: 0.6rem;
   }
   
   .mini-app-menu .menubar-trigger {
-    font-size: 0.65rem;
-    padding: 0.35rem 0.05rem !important;
+    font-size: 0.6rem;
+    padding: 0.35rem 0.02rem !important;
   }
 }
 

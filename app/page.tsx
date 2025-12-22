@@ -45,6 +45,7 @@ import { RecentActivity } from "./components/Support/RecentActivity";
 import { CreatePredictionModal } from "./components/Modals/CreatePredictionModal";
 import { HowToPlayModal } from "./components/Modals/HowToPlayModal";
 import { SwipeTokenCard } from "./components/Market/SwipeTokenCard";
+import { SwipeClaim } from "./components/Portfolio/SwipeClaim";
 
 type DashboardType = 'tinder' | 'user' | 'admin' | 'approver' | 'market-stats' | 'analytics' | 'settings' | 'audit-logs' | 'my-portfolio' | 'active-bets' | 'bet-history' | 'help-faq' | 'leaderboard' | 'recent-activity' | 'swipe-token';
 
@@ -194,6 +195,14 @@ export default function App() {
             <MenubarMenu>
               <MenubarTrigger 
                 className="menubar-trigger animate-pulse !bg-[#d4ff00] !text-black !font-bold hover:!bg-[#c4ef00]" 
+                onClick={() => setActiveDashboard('claim')}
+              >
+                🎁 Claim
+              </MenubarTrigger>
+            </MenubarMenu>
+            <MenubarMenu>
+              <MenubarTrigger 
+                className="menubar-trigger animate-pulse !bg-[#d4ff00] !text-black !font-bold hover:!bg-[#c4ef00]" 
                 onClick={() => setActiveDashboard('swipe-token')}
               >
                 $SWIPE
@@ -244,6 +253,13 @@ export default function App() {
 
           {/* SWIPE Token Card */}
           {activeDashboard === 'swipe-token' && <SwipeTokenCard />}
+
+          {/* Claim Page */}
+          {activeDashboard === 'claim' && (
+            <div style={{ padding: '20px' }}>
+              <SwipeClaim />
+            </div>
+          )}
 
           {/* Market Stats - separate from main dashboard flow */}
           {activeDashboard === 'market-stats' && <CompactStats />}

@@ -39,10 +39,18 @@ module.exports = {
     },
   },
   etherscan: {
-    apiKey: {
-      base: process.env.BASESCAN_API_KEY,
-      sepolia: process.env.ETHERSCAN_API_KEY,
-    },
+    // Use single Etherscan API V2 key for all chains (required for V2 migration)
+    apiKey: process.env.ETHERSCAN_API_V2_KEY || process.env.BASESCAN_API_KEY || process.env.ETHERSCAN_API_KEY,
+    customChains: [
+      {
+        network: "base",
+        chainId: 8453,
+        urls: {
+          apiURL: "https://api.etherscan.io/v2/api", // Use V2 API endpoint
+          browserURL: "https://basescan.org"
+        }
+      }
+    ]
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,

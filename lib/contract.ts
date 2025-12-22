@@ -1351,6 +1351,57 @@ export function getContract(signer?: ethers.Signer) {
   return getV2Contract(signer); // Default to V2
 }
 
+// SwipeClaim Contract Configuration
+export const SWIPE_CLAIM_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_SWIPE_CLAIM_CONTRACT || '0x0000000000000000000000000000000000000000';
+
+// SwipeClaim Contract ABI (simplified - only functions we need)
+export const SWIPE_CLAIM_ABI = [
+  {
+    inputs: [],
+    name: 'claimSwipe',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: '_user', type: 'address' }],
+    name: 'getUserClaimInfo',
+    outputs: [
+      { name: 'eligible', type: 'bool' },
+      { name: 'betCount', type: 'uint256' },
+      { name: 'rewardAmount', type: 'uint256' }
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: '_user', type: 'address' }],
+    name: 'hasClaimed',
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [],
+    name: 'claimingEnabled',
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [],
+    name: 'getSwipeBalance',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  }
+] as const;
+
+export const SWIPE_CLAIM_CONFIG = {
+  address: SWIPE_CLAIM_CONTRACT_ADDRESS,
+  abi: SWIPE_CLAIM_ABI,
+};
+
 // Type definitions for TypeScript
 export interface PredictionView {
   question: string;
