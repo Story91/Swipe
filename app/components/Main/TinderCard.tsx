@@ -1546,8 +1546,14 @@ KEY USER-FACING CHANGES: V1 → V2
     return uniqueParticipants;
   }, [currentCard?.id, hybridPredictions]);
   
-  // State for user stakes/votes
-  const [userStakes, setUserStakes] = useState<{[userId: string]: 'YES' | 'NO' | 'BOTH' | 'NONE'}>({});
+  // State for user stakes/votes with full stake data
+  interface UserStakeData {
+    vote: 'YES' | 'NO' | 'BOTH' | 'NONE';
+    yesAmount: number;
+    noAmount: number;
+    totalStaked: number;
+  }
+  const [userStakes, setUserStakes] = useState<{[userId: string]: UserStakeData}>({});
   const [stakesLoading, setStakesLoading] = useState(false);
   
   // State for copied addresses animation
@@ -1585,9 +1591,14 @@ KEY USER-FACING CHANGES: V1 → V2
         if (response.ok) {
           const data = await response.json();
           if (data.success) {
-            const stakesMap: {[userId: string]: 'YES' | 'NO' | 'BOTH' | 'NONE'} = {};
+            const stakesMap: {[userId: string]: UserStakeData} = {};
             data.data.stakes.forEach((stake: any) => {
-              stakesMap[stake.userId.toLowerCase()] = stake.vote;
+              stakesMap[stake.userId.toLowerCase()] = {
+                vote: stake.vote,
+                yesAmount: stake.yesAmount || 0,
+                noAmount: stake.noAmount || 0,
+                totalStaked: stake.totalStaked || 0
+              };
             });
             setUserStakes(stakesMap);
             console.log(`✅ Loaded stakes for prediction ${predictionId}:`, stakesMap);
@@ -2267,7 +2278,8 @@ KEY USER-FACING CHANGES: V1 → V2
                                  return colors[Math.abs(hash) % colors.length];
                                };
                                
-                               const userVote = userStakes[participantAddress.toLowerCase()] || 'NONE';
+                               const userStakeData = userStakes[participantAddress.toLowerCase()];
+                               const userVote = userStakeData?.vote || 'NONE';
                                
                                const getVoteIndicatorClass = () => {
                                  switch (userVote) {
@@ -2335,6 +2347,145 @@ KEY USER-FACING CHANGES: V1 → V2
           <div className="swipers-footer">Click avatars to view profiles</div>
            </div>
          </div>
+
+      {/* Potential Earnings Section */}
+      {Object.keys(userStakes).length > 0 && (
+        <div className="mt-4 rounded-xl overflow-hidden" style={{ backgroundColor: 'rgba(0, 0, 0, 0.85)' }}>
+          <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-700/50">
+            <span className="text-white font-mono text-xs font-bold">[ POTENTIAL_EARNINGS ]</span>
+            <span className="text-[#d4ff00] font-mono text-sm font-bold">💰</span>
+          </div>
+          <div className="p-3">
+            {(() => {
+              // Get current prediction pool data
+              const currentPred = transformedPredictions[currentIndex];
+              if (!currentPred) return null;
+
+              const yesPoolETH = (currentPred.yesTotalAmount || 0);
+              const noPoolETH = (currentPred.noTotalAmount || 0);
+              const platformFee = 0.01; // 1% fee
+
+              // Calculate potential earnings for each staker
+              const stakersWithEarnings = Object.entries(userStakes)
+                .filter(([_, data]) => data.totalStaked > 0)
+                .map(([address, data]) => {
+                  const profile = profiles.find((p: any) => p && p.address === address);
+                  const displayName = profile?.display_name || profile?.username || `${address.slice(0, 6)}...${address.slice(-4)}`;
+                  
+                  // Calculate potential payout if YES wins
+                  let yesEarnings = 0;
+                  let yesProfitPercent = 0;
+                  if (data.yesAmount > 0 && yesPoolETH > 0) {
+                    const shareOfYesPool = data.yesAmount / yesPoolETH;
+                    const winningsFromLosingPool = noPoolETH * (1 - platformFee);
+                    yesEarnings = data.yesAmount + (shareOfYesPool * winningsFromLosingPool);
+                    yesProfitPercent = ((yesEarnings - data.yesAmount) / data.yesAmount) * 100;
+                  }
+
+                  // Calculate potential payout if NO wins
+                  let noEarnings = 0;
+                  let noProfitPercent = 0;
+                  if (data.noAmount > 0 && noPoolETH > 0) {
+                    const shareOfNoPool = data.noAmount / noPoolETH;
+                    const winningsFromLosingPool = yesPoolETH * (1 - platformFee);
+                    noEarnings = data.noAmount + (shareOfNoPool * winningsFromLosingPool);
+                    noProfitPercent = ((noEarnings - data.noAmount) / data.noAmount) * 100;
+                  }
+
+                  return {
+                    address,
+                    displayName,
+                    vote: data.vote,
+                    yesAmount: data.yesAmount,
+                    noAmount: data.noAmount,
+                    yesEarnings,
+                    noEarnings,
+                    yesProfitPercent,
+                    noProfitPercent,
+                    pfp: profile?.pfp_url
+                  };
+                })
+                .sort((a, b) => (b.yesAmount + b.noAmount) - (a.yesAmount + a.noAmount)); // Sort by total stake
+
+              if (stakersWithEarnings.length === 0) {
+                return <div className="text-center text-zinc-400 font-mono text-xs py-4">No stakes data available</div>;
+              }
+
+              return (
+                <div className="space-y-2">
+                  {/* Header row */}
+                  <div className="grid grid-cols-12 gap-1 text-[10px] font-mono px-2 border-b border-zinc-600/50 pb-2">
+                    <div className="col-span-4 text-zinc-400">SWIPER</div>
+                    <div className="col-span-4 text-center text-emerald-400 font-bold">IF YES WINS</div>
+                    <div className="col-span-4 text-center text-rose-400 font-bold">IF NO WINS</div>
+                  </div>
+                  
+                  {/* Staker rows */}
+                  {stakersWithEarnings.slice(0, 10).map((staker, idx) => (
+                    <div 
+                      key={staker.address} 
+                      className={`grid grid-cols-12 gap-1 items-center px-2 py-2 rounded-lg ${
+                        idx % 2 === 0 ? 'bg-zinc-800/50' : 'bg-zinc-900/30'
+                      }`}
+                    >
+                      {/* User info */}
+                      <div className="col-span-4 flex items-center gap-1.5 overflow-hidden">
+                        <Avatar className="w-5 h-5 flex-shrink-0">
+                          <AvatarImage src={staker.pfp || undefined} />
+                          <AvatarFallback className="text-[8px] bg-zinc-600 text-white">
+                            {staker.displayName.slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-[10px] font-mono text-white truncate font-medium">
+                          {staker.displayName.length > 8 ? staker.displayName.slice(0, 8) + '...' : staker.displayName}
+                        </span>
+                      </div>
+                      
+                      {/* If YES wins */}
+                      <div className="col-span-4 text-center">
+                        {staker.yesAmount > 0 ? (
+                          <div className="space-y-0.5">
+                            <div className="text-[10px] font-mono text-emerald-400 font-bold">
+                              +{(staker.yesEarnings / 1e18).toFixed(4)} ETH
+                            </div>
+                            <div className="text-[8px] font-mono text-emerald-300">
+                              +{staker.yesProfitPercent.toFixed(0)}% profit
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-zinc-500">—</span>
+                        )}
+                      </div>
+                      
+                      {/* If NO wins */}
+                      <div className="col-span-4 text-center">
+                        {staker.noAmount > 0 ? (
+                          <div className="space-y-0.5">
+                            <div className="text-[10px] font-mono text-rose-400 font-bold">
+                              +{(staker.noEarnings / 1e18).toFixed(4)} ETH
+                            </div>
+                            <div className="text-[8px] font-mono text-rose-300">
+                              +{staker.noProfitPercent.toFixed(0)}% profit
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-zinc-500">—</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {stakersWithEarnings.length > 10 && (
+                    <div className="text-center text-zinc-400 font-mono text-[10px] pt-1">
+                      +{stakersWithEarnings.length - 10} more swipers...
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
         </div>
 
       {/* Professional Stake Modal with shadcn */}
