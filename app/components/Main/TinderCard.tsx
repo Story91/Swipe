@@ -1552,6 +1552,9 @@ KEY USER-FACING CHANGES: V1 → V2
     yesAmount: number;
     noAmount: number;
     totalStaked: number;
+    swipeYesAmount: number;
+    swipeNoAmount: number;
+    totalSwipeStaked: number;
   }
   const [userStakes, setUserStakes] = useState<{[userId: string]: UserStakeData}>({});
   const [stakesLoading, setStakesLoading] = useState(false);
@@ -1597,7 +1600,10 @@ KEY USER-FACING CHANGES: V1 → V2
                 vote: stake.vote,
                 yesAmount: stake.yesAmount || 0,
                 noAmount: stake.noAmount || 0,
-                totalStaked: stake.totalStaked || 0
+                totalStaked: stake.totalStaked || 0,
+                swipeYesAmount: stake.swipeYesAmount || 0,
+                swipeNoAmount: stake.swipeNoAmount || 0,
+                totalSwipeStaked: stake.totalSwipeStaked || 0
               };
             });
             setUserStakes(stakesMap);
@@ -2361,51 +2367,90 @@ KEY USER-FACING CHANGES: V1 → V2
               const currentPred = transformedPredictions[currentIndex];
               if (!currentPred) return null;
 
+              // ETH pools
               const yesPoolETH = (currentPred.yesTotalAmount || 0);
               const noPoolETH = (currentPred.noTotalAmount || 0);
+              // SWIPE pools
+              const yesPoolSWIPE = (currentPred.swipeYesTotalAmount || 0);
+              const noPoolSWIPE = (currentPred.swipeNoTotalAmount || 0);
               const platformFee = 0.01; // 1% fee
 
               // Calculate potential earnings for each staker
               const stakersWithEarnings = Object.entries(userStakes)
-                .filter(([_, data]) => data.totalStaked > 0)
+                .filter(([_, data]) => data.totalStaked > 0 || data.totalSwipeStaked > 0)
                 .map(([address, data]) => {
                   const profile = profiles.find((p: any) => p && p.address === address);
                   const displayName = profile?.display_name || profile?.username || `${address.slice(0, 6)}...${address.slice(-4)}`;
                   
-                  // Calculate potential payout if YES wins
-                  let yesEarnings = 0;
-                  let yesProfitPercent = 0;
+                  // === ETH EARNINGS ===
+                  // Calculate potential ETH payout if YES wins
+                  let ethYesEarnings = 0;
+                  let ethYesProfitPercent = 0;
                   if (data.yesAmount > 0 && yesPoolETH > 0) {
                     const shareOfYesPool = data.yesAmount / yesPoolETH;
                     const winningsFromLosingPool = noPoolETH * (1 - platformFee);
-                    yesEarnings = data.yesAmount + (shareOfYesPool * winningsFromLosingPool);
-                    yesProfitPercent = ((yesEarnings - data.yesAmount) / data.yesAmount) * 100;
+                    ethYesEarnings = data.yesAmount + (shareOfYesPool * winningsFromLosingPool);
+                    ethYesProfitPercent = ((ethYesEarnings - data.yesAmount) / data.yesAmount) * 100;
                   }
 
-                  // Calculate potential payout if NO wins
-                  let noEarnings = 0;
-                  let noProfitPercent = 0;
+                  // Calculate potential ETH payout if NO wins
+                  let ethNoEarnings = 0;
+                  let ethNoProfitPercent = 0;
                   if (data.noAmount > 0 && noPoolETH > 0) {
                     const shareOfNoPool = data.noAmount / noPoolETH;
                     const winningsFromLosingPool = yesPoolETH * (1 - platformFee);
-                    noEarnings = data.noAmount + (shareOfNoPool * winningsFromLosingPool);
-                    noProfitPercent = ((noEarnings - data.noAmount) / data.noAmount) * 100;
+                    ethNoEarnings = data.noAmount + (shareOfNoPool * winningsFromLosingPool);
+                    ethNoProfitPercent = ((ethNoEarnings - data.noAmount) / data.noAmount) * 100;
+                  }
+
+                  // === SWIPE EARNINGS ===
+                  // Calculate potential SWIPE payout if YES wins
+                  let swipeYesEarnings = 0;
+                  let swipeYesProfitPercent = 0;
+                  if (data.swipeYesAmount > 0 && yesPoolSWIPE > 0) {
+                    const shareOfYesPool = data.swipeYesAmount / yesPoolSWIPE;
+                    const winningsFromLosingPool = noPoolSWIPE * (1 - platformFee);
+                    swipeYesEarnings = data.swipeYesAmount + (shareOfYesPool * winningsFromLosingPool);
+                    swipeYesProfitPercent = ((swipeYesEarnings - data.swipeYesAmount) / data.swipeYesAmount) * 100;
+                  }
+
+                  // Calculate potential SWIPE payout if NO wins
+                  let swipeNoEarnings = 0;
+                  let swipeNoProfitPercent = 0;
+                  if (data.swipeNoAmount > 0 && noPoolSWIPE > 0) {
+                    const shareOfNoPool = data.swipeNoAmount / noPoolSWIPE;
+                    const winningsFromLosingPool = yesPoolSWIPE * (1 - platformFee);
+                    swipeNoEarnings = data.swipeNoAmount + (shareOfNoPool * winningsFromLosingPool);
+                    swipeNoProfitPercent = ((swipeNoEarnings - data.swipeNoAmount) / data.swipeNoAmount) * 100;
                   }
 
                   return {
                     address,
                     displayName,
                     vote: data.vote,
+                    // ETH data
                     yesAmount: data.yesAmount,
                     noAmount: data.noAmount,
-                    yesEarnings,
-                    noEarnings,
-                    yesProfitPercent,
-                    noProfitPercent,
+                    ethYesEarnings,
+                    ethNoEarnings,
+                    ethYesProfitPercent,
+                    ethNoProfitPercent,
+                    // SWIPE data
+                    swipeYesAmount: data.swipeYesAmount,
+                    swipeNoAmount: data.swipeNoAmount,
+                    swipeYesEarnings,
+                    swipeNoEarnings,
+                    swipeYesProfitPercent,
+                    swipeNoProfitPercent,
                     pfp: profile?.pfp_url
                   };
                 })
-                .sort((a, b) => (b.yesAmount + b.noAmount) - (a.yesAmount + a.noAmount)); // Sort by total stake
+                .sort((a, b) => {
+                  // Sort by total value (ETH + SWIPE combined)
+                  const aTotal = (a.yesAmount + a.noAmount) + (a.swipeYesAmount + a.swipeNoAmount);
+                  const bTotal = (b.yesAmount + b.noAmount) + (b.swipeYesAmount + b.swipeNoAmount);
+                  return bTotal - aTotal;
+                });
 
               if (stakersWithEarnings.length === 0) {
                 return <div className="text-center text-zinc-400 font-mono text-xs py-4">No stakes data available</div>;
@@ -2421,59 +2466,80 @@ KEY USER-FACING CHANGES: V1 → V2
                   </div>
                   
                   {/* Staker rows */}
-                  {stakersWithEarnings.slice(0, 10).map((staker, idx) => (
-                    <div 
-                      key={staker.address} 
-                      className={`grid grid-cols-12 gap-1 items-center px-2 py-2 rounded-lg ${
-                        idx % 2 === 0 ? 'bg-zinc-800/50' : 'bg-zinc-900/30'
-                      }`}
-                    >
-                      {/* User info */}
-                      <div className="col-span-4 flex items-center gap-1.5 overflow-hidden">
-                        <Avatar className="w-5 h-5 flex-shrink-0">
-                          <AvatarImage src={staker.pfp || undefined} />
-                          <AvatarFallback className="text-[8px] bg-zinc-600 text-white">
-                            {staker.displayName.slice(0, 2).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-[10px] font-mono text-white truncate font-medium">
-                          {staker.displayName.length > 8 ? staker.displayName.slice(0, 8) + '...' : staker.displayName}
-                        </span>
+                  {stakersWithEarnings.slice(0, 10).map((staker, idx) => {
+                    const hasEthYes = staker.yesAmount > 0;
+                    const hasEthNo = staker.noAmount > 0;
+                    const hasSwipeYes = staker.swipeYesAmount > 0;
+                    const hasSwipeNo = staker.swipeNoAmount > 0;
+                    
+                    return (
+                      <div 
+                        key={staker.address} 
+                        className={`grid grid-cols-12 gap-1 items-center px-2 py-2 rounded-lg ${
+                          idx % 2 === 0 ? 'bg-zinc-800/50' : 'bg-zinc-900/30'
+                        }`}
+                      >
+                        {/* User info */}
+                        <div className="col-span-4 flex items-center gap-1.5 overflow-hidden">
+                          <Avatar className="w-5 h-5 flex-shrink-0">
+                            <AvatarImage src={staker.pfp || undefined} />
+                            <AvatarFallback className="text-[8px] bg-zinc-600 text-white">
+                              {staker.displayName.slice(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-[10px] font-mono text-white truncate font-medium">
+                            {staker.displayName.length > 8 ? staker.displayName.slice(0, 8) + '...' : staker.displayName}
+                          </span>
+                        </div>
+                        
+                        {/* If YES wins */}
+                        <div className="col-span-4 text-center">
+                          {(hasEthYes || hasSwipeYes) ? (
+                            <div className="space-y-0.5">
+                              {hasEthYes && (
+                                <div className="text-[10px] font-mono text-emerald-400 font-bold">
+                                  +{(staker.ethYesEarnings / 1e18).toFixed(4)} ETH
+                                </div>
+                              )}
+                              {hasSwipeYes && (
+                                <div className="text-[10px] font-mono text-[#d4ff00] font-bold">
+                                  +{formatSwipeAmount(staker.swipeYesEarnings / 1e18)} $SWIPE
+                                </div>
+                              )}
+                              <div className="text-[8px] font-mono text-emerald-300">
+                                +{(hasEthYes ? staker.ethYesProfitPercent : staker.swipeYesProfitPercent).toFixed(0)}%
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-zinc-500">—</span>
+                          )}
+                        </div>
+                        
+                        {/* If NO wins */}
+                        <div className="col-span-4 text-center">
+                          {(hasEthNo || hasSwipeNo) ? (
+                            <div className="space-y-0.5">
+                              {hasEthNo && (
+                                <div className="text-[10px] font-mono text-rose-400 font-bold">
+                                  +{(staker.ethNoEarnings / 1e18).toFixed(4)} ETH
+                                </div>
+                              )}
+                              {hasSwipeNo && (
+                                <div className="text-[10px] font-mono text-[#d4ff00] font-bold">
+                                  +{formatSwipeAmount(staker.swipeNoEarnings / 1e18)} $SWIPE
+                                </div>
+                              )}
+                              <div className="text-[8px] font-mono text-rose-300">
+                                +{(hasEthNo ? staker.ethNoProfitPercent : staker.swipeNoProfitPercent).toFixed(0)}%
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-zinc-500">—</span>
+                          )}
+                        </div>
                       </div>
-                      
-                      {/* If YES wins */}
-                      <div className="col-span-4 text-center">
-                        {staker.yesAmount > 0 ? (
-                          <div className="space-y-0.5">
-                            <div className="text-[10px] font-mono text-emerald-400 font-bold">
-                              +{(staker.yesEarnings / 1e18).toFixed(4)} ETH
-                            </div>
-                            <div className="text-[8px] font-mono text-emerald-300">
-                              +{staker.yesProfitPercent.toFixed(0)}% profit
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-[10px] text-zinc-500">—</span>
-                        )}
-                      </div>
-                      
-                      {/* If NO wins */}
-                      <div className="col-span-4 text-center">
-                        {staker.noAmount > 0 ? (
-                          <div className="space-y-0.5">
-                            <div className="text-[10px] font-mono text-rose-400 font-bold">
-                              +{(staker.noEarnings / 1e18).toFixed(4)} ETH
-                            </div>
-                            <div className="text-[8px] font-mono text-rose-300">
-                              +{staker.noProfitPercent.toFixed(0)}% profit
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-[10px] text-zinc-500">—</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   
                   {stakersWithEarnings.length > 10 && (
                     <div className="text-center text-zinc-400 font-mono text-[10px] pt-1">

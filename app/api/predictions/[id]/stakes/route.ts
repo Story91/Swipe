@@ -46,7 +46,7 @@ export async function GET(
     
     for (const participant of participants) {
       try {
-        // Get user stakes from blockchain
+        // Get ETH stakes from blockchain
         const userStakeData = await publicClient.readContract({
           address: contract.address as `0x${string}`,
           abi: contract.abi,
@@ -54,14 +54,38 @@ export async function GET(
           args: [BigInt(predictionId.replace('pred_v1_', '').replace('pred_v2_', '')), participant as `0x${string}`],
         }) as [bigint, bigint, boolean]; // [yesAmount, noAmount, claimed]
 
-        const [yesAmount, noAmount, claimed] = userStakeData;
+        const [ethYesAmount, ethNoAmount, ethClaimed] = userStakeData;
         
-        // Only include if user has stakes
-        if (yesAmount > 0 || noAmount > 0) {
-          const hasYesStake = yesAmount > 0;
-          const hasNoStake = noAmount > 0;
+        // For V2, also get SWIPE stakes
+        let swipeYesAmount = BigInt(0);
+        let swipeNoAmount = BigInt(0);
+        let swipeClaimed = false;
+        
+        if (isV2) {
+          try {
+            const swipeStakeData = await publicClient.readContract({
+              address: contract.address as `0x${string}`,
+              abi: contract.abi,
+              functionName: 'userSwipeStakes',
+              args: [BigInt(predictionId.replace('pred_v1_', '').replace('pred_v2_', '')), participant as `0x${string}`],
+            }) as [bigint, bigint, boolean];
+            
+            [swipeYesAmount, swipeNoAmount, swipeClaimed] = swipeStakeData;
+          } catch (swipeError) {
+            // V1 contracts don't have userSwipeStakes, ignore error
+          }
+        }
+        
+        // Combine ETH and SWIPE amounts for vote determination
+        const totalYesAmount = ethYesAmount + swipeYesAmount;
+        const totalNoAmount = ethNoAmount + swipeNoAmount;
+        
+        // Only include if user has any stakes (ETH or SWIPE)
+        if (totalYesAmount > 0 || totalNoAmount > 0) {
+          const hasYesStake = totalYesAmount > 0;
+          const hasNoStake = totalNoAmount > 0;
           
-          // Determine user's vote based on which side has more stake
+          // Determine user's vote based on which side they staked on
           let vote: 'YES' | 'NO' | 'BOTH' | 'NONE' = 'NONE';
           if (hasYesStake && hasNoStake) {
             vote = 'BOTH';
@@ -74,11 +98,16 @@ export async function GET(
           stakesWithVotes.push({
             userId: participant.toLowerCase(),
             predictionId: predictionId,
-            yesAmount: Number(yesAmount),
-            noAmount: Number(noAmount),
+            // ETH amounts (in wei)
+            yesAmount: Number(ethYesAmount),
+            noAmount: Number(ethNoAmount),
+            // SWIPE amounts (in wei)
+            swipeYesAmount: Number(swipeYesAmount),
+            swipeNoAmount: Number(swipeNoAmount),
             vote,
-            totalStaked: Number(yesAmount) + Number(noAmount),
-            claimed,
+            totalStaked: Number(ethYesAmount) + Number(ethNoAmount),
+            totalSwipeStaked: Number(swipeYesAmount) + Number(swipeNoAmount),
+            claimed: ethClaimed || swipeClaimed,
             stakedAt: prediction.createdAt
           });
         }
