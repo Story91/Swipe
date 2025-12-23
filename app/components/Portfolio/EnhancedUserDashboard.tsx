@@ -1049,97 +1049,51 @@ export function EnhancedUserDashboard() {
             // Immediately refresh transaction history to show the new transaction
             fetchUserTransactions();
 
-            // Show custom modal instead of alert
-            showClaimModal(txHash, transaction.basescanUrl);
+            // Show success modal immediately - no need to wait for confirmation
+            // If we have txHash, the transaction was sent successfully
+            showSuccessModal(txHash, transaction.basescanUrl, predictionId, tokenType || 'ETH', stake?.potentialPayout || 0);
             
-            // Wait for transaction confirmation with better logic
-            const receipt = await new Promise((resolve, reject) => {
-              let attempts = 0;
-              const maxAttempts = 30; // 30 attempts = 60 seconds max wait
-              
-              const checkReceipt = async () => {
-                try {
-                  attempts++;
-                  console.log(`🔍 Checking transaction status (attempt ${attempts}/${maxAttempts}): ${txHash}`);
-                  
-                  const response = await fetch(`/api/check-transaction?txHash=${txHash}`);
-                  const data = await response.json();
-                  
-                  console.log(`📊 Transaction status response:`, data);
-                  
-                  if (data.success && data.data.status === 'success') {
-                    console.log('✅ Transaction confirmed successfully');
-                    resolve({ status: 'success' });
-                  } else if (data.success && data.data.status === 'failed' && attempts > 5) {
-                    // Only fail after 5 attempts to give transaction time to be mined
-                    console.log('❌ Transaction failed after multiple attempts');
-                    reject(new Error('Transaction failed'));
-                  } else if (attempts >= maxAttempts) {
-                    console.log('⏰ Transaction confirmation timeout');
-                    reject(new Error('Transaction confirmation timeout'));
-                  } else {
-                    console.log('⏳ Transaction still pending, checking again in 2 seconds...');
-                    setTimeout(checkReceipt, 2000); // Check again in 2 seconds
-                  }
-                } catch (error) {
-                  console.error('❌ Error checking transaction status:', error);
-                  if (attempts >= maxAttempts) {
-                    reject(error);
-                  } else {
-                    setTimeout(checkReceipt, 2000);
-                  }
-                }
-              };
-              
-              // Start checking after a short delay to give transaction time to be broadcast
-              setTimeout(checkReceipt, 3000);
-            });
-
-            if ((receipt as any).status === 'success') {
-              // Update transaction status in Redis
-              await fetch('/api/user-transactions', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  userId: address.toLowerCase(),
-                  txHash,
-                  status: 'success',
-                  blockNumber: (receipt as any).blockNumber,
-                  gasUsed: (receipt as any).gasUsed
-                })
-              });
-              
-              // Mark stake as claimed in Redis - only for the specific token type
-              try {
-                console.log(`🔄 Marking ${tokenType || 'ETH'} stake as claimed for prediction ${predictionId}...`);
-                const updateStakeResponse = await fetch('/api/stakes', {
-                  method: 'PUT',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    userId: address.toLowerCase(),
-                    predictionId: predictionId,
-                    tokenType: tokenType || 'ETH',
-                    updates: { claimed: true }
-                  }),
-                });
-                
-                if (updateStakeResponse.ok) {
-                  console.log('✅ Stake marked as claimed in Redis');
-                  const responseData = await updateStakeResponse.json();
-                  console.log('✅ Redis update response:', responseData);
-                } else {
-                  console.error('❌ Failed to mark stake as claimed');
-                  const errorData = await updateStakeResponse.json();
-                  console.error('❌ Error response:', errorData);
-                }
-              } catch (stakeUpdateError) {
-                console.error('❌ Error updating stake as claimed:', stakeUpdateError);
+            // Mark stake as claimed in Redis in background (don't block UI)
+            fetch('/api/stakes', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: address.toLowerCase(),
+                predictionId: predictionId,
+                tokenType: tokenType || 'ETH',
+                updates: { claimed: true }
+              }),
+            }).then(response => {
+              if (response.ok) {
+                console.log('✅ Stake marked as claimed in Redis');
               }
-              
-              // Show success modal with prediction data for share
-              showSuccessModal(txHash, transaction.basescanUrl, predictionId, tokenType || 'ETH', stake?.potentialPayout || 0);
+            }).catch(error => {
+              console.error('❌ Error updating stake as claimed:', error);
+            });
+            
+            // Update transaction status in background when confirmed
+            const checkAndUpdateTransaction = async () => {
+              try {
+                await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+                const response = await fetch(`/api/check-transaction?txHash=${txHash}`);
+                const data = await response.json();
+                
+                if (data.success && data.data.status === 'success') {
+                  await fetch('/api/user-transactions', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      userId: address.toLowerCase(),
+                      txHash,
+                      status: 'success'
+                    })
+                  });
+                }
+              } catch (error) {
+                console.error('Background transaction check failed:', error);
+              }
+            };
+            checkAndUpdateTransaction(); // Run in background, don't await
               
               // Auto-sync the specific prediction after claim with delay (like TinderCard)
               setTimeout(async () => {
@@ -1172,19 +1126,6 @@ export function EnhancedUserDashboard() {
                 console.error('❌ Failed to auto-sync after claim:', syncError);
               }
               }, 2000); // Initial 2 second delay
-            } else {
-              // Update transaction status in Redis
-              await fetch('/api/user-transactions', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  userId: address.toLowerCase(),
-                  txHash,
-                  status: 'failed'
-                })
-              });
-              showErrorModal('Claim transaction failed');
-            }
           },
           onError: (error) => {
             console.error('❌ Claim transaction failed:', error);
