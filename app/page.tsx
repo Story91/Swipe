@@ -194,7 +194,7 @@ export default function App() {
     fetchUserProfile();
   }, [address, context]);
 
-  // Wywołaj addMiniApp() zaraz po ready (po włączeniu aplikacji)
+  // Wywołaj addMiniApp() DOPIERO PO auto-connect (po połączeniu portfela lub po upływie czasu)
   useEffect(() => {
     const promptAddMiniApp = async () => {
       if (hasTriedAddMiniApp || !isFrameReady) return;
@@ -232,15 +232,16 @@ export default function App() {
       }
     };
 
-    // Wywołaj po krótkim opóźnieniu, żeby upewnić się że ready jest kompletne
-    if (isFrameReady) {
+    // Wait for auto-connect to complete first (hasTriedAutoConnect), then prompt addMiniApp
+    // This prevents addMiniApp modal from blocking auto-connect
+    if (isFrameReady && hasTriedAutoConnect) {
       const timer = setTimeout(() => {
         promptAddMiniApp();
-      }, 1000);
+      }, 500); // Shorter delay since we already waited for auto-connect
       
       return () => clearTimeout(timer);
     }
-  }, [isFrameReady, hasTriedAddMiniApp]);
+  }, [isFrameReady, hasTriedAddMiniApp, hasTriedAutoConnect]);
 
   // Check permissions
   const isAdmin = address && process.env.NEXT_PUBLIC_ADMIN_1?.toLowerCase() === address.toLowerCase();
