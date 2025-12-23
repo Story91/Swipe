@@ -1040,19 +1040,12 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     if (!lastStakedPrediction || stakeAmount === null || !stakeToken) return;
     
     try {
-      let shareText = '';
+      // Use full prediction text (not truncated title)
+      const fullPredictionText = lastStakedPrediction.prediction;
       const appUrl = window.location.origin; // Just the main app URL
       
-      switch (type) {
-        case 'achievement':
-          shareText = `🎉 I just staked on: ${lastStakedPrediction.title}\n\n💰 Stake: ${stakeAmount} ${stakeToken}\n\nDo you dare predict the future? 🔮`;
-          break;
-        case 'challenge':
-          shareText = `🏆 Challenge: Can you predict: ${lastStakedPrediction.title}?\n\n💰 Stake: ${stakeAmount} ${stakeToken}\n\nTry to beat my prediction! 🎯`;
-          break;
-        default:
-          shareText = `🔮 I predict: ${lastStakedPrediction.title}\n💰 Stake: ${stakeAmount} ${stakeToken}\n\nJoin the game and create your own prediction! 🎯`;
-      }
+      // Single unified share text
+      const shareText = `🎯 I just bet on SWIPE!\n\n"${fullPredictionText}"\n\n💰 My bet: ${stakeAmount} ${stakeToken}\n\nWDYT? 👀\n\nJoin the prediction market on Base:`;
       
       await composeCast({
         text: shareText,
@@ -1987,46 +1980,56 @@ KEY USER-FACING CHANGES: V1 → V2
       {/* Share Prompt */}
       {showSharePrompt && lastStakedPrediction && (
         <div className="share-prompt-overlay">
-          <div className="share-prompt-content">
-            <div className="share-prompt-header">
-              <div className="share-prompt-icon">🎉</div>
-              <h3>Congratulations!</h3>
-              <p>Your stake has been accepted!</p>
+          <div className="share-prompt-content-new">
+            {/* Close button */}
+            <button 
+              onClick={() => setShowSharePrompt(false)}
+              className="share-close-btn"
+            >
+              ✕
+            </button>
+            
+            {/* Header with logos */}
+            <div className="share-logos">
+              <img src="/farc.png" alt="Farcaster" className="share-logo" />
+              <span className="share-logo-divider">×</span>
+              <img src="/Base_square_blue.png" alt="Base" className="share-logo" />
             </div>
             
-            <div className="share-prompt-body">
-              <p>Share your prediction on Farcaster and challenge your friends!</p>
+            {/* Success icon */}
+            <div className="share-success-icon">
+              <div className="share-success-circle">
+                <span>✓</span>
+              </div>
             </div>
             
-            <div className="share-prompt-actions">
-              <button 
-                onClick={() => shareStakedPrediction('achievement')}
-                className="share-btn share-achievement"
-              >
-                🎉 Share Achievement
-              </button>
-              
-              <button 
-                onClick={() => shareStakedPrediction('challenge')}
-                className="share-btn share-challenge"
-              >
-                🏆 Challenge Friends
-              </button>
-              
-              <button 
-                onClick={() => shareStakedPrediction('prediction')}
-                className="share-btn share-prediction"
-              >
-                🔮 Share Prediction
-              </button>
-              
-              <button 
-                onClick={() => setShowSharePrompt(false)}
-                className="share-btn share-skip"
-              >
-                Not Now
-              </button>
-            </div>
+            {/* Title */}
+            <h2 className="share-title">Congratulations!</h2>
+            <p className="share-subtitle">Your bet has been accepted!</p>
+            
+            {/* Description */}
+            <p className="share-description">Share your bet and challenge your friends!</p>
+            
+            {/* Share button */}
+            <button 
+              onClick={() => shareStakedPrediction('achievement')}
+              className="share-main-btn"
+            >
+              <svg className="share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                <polyline points="16 6 12 2 8 6" />
+                <line x1="12" y1="2" x2="12" y2="15" />
+              </svg>
+              Share
+            </button>
+            
+            {/* Skip link */}
+            <button 
+              onClick={() => setShowSharePrompt(false)}
+              className="share-skip-link"
+            >
+              Maybe later
+            </button>
           </div>
         </div>
       )}

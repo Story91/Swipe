@@ -2635,22 +2635,225 @@ html, body {
   }
 }
 
-/* Share Prompt Styles */
+/* Share Prompt Styles - New Dark Theme */
 .share-prompt-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(10px);
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(12px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 10000;
   animation: fadeIn 0.3s ease-out;
+  padding: 20px;
 }
 
+.share-prompt-content-new {
+  background: linear-gradient(145deg, #1a1a1a 0%, #0d0d0d 100%);
+  border: 1px solid rgba(212, 255, 0, 0.3);
+  border-radius: 24px;
+  padding: 28px 24px;
+  max-width: 380px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 
+    0 0 40px rgba(212, 255, 0, 0.15),
+    0 20px 60px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  animation: slideUp 0.4s ease-out;
+  position: relative;
+}
+
+.share-close-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #888;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.share-close-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.share-logos {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.share-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: contain;
+}
+
+.share-logo-divider {
+  color: rgba(212, 255, 0, 0.5);
+  font-size: 20px;
+  font-weight: 300;
+}
+
+.share-success-icon {
+  margin-bottom: 16px;
+}
+
+.share-success-circle {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #d4ff00 0%, #a8cc00 100%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 30px rgba(212, 255, 0, 0.4);
+  animation: pulseSuccess 2s ease-in-out infinite;
+}
+
+.share-success-circle span {
+  font-size: 32px;
+  color: #000;
+  font-weight: bold;
+}
+
+@keyframes pulseSuccess {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(212, 255, 0, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(212, 255, 0, 0.6);
+  }
+}
+
+.share-title {
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 700;
+  font-size: 24px;
+  color: #fff;
+  margin: 0 0 6px 0;
+}
+
+.share-subtitle {
+  font-family: 'Source Code Pro', monospace;
+  font-size: 14px;
+  color: #888;
+  margin: 0 0 20px 0;
+}
+
+.share-bet-details {
+  background: rgba(212, 255, 0, 0.08);
+  border: 1px solid rgba(212, 255, 0, 0.2);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.share-bet-question {
+  font-family: 'Source Code Pro', monospace;
+  font-size: 14px;
+  color: #fff;
+  line-height: 1.5;
+  margin-bottom: 12px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.share-bet-amount {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.share-bet-label {
+  font-family: 'Source Code Pro', monospace;
+  font-size: 12px;
+  color: #666;
+}
+
+.share-bet-value {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: #d4ff00;
+}
+
+.share-description {
+  font-family: 'Source Code Pro', monospace;
+  font-size: 13px;
+  color: #888;
+  margin: 0 0 20px 0;
+  line-height: 1.4;
+}
+
+.share-main-btn {
+  width: 100%;
+  padding: 16px 24px;
+  border: none;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #d4ff00 0%, #a8cc00 100%);
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: #000;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 0 4px 20px rgba(212, 255, 0, 0.3);
+}
+
+.share-main-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(212, 255, 0, 0.5);
+}
+
+.share-main-btn:active {
+  transform: translateY(0);
+}
+
+.share-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.share-skip-link {
+  background: none;
+  border: none;
+  font-family: 'Source Code Pro', monospace;
+  font-size: 13px;
+  color: #666;
+  cursor: pointer;
+  margin-top: 16px;
+  padding: 8px 16px;
+  transition: color 0.2s ease;
+}
+
+.share-skip-link:hover {
+  color: #999;
+}
+
+/* Legacy styles - keep for backward compatibility */
 .share-prompt-content {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.9) 100%);
   backdrop-filter: blur(20px);
