@@ -109,15 +109,63 @@
 
 /* Description */
 .legacy-description {
-  font-size: 8px;
+  font-size: 9px;
   color: rgba(255, 255, 255, 0.7);
-  line-height: 1.4;
-  margin: 0 0 6px 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  line-height: 1.5;
+  margin: 0 0 8px 0;
   text-align: center;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.legacy-description a,
+.legacy-description .legacy-link {
+  color: #00aaff;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+.legacy-description a:hover,
+.legacy-description .legacy-link:hover {
+  color: #d4ff00;
+}
+
+/* Outcome Banner - Shows the admin's decision */
+.legacy-outcome-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.legacy-outcome-banner.outcome-yes {
+  background: linear-gradient(135deg, rgba(0, 255, 136, 0.15), rgba(0, 204, 106, 0.1));
+  border: 2px solid rgba(0, 255, 136, 0.5);
+  color: #00ff88;
+}
+
+.legacy-outcome-banner.outcome-no {
+  background: linear-gradient(135deg, rgba(255, 107, 107, 0.15), rgba(255, 71, 87, 0.1));
+  border: 2px solid rgba(255, 107, 107, 0.5);
+  color: #ff6b6b;
+}
+
+.legacy-outcome-banner .outcome-icon {
+  font-size: 16px;
+}
+
+.legacy-outcome-banner .outcome-text {
+  font-family: "Orbitron", sans-serif;
+  letter-spacing: 0.5px;
+}
+
+.legacy-outcome-banner .outcome-text strong {
+  font-size: 14px;
 }
 
 /* Meta Information */

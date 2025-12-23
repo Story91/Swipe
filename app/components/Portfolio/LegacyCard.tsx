@@ -68,6 +68,30 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading }: 
     return (wei / Math.pow(10, 18)).toFixed(6);
   };
 
+  // Convert URLs in text to clickable links
+  const formatDescription = (text: string) => {
+    const urlPattern = /(https?:\/\/[^\s<>"{}|\\^`\[\]]+)/g;
+    const parts = text.split(urlPattern);
+    
+    return parts.map((part, index) => {
+      if (part.match(urlPattern)) {
+        return (
+          <a 
+            key={index}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="legacy-link"
+            onClick={(e) => e.stopPropagation()}
+          >
+            🔗 {part.length > 40 ? part.substring(0, 40) + '...' : part}
+          </a>
+        );
+      }
+      return <span key={index}>{part}</span>;
+    });
+  };
+
   // Format SWIPE with K/M suffixes
   const formatSwipe = (wei: number): string => {
     const swipe = wei / Math.pow(10, 18);
@@ -145,7 +169,17 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading }: 
       </div>
 
       {/* Description */}
-      <p className="legacy-description">{prediction.description}</p>
+      <p className="legacy-description">{formatDescription(prediction.description)}</p>
+
+      {/* Outcome Banner - Show result if resolved */}
+      {prediction.resolved && prediction.outcome !== undefined && (
+        <div className={`legacy-outcome-banner ${prediction.outcome ? 'outcome-yes' : 'outcome-no'}`}>
+          <span className="outcome-icon">{prediction.outcome ? '✅' : '❌'}</span>
+          <span className="outcome-text">
+            Result: <strong>{prediction.outcome ? 'YES' : 'NO'}</strong>
+          </span>
+        </div>
+      )}
 
       {/* Meta Information */}
       <div className="legacy-meta">
