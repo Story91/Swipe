@@ -195,6 +195,7 @@ export default function App() {
   }, [address, context]);
 
   // Wywołaj addMiniApp() DOPIERO PO auto-connect (po połączeniu portfela lub po upływie czasu)
+  // WAŻNE: Sprawdź context.client.added - nie pokazuj modalu jeśli już dodany!
   useEffect(() => {
     const promptAddMiniApp = async () => {
       if (hasTriedAddMiniApp || !isFrameReady) return;
@@ -203,10 +204,20 @@ export default function App() {
         const isInMiniApp = await sdk.isInMiniApp();
         if (!isInMiniApp) {
           console.log('Not in Mini App, skipping addMiniApp');
+          setHasTriedAddMiniApp(true);
           return;
         }
 
-        console.log('📱 Prompting user to add Mini App after ready...');
+        // Check if user already added the mini app - don't prompt again!
+        // context.client.added tells us if the user has already added this app
+        const alreadyAdded = context?.client?.added;
+        if (alreadyAdded) {
+          console.log('✅ Mini App already added by user, skipping addMiniApp prompt');
+          setHasTriedAddMiniApp(true);
+          return;
+        }
+
+        console.log('📱 Prompting user to add Mini App (not added yet)...');
         setHasTriedAddMiniApp(true);
         
         try {
@@ -241,7 +252,7 @@ export default function App() {
       
       return () => clearTimeout(timer);
     }
-  }, [isFrameReady, hasTriedAddMiniApp, hasTriedAutoConnect]);
+  }, [isFrameReady, hasTriedAddMiniApp, hasTriedAutoConnect, context]);
 
   // Check permissions
   const isAdmin = address && process.env.NEXT_PUBLIC_ADMIN_1?.toLowerCase() === address.toLowerCase();
