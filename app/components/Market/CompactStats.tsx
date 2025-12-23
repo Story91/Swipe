@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import './CompactStats.css';
 
 interface CompactStatsData {
@@ -95,10 +97,12 @@ export function CompactStats() {
   if (loading) {
     return (
       <div className="compact-stats">
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>Loading market data...</p>
-        </div>
+        <Card className="stats-loading-card">
+          <CardContent className="loading-container">
+            <div className="loading-spinner"></div>
+            <p>Loading market data...</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -106,13 +110,15 @@ export function CompactStats() {
   if (error) {
     return (
       <div className="compact-stats">
-        <div className="error-container">
-          <div className="error-icon">⚠️</div>
-          <p>Failed to load stats</p>
-          <button onClick={() => window.location.reload()} className="retry-button">
-            Retry
-          </button>
-        </div>
+        <Card className="stats-error-card">
+          <CardContent className="error-container">
+            <div className="error-icon">⚠️</div>
+            <p>Failed to load stats</p>
+            <button onClick={() => window.location.reload()} className="retry-button">
+              Retry
+            </button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -120,134 +126,142 @@ export function CompactStats() {
   if (!statsData) {
     return (
       <div className="compact-stats">
-        <div className="no-data">
-          <p>No data available</p>
-        </div>
+        <Card className="stats-empty-card">
+          <CardContent className="no-data">
+            <p>No data available</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
     <div className="compact-stats">
-      {/* Header */}
-      <div className="stats-header">
-        <h1>Market Stats</h1>
-      </div>
 
       {/* Key Metrics Grid */}
       <div className="metrics-grid">
-        <div className="metric-card primary">
-          <div className="metric-content">
-            <div className="metric-value" style={{ color: '#d4ff00' }}>{statsData.totalPredictions.toLocaleString()}</div>
-            <div className="metric-label" style={{ color: '#d4ff00' }}>Total Predictions</div>
-          </div>
-        </div>
+        <Card className="metric-card-new primary">
+          <CardContent className="metric-content-new">
+            <div className="metric-value-new">{statsData.totalPredictions.toLocaleString()}</div>
+            <Badge variant="secondary" className="metric-badge">Total Predictions</Badge>
+          </CardContent>
+        </Card>
 
-        <div className="metric-card secondary">
-          <div className="metric-content">
-            <div className="metric-value-container">
-              <img src="/eth.png" alt="ETH" className="metric-logo" />
-              <div className="metric-value small-font" style={{ color: '#d4ff00' }}>{(statsData.totalVolumeETH / 1e18).toFixed(5)} ETH</div>
+        <Card className="metric-card-new secondary">
+          <CardContent className="metric-content-new">
+            <div className="metric-value-container-new">
+              <img src="/Ethereum-icon-purple.svg" alt="ETH" className="metric-logo-new" />
+              <div className="metric-value-new small">{(statsData.totalVolumeETH / 1e18).toFixed(5)}</div>
             </div>
-            <div className="metric-label" style={{ color: '#d4ff00' }}>Total ETH Stakes</div>
-          </div>
-        </div>
+            <Badge variant="secondary" className="metric-badge">ETH Volume</Badge>
+          </CardContent>
+        </Card>
 
-        <div className="metric-card accent">
-          <div className="metric-content">
-            <div className="metric-value" style={{ color: '#d4ff00' }}>{statsData.activePredictions}</div>
-            <div className="metric-label" style={{ color: '#d4ff00' }}>Active Now</div>
-          </div>
-        </div>
+        <Card className="metric-card-new accent">
+          <CardContent className="metric-content-new">
+            <div className="metric-value-new">{statsData.activePredictions}</div>
+            <Badge variant="default" className="metric-badge active">Active Now</Badge>
+          </CardContent>
+        </Card>
 
-        <div className="metric-card success">
-          <div className="metric-content">
-            <div className="metric-value-container">
-              <img src="/logo.png" alt="SWIPE" className="metric-logo" />
-              <div className="metric-value small-font" style={{ color: '#d4ff00' }}>{(statsData.totalVolumeSWIPE / 1e18).toFixed(0)} SWIPE</div>
+        <Card className="metric-card-new success">
+          <CardContent className="metric-content-new">
+            <div className="metric-value-container-new">
+              <img src="/logo.png" alt="SWIPE" className="metric-logo-new" />
+              <div className="metric-value-new small">{(statsData.totalVolumeSWIPE / 1e18).toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
             </div>
-            <div className="metric-label" style={{ color: '#d4ff00' }}>Total SWIPE Stakes</div>
-          </div>
-        </div>
+            <Badge variant="secondary" className="metric-badge">SWIPE Volume</Badge>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Today's Activity */}
-      <div className="today-section">
-        <h3>Today's Activity</h3>
-        <div className="activity-cards">
-          <div className="activity-card">
-            <div className="activity-value">{statsData.predictionsToday}</div>
-            <div className="activity-label">Ending Today</div>
+      <Card className="section-card">
+        <CardHeader className="section-header">
+          <CardTitle className="section-title">⚡ Today&apos;s Activity</CardTitle>
+        </CardHeader>
+        <CardContent className="activity-grid">
+          <div className="activity-item">
+            <div className="activity-value-new">{statsData.predictionsToday}</div>
+            <span className="activity-label-new">Ending Today</span>
           </div>
-          <div className="activity-card">
-            <div className="activity-value">{statsData.totalParticipants}</div>
-            <div className="activity-label">Participants</div>
+          <div className="activity-divider"></div>
+          <div className="activity-item">
+            <div className="activity-value-new">{statsData.totalParticipants}</div>
+            <span className="activity-label-new">Participants</span>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Top Category */}
-      <div className="category-section">
-        <h3>Top Category</h3>
-        <div className="category-card">
-          <div className="category-name">{statsData.topCategory}</div>
-          <div className="category-stats">
-            <span className="category-count">{statsData.activePredictions} active</span>
-          </div>
-        </div>
-      </div>
+      <Card className="section-card category">
+        <CardHeader className="section-header">
+          <CardTitle className="section-title">🏆 Top Category</CardTitle>
+        </CardHeader>
+        <CardContent className="category-content">
+          <Badge variant="default" className="category-badge">{statsData.topCategory}</Badge>
+          <span className="category-active-count">{statsData.activePredictions} active</span>
+        </CardContent>
+      </Card>
 
       {/* Trending Predictions */}
       {statsData.trendingPredictions.length > 0 && (
-        <div className="trending-section">
-          <h3>Trending Now</h3>
-          <div className="trending-list">
+        <Card className="section-card trending">
+          <CardHeader className="section-header">
+            <CardTitle className="section-title">🔥 Trending Now</CardTitle>
+          </CardHeader>
+          <CardContent className="trending-list-new">
             {statsData.trendingPredictions.map((prediction, index) => (
-              <div key={prediction.id} className="trending-item">
-                <div className="trending-rank">#{index + 1}</div>
-                <div className="trending-content">
-                  <div className="trending-question">{prediction.question}</div>
-                  <div className="trending-stats">
-                    <span className="trending-volume">
-                      <img src="/eth.png" alt="ETH" className="trending-logo" />
-                      {(prediction.volumeETH / 1e18).toFixed(5)} ETH
-                      {prediction.volumeSWIPE > 0 && (
-                        <>
-                          <span className="trending-separator"> • </span>
-                          <img src="/logo.png" alt="SWIPE" className="trending-logo" />
-                          {(prediction.volumeSWIPE / 1e18).toFixed(0)} SWIPE
-                        </>
-                      )}
+              <div key={prediction.id} className="trending-item-new">
+                <Badge variant="outline" className="trending-rank-badge">#{index + 1}</Badge>
+                <div className="trending-content-new">
+                  <div className="trending-question-new">{prediction.question}</div>
+                  <div className="trending-meta">
+                    <span className="trending-volume-new">
+                      <img src="/Ethereum-icon-purple.svg" alt="ETH" className="trending-logo-new" />
+                      {(prediction.volumeETH / 1e18).toFixed(5)}
                     </span>
-                    <span className="trending-participants">{prediction.participants} participants</span>
+                    {prediction.volumeSWIPE > 0 && (
+                      <span className="trending-volume-new swipe">
+                        <img src="/logo.png" alt="SWIPE" className="trending-logo-new" />
+                        {(prediction.volumeSWIPE / 1e18).toFixed(0)}
+                      </span>
+                    )}
+                    <Badge variant="secondary" className="participants-badge">{prediction.participants} 👥</Badge>
                   </div>
                 </div>
-                <div className={`trending-indicator ${prediction.isPositive ? 'positive' : 'negative'}`}>
-                  {prediction.isPositive ? '↗' : '↘'}
+                <div className={`trending-arrow ${prediction.isPositive ? 'up' : 'down'}`}>
+                  {prediction.isPositive ? '📈' : '📉'}
                 </div>
               </div>
             ))}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Quick Stats Footer */}
-      <div className="quick-stats">
-        <div className="quick-stat">
-          <span className="quick-label">Win Rate</span>
-          <span className="quick-value" style={{ color: '#d4ff00' }}>{statsData.successRate.toFixed(1)}%</span>
-        </div>
-        <div className="quick-stat">
-          <span className="quick-label">Avg. Stake</span>
-          <span className="quick-value" style={{ color: '#d4ff00' }}>
-            <img src="/eth.png" alt="ETH" className="quick-logo" />
-            0.00045 ETH
-            <span className="quick-separator"> • </span>
-            <img src="/logo.png" alt="SWIPE" className="quick-logo" />
-            14300 SWIPE
-          </span>
-        </div>
-      </div>
+      <Card className="footer-card">
+        <CardContent className="footer-content">
+          <div className="footer-stat">
+            <span className="footer-label">Win Rate</span>
+            <Badge variant="default" className="footer-value-badge">{statsData.successRate.toFixed(1)}%</Badge>
+          </div>
+          <div className="footer-divider"></div>
+          <div className="footer-stat">
+            <span className="footer-label">Avg. Stake</span>
+            <div className="footer-values">
+              <span className="footer-value-item">
+                <img src="/Ethereum-icon-purple.svg" alt="ETH" className="footer-logo" />
+                0.00045
+              </span>
+              <span className="footer-value-item">
+                <img src="/logo.png" alt="SWIPE" className="footer-logo" />
+                14.3K
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

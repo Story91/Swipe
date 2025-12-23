@@ -227,7 +227,7 @@ export function SwipeClaim() {
       <div className="claim-container">
         <Card className="claim-card">
           <CardHeader className="claim-header">
-            <CardTitle className="claim-title">🎁 SWIPE Rewards</CardTitle>
+            <CardTitle className="claim-title">💰 100M $SWIPE to Grab!</CardTitle>
             <CardDescription className="claim-subtitle">Connect wallet to check eligibility</CardDescription>
           </CardHeader>
         </Card>
@@ -267,10 +267,16 @@ export function SwipeClaim() {
     <div className="claim-container">
       <Card className="claim-card">
         <CardHeader className="claim-header">
-          <CardTitle className="claim-title">🎁 SWIPE Rewards</CardTitle>
+          <CardTitle className="claim-title">💰 100M $SWIPE to Grab!</CardTitle>
           <CardDescription className="claim-subtitle">
           For previous activities
         </CardDescription>
+        <div className="claim-tiers-info">
+          <div className="tier-info-item">🥉 10+ bets → 1M</div>
+          <div className="tier-info-item">🥈 25+ bets → 10M</div>
+          <div className="tier-info-item">🥇 50+ bets → 15M</div>
+          <div className="tier-info-item">👑 100+ bets → 25M</div>
+        </div>
         </CardHeader>
         <CardContent className="claim-content">
           {error && (

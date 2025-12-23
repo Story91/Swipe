@@ -316,13 +316,13 @@ export default function App() {
                 <Address />
                 <EthBalance />
               </Identity>
-              {/* View Farcaster Profile button */}
+              {/* View Base Profile button */}
               {userProfile?.fid && (
                 <div 
                   className="px-4 py-2 cursor-pointer hover:bg-gray-100 text-sm text-blue-600 font-medium border-t"
                   onClick={() => viewProfile(parseInt(userProfile.fid!, 10))}
                 >
-                  👤 View Farcaster Profile
+                  👤 View Base Profile
                 </div>
               )}
               <WalletDropdownDisconnect />
