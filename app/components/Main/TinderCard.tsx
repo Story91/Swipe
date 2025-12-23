@@ -244,13 +244,18 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
                     console.log('Opening cast:', castHash);
                     viewCast({ hash: castHash });
                   }}
-                  className="inline-flex items-center gap-1 text-[#d4ff00] hover:text-[#e5ff33] underline decoration-[#d4ff00]/50 hover:decoration-[#d4ff00] font-medium transition-all duration-200 cursor-pointer bg-transparent border-none p-0"
+                  className="inline-flex items-center gap-1 cursor-pointer bg-transparent border-none p-0 hover:scale-105 transition-transform duration-200"
                   style={{ font: 'inherit' }}
                 >
-                  <span>🔗</span>
-                  <span className="truncate max-w-[200px]">
-                    {part.includes('warpcast.com') ? 'View Cast' : part.length > 40 ? part.substring(0, 40) + '...' : part}
-                  </span>
+                  <GradientText 
+                    colors={['#7a9900', '#4d6600', '#7a9900', '#5c7700', '#7a9900']}
+                    animationSpeed={3}
+                    showBorder={false}
+                  >
+                    <span className="font-bold text-xs underline decoration-1">
+                      🔗 {part.includes('warpcast.com') ? 'View Cast' : 'Open Link'}
+                    </span>
+                  </GradientText>
                 </button>
               );
             } else {
@@ -262,10 +267,18 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
                     console.log('Opening URL:', part);
                     openUrl(part);
                   }}
-                  className="inline text-cyan-400 hover:text-cyan-300 underline decoration-cyan-400/50 hover:decoration-cyan-400 font-medium transition-all duration-200 cursor-pointer bg-transparent border-none p-0"
+                  className="inline-flex items-center cursor-pointer bg-transparent border-none p-0 hover:scale-105 transition-transform duration-200"
                   style={{ font: 'inherit' }}
                 >
-                  {part.length > 50 ? part.substring(0, 50) + '...' : part}
+                  <GradientText 
+                    colors={['#0066aa', '#004477', '#0066aa', '#005588', '#0066aa']}
+                    animationSpeed={3}
+                    showBorder={false}
+                  >
+                    <span className="font-bold text-xs underline decoration-1">
+                      🌐 {part.length > 35 ? part.substring(0, 35) + '...' : part}
+                    </span>
+                  </GradientText>
                 </button>
               );
             }
@@ -341,11 +354,23 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   // State for forcing re-render of time display
   const [timeUpdate, setTimeUpdate] = useState(0);
   
+  // State for SKIP/NEXT button animation
+  const [skipButtonText, setSkipButtonText] = useState<'SKIP' | 'NEXT'>('SKIP');
+  
   // Update time display every second for real-time countdown
   useEffect(() => {
     const interval = setInterval(() => {
       setTimeUpdate(prev => prev + 1);
     }, 1000); // Update every second
+    
+    return () => clearInterval(interval);
+  }, []);
+  
+  // Animate SKIP/NEXT button text
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSkipButtonText(prev => prev === 'SKIP' ? 'NEXT' : 'SKIP');
+    }, 1500); // Change every 1.5 seconds
     
     return () => clearInterval(interval);
   }, []);
@@ -2130,15 +2155,21 @@ KEY USER-FACING CHANGES: V1 → V2
       <div className="or-text">OR</div>
       
       <button
-        className="skip-button"
+        className={`skip-button ${skipButtonText === 'NEXT' ? 'pulse-glow' : ''}`}
         onClick={() => handleSkip(currentCard.id)}
+        style={{ minWidth: '80px' }}
       >
         <GradientText 
-          colors={['#1a1a1a', '#333333', '#1a1a1a', '#444444', '#1a1a1a']}
-          animationSpeed={3}
+          colors={skipButtonText === 'NEXT' 
+            ? ['#1a1a1a', '#2d2d2d', '#1a1a1a', '#333333', '#1a1a1a'] 
+            : ['#1a1a1a', '#333333', '#1a1a1a', '#444444', '#1a1a1a']
+          }
+          animationSpeed={skipButtonText === 'NEXT' ? 2 : 3}
           showBorder={false}
         >
-          <span className="font-black text-base tracking-wide">SKIP</span>
+          <span className="font-black text-base tracking-wide">
+            {skipButtonText} →
+          </span>
         </GradientText>
       </button>
     </div>
