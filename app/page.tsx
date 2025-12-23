@@ -192,12 +192,11 @@ export default function App() {
   }, [address, context]);
 
   // Prompt user to add Mini App (for notifications, etc.)
-  // Wait for auto-connect to complete first, then prompt addMiniApp
   // Check context.client.added - don't prompt if already added
   useEffect(() => {
+    if (hasTriedAddMiniApp || !isFrameReady) return;
+
     const promptAddMiniApp = async () => {
-      if (hasTriedAddMiniApp || !isFrameReady) return;
-      
       try {
         // Check if user already added the mini app - don't prompt again!
         const alreadyAdded = context?.client?.added;
@@ -233,16 +232,14 @@ export default function App() {
       }
     };
 
-    // Wait for auto-connect to complete first (hasTriedAutoConnect), then prompt addMiniApp
-    // This prevents addMiniApp modal from blocking auto-connect
-    if (isFrameReady && hasTriedAutoConnect) {
-      const timer = setTimeout(() => {
-        promptAddMiniApp();
-      }, 500); // Short delay since we already waited for auto-connect
-      
-      return () => clearTimeout(timer);
-    }
-  }, [isFrameReady, hasTriedAddMiniApp, hasTriedAutoConnect, context]);
+    // Wait 1 second after frame is ready before prompting
+    // This gives time for auto-connect to run first on Farcaster
+    const timer = setTimeout(() => {
+      promptAddMiniApp();
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, [isFrameReady, hasTriedAddMiniApp, context]);
 
   // Check permissions
   const isAdmin = address && process.env.NEXT_PUBLIC_ADMIN_1?.toLowerCase() === address.toLowerCase();
