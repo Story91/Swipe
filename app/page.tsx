@@ -80,6 +80,7 @@ export default function App() {
   }, [setFrameReady, isFrameReady]);
 
   // Auto-connect wallet in Farcaster frame context (Warpcast)
+  // Also marks hasTriedAutoConnect for Base app flow
   useEffect(() => {
     const autoConnectFarcasterWallet = async () => {
       // Skip if already connected or already tried
@@ -89,7 +90,8 @@ export default function App() {
         // Check if we're in a Farcaster Mini App context
         const isInMiniApp = await sdk.isInMiniApp();
         if (!isInMiniApp) {
-          console.log('ℹ️ Not in Mini App context, skipping auto-connect');
+          console.log('ℹ️ Not in Mini App context (likely Base app), marking auto-connect complete');
+          setHasTriedAutoConnect(true); // Important: still mark as tried so addMiniApp can run!
           return;
         }
 
@@ -112,6 +114,9 @@ export default function App() {
               connect({ connector: injectedConnector });
             }
           }
+        } else {
+          console.log('ℹ️ Farcaster wallet provider not available');
+          setHasTriedAutoConnect(true);
         }
       } catch (error) {
         console.log('ℹ️ Auto-connect check failed (likely in browser/Base app):', error);
