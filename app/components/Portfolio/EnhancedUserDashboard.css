@@ -1534,3 +1534,396 @@
     align-items: flex-start;
   }
 }
+
+/* ========================================
+   CLAIM MODAL - Dark Theme with Neon Accents
+   ======================================== */
+
+.claim-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(8px);
+}
+
+.claim-modal-content {
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0a0a0a 100%);
+  border: 2px solid rgba(212, 255, 0, 0.5);
+  border-radius: 20px;
+  padding: 30px;
+  max-width: 400px;
+  width: 90%;
+  position: relative;
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.5),
+    0 0 40px rgba(212, 255, 0, 0.1);
+  animation: claimModalSlideIn 0.3s ease-out;
+  text-align: center;
+}
+
+@keyframes claimModalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.claim-modal-close {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 18px;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.claim-modal-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+/* Logos */
+.claim-modal-logos {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.claim-modal-logo {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.claim-modal-logo-divider {
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.3);
+  font-weight: 300;
+}
+
+/* Loading Spinner */
+.claim-modal-loading {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.claim-modal-spinner {
+  width: 50px;
+  height: 50px;
+  border: 3px solid rgba(212, 255, 0, 0.2);
+  border-top-color: #d4ff00;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Success Icon */
+.claim-modal-success-icon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.claim-modal-success-circle {
+  width: 70px;
+  height: 70px;
+  background: linear-gradient(135deg, #00ff88, #00cc6a);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(0, 255, 136, 0.4);
+}
+
+.claim-modal-success-circle span {
+  font-size: 36px;
+  color: #000;
+  font-weight: 700;
+}
+
+/* Error Icon */
+.claim-modal-error-icon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.claim-modal-error-circle {
+  width: 70px;
+  height: 70px;
+  background: linear-gradient(135deg, #ff6b6b, #ff4757);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(255, 107, 107, 0.4);
+}
+
+.claim-modal-error-circle span {
+  font-size: 36px;
+  color: #fff;
+  font-weight: 700;
+}
+
+/* Titles */
+.claim-modal-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #d4ff00;
+  margin: 0 0 8px 0;
+  font-family: "Orbitron", sans-serif;
+}
+
+.claim-modal-title-error {
+  color: #ff6b6b;
+}
+
+.claim-modal-subtitle {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0 0 20px 0;
+  font-family: "Exo 2", sans-serif;
+}
+
+.claim-modal-description {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0 0 20px 0;
+  font-family: "Exo 2", sans-serif;
+}
+
+.claim-modal-error-message {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0 0 20px 0;
+  font-family: "Exo 2", sans-serif;
+}
+
+/* Amount Display */
+.claim-modal-amount {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding: 15px 20px;
+  background: rgba(0, 255, 136, 0.1);
+  border: 1px solid rgba(0, 255, 136, 0.3);
+  border-radius: 12px;
+}
+
+.claim-modal-amount-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #00ff88;
+  font-family: "Exo 2", sans-serif;
+}
+
+.claim-modal-amount-token {
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  font-family: "Exo 2", sans-serif;
+}
+
+/* Transaction Info */
+.claim-modal-tx-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding: 10px 15px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+.claim-modal-tx-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.claim-modal-tx-link {
+  font-size: 12px;
+  color: #60a5fa;
+  text-decoration: none;
+  font-family: monospace;
+}
+
+.claim-modal-tx-link:hover {
+  color: #93c5fd;
+  text-decoration: underline;
+}
+
+/* Share Button */
+.claim-modal-share-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  color: #fff;
+  border: none;
+  padding: 14px 24px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: all 0.3s ease;
+  font-family: "Exo 2", sans-serif;
+  box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+  margin-bottom: 15px;
+}
+
+.claim-modal-share-btn:hover {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.5);
+}
+
+.claim-modal-share-icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* Basescan Button */
+.claim-modal-basescan-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: #fff;
+  text-decoration: none;
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  font-family: "Exo 2", sans-serif;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.claim-modal-basescan-btn:hover {
+  background: linear-gradient(135deg, #1d4ed8, #1e40af);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+  color: #fff;
+}
+
+/* Basescan Link */
+.claim-modal-basescan-link {
+  display: block;
+  font-size: 12px;
+  color: #60a5fa;
+  text-decoration: none;
+  margin-bottom: 15px;
+  transition: color 0.2s ease;
+}
+
+.claim-modal-basescan-link:hover {
+  color: #93c5fd;
+  text-decoration: underline;
+}
+
+/* Close Link */
+.claim-modal-close-link {
+  background: none;
+  border: none;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  padding: 8px 16px;
+  transition: color 0.2s ease;
+  font-family: "Exo 2", sans-serif;
+}
+
+.claim-modal-close-link:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* OK Button for Error */
+.claim-modal-ok-btn {
+  background: linear-gradient(135deg, #ff6b6b, #ff4757);
+  color: #fff;
+  border: none;
+  padding: 12px 40px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: "Exo 2", sans-serif;
+  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+}
+
+.claim-modal-ok-btn:hover {
+  background: linear-gradient(135deg, #ff4757, #ff3838);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(255, 107, 107, 0.4);
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 480px) {
+  .claim-modal-content {
+    padding: 25px 20px;
+    margin: 15px;
+  }
+  
+  .claim-modal-title {
+    font-size: 20px;
+  }
+  
+  .claim-modal-amount-value {
+    font-size: 24px;
+  }
+  
+  .claim-modal-share-btn {
+    padding: 12px 20px;
+    font-size: 14px;
+  }
+  
+  .claim-modal-logo {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .claim-modal-success-circle,
+  .claim-modal-error-circle {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .claim-modal-success-circle span,
+  .claim-modal-error-circle span {
+    font-size: 30px;
+  }
+}

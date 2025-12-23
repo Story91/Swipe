@@ -118,10 +118,7 @@ export function useHybridPredictions() {
     setError(null);
 
     try {
-      // Fetch only ACTIVE predictions from Redis for better performance
-      console.log('🔄 Fetching ACTIVE predictions from Redis...');
-      await fetchRedisPredictions({ status: 'active' }); // Only active predictions
-      console.log('✅ Active predictions fetched from Redis successfully');
+      await fetchRedisPredictions({ status: 'active' });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch predictions';
       setError(errorMessage);
@@ -135,14 +132,11 @@ export function useHybridPredictions() {
   const fetchAllPredictionsComplete = useCallback(async () => {
     setLoading(true);
     setError(null);
-    setAllPredictionsLoaded(false); // Reset flag while loading
-    fetchAllModeRef.current = true; // Mark that we're in "fetch all" mode to prevent overwriting
+    setAllPredictionsLoaded(false);
+    fetchAllModeRef.current = true;
 
     try {
-      console.log('🔄 Fetching ALL predictions from Redis...');
-      await fetchRedisPredictions(); // No filter - get all predictions
-      console.log('✅ All predictions fetched from Redis successfully');
-      setAllPredictionsLoaded(true); // Mark that all predictions have been loaded
+      await fetchRedisPredictions();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch predictions';
       setError(errorMessage);
@@ -157,33 +151,27 @@ export function useHybridPredictions() {
     if (redisPredictions.length > 0) {
       const transformed = transformPredictions(redisPredictions);
       setPredictions(transformed);
-      // Once we have data, initial loading is complete
       setInitialLoading(false);
+      // If we're in "fetch all" mode, mark as loaded now that predictions are transformed
+      if (fetchAllModeRef.current) {
+        setAllPredictionsLoaded(true);
+      }
     }
   }, [redisPredictions, transformPredictions]);
   
   // Fetch predictions on mount with blockchain sync
   useEffect(() => {
     const initializePredictions = async () => {
-      // 1. First, fetch from Redis for instant display
-      console.log('⚡ Quick fetch from Redis cache...');
       fetchAllPredictions();
       
-      // 2. Then, sync ACTIVE predictions stakes from blockchain to Redis in background
-      console.log('🔄 Syncing active predictions stakes from blockchain...');
+      // Sync ACTIVE predictions stakes from blockchain to Redis in background
       try {
         const response = await fetch('/api/sync/v2/active-stakes', { method: 'POST' });
         if (response.ok) {
-          const result = await response.json();
-          console.log(`✅ Synced stakes for ${result.data?.syncedPredictions || 0} active predictions from blockchain`);
-          // 3. Refresh from Redis to get updated data - but only if we're not in "fetch all" mode
+          // Refresh from Redis to get updated data - but only if we're not in "fetch all" mode
           setTimeout(() => {
-            // Don't overwrite with active-only predictions if dashboard requested all predictions
             if (!fetchAllModeRef.current) {
-              console.log('🔄 Refreshing after stakes sync...');
               fetchAllPredictions();
-            } else {
-              console.log('⏭️ Skipping active-only refresh (dashboard mode active)');
             }
           }, 1000);
         }
@@ -197,43 +185,22 @@ export function useHybridPredictions() {
   
   // Fetch predictions when wallet connects for immediate live data (only once)
   useEffect(() => {
-    if (address) {
-      // Don't overwrite with active-only predictions if dashboard requested all predictions
-      if (!fetchAllModeRef.current) {
-        console.log('🔄 Wallet connected, fetching active predictions...');
-        fetchAllPredictions(); // Fetch only active predictions
-      } else {
-        console.log('⏭️ Skipping active-only fetch on wallet connect (dashboard mode active)');
-      }
+    if (address && !fetchAllModeRef.current) {
+      fetchAllPredictions();
     }
   }, [address, fetchAllPredictions]);
   
   // Auto-refresh interval for live data (every 2 minutes)
-  // Only refreshes ACTIVE predictions from Redis cache (no blockchain sync)
   useEffect(() => {
     const interval = setInterval(() => {
-      // Don't overwrite with active-only predictions if dashboard requested all predictions
       if (!fetchAllModeRef.current) {
-        console.log('🔄 Auto-refreshing active predictions (2 min interval)...');
-        fetchAllPredictions(); // Fetch only active predictions from Redis
-      } else {
-        console.log('⏭️ Skipping auto-refresh (dashboard mode active)');
+        fetchAllPredictions();
       }
-    }, 120000); // Refresh every 2 minutes (120 seconds)
+    }, 120000);
     
     return () => clearInterval(interval);
   }, [fetchAllPredictions]);
   
-  // Debug log when predictions change
-  useEffect(() => {
-    console.log('🔍 DEBUG: useHybridPredictions predictions changed:', {
-      predictionsLength: predictions.length,
-      redisPredictionsLength: redisPredictions.length,
-      loading: loading || redisLoading,
-      error: error || redisError
-    });
-  }, [predictions.length, redisPredictions.length, loading, redisLoading, error, redisError]);
-
   return {
     predictions,
     // Only show loading spinner on initial load (when we have no data yet)

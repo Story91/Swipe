@@ -211,10 +211,11 @@ export async function GET(request: NextRequest) {
 
 
 // PUT /api/stakes - Update stake (e.g., mark as claimed)
+// Supports tokenType for partial claims (ETH or SWIPE separately)
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId, predictionId, updates } = body;
+    const { userId, predictionId, updates, tokenType } = body;
     
     if (!userId || !predictionId) {
       return NextResponse.json(
@@ -235,14 +236,38 @@ export async function PUT(request: NextRequest) {
     }
     
     const existingStake = typeof existingData === 'string' ? JSON.parse(existingData) : existingData;
-    
-    // Update allowed fields
-    const allowedUpdates = ['claimed'];
     const updatedStake = { ...existingStake };
     
-    for (const field of allowedUpdates) {
-      if (updates[field] !== undefined) {
-        (updatedStake as any)[field] = updates[field];
+    // If tokenType is specified, update only that token's claimed status
+    if (tokenType && (tokenType === 'ETH' || tokenType === 'SWIPE')) {
+      // Check if this is a multi-token stake (V2 format with ETH/SWIPE nested objects)
+      if (updatedStake.ETH || updatedStake.SWIPE) {
+        // V2 multi-token stake format
+        if (updatedStake[tokenType]) {
+          updatedStake[tokenType] = {
+            ...updatedStake[tokenType],
+            claimed: updates.claimed ?? true
+          };
+        }
+      } else {
+        // V1 single stake format - mark the whole stake as claimed
+        // (V1 stakes are always ETH)
+        if (tokenType === 'ETH') {
+          updatedStake.claimed = updates.claimed ?? true;
+        }
+      }
+    } else {
+      // No tokenType specified - mark everything as claimed (legacy behavior)
+      // For V2 format
+      if (updatedStake.ETH) {
+        updatedStake.ETH.claimed = updates.claimed ?? true;
+      }
+      if (updatedStake.SWIPE) {
+        updatedStake.SWIPE.claimed = updates.claimed ?? true;
+      }
+      // For V1 format
+      if (!updatedStake.ETH && !updatedStake.SWIPE) {
+        updatedStake.claimed = updates.claimed ?? true;
       }
     }
     
@@ -252,7 +277,8 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: updatedStake,
-      message: 'Stake updated successfully',
+      tokenType: tokenType || 'all',
+      message: `Stake ${tokenType ? tokenType + ' ' : ''}marked as claimed`,
       timestamp: new Date().toISOString()
     });
     

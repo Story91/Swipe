@@ -88,7 +88,10 @@ export function EnhancedUserDashboard() {
   // Modal states
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState<'claim' | 'success' | 'error'>('claim');
-  const [modalData, setModalData] = useState<{txHash?: string, basescanUrl?: string, message?: string}>({});
+  const [modalData, setModalData] = useState<{txHash?: string, basescanUrl?: string, message?: string, predictionId?: string, tokenType?: 'ETH' | 'SWIPE', amount?: number}>({});
+  
+  // Claimed prediction for share
+  const [claimedPrediction, setClaimedPrediction] = useState<PredictionWithStakes | null>(null);
 
   // Transaction pagination state
   const [transactionPage, setTransactionPage] = useState(1);
@@ -99,49 +102,55 @@ export function EnhancedUserDashboard() {
     return wei / Math.pow(10, 18);
   };
 
-  // Mark stake as claimed locally
+  // Mark stake as claimed locally - only for specific token type
   const markStakeAsClaimed = (predictionId: string, tokenType: 'ETH' | 'SWIPE') => {
     const stakeKey = `${predictionId}-${tokenType}`;
     setClaimedStakes(prev => new Set([...prev, stakeKey]));
     
-    // Also update the local state immediately
-    setUserPredictions(prev => prev.map(pred => {
-      if (pred.id === predictionId) {
-        const updatedPred = { ...pred };
-        
-        // Handle multi-token stakes (V2)
-        if (updatedPred.userStakes?.[tokenType]) {
-          updatedPred.userStakes[tokenType] = {
+    // Helper function to update prediction with claimed token
+    const updatePrediction = (pred: PredictionWithStakes): PredictionWithStakes => {
+      if (pred.id !== predictionId) return pred;
+      
+      const updatedPred = { ...pred };
+      
+      // Handle multi-token stakes (V2)
+      if (updatedPred.userStakes?.[tokenType]) {
+        updatedPred.userStakes = {
+          ...updatedPred.userStakes,
+          [tokenType]: {
             ...updatedPred.userStakes[tokenType],
-            claimed: true
+            claimed: true,
+            canClaim: false
+          }
+        };
+      }
+      
+      // Also handle single stake format (V1) - check if it's a direct stake
+      if (updatedPred.userStakes && !updatedPred.userStakes.ETH && !updatedPred.userStakes.SWIPE) {
+        // This is a V1 single stake - convert to ETH format
+        if (tokenType === 'ETH') {
+          const originalStake = updatedPred.userStakes as any;
+          updatedPred.userStakes = {
+            ETH: {
+              predictionId: originalStake.predictionId || predictionId,
+              yesAmount: originalStake.yesAmount || 0,
+              noAmount: originalStake.noAmount || 0,
+              claimed: true,
+              canClaim: false,
+              potentialPayout: originalStake.potentialPayout || 0,
+              potentialProfit: originalStake.potentialProfit || 0,
+              isWinner: originalStake.isWinner || false
+            }
           };
         }
-        
-        // Also handle single stake format (V1) - check if it's a direct stake
-        if (updatedPred.userStakes && !updatedPred.userStakes.ETH && !updatedPred.userStakes.SWIPE) {
-          // This is a V1 single stake - convert to ETH format
-          if (tokenType === 'ETH') {
-            // For V1 stakes, we need to preserve the original data and add ETH wrapper
-            const originalStake = updatedPred.userStakes as any;
-            updatedPred.userStakes = {
-              ETH: {
-                predictionId: originalStake.predictionId || predictionId,
-                yesAmount: originalStake.yesAmount || 0,
-                noAmount: originalStake.noAmount || 0,
-                claimed: true,
-                potentialPayout: originalStake.potentialPayout || 0,
-                potentialProfit: originalStake.potentialProfit || 0,
-                canClaim: originalStake.canClaim || false,
-                isWinner: originalStake.isWinner || false
-              }
-            };
-          }
-        }
-        
-        return updatedPred;
       }
-      return pred;
-    }));
+      
+      return updatedPred;
+    };
+    
+    // Update both userPredictions and allUserPredictions
+    setUserPredictions(prev => prev.map(updatePrediction));
+    setAllUserPredictions(prev => prev.map(updatePrediction));
   };
 
   // Format ETH for display
@@ -226,41 +235,69 @@ export function EnhancedUserDashboard() {
     setModalType('claim');
     setModalData({ txHash, basescanUrl });
     setShowModal(true);
-    
-    // Auto-close after 3 seconds
-    setTimeout(() => {
-      setShowModal(false);
-    }, 3000);
+    // No auto-close - user must close manually
   };
 
-  const showSuccessModal = (txHash: string, basescanUrl: string) => {
+  const showSuccessModal = (txHash: string, basescanUrl: string, predictionId?: string, tokenType?: 'ETH' | 'SWIPE', amount?: number) => {
     setModalType('success');
-    setModalData({ txHash, basescanUrl });
+    setModalData({ txHash, basescanUrl, predictionId, tokenType, amount });
     setShowModal(true);
     
-    // Auto-close after 3 seconds and refresh data
-    setTimeout(() => {
-      setShowModal(false);
-      // Refresh data one more time to ensure everything is up to date
-      fetchUserStakes(true); // Force refresh after claim
-      fetchUserTransactions(true); // Force refresh after claim
-      console.log('🔄 Final data refresh after modal close');
-    }, 3000);
+    // Find the claimed prediction for share
+    if (predictionId) {
+      const prediction = allUserPredictions.find(p => p.id === predictionId);
+      if (prediction) {
+        setClaimedPrediction(prediction);
+      }
+    }
+    
+    // Refresh data in background
+    fetchUserStakes(true);
+    fetchUserTransactions(true);
+    console.log('🔄 Final data refresh after claim success');
+    // No auto-close - user must close manually
   };
 
   const showErrorModal = (message: string) => {
     setModalType('error');
     setModalData({ message });
     setShowModal(true);
-    
-    // Auto-close after 3 seconds
-    setTimeout(() => {
-      setShowModal(false);
-    }, 3000);
+    // No auto-close - user must close manually
   };
 
   const closeModal = () => {
     setShowModal(false);
+    setClaimedPrediction(null);
+  };
+  
+  // Share claimed prediction
+  const shareClaimedPrediction = () => {
+    if (!claimedPrediction || !modalData.tokenType) return;
+    
+    const stake = claimedPrediction.userStakes?.[modalData.tokenType];
+    const payout = stake?.potentialPayout || 0;
+    const profit = stake?.potentialProfit || 0;
+    const tokenSymbol = modalData.tokenType === 'ETH' ? 'ETH' : 'SWIPE';
+    
+    // Format amounts
+    const formatAmount = (wei: number) => {
+      const amount = wei / Math.pow(10, 18);
+      if (modalData.tokenType === 'SWIPE') {
+        if (amount >= 1000000) return `${(amount / 1000000).toFixed(2)}M`;
+        if (amount >= 1000) return `${(amount / 1000).toFixed(2)}K`;
+        return amount.toFixed(2);
+      }
+      return amount.toFixed(6);
+    };
+    
+    const profitFormatted = formatAmount(profit);
+    const payoutFormatted = formatAmount(payout);
+    
+    const text = `🎉 Just claimed ${payoutFormatted} ${tokenSymbol} (+${profitFormatted} profit) from Swiper!\n\n"${claimedPrediction.question}"\n\nPrediction was ${claimedPrediction.outcome ? 'YES ✅' : 'NO ❌'}\n\nPlay & earn: https://swiper.farcaster.xyz`;
+    
+    // Open Warpcast composer
+    const warpcastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}`;
+    window.open(warpcastUrl, '_blank');
   };
   
   // Hybrid predictions hook (includes both Redis and blockchain data)
@@ -329,64 +366,29 @@ export function EnhancedUserDashboard() {
 
          // Fetch ALL user predictions (for statistics) - always fresh from Redis
          const fetchAllUserPredictions = useCallback(async (forceRefresh: boolean = false) => {
-           if (!address) {
-             console.log('❌ No address connected, skipping fetchAllUserPredictions');
-             return;
-           }
+           if (!address) return;
            
-           console.log('🔍 DEBUG: fetchAllUserPredictions called with:', {
-             forceRefresh,
-             address,
-             predictionsLoading,
-             loadingStakes,
-             allPredictionsLength: allPredictions?.length || 0
-           });
-           
-           // Always fetch fresh from Redis - no cache
-    
-    // Don't fetch if predictions are still loading
-    if (predictionsLoading) {
-      console.log('⏳ Predictions still loading, skipping fetchAllUserPredictions');
-      return;
-    }
-    
-    // Don't fetch if already loading
-    if (loadingStakes) {
-      console.log('⏳ Already loading stakes, skipping fetchAllUserPredictions');
-      return;
-    }
+           // Don't fetch if predictions are still loading or already loading stakes
+           if (predictionsLoading || loadingStakes) return;
     
     setLoadingStakes(true);
     try {
-      console.log(`🔍 Fetching ALL user stakes for ${address} in single API call`);
-      
       // OPTIMIZATION: Get all user stakes in one API call instead of individual calls
       const allStakesResponse = await fetch(`/api/stakes?getAllUserStakes=true&userId=${address.toLowerCase()}`);
       const allStakesData = await allStakesResponse.json();
       
-      console.log('🔍 DEBUG: All stakes response:', allStakesData);
-      
       if (!allStakesData.success) {
-        console.log('⚠️ No stakes found for user');
         setAllUserPredictions([]);
         return;
       }
       
       const userStakes = allStakesData.data || [];
-      console.log(`💰 Found ${userStakes.length} total stakes for user ${address}`);
-      
-      // Use the Redis predictions from the hook
       const predictions = allPredictions || [];
-      console.log(`📊 Found ${predictions.length} total predictions`);
       
       if (predictions.length === 0) {
-        console.log('⚠️ No predictions found in Redis');
         setAllUserPredictions([]);
         return;
       }
-      
-      // OPTIMIZATION: Fetch stakes for each prediction in parallel instead of sequential
-      console.log(`🚀 Processing ${userStakes.length} stakes for ${predictions.length} predictions`);
       
       // Group stakes by prediction ID for faster lookup
       const stakesByPrediction: { [key: string]: any[] } = {};
@@ -396,8 +398,6 @@ export function EnhancedUserDashboard() {
         }
         stakesByPrediction[stake.predictionId].push(stake);
       });
-      
-      console.log(`💰 Found stakes for ${Object.keys(stakesByPrediction).length} predictions:`, Object.keys(stakesByPrediction));
       
       const allUserPredictionsWithStakes: PredictionWithStakes[] = [];
       
@@ -827,13 +827,15 @@ export function EnhancedUserDashboard() {
   }, [address, allPredictions.length, predictionsLoading, fetchAllPredictionsComplete]);
 
   // Fetch all user predictions when ALL predictions are loaded (not just active)
-  // Wait for allPredictionsLoaded flag to ensure we have all predictions including resolved ones
+  // Wait for allPredictionsLoaded flag AND a reasonable number of predictions to ensure we have resolved ones too
   useEffect(() => {
-    if (allPredictions && allPredictions.length > 0 && address && allUserPredictions.length === 0 && !predictionsLoading && allPredictionsLoaded) {
-      console.log('🔄 ALL predictions loaded, fetching all user predictions...');
-      console.log(`📊 allPredictions count: ${allPredictions.length} (allPredictionsLoaded: ${allPredictionsLoaded})`);
-      calculateStats(); // Calculate statistics first
-      fetchAllUserPredictions(false); // Fetch all user predictions for statistics
+    // We need at least 50 predictions to ensure we have resolved predictions loaded
+    // (if only 6 are loaded, that's just active predictions from main page)
+    const hasEnoughPredictions = allPredictions && allPredictions.length >= 50;
+    
+    if (hasEnoughPredictions && address && allUserPredictions.length === 0 && !predictionsLoading && allPredictionsLoaded) {
+      calculateStats();
+      fetchAllUserPredictions(false);
     }
   }, [allPredictions, address, calculateStats, fetchAllUserPredictions, allUserPredictions.length, predictionsLoading, allPredictionsLoaded]);
   
@@ -1032,13 +1034,14 @@ export function EnhancedUserDashboard() {
             // Add transaction incrementally instead of refetching all
             addNewTransaction(transaction);
 
-            // Update stake as claimed in Redis
+            // Update stake as claimed in Redis - only for the specific token type
             await fetch('/api/stakes', {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 userId: address.toLowerCase(),
                 predictionId: predictionId,
+                tokenType: tokenType || 'ETH',
                 updates: { claimed: true }
               })
             });
@@ -1106,9 +1109,9 @@ export function EnhancedUserDashboard() {
                 })
               });
               
-              // Mark stake as claimed in Redis
+              // Mark stake as claimed in Redis - only for the specific token type
               try {
-                console.log(`🔄 Marking stake as claimed for prediction ${predictionId}...`);
+                console.log(`🔄 Marking ${tokenType || 'ETH'} stake as claimed for prediction ${predictionId}...`);
                 const updateStakeResponse = await fetch('/api/stakes', {
                   method: 'PUT',
                   headers: {
@@ -1117,6 +1120,7 @@ export function EnhancedUserDashboard() {
                   body: JSON.stringify({
                     userId: address.toLowerCase(),
                     predictionId: predictionId,
+                    tokenType: tokenType || 'ETH',
                     updates: { claimed: true }
                   }),
                 });
@@ -1134,8 +1138,8 @@ export function EnhancedUserDashboard() {
                 console.error('❌ Error updating stake as claimed:', stakeUpdateError);
               }
               
-              // Show success modal
-              showSuccessModal(txHash, transaction.basescanUrl);
+              // Show success modal with prediction data for share
+              showSuccessModal(txHash, transaction.basescanUrl, predictionId, tokenType || 'ETH', stake?.potentialPayout || 0);
               
               // Auto-sync the specific prediction after claim with delay (like TinderCard)
               setTimeout(async () => {
@@ -1195,7 +1199,7 @@ export function EnhancedUserDashboard() {
         if (stakeData.success && stakeData.data.length > 0) {
           const userStake = stakeData.data[0];
           
-          // Update the stake as claimed
+          // Update the stake as claimed - only for the specific token type
           const updateResponse = await fetch('/api/stakes', {
             method: 'PUT',
             headers: {
@@ -1204,12 +1208,13 @@ export function EnhancedUserDashboard() {
             body: JSON.stringify({
               userId: address.toLowerCase(),
               predictionId: predictionId,
+              tokenType: tokenType || 'ETH',
               updates: { claimed: true }
             }),
           });
           
           if (updateResponse.ok) {
-            console.log('✅ Stake marked as claimed successfully');
+            console.log(`✅ ${tokenType || 'ETH'} stake marked as claimed successfully`);
             // Refresh user stakes after successful claim
             setTimeout(() => {
               fetchUserStakes(true); // Force refresh after claim
@@ -1733,76 +1738,145 @@ export function EnhancedUserDashboard() {
         )}
       </div>
 
-      {/* Custom Modal */}
+      {/* Custom Modal - Dark Theme */}
       {showModal && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>
-                {modalType === 'claim' && '🎯 CLAIM TRANSACTION SENT!'}
-                {modalType === 'success' && '✅ CLAIM SUCCESSFUL!'}
-                {modalType === 'error' && '❌ ERROR'}
-              </h3>
-              <button className="modal-close" onClick={closeModal}>×</button>
-            </div>
+        <div className="claim-modal-overlay" onClick={closeModal}>
+          <div className="claim-modal-content" onClick={(e) => e.stopPropagation()}>
+            {/* Close button */}
+            <button className="claim-modal-close" onClick={closeModal}>✕</button>
             
-            <div className="modal-body">
-              {modalType === 'claim' && (
-                <>
-                  <div className="transaction-info">
-                    <p><strong>Transaction Hash:</strong> {modalData.txHash}</p>
-                    <p><strong>Status:</strong> Waiting for confirmation...</p>
-                  </div>
-                  <div className="modal-actions">
-                    <a 
-                      href={modalData.basescanUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="basescan-btn"
-                    >
-                      🔗 View on Basescan
-                    </a>
-                  </div>
-                </>
-              )}
-              
-              {modalType === 'success' && (
-                <>
-                  <div className="transaction-info">
-                    <p><strong>Transaction Hash:</strong> {modalData.txHash}</p>
-                    <p><strong>Status:</strong> ✅ Confirmed on blockchain!</p>
-                    <p><strong>Note:</strong> Dashboard is refreshing...</p>
-                  </div>
-                  <div className="modal-actions">
-                    <a 
-                      href={modalData.basescanUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="basescan-btn"
-                    >
-                      🔗 View on Basescan
-                    </a>
-                  </div>
-                </>
-              )}
-              
-              {modalType === 'error' && (
-                <>
-                  <div className="error-info">
-                    <p>{modalData.message}</p>
-                  </div>
-                  <div className="modal-actions">
-                    <button className="retry-btn" onClick={closeModal}>
-                      OK
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+            {/* Pending State */}
+            {modalType === 'claim' && (
+              <>
+                {/* Header with logos */}
+                <div className="claim-modal-logos">
+                  <img src="/farc.png" alt="Farcaster" className="claim-modal-logo" />
+                  <span className="claim-modal-logo-divider">×</span>
+                  <img src="/Base_square_blue.png" alt="Base" className="claim-modal-logo" />
+                </div>
+                
+                {/* Loading spinner */}
+                <div className="claim-modal-loading">
+                  <div className="claim-modal-spinner"></div>
+                </div>
+                
+                <h2 className="claim-modal-title">Processing Claim...</h2>
+                <p className="claim-modal-subtitle">Waiting for blockchain confirmation</p>
+                
+                <div className="claim-modal-tx-info">
+                  <span className="claim-modal-tx-label">Transaction:</span>
+                  <a 
+                    href={modalData.basescanUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="claim-modal-tx-link"
+                  >
+                    {modalData.txHash?.slice(0, 10)}...{modalData.txHash?.slice(-8)}
+                  </a>
+                </div>
+                
+                <a 
+                  href={modalData.basescanUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="claim-modal-basescan-btn"
+                >
+                  🔗 View on Basescan
+                </a>
+              </>
+            )}
             
-            <div className="modal-footer">
-              <p className="auto-close-notice">This modal will close automatically in 3 seconds</p>
-            </div>
+            {/* Success State */}
+            {modalType === 'success' && (
+              <>
+                {/* Header with logos */}
+                <div className="claim-modal-logos">
+                  <img src="/farc.png" alt="Farcaster" className="claim-modal-logo" />
+                  <span className="claim-modal-logo-divider">×</span>
+                  <img src="/Base_square_blue.png" alt="Base" className="claim-modal-logo" />
+                </div>
+                
+                {/* Success icon */}
+                <div className="claim-modal-success-icon">
+                  <div className="claim-modal-success-circle">
+                    <span>✓</span>
+                  </div>
+                </div>
+                
+                <h2 className="claim-modal-title">Congratulations!</h2>
+                <p className="claim-modal-subtitle">Your reward has been claimed!</p>
+                
+                {/* Amount claimed */}
+                {modalData.amount && modalData.tokenType && (
+                  <div className="claim-modal-amount">
+                    <span className="claim-modal-amount-value">
+                      +{modalData.tokenType === 'SWIPE' 
+                        ? (modalData.amount / Math.pow(10, 18) >= 1000 
+                          ? `${(modalData.amount / Math.pow(10, 18) / 1000).toFixed(2)}K` 
+                          : (modalData.amount / Math.pow(10, 18)).toFixed(2))
+                        : (modalData.amount / Math.pow(10, 18)).toFixed(6)
+                      }
+                    </span>
+                    <span className="claim-modal-amount-token">{modalData.tokenType}</span>
+                  </div>
+                )}
+                
+                <p className="claim-modal-description">Share your win and challenge your friends!</p>
+                
+                {/* Share button */}
+                <button 
+                  onClick={shareClaimedPrediction}
+                  className="claim-modal-share-btn"
+                >
+                  <svg className="claim-modal-share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                    <polyline points="16 6 12 2 8 6" />
+                    <line x1="12" y1="2" x2="12" y2="15" />
+                  </svg>
+                  Share on Warpcast
+                </button>
+                
+                {/* Basescan link */}
+                <a 
+                  href={modalData.basescanUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="claim-modal-basescan-link"
+                >
+                  🔗 View transaction on Basescan
+                </a>
+                
+                {/* Close link */}
+                <button 
+                  onClick={closeModal}
+                  className="claim-modal-close-link"
+                >
+                  Close
+                </button>
+              </>
+            )}
+            
+            {/* Error State */}
+            {modalType === 'error' && (
+              <>
+                {/* Error icon */}
+                <div className="claim-modal-error-icon">
+                  <div className="claim-modal-error-circle">
+                    <span>✕</span>
+                  </div>
+                </div>
+                
+                <h2 className="claim-modal-title claim-modal-title-error">Error</h2>
+                <p className="claim-modal-error-message">{modalData.message}</p>
+                
+                <button 
+                  onClick={closeModal}
+                  className="claim-modal-ok-btn"
+                >
+                  OK
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
