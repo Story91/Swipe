@@ -128,11 +128,20 @@ function isFarcasterCastUrl(url: string): boolean {
   return extractCastHash(url) !== null;
 }
 
+// TinderCard API interface for ref
+interface TinderCardAPI {
+  swipe: (dir?: 'left' | 'right' | 'up' | 'down') => Promise<void>;
+  restoreCard: () => Promise<void>;
+}
+
 const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>(({ items, activeDashboard: propActiveDashboard, onDashboardChange }, ref) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
   const [swipeProgress, setSwipeProgress] = useState(0);
   const [loadingStates, setLoadingStates] = useState<{ [key: number]: boolean }>({});
+  
+  // Ref for TinderCard to restore card if stake is cancelled
+  const tinderCardRef = useRef<TinderCardAPI>(null);
   const [internalActiveDashboard, setInternalActiveDashboard] = useState<DashboardType>('tinder');
   const [stakeModal, setStakeModal] = useState<{
     isOpen: boolean;
@@ -878,8 +887,16 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
 
   // Helper function for stake success
   const handleStakeSuccess = async () => {
+    // Move to next card after successful stake
+    console.log('✅ Stake successful, moving to next card...');
+    setCurrentIndex(prev => {
+      const next = prev + 1;
+      // Reset to first card when reaching the end, or stay on last if only one card
+      return cardItems.length <= 1 ? 0 : (next >= cardItems.length ? 0 : next);
+    });
+    
     // Refresh predictions immediately after stake for live data
-    console.log('✅ Stake successful, refreshing predictions for live data...');
+    console.log('🔄 Refreshing predictions for live data...');
     
     // First, quick refresh from Redis
     if (refreshPredictions) {
@@ -1498,8 +1515,22 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     }, 1500);
   };
 
-  const handleCloseStakeModal = () => {
+  const handleCloseStakeModal = async () => {
     setStakeModal(prev => ({ ...prev, isOpen: false }));
+    
+    // Restore the card back to its position since stake was cancelled
+    // Small delay to ensure modal is closed first
+    setTimeout(async () => {
+      if (tinderCardRef.current) {
+        try {
+          console.log('🔄 Restoring card after stake cancelled...');
+          await tinderCardRef.current.restoreCard();
+          console.log('✅ Card restored successfully');
+        } catch (error) {
+          console.error('Failed to restore card:', error);
+        }
+      }
+    }, 100);
   };
 
   // Handle skip button click
@@ -1561,14 +1592,8 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     }, 3000);
 
     // Open stake modal for bets (both left and right swipe)
+    // Card will move to next only after successful stake (in handleStakeSuccess)
     openStakeModal(direction, swipedId);
-    
-    // Move to next card
-    setCurrentIndex(prev => {
-      const next = prev + 1;
-      // Reset to first card when reaching the end, or stay on last if only one card
-      return cardItems.length <= 1 ? 0 : (next >= cardItems.length ? 0 : next);
-    });
   };
 
   const onCardLeftScreen = (swipedId: number) => {
@@ -2037,6 +2062,7 @@ KEY USER-FACING CHANGES: V1 → V2
       {/* Tinder Card */}
       <div className="card-container">
         <TinderCard
+          ref={tinderCardRef}
           key={currentCard.id}
           onSwipe={(dir) => onSwipe(dir, currentCard.id)}
           onCardLeftScreen={() => onCardLeftScreen(currentCard.id)}
