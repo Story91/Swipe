@@ -2,6 +2,7 @@
 
 import {
   useMiniKit,
+  useViewProfile,
 } from "@coinbase/onchainkit/minikit";
 import sdk from "@farcaster/miniapp-sdk";
 import {
@@ -17,6 +18,7 @@ import {
   WalletDropdown,
   WalletDropdownDisconnect,
 } from "@coinbase/onchainkit/wallet";
+import { Avatar as ShadcnAvatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   Menubar,
   MenubarContent,
@@ -49,20 +51,98 @@ import { SwipeClaim } from "./components/Portfolio/SwipeClaim";
 
 type DashboardType = 'tinder' | 'user' | 'admin' | 'approver' | 'market-stats' | 'analytics' | 'settings' | 'audit-logs' | 'my-portfolio' | 'active-bets' | 'bet-history' | 'help-faq' | 'leaderboard' | 'recent-activity' | 'swipe-token' | 'claim';
 
+// User profile type
+interface UserProfile {
+  fid: string | null;
+  username: string | null;
+  display_name: string | null;
+  pfp_url: string | null;
+}
+
 export default function App() {
-  const { setFrameReady, isFrameReady } = useMiniKit();
+  const { setFrameReady, isFrameReady, context } = useMiniKit();
   const [activeDashboard, setActiveDashboard] = useState<DashboardType>('tinder');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isHowToPlayOpen, setIsHowToPlayOpen] = useState(false);
   const { address } = useAccount();
   const tinderCardRef = useRef<{ refresh: () => void } | null>(null);
   const [hasTriedAddMiniApp, setHasTriedAddMiniApp] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const viewProfile = useViewProfile();
 
   useEffect(() => {
     if (!isFrameReady) {
       setFrameReady();
     }
   }, [setFrameReady, isFrameReady]);
+
+  // Fetch user profile from MiniKit context or Farcaster API
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (!address) {
+        setUserProfile(null);
+        return;
+      }
+
+      // First try to get from MiniKit context
+      if (context?.user) {
+        const user = context.user as any;
+        if (user.fid || user.pfpUrl || user.displayName) {
+          setUserProfile({
+            fid: user.fid?.toString() || null,
+            username: user.username || null,
+            display_name: user.displayName || user.display_name || null,
+            pfp_url: user.pfpUrl || user.pfp_url || null,
+          });
+          return;
+        }
+      }
+
+      // Fallback: fetch from our Farcaster API
+      setProfileLoading(true);
+      try {
+        const response = await fetch('/api/farcaster/profiles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ addresses: [address] })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.profiles && data.profiles.length > 0) {
+            const profile = data.profiles[0];
+            setUserProfile({
+              fid: profile.fid || null,
+              username: profile.username || null,
+              display_name: profile.display_name || null,
+              pfp_url: profile.pfp_url || null,
+            });
+          } else {
+            // No Farcaster profile, use wallet address
+            setUserProfile({
+              fid: null,
+              username: null,
+              display_name: null,
+              pfp_url: null,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch user profile:', error);
+        setUserProfile({
+          fid: null,
+          username: null,
+          display_name: null,
+          pfp_url: null,
+        });
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+
+    fetchUserProfile();
+  }, [address, context]);
 
   // Wywołaj addMiniApp() zaraz po ready (po włączeniu aplikacji)
   useEffect(() => {
@@ -132,8 +212,53 @@ export default function App() {
         {/* Wallet Connection and Admin/Help - Top */}
         <div className="flex justify-between items-center mb-3">
           <Wallet className="z-10">
-            <ConnectWallet className="!px-4 !py-2 !text-sm !min-w-0 !text-black !border-2 !border-black !font-semibold !shadow-md" text="Sign In">
-              <Name className="text-inherit text-xs" />
+            <ConnectWallet 
+              className={address 
+                ? "!px-2 !py-1.5 !text-sm !min-w-0 !text-black !border-2 !border-black !font-semibold !shadow-md !rounded-full !bg-gradient-to-r !from-[#d4ff00] !to-[#a8cc00] hover:!shadow-lg hover:!scale-105 !transition-all !duration-200" 
+                : "!px-4 !py-2 !text-sm !min-w-0 !text-black !border-2 !border-black !font-semibold !shadow-md"
+              } 
+              text="Sign In"
+            >
+              {address && userProfile ? (
+                <div className="flex items-center gap-2">
+                  <ShadcnAvatar className="w-7 h-7 ring-2 ring-black/20">
+                    <AvatarImage 
+                      src={userProfile?.pfp_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${address?.slice(2, 8)}`} 
+                      alt={userProfile?.display_name || 'User'} 
+                    />
+                    <AvatarFallback className="bg-black text-[#d4ff00] font-bold text-[10px]">
+                      {userProfile?.display_name?.slice(0, 2).toUpperCase() || address?.slice(2, 4).toUpperCase()}
+                    </AvatarFallback>
+                  </ShadcnAvatar>
+                  <div className="flex flex-col">
+                    <span className="text-black font-bold text-xs leading-tight truncate max-w-[70px]">
+                      {userProfile?.display_name || userProfile?.username || `${address?.slice(0, 6)}...`}
+                    </span>
+                    {userProfile?.username && (
+                      <span className="text-black/60 text-[9px] leading-tight">
+                        @{userProfile.username}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ) : address ? (
+                <div className="flex items-center gap-2">
+                  <ShadcnAvatar className="w-7 h-7 ring-2 ring-black/20">
+                    <AvatarImage 
+                      src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${address?.slice(2, 8)}`} 
+                      alt="User" 
+                    />
+                    <AvatarFallback className="bg-black text-[#d4ff00] font-bold text-[10px]">
+                      {address?.slice(2, 4).toUpperCase()}
+                    </AvatarFallback>
+                  </ShadcnAvatar>
+                  <span className="text-black font-bold text-xs">
+                    {`${address?.slice(0, 6)}...`}
+                  </span>
+                </div>
+              ) : (
+                <Name className="text-inherit text-xs" />
+              )}
             </ConnectWallet>
             <WalletDropdown>
               <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
@@ -142,6 +267,15 @@ export default function App() {
                 <Address />
                 <EthBalance />
               </Identity>
+              {/* View Farcaster Profile button */}
+              {userProfile?.fid && (
+                <div 
+                  className="px-4 py-2 cursor-pointer hover:bg-gray-100 text-sm text-blue-600 font-medium border-t"
+                  onClick={() => viewProfile(parseInt(userProfile.fid!, 10))}
+                >
+                  👤 View Farcaster Profile
+                </div>
+              )}
               <WalletDropdownDisconnect />
             </WalletDropdown>
           </Wallet>
