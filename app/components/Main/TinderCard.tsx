@@ -4,7 +4,7 @@ import { useAccount, useWriteContract, useReadContract, useWaitForTransactionRec
 import { ethers } from 'ethers';
 import { CONTRACTS, SWIPE_TOKEN, getV2Contract, getContractForAction } from '../../../lib/contract';
 import { calculateApprovalAmount } from '../../../lib/constants/approval';
-import { useViewProfile, useComposeCast, useMiniKit } from '@coinbase/onchainkit/minikit';
+import { useViewProfile, useComposeCast, useMiniKit, useViewCast, useOpenUrl } from '@coinbase/onchainkit/minikit';
 import './TinderCard.css';
 import './Dashboards.css';
 import { NotificationSystem, showNotification, UserDashboard } from '../Portfolio/UserDashboard';
@@ -99,6 +99,35 @@ function getTimeUrgencyClass(deadline: number): string {
   }
 }
 
+// Helper function to extract cast hash from various Farcaster/Warpcast URLs
+function extractCastHash(url: string): string | null {
+  // Match patterns like:
+  // https://warpcast.com/username/0x1234...
+  // https://warpcast.com/~/conversations/0x1234...
+  // https://base.app/post/0x1234...
+  // https://farcaster.xyz/~/cast/0x1234...
+  const patterns = [
+    /warpcast\.com\/[^\/]+\/([0-9a-fA-Fx]+)$/,
+    /warpcast\.com\/~\/conversations\/([0-9a-fA-Fx]+)/,
+    /base\.app\/post\/([0-9a-fA-Fx]+)/,
+    /farcaster\.xyz\/~\/cast\/([0-9a-fA-Fx]+)/,
+    /\/cast\/([0-9a-fA-Fx]+)/,
+  ];
+  
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+  return null;
+}
+
+// Helper function to check if URL is a Farcaster cast URL
+function isFarcasterCastUrl(url: string): boolean {
+  return extractCastHash(url) !== null;
+}
+
 const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>(({ items, activeDashboard: propActiveDashboard, onDashboardChange }, ref) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
@@ -183,6 +212,71 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   const { writeContract } = useWriteContract();
   const { composeCast } = useComposeCast();
   const { context } = useMiniKit();
+  const { viewCast } = useViewCast();
+  const openUrl = useOpenUrl();
+  
+  // Component to render description with clickable links
+  const DescriptionWithLinks = useCallback(({ text }: { text: string }) => {
+    // URL regex pattern
+    const urlPattern = /(https?:\/\/[^\s<>"{}|\\^`\[\]]+)/g;
+    
+    // Split text by URLs
+    const parts = text.split(urlPattern);
+    
+    if (parts.length === 1) {
+      // No URLs found
+      return <>{text}</>;
+    }
+    
+    return (
+      <>
+        {parts.map((part, index) => {
+          // Check if this part is a URL
+          if (part.match(urlPattern)) {
+            const castHash = extractCastHash(part);
+            
+            if (castHash) {
+              // This is a Farcaster cast URL - use viewCast
+              return (
+                <button
+                  key={index}
+                  onClick={() => {
+                    console.log('Opening cast:', castHash);
+                    viewCast({ hash: castHash });
+                  }}
+                  className="inline-flex items-center gap-1 text-[#d4ff00] hover:text-[#e5ff33] underline decoration-[#d4ff00]/50 hover:decoration-[#d4ff00] font-medium transition-all duration-200 cursor-pointer bg-transparent border-none p-0"
+                  style={{ font: 'inherit' }}
+                >
+                  <span>🔗</span>
+                  <span className="truncate max-w-[200px]">
+                    {part.includes('warpcast.com') ? 'View Cast' : part.length > 40 ? part.substring(0, 40) + '...' : part}
+                  </span>
+                </button>
+              );
+            } else {
+              // Regular URL - use openUrl
+              return (
+                <button
+                  key={index}
+                  onClick={() => {
+                    console.log('Opening URL:', part);
+                    openUrl(part);
+                  }}
+                  className="inline text-cyan-400 hover:text-cyan-300 underline decoration-cyan-400/50 hover:decoration-cyan-400 font-medium transition-all duration-200 cursor-pointer bg-transparent border-none p-0"
+                  style={{ font: 'inherit' }}
+                >
+                  {part.length > 50 ? part.substring(0, 50) + '...' : part}
+                </button>
+              );
+            }
+          }
+          
+          // Regular text
+          return <span key={index}>{part}</span>;
+        })}
+      </>
+    );
+  }, [viewCast, openUrl]);
   
   // Token prices for USD conversion
   const { formatUsdValue, getUsdValue } = useTokenPrices();
@@ -2060,7 +2154,9 @@ KEY USER-FACING CHANGES: V1 → V2
          </div>
            </div>
         <div className="terminal-body">
-          <p className="text-[#1a1a1a] font-mono text-xs leading-relaxed">{currentCard.description}</p>
+          <p className="text-[#1a1a1a] font-mono text-xs leading-relaxed">
+            <DescriptionWithLinks text={currentCard.description} />
+          </p>
            </div>
           </div>
 
