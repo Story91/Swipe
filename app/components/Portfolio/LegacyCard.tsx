@@ -131,6 +131,43 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading }: 
     }
   };
 
+  // Get crypto logo based on question/description text
+  const getCryptoLogo = (question: string, description: string): string | null => {
+    const text = `${question} ${description}`.toLowerCase();
+    
+    // Check for specific cryptocurrencies
+    if (text.includes('btc') || text.includes('bitcoin')) {
+      return '/bt3.png';
+    }
+    if (text.includes('eth') || text.includes('ethereum')) {
+      return '/Ethereum-icon-purple.svg';
+    }
+    if (text.includes('sol') || text.includes('solana')) {
+      return '/sol.png';
+    }
+    
+    return null; // No crypto detected
+  };
+
+  // Determine which image to show for the avatar
+  const getAvatarImage = (): string => {
+    // If it's a chart prediction, try to get crypto logo from question
+    if (prediction.includeChart) {
+      const cryptoLogo = getCryptoLogo(prediction.question, prediction.description);
+      if (cryptoLogo) return cryptoLogo;
+    }
+    
+    // Fall back to imageUrl or splash
+    // For geckoterminal URLs, try to detect crypto from question
+    if (prediction.imageUrl?.includes('geckoterminal.com')) {
+      const cryptoLogo = getCryptoLogo(prediction.question, prediction.description);
+      if (cryptoLogo) return cryptoLogo;
+      return '/splash.png'; // Fallback for unknown crypto
+    }
+    
+    return prediction.imageUrl || '/splash.png';
+  };
+
   // Calculate total staked for user
   const ethStake = prediction.userStakes?.ETH;
   const swipeStake = prediction.userStakes?.SWIPE;
@@ -151,10 +188,10 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading }: 
 
       {/* Header with Avatar */}
       <div className="legacy-card-header">
-        {/* Avatar */}
+        {/* Avatar - use crypto logo for chart predictions */}
         <div className="legacy-avatar">
           <img 
-            src={prediction.imageUrl || '/splash.png'} 
+            src={getAvatarImage()} 
             alt="Prediction" 
             onError={(e) => {
               (e.target as HTMLImageElement).src = '/splash.png';

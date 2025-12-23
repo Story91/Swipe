@@ -9,6 +9,7 @@ import { RedisPrediction, RedisUserStake, UserTransaction } from '../../../lib/t
 import { generateBasescanUrl, generateTransactionId } from '../../../lib/utils/redis-utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LegacyCard } from './LegacyCard';
+import GradientText from '@/components/GradientText';
 import './EnhancedUserDashboard.css';
 
 interface PredictionWithStakes {
@@ -293,7 +294,7 @@ export function EnhancedUserDashboard() {
     const profitFormatted = formatAmount(profit);
     const payoutFormatted = formatAmount(payout);
     
-    const text = `🎉 Just claimed ${payoutFormatted} ${tokenSymbol} (+${profitFormatted} profit) from Swiper!\n\n"${claimedPrediction.question}"\n\nPrediction was ${claimedPrediction.outcome ? 'YES ✅' : 'NO ❌'}\n\nPlay & earn: https://swiper.farcaster.xyz`;
+    const text = `🎉 Just claimed ${payoutFormatted} ${tokenSymbol} (+${profitFormatted} profit) from Swipe!\n\n"${claimedPrediction.question}"\n\nPrediction was ${claimedPrediction.outcome ? 'YES ✅' : 'NO ❌'}\n\nPredict, Swipe and Earn: https://theswipe.app`;
     
     // Open Warpcast composer
     const warpcastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}`;
@@ -1411,77 +1412,82 @@ export function EnhancedUserDashboard() {
           <div className="claim-badge">
             <span className="claim-icon">🎉</span>
             <span className="claim-count">{canClaimCount}</span>
-            <span className="claim-label">Ready to Claim</span>
+            <GradientText 
+              colors={['#0a0a0a', '#1a2a00', '#0a0a0a', '#1a3000', '#0a0a0a']}
+              animationSpeed={3}
+              showBorder={false}
+            >
+              <span className="claim-label">READY TO CLAIM</span>
+            </GradientText>
+          </div>
+        </div>
+
+        {/* Filter Row - inline with separator */}
+        <div className="filter-row">
+          <div className="filter-row-divider"></div>
+          <div className="filter-row-content">
+            <span className="filter-row-label">🔻 Filters:</span>
+            <Select value={selectedFilter} onValueChange={handleFilterChange}>
+              <SelectTrigger className="filter-row-select">
+                <SelectValue placeholder="Select" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ready-to-claim">🎉 Ready to Claim</SelectItem>
+                <SelectItem value="active">⏳ Active</SelectItem>
+                <SelectItem value="won">🏆 Won</SelectItem>
+                <SelectItem value="lost">💔 Lost</SelectItem>
+                <SelectItem value="expired">⏰ Expired</SelectItem>
+                <SelectItem value="cancelled">❌ Cancelled</SelectItem>
+                <SelectItem value="claimed">✅ Claimed</SelectItem>
+                <SelectItem value="all">📊 All</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </div>
 
-      {/* Filter Section - combined with message when no predictions */}
-      <div className={`filter-section ${filteredPredictions.length === 0 ? 'with-message' : ''}`}>
-        <div className={`filter-container ${filteredPredictions.length === 0 ? 'has-message' : ''}`}>
-          <label htmlFor="prediction-filter" className="filter-label">
-            Filter Predictions:
-          </label>
-          <Select value={selectedFilter} onValueChange={handleFilterChange}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Select filter" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ready-to-claim">🎉 Ready to Claim</SelectItem>
-              <SelectItem value="active">⏳ Active</SelectItem>
-              <SelectItem value="won">🏆 Won</SelectItem>
-              <SelectItem value="lost">💔 Lost</SelectItem>
-              <SelectItem value="expired">⏰ Expired</SelectItem>
-              <SelectItem value="cancelled">❌ Cancelled</SelectItem>
-              <SelectItem value="claimed">✅ Claimed</SelectItem>
-              <SelectItem value="all">📊 All Predictions</SelectItem>
-            </SelectContent>
-          </Select>
+      {/* No predictions message */}
+      {filteredPredictions.length === 0 && (
+        <div className="no-predictions-inline">
+          {selectedFilter === 'ready-to-claim' ? (
+            <>
+              <h3>🎉 No Rewards to Claim</h3>
+              <p>You don't have any predictions ready to claim right now.</p>
+              <p className="cta-text">Win some predictions to earn rewards!</p>
+            </>
+          ) : selectedFilter === 'active' ? (
+            <>
+              <h3>⏳ No Active Predictions</h3>
+              <p>There are no active predictions at the moment.</p>
+              <p className="cta-text">Check back soon for new predictions!</p>
+            </>
+          ) : selectedFilter === 'won' ? (
+            <>
+              <h3>🏆 No Wins Yet</h3>
+              <p>You haven't won any predictions yet.</p>
+              <p className="cta-text">Keep predicting to score your first win!</p>
+            </>
+          ) : selectedFilter === 'lost' ? (
+            <>
+              <h3>💔 No Losses</h3>
+              <p>Great news! You haven't lost any predictions.</p>
+              <p className="cta-text">Keep up the winning streak!</p>
+            </>
+          ) : selectedFilter === 'claimed' ? (
+            <>
+              <h3>✅ No Claimed Rewards</h3>
+              <p>You haven't claimed any rewards yet.</p>
+              <p className="cta-text">Win predictions and claim your rewards!</p>
+            </>
+          ) : (
+            <>
+              <h3>📝 No Predictions Found</h3>
+              <p>You haven't participated in any predictions yet.</p>
+              <p className="cta-text">Start by swiping on some predictions to place your stakes!</p>
+            </>
+          )}
         </div>
-        
-        {/* No predictions message - inline when no results */}
-        {filteredPredictions.length === 0 && (
-          <div className="no-predictions-inline">
-            {selectedFilter === 'ready-to-claim' ? (
-              <>
-                <h3>🎉 No Rewards to Claim</h3>
-                <p>You don't have any predictions ready to claim right now.</p>
-                <p className="cta-text">Win some predictions to earn rewards!</p>
-              </>
-            ) : selectedFilter === 'active' ? (
-              <>
-                <h3>⏳ No Active Predictions</h3>
-                <p>There are no active predictions at the moment.</p>
-                <p className="cta-text">Check back soon for new predictions!</p>
-              </>
-            ) : selectedFilter === 'won' ? (
-              <>
-                <h3>🏆 No Wins Yet</h3>
-                <p>You haven't won any predictions yet.</p>
-                <p className="cta-text">Keep predicting to score your first win!</p>
-              </>
-            ) : selectedFilter === 'lost' ? (
-              <>
-                <h3>💔 No Losses</h3>
-                <p>Great news! You haven't lost any predictions.</p>
-                <p className="cta-text">Keep up the winning streak!</p>
-              </>
-            ) : selectedFilter === 'claimed' ? (
-              <>
-                <h3>✅ No Claimed Rewards</h3>
-                <p>You haven't claimed any rewards yet.</p>
-                <p className="cta-text">Win predictions and claim your rewards!</p>
-              </>
-            ) : (
-              <>
-                <h3>📝 No Predictions Found</h3>
-                <p>You haven't participated in any predictions yet.</p>
-                <p className="cta-text">Start by swiping on some predictions to place your stakes!</p>
-              </>
-            )}
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Filtered Predictions Section */}
       {filteredPredictions.length > 0 && (
@@ -1730,13 +1736,6 @@ export function EnhancedUserDashboard() {
             {/* Success State */}
             {modalType === 'success' && (
               <>
-                {/* Header with logos */}
-                <div className="claim-modal-logos">
-                  <img src="/farc.png" alt="Farcaster" className="claim-modal-logo" />
-                  <span className="claim-modal-logo-divider">×</span>
-                  <img src="/Base_square_blue.png" alt="Base" className="claim-modal-logo" />
-                </div>
-                
                 {/* Success icon */}
                 <div className="claim-modal-success-icon">
                   <div className="claim-modal-success-circle">
@@ -1764,17 +1763,16 @@ export function EnhancedUserDashboard() {
                 
                 <p className="claim-modal-description">Share your win and challenge your friends!</p>
                 
-                {/* Share button */}
+                {/* Share button with logos */}
                 <button 
                   onClick={shareClaimedPrediction}
                   className="claim-modal-share-btn"
                 >
-                  <svg className="claim-modal-share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                    <polyline points="16 6 12 2 8 6" />
-                    <line x1="12" y1="2" x2="12" y2="15" />
-                  </svg>
-                  Share on Warpcast
+                  <span className="share-btn-text">Share on</span>
+                  <div className="share-btn-logos">
+                    <img src="/farc.png" alt="Farcaster" className="share-btn-logo" />
+                    <img src="/Base_square_blue.png" alt="Base" className="share-btn-logo" />
+                  </div>
                 </button>
                 
                 {/* Basescan link */}

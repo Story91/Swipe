@@ -89,6 +89,15 @@
   object-fit: cover;
 }
 
+/* Crypto logos - smaller to fit nicely in avatar */
+.legacy-avatar img[src*="Ethereum"],
+.legacy-avatar img[src*="sol.png"] {
+  width: 80%;
+  height: 80%;
+  object-fit: contain;
+  margin: 10%;
+}
+
 /* Header Content */
 .legacy-header-content {
   width: 100%;

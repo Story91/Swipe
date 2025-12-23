@@ -195,6 +195,63 @@
 }
 
 /* Filter Section */
+/* Filter Row - compact inline in stats section */
+.filter-row {
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.filter-row-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(212, 255, 0, 0.3), transparent);
+  margin-bottom: 8px;
+}
+
+.filter-row-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.filter-row-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #ffffff;
+  font-family: "Exo 2", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.filter-row-select {
+  width: auto !important;
+  min-width: unset !important;
+  height: 26px !important;
+  background: rgba(0, 0, 0, 0.6) !important;
+  border: 1px solid rgba(212, 255, 0, 0.4) !important;
+  border-radius: 6px !important;
+  font-size: 10px !important;
+  color: #ffffff !important;
+  padding: 0 8px !important;
+}
+
+.filter-row-select span {
+  color: #ffffff !important;
+  font-size: 10px !important;
+}
+
+.filter-row-select svg {
+  color: #d4ff00 !important;
+  width: 12px !important;
+  height: 12px !important;
+}
+
+.filter-row-select:hover {
+  border-color: #d4ff00 !important;
+  background: rgba(212, 255, 0, 0.1) !important;
+}
+
+/* Legacy filter-section - keep for backwards compatibility */
 .filter-section {
   margin-bottom: 20px;
   padding: 20px;
@@ -1812,6 +1869,23 @@
 .claim-modal-share-icon {
   width: 20px;
   height: 20px;
+}
+
+.share-btn-text {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.share-btn-logos {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.share-btn-logo {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
 }
 
 /* Basescan Button */
