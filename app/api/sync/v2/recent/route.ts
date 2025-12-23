@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createPublicClient, http } from 'viem';
 import { base } from 'viem/chains';
-import { CONTRACTS } from '../../../../lib/contract';
-import { redisHelpers } from '../../../../lib/redis';
+import { CONTRACTS } from '../../../../../lib/contract';
+import { redisHelpers } from '../../../../../lib/redis';
 
 // Initialize public client for Base network
 const publicClient = createPublicClient({
@@ -35,10 +35,14 @@ async function retryWithBackoff<T>(
   throw new Error('Max retries exceeded');
 }
 
-// GET /api/sync/v2 - Full V2 sync (all predictions + stakes)
+// GET /api/sync/v2/recent?count=15 - Sync only the most recent N predictions
 export async function GET(request: NextRequest) {
   try {
-    console.log('🔄 Starting V2 contract full sync...');
+    const { searchParams } = new URL(request.url);
+    const countParam = searchParams.get('count');
+    const count = countParam ? parseInt(countParam) : 15; // Default to 15 predictions
+
+    console.log(`🔄 Starting V2 recent sync (last ${count} predictions)...`);
 
     // Get total prediction count from V2 contract
     const totalCount = await retryWithBackoff(async () => {
@@ -51,16 +55,18 @@ export async function GET(request: NextRequest) {
     });
 
     const totalCountNumber = Number(totalCount);
-    console.log(`📊 Found ${totalCountNumber} total predictions on V2 contract`);
+    const startId = Math.max(1, totalCountNumber - count);
+    
+    console.log(`📊 Total predictions: ${totalCountNumber - 1}, syncing from ${startId} to ${totalCountNumber - 1}`);
 
     let syncedPredictions = 0;
     let syncedStakes = 0;
     let errorsCount = 0;
 
-    // Sync all predictions from 1 to totalCount-1
-    for (let i = 1; i < totalCountNumber; i++) {
+    // Sync only the most recent predictions
+    for (let i = startId; i < totalCountNumber; i++) {
       try {
-        console.log(`🔄 Syncing V2 prediction ${i}/${totalCountNumber-1}...`);
+        console.log(`🔄 Syncing V2 prediction ${i}...`);
 
         // Get prediction data from blockchain
         const predictionData = await retryWithBackoff(async () => {
@@ -84,16 +90,6 @@ export async function GET(request: NextRequest) {
 
         // Parse prediction data (V2 ABI order)
         const [question, description, category, imageUrl, yesTotalAmount, noTotalAmount, swipeYesTotalAmount, swipeNoTotalAmount, deadline, resolutionDeadline, resolved, outcome, cancelled, createdAt, creator, verified, approved, needsApproval, creationToken, creationTokenAmount] = predictionData as any[];
-        
-        // Debug: Log raw blockchain data
-        console.log(`🔍 Prediction ${i} raw blockchain data:`, {
-          deadline: deadline,
-          deadlineType: typeof deadline,
-          resolved: resolved,
-          resolvedType: typeof resolved,
-          creator: creator,
-          creatorType: typeof creator
-        });
 
         const predictionId = `pred_v2_${i}`;
         const deadlineNum = Number(deadline);
@@ -110,19 +106,16 @@ export async function GET(request: NextRequest) {
         const needsApprovalBool = Boolean(needsApproval);
 
         // Validate deadline - skip predictions with deadline 0 (uninitialized)
-        console.log(`🔍 Prediction ${i} deadline debug:`, { deadlineNum, type: typeof deadlineNum, isNaN: isNaN(deadlineNum) });
-        
         if (!deadlineNum || deadlineNum <= 0 || isNaN(deadlineNum)) {
-          console.log(`⚠️ Skipping prediction ${i} - invalid deadline: ${deadlineNum} (type: ${typeof deadlineNum})`);
+          console.log(`⚠️ Skipping prediction ${i} - invalid deadline: ${deadlineNum}`);
           continue;
         }
 
         // Create safe date strings (deadline is in seconds, convert to milliseconds)
         const deadlineDate = new Date(deadlineNum * 1000);
         
-        // Additional validation for Date object
         if (isNaN(deadlineDate.getTime())) {
-          console.error(`❌ Invalid date created from deadline ${deadline} for prediction ${i}`);
+          console.error(`❌ Invalid date for prediction ${i}`);
           continue;
         }
         
@@ -139,7 +132,7 @@ export async function GET(request: NextRequest) {
           description: String(description),
           category: String(category),
           imageUrl: String(imageUrl),
-          deadline: deadlineNum, // Deadline is already in seconds
+          deadline: deadlineNum,
           yesTotalAmount: yesTotal,
           noTotalAmount: noTotal,
           swipeYesTotalAmount: swipeYesTotal,
@@ -150,7 +143,7 @@ export async function GET(request: NextRequest) {
           creator: String(creator),
           verified: verifiedBool,
           needsApproval: needsApprovalBool,
-          approved: true, // V2 predictions are auto-approved
+          approved: true,
           // Preserve existing non-blockchain fields, or use defaults for new predictions
           includeChart: existingPrediction?.includeChart ?? false,
           selectedCrypto: existingPrediction?.selectedCrypto ?? '',
@@ -161,14 +154,6 @@ export async function GET(request: NextRequest) {
           createdAt: Number(createdAt),
           contractVersion: 'V2' as const
         };
-        
-        // Debug: Check for BigInt values
-        console.log(`🔍 Prediction ${i} BigInt check:`, {
-          question: typeof question,
-          creator: typeof creator,
-          verified: typeof verified,
-          needsApproval: typeof needsApproval
-        });
 
         // Save prediction to Redis
         await redisHelpers.savePrediction(redisPrediction);
@@ -198,7 +183,6 @@ export async function GET(request: NextRequest) {
                 });
               }) as unknown as [bigint, bigint, boolean]
             ]);
-            
 
             // V2 returns struct {yesAmount, noAmount, claimed}
             const ethYesAmount = userStakeData[0] || 0;
@@ -250,10 +234,10 @@ export async function GET(request: NextRequest) {
         }
 
         syncedStakes += stakesCount;
-        console.log(`✅ Synced V2 prediction ${i}: ${question.substring(0, 50)}... (${stakesCount} stakes, resolved: ${resolvedBool}, outcome: ${outcomeBool}, participants: ${participants.length})`);
+        console.log(`✅ Synced prediction ${i}: ${String(question).substring(0, 40)}... (${stakesCount} stakes, resolved: ${resolvedBool})`);
 
       } catch (error) {
-        console.error(`❌ Failed to sync V2 prediction ${i}:`, error);
+        console.error(`❌ Failed to sync prediction ${i}:`, error);
         errorsCount++;
       }
     }
@@ -261,14 +245,15 @@ export async function GET(request: NextRequest) {
     // Update market stats
     await redisHelpers.updateMarketStats();
 
-    console.log(`🎉 V2 sync completed! Synced: ${syncedPredictions} predictions, ${syncedStakes} stakes, Errors: ${errorsCount}`);
+    console.log(`🎉 V2 recent sync completed! Synced: ${syncedPredictions} predictions, ${syncedStakes} stakes, Errors: ${errorsCount}`);
 
     return NextResponse.json({
       success: true,
-      message: 'V2 contract sync completed',
+      message: `V2 recent sync completed (last ${count} predictions)`,
       data: {
         contractVersion: 'V2',
         totalPredictions: totalCountNumber - 1,
+        syncedRange: { from: startId, to: totalCountNumber - 1 },
         syncedPredictions,
         syncedStakes,
         errorsCount
@@ -277,14 +262,15 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('❌ V2 sync failed:', error);
+    console.error('❌ V2 recent sync failed:', error);
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to sync V2 contract data',
+        error: 'Failed to sync recent V2 predictions',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
     );
   }
 }
+

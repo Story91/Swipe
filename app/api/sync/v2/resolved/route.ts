@@ -124,7 +124,10 @@ export async function GET(request: NextRequest) {
         const endDate = deadlineDate.toISOString().split('T')[0];
         const endTimeStr = deadlineDate.toISOString().split('T')[1].split('.')[0];
 
-        // Create Redis prediction object
+        // Get existing prediction from Redis to preserve non-blockchain fields
+        const existingPrediction = await redisHelpers.getPrediction(predictionId);
+
+        // Create Redis prediction object - preserve existing non-blockchain fields
         const redisPrediction = {
           id: predictionId,
           question: String(question),
@@ -143,12 +146,14 @@ export async function GET(request: NextRequest) {
           verified: verifiedBool,
           needsApproval: needsApprovalBool,
           approved: true, // V2 predictions are auto-approved
-          includeChart: false,
+          // Preserve existing non-blockchain fields, or use defaults for new predictions
+          includeChart: existingPrediction?.includeChart ?? false,
+          selectedCrypto: existingPrediction?.selectedCrypto ?? '',
           endDate: endDate,
           endTime: endTimeStr,
           participants: participants.map(p => String(p).toLowerCase()),
           totalStakes: participants.length,
-          createdAt: Math.floor(Date.now() / 1000),
+          createdAt: existingPrediction?.createdAt ?? Math.floor(Date.now() / 1000),
           contractVersion: 'V2' as const
         };
 

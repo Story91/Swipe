@@ -132,15 +132,21 @@ export async function GET(request: NextRequest) {
           continue;
         }
 
-        // Convert contract data to Redis format
+        // Get existing prediction from Redis to preserve non-blockchain fields
+        const predictionId = `pred_v2_${i}`;
+        const existingPrediction = await redisHelpers.getPrediction(predictionId);
+        
+        // Convert contract data to Redis format - preserve existing non-blockchain fields
         const predictionArray = predictionData as any[];
         const redisPrediction = {
-          id: `pred_v2_${i}`,
+          id: predictionId,
           question: predictionArray[0] || '',
           description: predictionArray[1] || '',
           category: predictionArray[2] || 'general',
           imageUrl: predictionArray[3] || '',
-          includeChart: false,
+          // Preserve existing non-blockchain fields, or use defaults for new predictions
+          includeChart: existingPrediction?.includeChart ?? false,
+          selectedCrypto: existingPrediction?.selectedCrypto ?? '',
           endDate: new Date(Number(predictionArray[4]) * 1000).toISOString().split('T')[0],
           endTime: new Date(Number(predictionArray[4]) * 1000).toTimeString().split(' ')[0],
           deadline: Number(predictionArray[4]),
