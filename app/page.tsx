@@ -87,18 +87,9 @@ export default function App() {
       if (address || hasTriedAutoConnect) return;
       
       try {
-        // Check if we're in a Farcaster Mini App context
-        const isInMiniApp = await sdk.isInMiniApp();
-        if (!isInMiniApp) {
-          console.log('ℹ️ Not in Mini App context (likely Base app), marking auto-connect complete');
-          setHasTriedAutoConnect(true); // Important: still mark as tried so addMiniApp can run!
-          return;
-        }
-
-        // Check if Farcaster wallet provider is available
+        // Check if Farcaster wallet provider is available (only in Warpcast)
         if (sdk.wallet?.ethProvider) {
           console.log('🔄 Farcaster wallet detected, attempting auto-connect...');
-          setHasTriedAutoConnect(true);
           
           // Find the Farcaster frame connector
           const farcasterConnector = connectors.find(c => c.id === 'farcaster-frame' || c.name === 'Farcaster Frame');
@@ -115,13 +106,14 @@ export default function App() {
             }
           }
         } else {
-          console.log('ℹ️ Farcaster wallet provider not available');
-          setHasTriedAutoConnect(true);
+          console.log('ℹ️ Farcaster wallet provider not available (likely Base app)');
         }
       } catch (error) {
-        console.log('ℹ️ Auto-connect check failed (likely in browser/Base app):', error);
-        setHasTriedAutoConnect(true);
+        console.log('ℹ️ Auto-connect check failed:', error);
       }
+      
+      // Always mark as tried so addMiniApp can run
+      setHasTriedAutoConnect(true);
     };
 
     // Wait a bit for SDK to initialize
