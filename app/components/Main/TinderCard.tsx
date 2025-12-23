@@ -5,6 +5,7 @@ import { ethers } from 'ethers';
 import { CONTRACTS, SWIPE_TOKEN, getV2Contract, getContractForAction } from '../../../lib/contract';
 import { calculateApprovalAmount } from '../../../lib/constants/approval';
 import { useViewProfile, useComposeCast, useMiniKit, useViewCast, useOpenUrl } from '@coinbase/onchainkit/minikit';
+import sdk from '@farcaster/miniapp-sdk';
 import './TinderCard.css';
 import './Dashboards.css';
 import { NotificationSystem, showNotification, UserDashboard } from '../Portfolio/UserDashboard';
@@ -219,10 +220,83 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   
   const { address } = useAccount();
   const { writeContract } = useWriteContract();
-  const { composeCast } = useComposeCast();
+  const { composeCast: minikitComposeCast } = useComposeCast();
   const { context } = useMiniKit();
-  const { viewCast } = useViewCast();
-  const openUrl = useOpenUrl();
+  const { viewCast: minikitViewCast } = useViewCast();
+  const minikitOpenUrl = useOpenUrl();
+  
+  // Universal share function - works on both MiniKit (Base app) and Farcaster SDK (Warpcast)
+  const composeCast = useCallback(async (params: { text: string; embeds?: string[] }) => {
+    // Try MiniKit first (Base app)
+    try {
+      if (minikitComposeCast) {
+        console.log('📱 Using MiniKit composeCast...');
+        // MiniKit expects max 2 embeds as tuple
+        const embedsParam = params.embeds?.slice(0, 2) as [] | [string] | [string, string] | undefined;
+        await minikitComposeCast({ text: params.text, embeds: embedsParam });
+        return;
+      }
+    } catch (error) {
+      console.log('MiniKit composeCast failed, trying Farcaster SDK...', error);
+    }
+    
+    // Fallback to Farcaster SDK (Warpcast and other clients)
+    try {
+      console.log('📱 Using Farcaster SDK composeCast...');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await sdk.actions.composeCast({
+        text: params.text,
+        embeds: params.embeds?.map(url => ({ url })) as any
+      });
+    } catch (error) {
+      console.error('Both composeCast methods failed:', error);
+      throw error;
+    }
+  }, [minikitComposeCast]);
+  
+  // Universal viewCast function
+  const viewCast = useCallback((params: { hash: string }) => {
+    // Try MiniKit first
+    try {
+      if (minikitViewCast) {
+        console.log('📱 Using MiniKit viewCast...');
+        minikitViewCast(params);
+        return;
+      }
+    } catch (error) {
+      console.log('MiniKit viewCast failed, trying Farcaster SDK...', error);
+    }
+    
+    // Fallback to Farcaster SDK
+    try {
+      console.log('📱 Using Farcaster SDK viewCast...');
+      sdk.actions.viewCast({ hash: params.hash });
+    } catch (error) {
+      console.error('Both viewCast methods failed:', error);
+    }
+  }, [minikitViewCast]);
+  
+  // Universal openUrl function
+  const openUrl = useCallback((url: string) => {
+    // Try MiniKit first
+    try {
+      if (minikitOpenUrl) {
+        console.log('📱 Using MiniKit openUrl...');
+        minikitOpenUrl(url);
+        return;
+      }
+    } catch (error) {
+      console.log('MiniKit openUrl failed, trying Farcaster SDK...', error);
+    }
+    
+    // Fallback to Farcaster SDK
+    try {
+      console.log('📱 Using Farcaster SDK openUrl...');
+      sdk.actions.openUrl(url);
+    } catch (error) {
+      console.error('Both openUrl methods failed:', error);
+    }
+  }, [minikitOpenUrl]);
   
   // Component to render description with clickable links
   const DescriptionWithLinks = useCallback(({ text }: { text: string }) => {
@@ -315,9 +389,38 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   };
   
   // Wait for stake transaction confirmation
-  const { isLoading: isStakeConfirming, isSuccess: isStakeConfirmed } = useWaitForTransactionReceipt({
+  const { isLoading: isStakeConfirming, isSuccess: isStakeConfirmed, isError: isStakeError } = useWaitForTransactionReceipt({
     hash: stakeTransactionHash || undefined,
   });
+  
+  // State to track if we've already handled the confirmation
+  const [hasHandledConfirmation, setHasHandledConfirmation] = useState(false);
+  
+  // Handle stake transaction confirmation - this is where we actually move the card
+  useEffect(() => {
+    if (isStakeConfirmed && stakeTransactionHash && !hasHandledConfirmation) {
+      console.log('✅ Transaction confirmed on blockchain!');
+      setHasHandledConfirmation(true);
+      
+      // Now we can safely move to next card and show success
+      handleStakeSuccess();
+    }
+    
+    if (isStakeError && stakeTransactionHash && !hasHandledConfirmation) {
+      console.log('❌ Transaction failed on blockchain!');
+      setHasHandledConfirmation(true);
+      
+      // Transaction failed after being sent
+      handleStakeError({ message: 'Transaction failed on blockchain' });
+    }
+  }, [isStakeConfirmed, isStakeError, stakeTransactionHash, hasHandledConfirmation]);
+  
+  // Reset confirmation handler when new transaction starts
+  useEffect(() => {
+    if (!stakeTransactionHash) {
+      setHasHandledConfirmation(false);
+    }
+  }, [stakeTransactionHash]);
   
   // Check SWIPE allowance for user
   const { data: swipeAllowance, refetch: refetchAllowance } = useReadContract({
@@ -836,20 +939,19 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
         args: [BigInt(predictionId), isYes],
         value: ethers.parseEther(amount.toString()),
       }, {
-        onSuccess: async (tx) => {
-          console.log('✅ ETH Stake transaction successful:', tx);
-          showNotification('success', 'Stake Placed!', `Successfully staked ${amount} ETH on ${side}!`);
+        onSuccess: (tx) => {
+          console.log('📤 ETH Stake transaction sent:', tx);
+          showNotification('info', 'Transaction Sent', 'Waiting for blockchain confirmation...');
           
-          // Set transaction hash and prediction ID for auto-sync
+          // Set transaction hash for tracking - card will move after confirmation in useEffect
           setStakeTransactionHash(tx);
           setStakePredictionId(predictionId);
           setStakeAmount(amount);
           setStakeToken('ETH');
           setStakeIsYes(isYes);
           
-          // Auto-sync will be handled by useEffect after transaction confirmation
-          
-          await handleStakeSuccess();
+          // Keep modal open with loading state until confirmation
+          // Card movement and modal close will happen in useEffect when isStakeConfirmed becomes true
         },
         onError: (error) => {
           handleStakeError(error);
@@ -863,20 +965,19 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
         functionName: 'placeStakeWithToken',
         args: [BigInt(predictionId), isYes, ethers.parseEther(amount.toString())],
       }, {
-        onSuccess: async (tx) => {
-          console.log('✅ SWIPE Stake transaction successful:', tx);
-          showNotification('success', 'Stake Placed!', `Successfully staked ${amount} SWIPE on ${side}!`);
+        onSuccess: (tx) => {
+          console.log('📤 SWIPE Stake transaction sent:', tx);
+          showNotification('info', 'Transaction Sent', 'Waiting for blockchain confirmation...');
           
-          // Set transaction hash and prediction ID for auto-sync
+          // Set transaction hash for tracking - card will move after confirmation in useEffect
           setStakeTransactionHash(tx);
           setStakePredictionId(predictionId);
           setStakeAmount(amount);
           setStakeToken('SWIPE');
           setStakeIsYes(isYes);
           
-          // Auto-sync will be handled by useEffect after transaction confirmation
-          
-          await handleStakeSuccess();
+          // Keep modal open with loading state until confirmation
+          // Card movement and modal close will happen in useEffect when isStakeConfirmed becomes true
         },
         onError: (error) => {
           handleStakeError(error);
@@ -887,6 +988,10 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
 
   // Helper function for stake success
   const handleStakeSuccess = async () => {
+    // Close modal and reset loading state
+    setStakeModal(prev => ({ ...prev, isOpen: false }));
+    setIsTransactionLoading(false);
+    
     // Move to next card after successful stake
     console.log('✅ Stake successful, moving to next card...');
     setCurrentIndex(prev => {
@@ -1119,9 +1224,28 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       errorMessage = '❌ Transaction reverted by contract.';
     } else if (error?.message?.includes('allowance')) {
       errorMessage = '❌ Insufficient SWIPE allowance. Please approve first.';
+    } else if (error?.message?.includes('rejected') || error?.message?.includes('denied') || error?.message?.includes('cancelled') || error?.message?.includes('User rejected')) {
+      errorMessage = '❌ Transaction cancelled by user.';
     }
 
     showNotification('error', 'Stake Failed', errorMessage);
+    
+    // Close the stake modal and reset loading state
+    setStakeModal(prev => ({ ...prev, isOpen: false }));
+    setIsTransactionLoading(false);
+    
+    // Restore the card back to its position since transaction failed
+    setTimeout(async () => {
+      if (tinderCardRef.current) {
+        try {
+          console.log('🔄 Restoring card after stake error...');
+          await tinderCardRef.current.restoreCard();
+          console.log('✅ Card restored successfully after error');
+        } catch (restoreError) {
+          console.error('Failed to restore card:', restoreError);
+        }
+      }
+    }, 100);
   };
 
   const handleClaimReward = (predictionId: number, token: 'ETH' | 'SWIPE' = 'ETH') => {
@@ -1502,17 +1626,12 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     const numericPredictionId = predictionId;
 
     // Call the stake handler from dashboard with token
+    // The modal will be closed and card handled by onSuccess/onError callbacks in handleStakeBet
     handleStakeBet(numericPredictionId, isYes, amount, selectedToken);
-
-    // Close modal after a short delay to show loading
-    setTimeout(() => {
-      setStakeModal(prev => ({ ...prev, isOpen: false }));
-      setIsTransactionLoading(false);
-
-      // Show success animation
-      const successMessage = `🎯 Successfully staked ${amount} ${selectedToken} on ${isYes ? 'YES' : 'NO'}!`;
-      showNotification('success', 'Transaction Successful!', successMessage);
-    }, 1500);
+    
+    // Note: Modal closing and success/error handling is done in handleStakeBet callbacks
+    // - onSuccess: calls handleStakeSuccess() which moves to next card, then shows share modal
+    // - onError: calls handleStakeError() which shows notification and restores card
   };
 
   const handleCloseStakeModal = async () => {

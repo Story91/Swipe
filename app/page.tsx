@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/menubar";
 import { Button } from "@/components/ui/button";
 import { Trophy, HelpCircle, Settings } from "lucide-react";
-import { useAccount } from "wagmi";
+import { useAccount, useConnect } from "wagmi";
 import { useState, useEffect, useRef } from "react";
 import TinderCardComponent from "./components/Main/TinderCard";
 import { AdminPanel } from "./components/Admin/AdminPanel";
@@ -65,8 +65,10 @@ export default function App() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isHowToPlayOpen, setIsHowToPlayOpen] = useState(false);
   const { address } = useAccount();
+  const { connect, connectors } = useConnect();
   const tinderCardRef = useRef<{ refresh: () => void } | null>(null);
   const [hasTriedAddMiniApp, setHasTriedAddMiniApp] = useState(false);
+  const [hasTriedAutoConnect, setHasTriedAutoConnect] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const viewProfile = useViewProfile();
@@ -76,6 +78,54 @@ export default function App() {
       setFrameReady();
     }
   }, [setFrameReady, isFrameReady]);
+
+  // Auto-connect wallet in Farcaster frame context (Warpcast)
+  useEffect(() => {
+    const autoConnectFarcasterWallet = async () => {
+      // Skip if already connected or already tried
+      if (address || hasTriedAutoConnect) return;
+      
+      try {
+        // Check if we're in a Farcaster Mini App context
+        const isInMiniApp = await sdk.isInMiniApp();
+        if (!isInMiniApp) {
+          console.log('ℹ️ Not in Mini App context, skipping auto-connect');
+          return;
+        }
+
+        // Check if Farcaster wallet provider is available
+        if (sdk.wallet?.ethProvider) {
+          console.log('🔄 Farcaster wallet detected, attempting auto-connect...');
+          setHasTriedAutoConnect(true);
+          
+          // Find the Farcaster frame connector
+          const farcasterConnector = connectors.find(c => c.id === 'farcaster-frame' || c.name === 'Farcaster Frame');
+          
+          if (farcasterConnector) {
+            console.log('📱 Connecting via Farcaster Frame connector...');
+            connect({ connector: farcasterConnector });
+          } else {
+            // Fallback: try injected connector which should pick up the Farcaster provider
+            const injectedConnector = connectors.find(c => c.id === 'injected');
+            if (injectedConnector) {
+              console.log('📱 Connecting via injected connector...');
+              connect({ connector: injectedConnector });
+            }
+          }
+        }
+      } catch (error) {
+        console.log('ℹ️ Auto-connect check failed (likely in browser/Base app):', error);
+        setHasTriedAutoConnect(true);
+      }
+    };
+
+    // Wait a bit for SDK to initialize
+    const timer = setTimeout(() => {
+      autoConnectFarcasterWallet();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [address, hasTriedAutoConnect, connect, connectors]);
 
   // Fetch user profile from MiniKit context or Farcaster API
   useEffect(() => {
