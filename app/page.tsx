@@ -80,7 +80,6 @@ export default function App() {
   }, [setFrameReady, isFrameReady]);
 
   // Auto-connect wallet in Farcaster frame context (Warpcast)
-  // Also marks hasTriedAutoConnect for Base app flow
   useEffect(() => {
     const autoConnectFarcasterWallet = async () => {
       // Skip if already connected or already tried
@@ -90,8 +89,7 @@ export default function App() {
         // Check if we're in a Farcaster Mini App context
         const isInMiniApp = await sdk.isInMiniApp();
         if (!isInMiniApp) {
-          console.log('ℹ️ Not in Mini App context (likely Base app), marking auto-connect complete');
-          setHasTriedAutoConnect(true); // Important: still mark as tried so addMiniApp can run!
+          console.log('ℹ️ Not in Mini App context, skipping auto-connect');
           return;
         }
 
@@ -114,9 +112,6 @@ export default function App() {
               connect({ connector: injectedConnector });
             }
           }
-        } else {
-          console.log('ℹ️ Farcaster wallet provider not available');
-          setHasTriedAutoConnect(true);
         }
       } catch (error) {
         console.log('ℹ️ Auto-connect check failed (likely in browser/Base app):', error);
@@ -199,22 +194,14 @@ export default function App() {
     fetchUserProfile();
   }, [address, context]);
 
-  // Wywołaj addMiniApp() DOPIERO PO auto-connect (po połączeniu portfela lub po upływie czasu)
-  // WAŻNE: Sprawdź context.client.added - nie pokazuj modalu jeśli już dodany!
+  // Prompt user to add Mini App (for notifications, etc.)
+  // Check context.client.added - don't prompt if already added
   useEffect(() => {
     const promptAddMiniApp = async () => {
       if (hasTriedAddMiniApp || !isFrameReady) return;
       
       try {
-        const isInMiniApp = await sdk.isInMiniApp();
-        if (!isInMiniApp) {
-          console.log('Not in Mini App, skipping addMiniApp');
-          setHasTriedAddMiniApp(true);
-          return;
-        }
-
         // Check if user already added the mini app - don't prompt again!
-        // context.client.added tells us if the user has already added this app
         const alreadyAdded = context?.client?.added;
         if (alreadyAdded) {
           console.log('✅ Mini App already added by user, skipping addMiniApp prompt');
@@ -222,6 +209,9 @@ export default function App() {
           return;
         }
 
+        // Small delay to let things settle
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
         console.log('📱 Prompting user to add Mini App (not added yet)...');
         setHasTriedAddMiniApp(true);
         
@@ -248,16 +238,10 @@ export default function App() {
       }
     };
 
-    // Wait for auto-connect to complete first (hasTriedAutoConnect), then prompt addMiniApp
-    // This prevents addMiniApp modal from blocking auto-connect
-    if (isFrameReady && hasTriedAutoConnect) {
-      const timer = setTimeout(() => {
-        promptAddMiniApp();
-      }, 500); // Shorter delay since we already waited for auto-connect
-      
-      return () => clearTimeout(timer);
+    if (isFrameReady) {
+      promptAddMiniApp();
     }
-  }, [isFrameReady, hasTriedAddMiniApp, hasTriedAutoConnect, context]);
+  }, [isFrameReady, hasTriedAddMiniApp, context]);
 
   // Check permissions
   const isAdmin = address && process.env.NEXT_PUBLIC_ADMIN_1?.toLowerCase() === address.toLowerCase();
