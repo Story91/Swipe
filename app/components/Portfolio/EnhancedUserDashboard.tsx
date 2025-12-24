@@ -10,6 +10,8 @@ import { generateBasescanUrl, generateTransactionId } from '../../../lib/utils/r
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LegacyCard } from './LegacyCard';
 import GradientText from '@/components/GradientText';
+import { useComposeCast } from '@coinbase/onchainkit/minikit';
+import sdk from '@farcaster/miniapp-sdk';
 import './EnhancedUserDashboard.css';
 
 interface PredictionWithStakes {
@@ -70,6 +72,34 @@ interface PredictionWithStakes {
 export function EnhancedUserDashboard() {
   const { address } = useAccount();
   const { writeContract } = useWriteContract();
+  const { composeCast: minikitComposeCast } = useComposeCast();
+  
+  // Universal share function - works on both MiniKit (Base app) and Farcaster SDK (Warpcast)
+  const composeCast = useCallback(async (params: { text: string; embeds?: string[] }) => {
+    // Try MiniKit first (Base app)
+    try {
+      if (minikitComposeCast) {
+        console.log('📱 Using MiniKit composeCast for claim share...');
+        const embedsParam = params.embeds?.slice(0, 2) as [] | [string] | [string, string] | undefined;
+        await minikitComposeCast({ text: params.text, embeds: embedsParam });
+        return;
+      }
+    } catch (error) {
+      console.log('MiniKit composeCast failed, trying Farcaster SDK...', error);
+    }
+    
+    // Fallback to Farcaster SDK (Warpcast and other clients)
+    try {
+      console.log('📱 Using Farcaster SDK composeCast for claim share...');
+      await sdk.actions.composeCast({
+        text: params.text,
+        embeds: params.embeds?.map(url => ({ url })) as any
+      });
+    } catch (error) {
+      console.error('Both composeCast methods failed:', error);
+      throw error;
+    }
+  }, [minikitComposeCast]);
   const [userPredictions, setUserPredictions] = useState<PredictionWithStakes[]>([]);
   const [allUserPredictions, setAllUserPredictions] = useState<PredictionWithStakes[]>([]);
   const [loadingStakes, setLoadingStakes] = useState(false);
@@ -272,7 +302,7 @@ export function EnhancedUserDashboard() {
   };
   
   // Share claimed prediction
-  const shareClaimedPrediction = () => {
+  const shareClaimedPrediction = async () => {
     if (!claimedPrediction || !modalData.tokenType) return;
     
     const stake = claimedPrediction.userStakes?.[modalData.tokenType];
@@ -280,25 +310,42 @@ export function EnhancedUserDashboard() {
     const profit = stake?.potentialProfit || 0;
     const tokenSymbol = modalData.tokenType === 'ETH' ? 'ETH' : 'SWIPE';
     
-    // Format amounts
+    // Format amounts - always round to millions for SWIPE
     const formatAmount = (wei: number) => {
       const amount = wei / Math.pow(10, 18);
       if (modalData.tokenType === 'SWIPE') {
-        if (amount >= 1000000) return `${(amount / 1000000).toFixed(2)}M`;
-        if (amount >= 1000) return `${(amount / 1000).toFixed(2)}K`;
-        return amount.toFixed(2);
+        // Always show in millions for SWIPE (e.g., 25.1M instead of 25100.00K)
+        if (amount >= 1000000) {
+          const millions = amount / 1000000;
+          return millions >= 10 ? `${millions.toFixed(1)}M` : `${millions.toFixed(2)}M`;
+        }
+        if (amount >= 1000) {
+          const thousands = amount / 1000;
+          return `${thousands.toFixed(0)}K`;
+        }
+        return amount.toFixed(0);
       }
+      // ETH - show 6 decimals
       return amount.toFixed(6);
     };
     
     const profitFormatted = formatAmount(profit);
     const payoutFormatted = formatAmount(payout);
     
-    const text = `🎉 Just claimed ${payoutFormatted} ${tokenSymbol} (+${profitFormatted} profit) from Swipe!\n\n"${claimedPrediction.question}"\n\nPrediction was ${claimedPrediction.outcome ? 'YES ✅' : 'NO ❌'}\n\nPredict, Swipe and Earn: https://theswipe.app`;
+    const text = `🎉 Just claimed ${payoutFormatted} ${tokenSymbol} (+${profitFormatted} profit) from Swipe!\n\n"${claimedPrediction.question}"\n\nPrediction was ${claimedPrediction.outcome ? 'YES ✅' : 'NO ❌'}\n\nPredict, Swipe and Earn:`;
     
-    // Open Warpcast composer
-    const warpcastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}`;
-    window.open(warpcastUrl, '_blank');
+    // Use composeCast SDK instead of window.open
+    try {
+      await composeCast({
+        text: text,
+        embeds: ['https://theswipe.app']
+      });
+    } catch (error) {
+      console.error('Failed to share claimed prediction:', error);
+      // Fallback to window.open if SDK fails
+      const warpcastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(text + ' https://theswipe.app')}`;
+      window.open(warpcastUrl, '_blank');
+    }
   };
   
   // Hybrid predictions hook (includes both Redis and blockchain data)
