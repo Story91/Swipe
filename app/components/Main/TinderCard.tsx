@@ -171,6 +171,12 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   // Show share prompt after successful stake
   const [showSharePrompt, setShowSharePrompt] = useState(false);
   const [lastStakedPrediction, setLastStakedPrediction] = useState<PredictionData | null>(null);
+  // Store stake details for sharing (separate from transaction tracking to avoid reset issues)
+  const [shareStakeData, setShareStakeData] = useState<{
+    amount: number;
+    token: 'ETH' | 'SWIPE';
+    isYes: boolean;
+  } | null>(null);
   
   // State for tracking stake transactions
   const [stakeTransactionHash, setStakeTransactionHash] = useState<`0x${string}` | null>(null);
@@ -1048,6 +1054,15 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       console.error('Failed to send stake success notification:', error);
     }
     
+    // Save stake data for sharing BEFORE auto-sync resets the values
+    if (stakeAmount !== null && stakeToken && stakeIsYes !== null) {
+      setShareStakeData({
+        amount: stakeAmount,
+        token: stakeToken,
+        isYes: stakeIsYes
+      });
+    }
+    
     // Show share option after successful stake
     setTimeout(() => {
       setShowSharePrompt(true);
@@ -1159,15 +1174,31 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
 
   // Function to share prediction after stake
   const shareStakedPrediction = async (type: 'achievement' | 'challenge' | 'prediction' = 'achievement') => {
-    if (!lastStakedPrediction || stakeAmount === null || !stakeToken) return;
+    // Use shareStakeData instead of stakeAmount/stakeToken (which may have been reset by auto-sync)
+    if (!lastStakedPrediction || !shareStakeData) {
+      console.log('Cannot share - missing data:', { lastStakedPrediction: !!lastStakedPrediction, shareStakeData });
+      return;
+    }
     
     try {
       // Use full prediction text (not truncated title)
       const fullPredictionText = lastStakedPrediction.prediction;
-      const appUrl = window.location.origin; // Just the main app URL
+      const appUrl = 'https://theswipe.app';
+      
+      // Format stake amount for display
+      const formatStakeAmount = (amount: number, token: 'ETH' | 'SWIPE') => {
+        if (token === 'SWIPE') {
+          if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M`;
+          if (amount >= 1000) return `${(amount / 1000).toFixed(0)}K`;
+          return amount.toFixed(0);
+        }
+        return amount.toString();
+      };
+      
+      const formattedAmount = formatStakeAmount(shareStakeData.amount, shareStakeData.token);
       
       // Single unified share text
-      const shareText = `🎯 I just bet on SWIPE!\n\n"${fullPredictionText}"\n\n💰 My bet: ${stakeAmount} ${stakeToken}\n\nWDYT? 👀\n\nJoin the prediction market on Base:`;
+      const shareText = `🎯 I just bet on SWIPE!\n\n"${fullPredictionText}"\n\n💰 My bet: ${formattedAmount} ${shareStakeData.token}\n\nWDYT? 👀\n\nJoin the prediction market on Base:`;
       
       await composeCast({
         text: shareText,
@@ -1175,6 +1206,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       });
       
       setShowSharePrompt(false);
+      setShareStakeData(null); // Clear after successful share
       showNotification('success', 'Shared!', 'Your prediction has been shared on Farcaster! 🚀');
       
       // Send Farcaster notification if user has notifications enabled
