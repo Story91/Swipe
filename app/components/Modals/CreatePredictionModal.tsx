@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useWriteContract, useAccount, useReadContract, useWaitForTransactionReceipt, useChainId, useBalance } from 'wagmi';
 import { formatEther } from 'viem';
 import { base } from 'wagmi/chains';
@@ -14,6 +14,8 @@ import { Input } from '../../../components/ui/input';
 import { Separator } from '../../../components/ui/separator';
 import { Badge } from '../../../components/ui/badge';
 import GradientText from '../../../components/GradientText';
+import { useComposeCast, useMiniKit } from '@coinbase/onchainkit/minikit';
+import sdk from '@farcaster/miniapp-sdk';
 
 interface CreatePredictionModalProps {
   isOpen: boolean;
@@ -50,6 +52,54 @@ const CRYPTO_OPTIONS = [
 export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePredictionModalProps) {
   const { address } = useAccount();
   const { writeContract, data: hash, error: writeError, isPending, reset: resetWriteContract } = useWriteContract();
+  const { composeCast: minikitComposeCast } = useComposeCast();
+  const { context } = useMiniKit();
+  
+  // Success modal state
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successTxHash, setSuccessTxHash] = useState<string>('');
+  const [createdQuestion, setCreatedQuestion] = useState<string>('');
+  
+  // Universal share function - works on both MiniKit (Base app) and Farcaster SDK (Warpcast)
+  const composeCast = useCallback(async (params: { text: string; embeds?: string[] }) => {
+    try {
+      if (minikitComposeCast) {
+        console.log('📱 Using MiniKit composeCast...');
+        const embedsParam = params.embeds?.slice(0, 2) as [] | [string] | [string, string] | undefined;
+        await minikitComposeCast({ text: params.text, embeds: embedsParam });
+        return;
+      }
+    } catch (error) {
+      console.log('MiniKit composeCast failed, trying Farcaster SDK...', error);
+    }
+    
+    try {
+      console.log('📱 Using Farcaster SDK composeCast...');
+      await sdk.actions.composeCast({
+        text: params.text,
+        embeds: params.embeds?.map(url => ({ url })) as any
+      });
+    } catch (error) {
+      console.error('Both composeCast methods failed:', error);
+      throw error;
+    }
+  }, [minikitComposeCast]);
+  
+  // Share created prediction
+  const shareCreatedPrediction = async () => {
+    const appUrl = 'https://theswipe.app';
+    const shareText = `🎯 I just created a new prediction on SWIPE!\n\n"${createdQuestion}"\n\nWill it happen? Cast your vote! 👀\n\nJoin the prediction market on Base:`;
+    
+    try {
+      await composeCast({
+        text: shareText,
+        embeds: [appUrl]
+      });
+      setShowSuccessModal(false);
+    } catch (error) {
+      console.error('Share failed:', error);
+    }
+  };
   
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
@@ -195,11 +245,13 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
       setTransactionHandled(true); // Prevent duplicate handling
       
       const handleSuccess = async () => {
-        // Close modal immediately after success
-        onClose();
+        // Save data for success modal
+        setSuccessTxHash(hash);
+        setCreatedQuestion(formData.question);
         
-        // Show success notification
-        alert(`🎉 Prediction created successfully!\n\nTransaction: ${hash}\nView on Basescan: https://basescan.org/tx/${hash}`);
+        // Close create modal and show success modal
+        onClose();
+        setShowSuccessModal(true);
         
         try {
           console.log('⏳ Waiting for blockchain propagation before auto-sync...');
@@ -228,7 +280,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
       
       handleSuccess();
     }
-  }, [isConfirmed, hash, onSuccess, transactionHandled, onClose]);
+  }, [isConfirmed, hash, onSuccess, transactionHandled, onClose, formData.question]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -382,28 +434,57 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleApproveSwipe = async () => {
-    if (!address || !swipeFee) return;
 
-    try {
-      const swipeFeeAmount = BigInt(swipeFee.toString());
-      const approvalAmount = calculateApprovalAmount(swipeFeeAmount);
+  // State for tracking if we're in approval phase
+  const [isApproving, setIsApproving] = useState(false);
+
+  // Helper function to execute the actual prediction creation
+  const executeCreatePrediction = async () => {
+    const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
+    const durationHours = Math.ceil((endDateTime.getTime() - Date.now()) / (1000 * 60 * 60));
+    
+    const selectedCryptoData = CRYPTO_OPTIONS.find(c => c.symbol === formData.selectedCrypto);
+    let finalImageUrl = formData.imageUrl.trim();
+    
+    if (formData.includeChart && selectedCryptoData) {
+      finalImageUrl = `https://www.geckoterminal.com/${selectedCryptoData.chain}/pools/${selectedCryptoData.poolAddress}?embed=1&info=0&swaps=0&light_chart=1&chart_type=price&resolution=1d&bg_color=ffffff`;
+    }
+
+    if (formData.paymentToken === 'ETH') {
+      const value = canCreateFree ? BigInt(0) : (ethFee as bigint || BigInt(0));
       
       await writeContract({
-        address: SWIPE_TOKEN.address as `0x${string}`,
-        abi: [{
-          inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }],
-          name: 'approve',
-          outputs: [{ name: '', type: 'bool' }],
-          stateMutability: 'nonpayable',
-          type: 'function'
-        }],
-        functionName: 'approve',
-        args: [CONTRACTS.V2.address as `0x${string}`, approvalAmount],
-        chainId: base.id // Force Base network
+        address: CONTRACTS.V2.address as `0x${string}`,
+        abi: CONTRACTS.V2.abi,
+        functionName: 'createPrediction',
+        args: [
+          formData.question.trim(),
+          formData.description.trim(),
+          formData.category,
+          finalImageUrl,
+          BigInt(durationHours)
+        ],
+        value,
+        chainId: base.id
       });
-    } catch (error) {
-      console.error('Approval failed:', error);
+    } else {
+      const tokenAmount = canCreateFree ? BigInt(0) : (swipeFee as bigint || BigInt(0));
+
+      await writeContract({
+        address: CONTRACTS.V2.address as `0x${string}`,
+        abi: CONTRACTS.V2.abi,
+        functionName: 'createPredictionWithToken',
+        args: [
+          formData.question.trim(),
+          formData.description.trim(),
+          formData.category,
+          finalImageUrl,
+          BigInt(durationHours),
+          SWIPE_TOKEN.address as `0x${string}`,
+          tokenAmount
+        ],
+        chainId: base.id
+      });
     }
   };
 
@@ -413,75 +494,65 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
     if (!validateForm() || !canCreate) return;
 
     try {
-      const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
-      const durationHours = Math.ceil((endDateTime.getTime() - Date.now()) / (1000 * 60 * 60));
-      
-      const selectedCryptoData = CRYPTO_OPTIONS.find(c => c.symbol === formData.selectedCrypto);
-      let finalImageUrl = formData.imageUrl.trim();
-      
-      if (formData.includeChart && selectedCryptoData) {
-        finalImageUrl = `https://www.geckoterminal.com/${selectedCryptoData.chain}/pools/${selectedCryptoData.poolAddress}?embed=1&info=0&swaps=0&light_chart=1&chart_type=price&resolution=1d&bg_color=ffffff`;
-      }
-
-      if (formData.paymentToken === 'ETH') {
-        const value = canCreateFree ? BigInt(0) : (ethFee as bigint || BigInt(0));
+      // For SWIPE payment, check if approval is needed first
+      if (formData.paymentToken === 'SWIPE' && !canCreateFree && swipeFee) {
+        const currentAllowance = swipeAllowance as bigint || BigInt(0);
+        const requiredAmount = swipeFee as bigint;
         
-        await writeContract({
-          address: CONTRACTS.V2.address as `0x${string}`,
-          abi: CONTRACTS.V2.abi,
-          functionName: 'createPrediction',
-          args: [
-            formData.question.trim(),
-            formData.description.trim(),
-            formData.category,
-            finalImageUrl,
-            BigInt(durationHours)
-          ],
-          value,
-          chainId: base.id // Force Base network
-        });
-      } else {
-        // SWIPE payment - requires token amount parameter
-        const tokenAmount = canCreateFree ? BigInt(0) : (swipeFee as bigint || BigInt(0));
-        
-        if (!canCreateFree && swipeFee) {
-          const currentAllowance = swipeAllowance as bigint || BigInt(0);
-          if (currentAllowance < (swipeFee as bigint)) {
-            alert('Please approve SWIPE tokens first');
-            await handleApproveSwipe();
-            return;
-          }
+        if (currentAllowance < requiredAmount) {
+          // Need approval first - do approve then create (like TinderCard)
+          setIsApproving(true);
+          
+          const approvalAmount = calculateApprovalAmount(requiredAmount);
+          
+          writeContract({
+            address: SWIPE_TOKEN.address as `0x${string}`,
+            abi: [{
+              inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }],
+              name: 'approve',
+              outputs: [{ name: '', type: 'bool' }],
+              stateMutability: 'nonpayable',
+              type: 'function'
+            }],
+            functionName: 'approve',
+            args: [CONTRACTS.V2.address as `0x${string}`, approvalAmount],
+            chainId: base.id
+          }, {
+            onSuccess: async () => {
+              console.log('✅ SWIPE approval successful, now creating prediction...');
+              setIsApproving(false);
+              
+              // Wait a moment for approval to be mined, then create prediction
+              setTimeout(async () => {
+                try {
+                  await executeCreatePrediction();
+                } catch (error) {
+                  console.error('Create prediction after approval failed:', error);
+                  setErrors({ submit: 'Failed to create prediction after approval. Please try again.' });
+                }
+              }, 2000);
+            },
+            onError: (error) => {
+              console.error('❌ SWIPE approval failed:', error);
+              setIsApproving(false);
+              setErrors({ submit: 'SWIPE approval failed. Please try again.' });
+            }
+          });
+          
+          return; // Don't proceed yet, wait for approval callback
         }
-
-        await writeContract({
-          address: CONTRACTS.V2.address as `0x${string}`,
-          abi: CONTRACTS.V2.abi,
-          functionName: 'createPredictionWithToken',
-          args: [
-            formData.question.trim(),
-            formData.description.trim(),
-            formData.category,
-            finalImageUrl,
-            BigInt(durationHours),
-            SWIPE_TOKEN.address as `0x${string}`,
-            tokenAmount // 7th parameter - _tokenAmount
-          ],
-          chainId: base.id // Force Base network
-        });
       }
+
+      // ETH payment or SWIPE already approved - create directly
+      await executeCreatePrediction();
     } catch (error) {
       console.error('Create prediction failed:', error);
       setErrors({ submit: 'Failed to create prediction. Please try again.' });
     }
   };
 
-  const needsSwipeApproval: boolean = formData.paymentToken === 'SWIPE' && 
-    !canCreateFree && 
-    swipeFee !== undefined && 
-    swipeAllowance !== undefined &&
-    (swipeAllowance as bigint) < (swipeFee as bigint);
-
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto bg-zinc-900 border-zinc-800 text-white p-4">
         
@@ -619,21 +690,6 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
                publicCreationEnabled ? '👤 Public User - Fee required' :
                '🚫 Creation disabled'}
             </p>
-          </div>
-        )}
-
-        {/* SWIPE Approval Notice */}
-        {needsSwipeApproval && (
-          <div className="flex items-center justify-between bg-amber-500/10 border border-amber-500/30 rounded-lg px-2.5 py-1.5 mb-2">
-            <span className="text-amber-400 text-[10px]">⚠️ Approval needed</span>
-            <Button 
-              size="sm" 
-              onClick={handleApproveSwipe}
-              disabled={isPending}
-              className="bg-amber-500 hover:bg-amber-600 text-black font-semibold text-[10px] h-6 px-2"
-            >
-              Approve
-            </Button>
           </div>
         )}
 
@@ -954,17 +1010,23 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
             </Button>
             <Button 
               type="submit"
-              disabled={!canCreate || isPending || isConfirming || transactionHandled}
+              disabled={!canCreate || isPending || isConfirming || transactionHandled || isApproving}
               className={`flex-1 font-semibold ${
                 formData.paymentToken === 'ETH'
                   ? 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700'
                   : 'bg-gradient-to-r from-[#d4ff00] to-[#a8cc00] text-black hover:from-[#c4ef00] hover:to-[#98bc00]'
               }`}
             >
-              {isPending || isConfirming ? (
+              {isApproving ? (
+                <span className="flex items-center gap-2">
+                  <span className="animate-spin">⏳</span> Approving...
+                </span>
+              ) : isPending || isConfirming ? (
                 <span className="flex items-center gap-2">
                   <span className="animate-spin">⏳</span> Creating...
                 </span>
+              ) : formData.paymentToken === 'SWIPE' && !canCreateFree ? (
+                `Approve & Create with SWIPE`
               ) : (
                 `Create with ${formData.paymentToken}`
               )}
@@ -973,5 +1035,78 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
         </form>
       </DialogContent>
     </Dialog>
+
+    {/* Success Modal - Similar to TinderCard share prompt */}
+    {showSuccessModal && (
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+        <div className="bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 border border-[#d4ff00]/30 rounded-3xl p-7 max-w-sm w-full text-center relative animate-in fade-in zoom-in duration-300">
+          {/* Close button */}
+          <button 
+            onClick={() => setShowSuccessModal(false)}
+            className="absolute top-4 right-4 w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 flex items-center justify-center transition-all"
+          >
+            ✕
+          </button>
+          
+          {/* Header with logos */}
+          <div className="flex items-center justify-center gap-3 mb-5">
+            <img src="/farc.png" alt="Farcaster" className="w-10 h-10 rounded-lg" />
+            <span className="text-zinc-500 text-lg">×</span>
+            <img src="/Base_square_blue.png" alt="Base" className="w-10 h-10 rounded-lg" />
+          </div>
+          
+          {/* Success icon */}
+          <div className="mb-4">
+            <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-[#d4ff00] to-[#a8cc00] flex items-center justify-center shadow-lg shadow-[#d4ff00]/30">
+              <span className="text-3xl text-black font-bold">✓</span>
+            </div>
+          </div>
+          
+          {/* Title */}
+          <h2 className="text-xl font-bold text-white mb-1">Congratulations!</h2>
+          <p className="text-[#d4ff00] font-semibold mb-3">Prediction created successfully!</p>
+          
+          {/* Question preview */}
+          <p className="text-zinc-400 text-sm mb-4 line-clamp-2 px-2">
+            "{createdQuestion}"
+          </p>
+          
+          {/* Transaction link */}
+          <a 
+            href={`https://basescan.org/tx/${successTxHash}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-blue-400 hover:text-blue-300 underline mb-5 block"
+          >
+            View on Basescan →
+          </a>
+          
+          {/* Description */}
+          <p className="text-zinc-500 text-sm mb-5">Share your prediction and challenge your friends!</p>
+          
+          {/* Share button */}
+          <button 
+            onClick={shareCreatedPrediction}
+            className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-[#d4ff00] to-[#a8cc00] text-black font-bold text-base flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-[#d4ff00]/40 hover:-translate-y-0.5 transition-all duration-300"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+              <polyline points="16 6 12 2 8 6" />
+              <line x1="12" y1="2" x2="12" y2="15" />
+            </svg>
+            Share
+          </button>
+          
+          {/* Skip link */}
+          <button 
+            onClick={() => setShowSuccessModal(false)}
+            className="mt-4 text-zinc-500 hover:text-zinc-300 text-sm transition-colors"
+          >
+            Maybe later
+          </button>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
