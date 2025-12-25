@@ -259,14 +259,42 @@ export function AdminDashboard({
   // Contract stats (contractStats, totalPredictions) are still fetched from blockchain for admin info
 
   // Calculate real stats (use displayPredictions for total stats, filteredPredictions for current view)
+  // Note: wagmi may return structs as arrays or objects depending on ABI definition
+  // ContractStats struct order: totalPredictions, platformFee, ethFees, swipeFees, ethMinStake, ethMaxStake, swipeMinStake, swipeMaxStake, contractBalance
   const stats = {
     totalPredictions: totalPredictions ? Number(totalPredictions) - 1 : displayPredictions.length,
     needsResolution: displayPredictions.filter(p => needsResolution(p)).length,
-    collectedFees: contractStats && (contractStats as any)[2] ? Number((contractStats as any)[2]) / 1e18 : 0, // Convert from wei to ETH
+    collectedFees: contractStats ? (
+      // Try object property first, then array index
+      (contractStats as any).ethFees ? Number((contractStats as any).ethFees) / 1e18 :
+      Array.isArray(contractStats) && contractStats[2] ? Number(contractStats[2]) / 1e18 : 0
+    ) : 0,
+    collectedSwipeFees: contractStats ? (
+      // Try object property first, then array index
+      (contractStats as any).swipeFees ? Number((contractStats as any).swipeFees) / 1e18 :
+      Array.isArray(contractStats) && contractStats[3] ? Number(contractStats[3]) / 1e18 : 0
+    ) : 0,
     activeApprovers: 5, // TODO: Add function to get active approvers count
-    contractBalance: contractStats && (contractStats as any)[5] ? Number((contractStats as any)[5]) / 1e18 : 0,
-    platformFee: contractStats && (contractStats as any)[1] ? Number((contractStats as any)[1]) / 100 : 1 // Convert to percentage
+    contractBalance: contractStats ? (
+      // Try object property first, then array index
+      (contractStats as any).contractBalance ? Number((contractStats as any).contractBalance) / 1e18 :
+      Array.isArray(contractStats) && contractStats[8] ? Number(contractStats[8]) / 1e18 : 0
+    ) : 0,
+    platformFee: contractStats ? (
+      // Try object property first, then array index
+      (contractStats as any).platformFee ? Number((contractStats as any).platformFee) / 100 :
+      Array.isArray(contractStats) && contractStats[1] ? Number(contractStats[1]) / 100 : 1
+    ) : 1
   };
+
+  // Debug: Log contract stats structure
+  useEffect(() => {
+    if (contractStats) {
+      console.log('🔍 ContractStats structure:', contractStats);
+      console.log('🔍 ContractStats type:', typeof contractStats, Array.isArray(contractStats));
+      console.log('🔍 ContractStats keys:', Object.keys(contractStats || {}));
+    }
+  }, [contractStats]);
 
   const handleResolve = async (predictionId: string | number, outcome: boolean) => {
     const side = outcome ? 'YES' : 'NO';
@@ -1236,11 +1264,15 @@ export function AdminDashboard({
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontWeight: '600', color: 'rgba(0, 0, 0, 0.8)', fontSize: '12px' }}>ETH Collected Fees:</span>
-            <span style={{ fontFamily: 'monospace', color: '#059669', fontSize: '14px', fontWeight: '700' }}>{stats.collectedFees.toFixed(4)}</span>
+            <span style={{ fontFamily: 'monospace', color: '#059669', fontSize: '14px', fontWeight: '700' }}>{stats.collectedFees.toFixed(4)} ETH</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontWeight: '600', color: 'rgba(0, 0, 0, 0.8)', fontSize: '12px' }}>$SWIPE Collected Fees:</span>
+            <span style={{ fontFamily: 'monospace', color: '#059669', fontSize: '14px', fontWeight: '700' }}>{stats.collectedSwipeFees.toFixed(2)} SWIPE</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontWeight: '600', color: 'rgba(0, 0, 0, 0.8)', fontSize: '12px' }}>ETH Contract Balance:</span>
-            <span style={{ fontFamily: 'monospace', color: '#059669', fontSize: '14px', fontWeight: '700' }}>{stats.contractBalance.toFixed(4)}</span>
+            <span style={{ fontFamily: 'monospace', color: '#059669', fontSize: '14px', fontWeight: '700' }}>{stats.contractBalance.toFixed(4)} ETH</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontWeight: '600', color: 'rgba(0, 0, 0, 0.8)', fontSize: '12px' }}>Active Approvers:</span>
