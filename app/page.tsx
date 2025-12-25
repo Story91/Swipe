@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Trophy, HelpCircle, Settings } from "lucide-react";
 import { useAccount, useConnect } from "wagmi";
 import { useState, useEffect, useRef } from "react";
+import { Badge } from "@/components/ui/badge";
 import TinderCardComponent from "./components/Main/TinderCard";
 import { AdminPanel } from "./components/Admin/AdminPanel";
 import { CompactStats } from "./components/Market/CompactStats";
@@ -67,10 +68,13 @@ export default function App() {
   const { address } = useAccount();
   const { connect, connectors } = useConnect();
   const tinderCardRef = useRef<{ refresh: () => void } | null>(null);
+  const dashboardTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [hasTriedAddMiniApp, setHasTriedAddMiniApp] = useState(false);
   const [hasTriedAutoConnect, setHasTriedAutoConnect] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [readyToClaimCount, setReadyToClaimCount] = useState(0);
+  const [badgePosition, setBadgePosition] = useState({ top: 0, right: 0 });
   const viewProfile = useViewProfile();
 
   useEffect(() => {
@@ -248,6 +252,62 @@ export default function App() {
                                process.env.NEXT_PUBLIC_APPROVER_3?.toLowerCase() === address.toLowerCase() ||
                                process.env.NEXT_PUBLIC_ADMIN_1?.toLowerCase() === address.toLowerCase());
 
+  // Fetch ready-to-claim predictions count using optimized endpoint
+  useEffect(() => {
+    const fetchReadyToClaimCount = async () => {
+      if (!address) {
+        setReadyToClaimCount(0);
+        return;
+      }
+
+      try {
+        // Use fast dedicated endpoint that doesn't require loading full dashboard data
+        const response = await fetch(`/api/claims/count?userId=${address.toLowerCase()}`);
+        if (!response.ok) {
+          setReadyToClaimCount(0);
+          return;
+        }
+
+        const data = await response.json();
+        if (data.success) {
+          setReadyToClaimCount(data.count || 0);
+        } else {
+          setReadyToClaimCount(0);
+        }
+      } catch (error) {
+        console.error('Error fetching ready-to-claim count:', error);
+        setReadyToClaimCount(0);
+      }
+    };
+
+    // Fetch immediately on mount
+    fetchReadyToClaimCount();
+    
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchReadyToClaimCount, 30000);
+    return () => clearInterval(interval);
+  }, [address]);
+
+  // Update badge position relative to Dashboard trigger
+  useEffect(() => {
+    const updateBadgePosition = () => {
+      if (dashboardTriggerRef.current) {
+        const rect = dashboardTriggerRef.current.getBoundingClientRect();
+        const containerRect = dashboardTriggerRef.current.closest('.mb-4')?.getBoundingClientRect();
+        if (containerRect) {
+          setBadgePosition({
+            top: rect.top - containerRect.top - 4,
+            right: containerRect.right - rect.right - 4,
+          });
+        }
+      }
+    };
+
+    updateBadgePosition();
+    window.addEventListener('resize', updateBadgePosition);
+    return () => window.removeEventListener('resize', updateBadgePosition);
+  }, [readyToClaimCount]);
+
   // Function to refresh predictions data
   const refreshPredictions = () => {
     if (tinderCardRef.current?.refresh) {
@@ -368,7 +428,7 @@ export default function App() {
         </div>
 
         {/* Menu Bar - Right after Wallet */}
-        <div className="mb-4 overflow-hidden">
+        <div className="mb-4 relative" style={{ overflow: 'visible' }}>
           <Menubar className="mini-app-menu">
             <MenubarMenu>
               <MenubarTrigger className="menubar-trigger" onClick={() => setActiveDashboard('tinder')}>
@@ -377,10 +437,13 @@ export default function App() {
             </MenubarMenu>
             <MenubarMenu>
               <MenubarTrigger 
-                className="menubar-trigger animate-pulse !bg-[#d4ff00] !text-black !font-bold hover:!bg-[#c4ef00]" 
-                onClick={() => setActiveDashboard('claim')}
+                ref={dashboardTriggerRef}
+                id="dashboard-trigger"
+                className="menubar-trigger relative" 
+                onClick={() => setActiveDashboard('user')}
+                style={{ overflow: 'visible' }}
               >
-                🎁 Claim
+                <span>Dashboard</span>
               </MenubarTrigger>
             </MenubarMenu>
             <MenubarMenu>
@@ -397,11 +460,6 @@ export default function App() {
               </MenubarTrigger>
             </MenubarMenu>
             <MenubarMenu>
-              <MenubarTrigger className="menubar-trigger" onClick={() => setActiveDashboard('user')}>
-                Dashboard
-              </MenubarTrigger>
-            </MenubarMenu>
-            <MenubarMenu>
               <MenubarTrigger className="menubar-trigger">
                 Create
               </MenubarTrigger>
@@ -412,6 +470,20 @@ export default function App() {
               </MenubarContent>
             </MenubarMenu>
           </Menubar>
+          {/* Animated notification badge positioned absolutely outside Menubar */}
+          {readyToClaimCount > 0 && (
+            <div
+              className="notification-badge"
+              style={{ 
+                position: 'absolute',
+                top: `${badgePosition.top}px`, 
+                right: `${badgePosition.right}px`,
+                zIndex: 99999 
+              }}
+            >
+              {readyToClaimCount > 9 ? '9+' : readyToClaimCount}
+            </div>
+          )}
         </div>
 
         {/* Main Content with Tinder Cards */}
@@ -424,12 +496,6 @@ export default function App() {
             />
           )}
 
-          {activeDashboard === 'user' && (
-            <div>
-              <EnhancedUserDashboard />
-            </div>
-          )}
-
           {activeDashboard === 'admin' && <AdminPanel />}
 
           {activeDashboard === 'approver' && <AdminPanel />}
@@ -437,7 +503,14 @@ export default function App() {
           {/* SWIPE Token Card */}
           {activeDashboard === 'swipe-token' && <SwipeTokenCard />}
 
-          {/* Claim Page */}
+          {/* Dashboard - moved from 'user' to replace CLAIM */}
+          {activeDashboard === 'user' && (
+            <div>
+              <EnhancedUserDashboard />
+            </div>
+          )}
+
+          {/* Claim Page - kept for future use but not accessible from nav */}
           {activeDashboard === 'claim' && (
             <div style={{ padding: '20px' }}>
               <SwipeClaim />

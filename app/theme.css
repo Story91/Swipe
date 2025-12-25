@@ -203,7 +203,8 @@ button, .btn {
   display: flex !important;
   justify-content: stretch !important;
   width: 100%;
-  overflow: hidden;
+  overflow: visible !important;
+  position: relative;
 }
 
 /* Force equal width for all menu items */
@@ -230,6 +231,138 @@ button, .btn {
   display: flex !important;
   justify-content: center !important;
   align-items: center !important;
+  overflow: visible !important;
+  position: relative !important;
+}
+
+/* Badge on Dashboard button - always on top */
+.mini-app-menu .menubar-trigger .badge,
+.mini-app-menu .menubar-trigger [class*="badge"] {
+  position: absolute !important;
+  top: -4px !important;
+  right: -4px !important;
+  z-index: 99999 !important;
+  pointer-events: none !important;
+}
+
+/* Animated notification badge with gradient border and pulse */
+.notification-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 9px;
+  font-weight: 700;
+  color: white;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #b91c1c 100%);
+  border-radius: 9999px;
+  box-shadow: 
+    0 0 8px rgba(239, 68, 68, 0.5),
+    0 0 15px rgba(239, 68, 68, 0.3),
+    0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  animation: badgePulse 2s ease-in-out infinite, badgeBounce 0.6s ease-out;
+  z-index: 99999;
+  pointer-events: none;
+}
+
+.notification-badge::before {
+  content: '';
+  position: absolute;
+  top: -1.5px;
+  left: -1.5px;
+  right: -1.5px;
+  bottom: -1.5px;
+  background: linear-gradient(
+    45deg,
+    #ef4444,
+    #f59e0b,
+    #ef4444,
+    #dc2626,
+    #ef4444,
+    #fbbf24,
+    #ef4444
+  );
+  background-size: 400% 400%;
+  border-radius: 9999px;
+  z-index: -1;
+  animation: gradientRotate 3s linear infinite;
+  opacity: 0.8;
+}
+
+.notification-badge::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  right: -3px;
+  bottom: -3px;
+  background: linear-gradient(
+    135deg,
+    rgba(239, 68, 68, 0.4),
+    rgba(245, 158, 11, 0.4),
+    rgba(239, 68, 68, 0.4)
+  );
+  border-radius: 9999px;
+  z-index: -2;
+  animation: glowPulse 2s ease-in-out infinite;
+  filter: blur(3px);
+}
+
+@keyframes badgePulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 
+      0 0 6px rgba(239, 68, 68, 0.5),
+      0 0 12px rgba(239, 68, 68, 0.3),
+      0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow: 
+      0 0 10px rgba(239, 68, 68, 0.8),
+      0 0 18px rgba(239, 68, 68, 0.5),
+      0 3px 5px -1px rgba(0, 0, 0, 0.4);
+  }
+}
+
+@keyframes badgeBounce {
+  0% {
+    transform: scale(0) rotate(-180deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2) rotate(-90deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes gradientRotate {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.15);
+  }
 }
 
 .mini-app-menu .menubar-trigger:hover {
