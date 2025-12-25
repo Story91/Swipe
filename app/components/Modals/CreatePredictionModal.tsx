@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useWriteContract, useAccount, useReadContract, useWaitForTransactionReceipt, useChainId, useBalance } from 'wagmi';
 import { formatEther } from 'viem';
 import { base } from 'wagmi/chains';
 import { CONTRACTS, SWIPE_TOKEN } from '../../../lib/contract';
 import { calculateApprovalAmount } from '../../../lib/constants/approval';
+import { uploadToImgBB } from '../../../lib/imgbb';
 import { Dialog, DialogContent } from '../../../components/ui/dialog';
 import { Card, CardContent } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
@@ -67,6 +68,12 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof FormData | 'submit', string>>>({});
+  
+  // Image upload states
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string>('');
+  const [imagePreview, setImagePreview] = useState<string>('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Contract reads
   const { data: ethFee } = useReadContract({
@@ -179,10 +186,19 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
     }));
   }, []);
 
+  // Track if transaction was already handled to prevent duplicate processing
+  const [transactionHandled, setTransactionHandled] = useState(false);
+
   // Handle successful transaction
   useEffect(() => {
-    if (isConfirmed && hash) {
+    if (isConfirmed && hash && !transactionHandled) {
+      setTransactionHandled(true); // Prevent duplicate handling
+      
       const handleSuccess = async () => {
+        // Close modal immediately after success
+        onClose();
+        
+        // Show success notification
         alert(`🎉 Prediction created successfully!\n\nTransaction: ${hash}\nView on Basescan: https://basescan.org/tx/${hash}`);
         
         try {
@@ -212,11 +228,12 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
       
       handleSuccess();
     }
-  }, [isConfirmed, hash, onSuccess]);
+  }, [isConfirmed, hash, onSuccess, transactionHandled, onClose]);
 
   useEffect(() => {
     if (!isOpen) {
       resetForm();
+      setTransactionHandled(false); // Reset for next time modal opens
       if (resetWriteContract) resetWriteContract();
     }
   }, [isOpen, resetWriteContract]);
@@ -237,12 +254,92 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
       selectedCrypto: ''
     });
     setErrors({});
+    // Reset image upload states
+    setUploadedImageUrl('');
+    setImagePreview('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleInputChange = (field: keyof FormData, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field as keyof typeof errors]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
+
+  // Validate image is 1:1 aspect ratio
+  const validateImageAspectRatio = (file: File): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const aspectRatio = img.width / img.height;
+        // Allow some tolerance (0.95 - 1.05 for near-square images)
+        const isSquare = aspectRatio >= 0.95 && aspectRatio <= 1.05;
+        URL.revokeObjectURL(img.src);
+        resolve(isSquare);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(img.src);
+        resolve(false);
+      };
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  // Handle image upload
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      setErrors(prev => ({ ...prev, imageUrl: 'Please select an image file' }));
+      return;
+    }
+
+    // Check file size (max 32MB for ImgBB)
+    if (file.size > 32 * 1024 * 1024) {
+      setErrors(prev => ({ ...prev, imageUrl: 'Image must be less than 32MB' }));
+      return;
+    }
+
+    // Validate 1:1 aspect ratio
+    const isSquare = await validateImageAspectRatio(file);
+    if (!isSquare) {
+      setErrors(prev => ({ ...prev, imageUrl: '⚠️ Image must be square (1:1 aspect ratio)' }));
+      return;
+    }
+
+    // Create preview
+    const previewUrl = URL.createObjectURL(file);
+    setImagePreview(previewUrl);
+
+    // Upload to ImgBB
+    setIsUploading(true);
+    setErrors(prev => ({ ...prev, imageUrl: '' }));
+
+    try {
+      const response = await uploadToImgBB(file);
+      setUploadedImageUrl(response.data.display_url);
+      handleInputChange('imageUrl', response.data.display_url);
+    } catch (error) {
+      console.error('Upload failed:', error);
+      setErrors(prev => ({ ...prev, imageUrl: 'Failed to upload image. Please try again.' }));
+      setImagePreview('');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Clear uploaded image
+  const clearUploadedImage = () => {
+    setUploadedImageUrl('');
+    setImagePreview('');
+    handleInputChange('imageUrl', '');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -409,7 +506,14 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
                 }`}
               >
                 <div className="relative">
-                  <img src="/eth.png" alt="ETH" className="w-5 h-5 rounded-sm" />
+                  <div className="w-5 h-5 rounded-sm bg-gradient-to-br from-[#627eea] to-[#3c3c3d] flex items-center justify-center">
+                    <svg className="w-3 h-3" viewBox="0 0 256 417" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M127.961 0L125.166 9.5V285.168L127.961 287.958L255.923 212.32L127.961 0Z" fill="white" fillOpacity="0.9"/>
+                      <path d="M127.962 0L0 212.32L127.962 287.959V154.158V0Z" fill="white"/>
+                      <path d="M127.961 312.187L126.386 314.107V412.306L127.961 416.905L255.999 236.587L127.961 312.187Z" fill="white" fillOpacity="0.9"/>
+                      <path d="M127.962 416.905V312.187L0 236.587L127.962 416.905Z" fill="white"/>
+                    </svg>
+                  </div>
                   <img 
                     src="/Base_square_blue.png" 
                     alt="Base" 
@@ -622,18 +726,168 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
             </CardContent>
           </Card>
 
-          {/* Image URL */}
+          {/* Image Upload */}
           {!formData.includeChart && (
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-[#d4ff00]">Image URL *</label>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-[#d4ff00]">Image * <span className="text-zinc-500 font-normal">(1:1 square)</span></label>
+              
+              {/* Upload area or Preview */}
+              {imagePreview || uploadedImageUrl ? (
+                <div className="relative w-full aspect-square max-w-[200px] mx-auto">
+                  <img 
+                    src={imagePreview || uploadedImageUrl} 
+                    alt="Preview" 
+                    className="w-full h-full object-cover rounded-lg border-2 border-[#d4ff00]/50"
+                  />
+                  {isUploading && (
+                    <div className="absolute inset-0 bg-black/70 rounded-lg flex items-center justify-center">
+                      <div className="text-center">
+                        <span className="animate-spin text-2xl block mb-1">⏳</span>
+                        <span className="text-[#d4ff00] text-xs">Uploading...</span>
+                      </div>
+                    </div>
+                  )}
+                  {uploadedImageUrl && !isUploading && (
+                    <div className="absolute top-1 right-1 flex gap-1">
+                      <span className="bg-emerald-500 text-white text-[8px] px-1.5 py-0.5 rounded-full">✓ Uploaded</span>
+                      <button
+                        type="button"
+                        onClick={clearUploadedImage}
+                        className="bg-red-500 hover:bg-red-600 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center transition-colors"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full aspect-square max-w-[200px] mx-auto border-2 border-dashed border-[#d4ff00]/30 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#d4ff00]/60 hover:bg-[#d4ff00]/5 transition-all"
+                >
+                  <span className="text-3xl mb-2">📷</span>
+                  <span className="text-[#d4ff00] text-xs font-medium">Click to upload</span>
+                  <span className="text-zinc-500 text-[10px] mt-1">1:1 square only</span>
+                </div>
+              )}
+              
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+              
+              {/* Or use URL */}
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-px bg-zinc-700"></div>
+                <span className="text-zinc-500 text-[10px]">or paste URL</span>
+                <div className="flex-1 h-px bg-zinc-700"></div>
+              </div>
+              
               <Input
                 type="url"
                 value={formData.imageUrl}
-                onChange={(e) => handleInputChange('imageUrl', e.target.value)}
+                onChange={(e) => {
+                  handleInputChange('imageUrl', e.target.value);
+                  // Clear uploaded image if user types URL manually
+                  if (e.target.value !== uploadedImageUrl) {
+                    setUploadedImageUrl('');
+                    setImagePreview('');
+                  }
+                }}
                 placeholder="https://example.com/image.jpg"
-                className={`bg-black/60 border-[#d4ff00]/30 text-white focus:ring-[#d4ff00]/50 focus:border-[#d4ff00] ${errors.imageUrl ? 'border-red-500' : ''}`}
+                className={`bg-black/60 border-[#d4ff00]/30 text-white focus:ring-[#d4ff00]/50 focus:border-[#d4ff00] text-xs ${errors.imageUrl ? 'border-red-500' : ''}`}
               />
               {errors.imageUrl && <p className="text-red-400 text-xs">{errors.imageUrl}</p>}
+            </div>
+          )}
+
+          {/* Mini Card Preview */}
+          {(formData.question.trim() || formData.imageUrl || formData.includeChart) && (
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-[#d4ff00]">📱 Card Preview</label>
+              <div className="relative w-full max-w-[280px] mx-auto bg-white rounded-2xl overflow-hidden shadow-xl border border-zinc-200">
+                {/* Image/Chart Section */}
+                <div className="relative aspect-square bg-zinc-100">
+                  {formData.includeChart && formData.selectedCrypto ? (
+                    (() => {
+                      const selectedCryptoData = CRYPTO_OPTIONS.find(c => c.symbol === formData.selectedCrypto);
+                      if (selectedCryptoData) {
+                        const chartUrl = `https://www.geckoterminal.com/${selectedCryptoData.chain}/pools/${selectedCryptoData.poolAddress}?embed=1&info=0&swaps=0&light_chart=1&chart_type=price&resolution=1d`;
+                        return (
+                          <iframe
+                            src={chartUrl}
+                            title={`${formData.selectedCrypto} Chart`}
+                            className="w-full h-full border-0"
+                            allow="clipboard-write"
+                            sandbox="allow-scripts allow-same-origin"
+                          />
+                        );
+                      }
+                      return (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-900">
+                          <div className="text-center">
+                            <span className="text-4xl block mb-2">📊</span>
+                            <span className="text-white text-xs font-mono">Select crypto...</span>
+                          </div>
+                        </div>
+                      );
+                    })()
+                  ) : (imagePreview || uploadedImageUrl || formData.imageUrl) ? (
+                    <img 
+                      src={imagePreview || uploadedImageUrl || formData.imageUrl} 
+                      alt="Preview" 
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-200 to-zinc-300">
+                      <span className="text-6xl opacity-30">🖼️</span>
+                    </div>
+                  )}
+                  {/* Category Badge */}
+                  {formData.category && (
+                    <div className="absolute bottom-2 left-2">
+                      <span className="bg-black/70 text-white text-[10px] px-2 py-0.5 rounded-full font-medium">
+                        {formData.category}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Content Section */}
+                <div className="p-3 bg-white">
+                  <h3 className="text-sm font-bold text-zinc-900 line-clamp-2 min-h-[40px]">
+                    {formData.question.trim() || 'Your prediction question...'}
+                  </h3>
+                  
+                  {/* Countdown placeholder */}
+                  <div className="flex items-center justify-center gap-1.5 mt-2 py-1.5 px-3 bg-zinc-100 rounded-full mx-auto w-fit">
+                    <span className="text-rose-500 text-xs">⏰</span>
+                    <span className="text-zinc-700 text-[11px] font-semibold tracking-wide">
+                      {formData.endDate && formData.endTime 
+                        ? `${formData.endDate} • ${formData.endTime}` 
+                        : 'Set deadline...'}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Voting Bar - 50/50 */}
+                <div className="h-6 flex">
+                  <div className="flex-1 bg-gradient-to-r from-rose-500 to-rose-400 flex items-center justify-center">
+                    <span className="text-white text-[10px] font-bold">NO 50%</span>
+                  </div>
+                  <div className="flex-1 bg-gradient-to-r from-emerald-400 to-emerald-500 flex items-center justify-center">
+                    <span className="text-white text-[10px] font-bold">YES 50%</span>
+                  </div>
+                </div>
+              </div>
+              <p className="text-center text-zinc-500 text-[9px]">This is how your prediction will look</p>
             </div>
           )}
 
@@ -700,7 +954,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
             </Button>
             <Button 
               type="submit"
-              disabled={!canCreate || isPending || isConfirming}
+              disabled={!canCreate || isPending || isConfirming || transactionHandled}
               className={`flex-1 font-semibold ${
                 formData.paymentToken === 'ETH'
                   ? 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700'
