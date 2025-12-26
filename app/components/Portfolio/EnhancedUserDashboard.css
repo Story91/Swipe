@@ -1261,7 +1261,236 @@
   margin-left: 8px;
 }
 
-/* Transaction Card Dark Theme */
+/* Transaction Card Dark Theme - Compact */
+.transaction-card-compact {
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0a0a0a 100%);
+  border-radius: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(212, 255, 0, 0.15);
+  transition: all 0.2s ease;
+}
+
+.transaction-card-compact:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(212, 255, 0, 0.12);
+  border-color: rgba(212, 255, 0, 0.3);
+}
+
+.transaction-header-compact {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.transaction-badges-compact {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.type-badge-compact {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-family: "Orbitron", sans-serif;
+}
+
+.type-badge-compact.claim {
+  background: rgba(76, 175, 80, 0.25);
+  color: #4caf50;
+  border: 1px solid rgba(76, 175, 80, 0.4);
+}
+
+.type-badge-compact.stake {
+  background: rgba(33, 150, 243, 0.25);
+  color: #60a5fa;
+  border: 1px solid rgba(33, 150, 243, 0.4);
+}
+
+.type-badge-compact.resolve {
+  background: rgba(156, 39, 176, 0.25);
+  color: #ab47bc;
+  border: 1px solid rgba(156, 39, 176, 0.4);
+}
+
+.type-badge-compact.cancel {
+  background: rgba(244, 67, 54, 0.25);
+  color: #f44336;
+  border: 1px solid rgba(244, 67, 54, 0.4);
+}
+
+.token-type-badge-compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-family: "Orbitron", sans-serif;
+}
+
+.token-type-badge-compact.eth {
+  background: transparent;
+  color: #60a5fa;
+  border: 1px solid rgba(96, 165, 250, 0.3);
+}
+
+.token-type-badge-compact.swipe {
+  background: rgba(212, 255, 0, 0.15);
+  color: #d4ff00;
+  border: 1px solid rgba(212, 255, 0, 0.3);
+}
+
+.token-badge-icon-compact {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+
+.token-badge-icon-compact.eth-icon-no-bg {
+  background: transparent !important;
+  filter: drop-shadow(0 0 2px rgba(96, 165, 250, 0.5));
+}
+
+.token-type-badge-compact.swipe .token-badge-icon-compact {
+  width: 16px;
+  height: 16px;
+}
+
+.status-badge-compact {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-family: "Orbitron", sans-serif;
+}
+
+.status-badge-compact.pending {
+  background: rgba(255, 193, 7, 0.25);
+  color: #ffc107;
+  border: 1px solid rgba(255, 193, 7, 0.4);
+}
+
+.status-badge-compact.success {
+  background: rgba(76, 175, 80, 0.25);
+  color: #4caf50;
+  border: 1px solid rgba(76, 175, 80, 0.4);
+}
+
+.status-badge-compact.failed {
+  background: rgba(244, 67, 54, 0.25);
+  color: #f44336;
+  border: 1px solid rgba(244, 67, 54, 0.4);
+}
+
+.transaction-time-compact {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: monospace;
+  white-space: nowrap;
+}
+
+.transaction-details-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.transaction-details-compact p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: baseline;
+}
+
+.transaction-details-compact .label {
+  color: #60a5fa;
+  font-weight: 600;
+  font-family: "Orbitron", sans-serif;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.transaction-details-compact .value {
+  color: rgba(255, 255, 255, 0.95);
+  font-family: "Exo 2", sans-serif;
+}
+
+.transaction-prediction .value {
+  color: #d4ff00;
+  font-weight: 500;
+}
+
+.transaction-hash {
+  font-family: monospace;
+}
+
+.basescan-link-compact {
+  color: #ffffff;
+  text-decoration: none;
+  font-size: 11px;
+  transition: all 0.2s ease;
+  font-family: monospace;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.basescan-link-compact:hover {
+  color: rgba(255, 255, 255, 0.8);
+  text-decoration: underline;
+}
+
+.basescan-link-compact .basescan-icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.basescan-link-compact:hover .basescan-icon {
+  transform: translate(2px, -2px);
+}
+
+.pending-text {
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+}
+
+.transaction-amount-compact {
+  margin-top: 2px;
+}
+
+.amount-value-compact {
+  font-weight: 600;
+  font-family: "Orbitron", sans-serif;
+}
+
+.amount-value-compact.eth {
+  color: #ffffff;
+}
+
+.amount-value-compact.swipe {
+  color: #d4ff00;
+}
+
+/* Legacy support - keep old classes for backwards compatibility */
 .transaction-card {
   background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0a0a0a 100%);
   border-radius: 12px;

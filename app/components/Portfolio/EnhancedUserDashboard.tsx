@@ -1427,7 +1427,7 @@ export function EnhancedUserDashboard() {
           <tbody>
             <tr className="eth-row">
               <td className="token-cell">
-                <img src="/eth.png" alt="ETH" className="token-logo" />
+                <img src="/Ethereum-icon-purple.svg" alt="ETH" className="token-logo" />
               </td>
               <td className="value-cell">
                 <span className="stat-value-total">{formatEth(ethTotalStaked)}</span>
@@ -1694,58 +1694,70 @@ export function EnhancedUserDashboard() {
                   const isSwipe = tokenType === 'SWIPE';
                   
                   return (
-                    <div key={uniqueKey} className="transaction-card">
-                      <div className="transaction-header">
-                        <div className="transaction-type">
-                          <span className={`type-badge ${transaction.type}`}>
+                    <div key={uniqueKey} className="transaction-card-compact">
+                      <div className="transaction-header-compact">
+                        <div className="transaction-badges-compact">
+                          <span className={`type-badge-compact ${transaction.type}`}>
                             {transaction.type === 'claim' && '💰'}
                             {transaction.type === 'stake' && '🎯'}
                             {transaction.type === 'resolve' && '✅'}
                             {transaction.type === 'cancel' && '🚫'}
                             {transaction.type.toUpperCase()}
                           </span>
-                          <span className={`token-type-badge ${tokenType.toLowerCase()}`}>
+                          <span className={`token-type-badge-compact ${tokenType.toLowerCase()}`}>
                             {isSwipe ? (
-                              <img src="/splash.png" alt="SWIPE" className="token-badge-icon" />
+                              <img src="/splash.png" alt="SWIPE" className="token-badge-icon-compact" />
                             ) : (
-                              <img src="/eth.png" alt="ETH" className="token-badge-icon" />
+                              <img src="/Ethereum-icon-purple.svg" alt="ETH" className="token-badge-icon-compact eth-icon-no-bg" />
                             )}
                             {tokenType}
                           </span>
-                          <span className={`status-badge ${displayStatus}`}>
+                          <span className={`status-badge-compact ${displayStatus}`}>
                             {displayStatus === 'pending' && '⏳'}
                             {displayStatus === 'success' && '✅'}
                             {displayStatus === 'failed' && '❌'}
                             {displayStatus.toUpperCase()}
                           </span>
                         </div>
-                        <div className="transaction-time">
-                          {new Date(transaction.timestamp).toLocaleString()}
+                        <div className="transaction-time-compact">
+                          {new Date(transaction.timestamp).toLocaleString('pl-PL', { 
+                            day: '2-digit', 
+                            month: '2-digit', 
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit'
+                          })}
                         </div>
                       </div>
-                      <div className="transaction-details">
-                        <p><strong>Prediction:</strong> {transaction.predictionQuestion}</p>
-                        <p><strong>Transaction Hash:</strong> 
+                      <div className="transaction-details-compact">
+                        <p className="transaction-prediction">
+                          <span className="label">Prediction:</span>
+                          <span className="value">{transaction.predictionQuestion}</span>
+                        </p>
+                        <p className="transaction-hash">
+                          <span className="label">Transaction Hash:</span>
                           {transaction.txHash ? (
                             <a 
                               href={transaction.basescanUrl} 
                               target="_blank" 
                               rel="noopener noreferrer"
-                              className="basescan-link"
+                              className="basescan-link-compact"
                             >
-                              {transaction.txHash.substring(0, 10)}...{transaction.txHash.substring(transaction.txHash.length - 8)}
+                              Basescan
+                              <svg className="basescan-icon" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M10 2L2 10M10 2H6M10 2V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
                             </a>
                           ) : (
-                            <span>Pending...</span>
+                            <span className="pending-text">Pending...</span>
                           )}
                         </p>
                         {transaction.amount && transaction.amount > 0 && (
-                          <p className="transaction-amount">
-                            <strong>Amount:</strong>{' '}
-                            <span className={`amount-value ${tokenType.toLowerCase()}`}>
+                          <p className="transaction-amount-compact">
+                            <span className="label">Amount:</span>
+                            <span className={`amount-value-compact ${tokenType.toLowerCase()}`}>
                               {(() => {
-                                // Check if amount is in wei (very large number) or already in token units
-                                // If amount > 1000000, it's likely in wei and needs conversion
                                 const isWei = transaction.amount > 1000000;
                                 if (isSwipe) {
                                   return isWei ? formatSwipe(transaction.amount) : `${transaction.amount.toLocaleString()}`;
@@ -1755,9 +1767,6 @@ export function EnhancedUserDashboard() {
                               })()} {tokenType}
                             </span>
                           </p>
-                        )}
-                        {transaction.blockNumber && (
-                          <p><strong>Block:</strong> {transaction.blockNumber}</p>
                         )}
                       </div>
                     </div>
