@@ -8,6 +8,7 @@ import { useHybridPredictions } from '../../../lib/hooks/useHybridPredictions';
 import { RedisPrediction, RedisUserStake, UserTransaction } from '../../../lib/types/redis';
 import { generateBasescanUrl, generateTransactionId } from '../../../lib/utils/redis-utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { LegacyCard } from './LegacyCard';
 import GradientText from '@/components/GradientText';
 import { useComposeCast } from '@coinbase/onchainkit/minikit';
@@ -127,6 +128,10 @@ export function EnhancedUserDashboard() {
   // Transaction pagination state
   const [transactionPage, setTransactionPage] = useState(1);
   const transactionsPerPage = 10;
+  
+  // Predictions pagination state
+  const [predictionsPage, setPredictionsPage] = useState(1);
+  const predictionsPerPage = 10;
 
   // Convert wei to ETH
   const weiToEth = (wei: number): number => {
@@ -627,8 +632,8 @@ export function EnhancedUserDashboard() {
         break;
         
       case 'active':
-        // Show all active predictions from allPredictions (not just user predictions)
-        filteredPredictions = allPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline > Date.now() / 1000);
+        // Show only active predictions where user participated
+        filteredPredictions = allUserPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline > Date.now() / 1000);
         break;
         
       case 'won':
@@ -651,13 +656,13 @@ export function EnhancedUserDashboard() {
         break;
         
       case 'expired':
-        // Show all expired predictions (deadline passed but not resolved)
-        filteredPredictions = allPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline <= Date.now() / 1000);
+        // Show only expired predictions where user participated (deadline passed but not resolved)
+        filteredPredictions = allUserPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline <= Date.now() / 1000);
         break;
         
       case 'cancelled':
-        // Show all cancelled predictions
-        filteredPredictions = allPredictions.filter(p => p.cancelled);
+        // Show only cancelled predictions where user participated
+        filteredPredictions = allUserPredictions.filter(p => p.cancelled);
         break;
         
       case 'claimed':
@@ -675,8 +680,8 @@ export function EnhancedUserDashboard() {
         break;
         
       case 'all':
-        // Show all predictions (both user predictions and all predictions)
-        filteredPredictions = allPredictions;
+        // Show all predictions where user participated
+        filteredPredictions = allUserPredictions;
         break;
         
       default:
@@ -904,6 +909,7 @@ export function EnhancedUserDashboard() {
   const handleFilterChange = useCallback(async (newFilter: string) => {
     console.log(`🔄 Filter changed from ${selectedFilter} to ${newFilter}`);
     setSelectedFilter(newFilter);
+    setPredictionsPage(1); // Reset pagination on filter change
     
     // If allUserPredictions is empty, fetch it first
     if (allUserPredictions.length === 0) {
@@ -1261,8 +1267,8 @@ export function EnhancedUserDashboard() {
           return ethCanClaim || swipeCanClaim;
         });
       case 'active':
-        // Show all active predictions from allPredictions (not just user predictions)
-        return allPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline > Date.now() / 1000);
+        // Show only active predictions where user participated
+        return allUserPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline > Date.now() / 1000);
       case 'won':
         // Show only predictions where user won (regardless of claimed status)
         return allUserPredictions.filter(p => {
@@ -1279,11 +1285,11 @@ export function EnhancedUserDashboard() {
                  (swipeStake && !swipeStake.isWinner && p.status === 'resolved');
         });
       case 'expired':
-        // Show all expired predictions (deadline passed but not resolved)
-        return allPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline <= Date.now() / 1000);
+        // Show only expired predictions where user participated (deadline passed but not resolved)
+        return allUserPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline <= Date.now() / 1000);
       case 'cancelled':
-        // Show all cancelled predictions
-        return allPredictions.filter(p => p.cancelled);
+        // Show only cancelled predictions where user participated
+        return allUserPredictions.filter(p => p.cancelled);
       case 'claimed':
         // Show only predictions that have been claimed
         return allUserPredictions.filter(p => {
@@ -1297,8 +1303,8 @@ export function EnhancedUserDashboard() {
           return ethClaimed || swipeClaimed;
         });
       case 'all':
-        // Show all predictions (both user predictions and all predictions)
-        return allPredictions;
+        // Show all predictions where user participated
+        return allUserPredictions;
       default:
         // Default to ready-to-claim
         return allUserPredictions.filter(p => {
@@ -1550,33 +1556,91 @@ export function EnhancedUserDashboard() {
             {selectedFilter === 'all' && '📊 All Predictions'}
           </h3>
           <div className="predictions-grid">
-            {filteredPredictions.map((prediction) => {
-              // Check if this is a V1 prediction
-              const isV1 = prediction.id.startsWith('pred_v1_');
-              
-              if (isV1) {
-                // Use LegacyCard for V1 predictions
-                return (
-                  <LegacyCard
-                    key={prediction.id}
-                    prediction={prediction}
-                    onClaimReward={handleClaimReward}
-                    isTransactionLoading={isTransactionLoading}
-                  />
-                );
-              } else {
-                // Use LegacyCard for all V2 predictions
-                return (
-                  <LegacyCard
-                    key={prediction.id}
-                    prediction={prediction}
-                    onClaimReward={handleClaimReward}
-                    isTransactionLoading={isTransactionLoading}
-                  />
-                );
-              }
-            })}
+            {filteredPredictions
+              .slice((predictionsPage - 1) * predictionsPerPage, predictionsPage * predictionsPerPage)
+              .map((prediction) => {
+                // Check if this is a V1 prediction
+                const isV1 = prediction.id.startsWith('pred_v1_');
+                
+                if (isV1) {
+                  // Use LegacyCard for V1 predictions
+                  return (
+                    <LegacyCard
+                      key={prediction.id}
+                      prediction={prediction}
+                      onClaimReward={handleClaimReward}
+                      isTransactionLoading={isTransactionLoading}
+                    />
+                  );
+                } else {
+                  // Use LegacyCard for all V2 predictions
+                  return (
+                    <LegacyCard
+                      key={prediction.id}
+                      prediction={prediction}
+                      onClaimReward={handleClaimReward}
+                      isTransactionLoading={isTransactionLoading}
+                    />
+                  );
+                }
+              })}
           </div>
+          
+          {/* Predictions Pagination */}
+          {filteredPredictions.length > predictionsPerPage && (
+            <div className="flex items-center justify-center gap-2 mt-6 p-4 bg-gradient-to-r from-black/80 via-zinc-900/90 to-black/80 rounded-xl border border-[#d4ff00]/20">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPredictionsPage(prev => Math.max(1, prev - 1))}
+                disabled={predictionsPage === 1}
+                className="gap-2 bg-zinc-900/80 border-zinc-700 hover:bg-zinc-800 hover:border-[#d4ff00]/50 text-white disabled:opacity-30"
+              >
+                <span>←</span>
+                <span className="hidden sm:inline">Back</span>
+              </Button>
+              
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.ceil(filteredPredictions.length / predictionsPerPage) }, (_, i) => i + 1)
+                  .filter(page => {
+                    const totalPages = Math.ceil(filteredPredictions.length / predictionsPerPage);
+                    return page === 1 || 
+                           page === totalPages || 
+                           Math.abs(page - predictionsPage) <= 1;
+                  })
+                  .map((page, index, arr) => (
+                    <React.Fragment key={page}>
+                      {index > 0 && arr[index - 1] !== page - 1 && (
+                        <span className="text-zinc-500 px-1">•••</span>
+                      )}
+                      <Button
+                        variant={predictionsPage === page ? "swipe" : "ghost"}
+                        size="sm"
+                        onClick={() => setPredictionsPage(page)}
+                        className={predictionsPage === page 
+                          ? "min-w-[36px] font-bold" 
+                          : "min-w-[36px] text-zinc-400 hover:text-white hover:bg-zinc-800"
+                        }
+                      >
+                        {page}
+                      </Button>
+                    </React.Fragment>
+                  ))
+                }
+              </div>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPredictionsPage(prev => Math.min(Math.ceil(filteredPredictions.length / predictionsPerPage), prev + 1))}
+                disabled={predictionsPage >= Math.ceil(filteredPredictions.length / predictionsPerPage)}
+                className="gap-2 bg-zinc-900/80 border-zinc-700 hover:bg-zinc-800 hover:border-[#d4ff00]/50 text-white disabled:opacity-30"
+              >
+                <span className="hidden sm:inline">Next</span>
+                <span>→</span>
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -1703,25 +1767,31 @@ export function EnhancedUserDashboard() {
             
             {/* Pagination */}
             {userTransactions.length > transactionsPerPage && (
-              <div className="transaction-pagination">
-                <button 
-                  className="pagination-btn"
+              <div className="flex items-center justify-center gap-4 mt-6 p-4 bg-gradient-to-r from-black/80 via-zinc-900/90 to-black/80 rounded-xl border border-[#d4ff00]/20">
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setTransactionPage(prev => Math.max(1, prev - 1))}
                   disabled={transactionPage === 1}
+                  className="gap-2 bg-zinc-900/80 border-zinc-700 hover:bg-zinc-800 hover:border-[#d4ff00]/50 text-white disabled:opacity-30"
                 >
-                  ← Previous
-                </button>
-                <span className="pagination-info">
-                  Page {transactionPage} of {Math.ceil(userTransactions.length / transactionsPerPage)}
-                  <span className="pagination-total">({userTransactions.length} total)</span>
+                  <span>←</span>
+                  <span className="hidden sm:inline">Previous</span>
+                </Button>
+                <span className="text-white font-medium text-sm">
+                  Page <span className="text-[#d4ff00] font-bold">{transactionPage}</span> of {Math.ceil(userTransactions.length / transactionsPerPage)}
+                  <span className="text-zinc-400 text-xs ml-2">({userTransactions.length} total)</span>
                 </span>
-                <button 
-                  className="pagination-btn"
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setTransactionPage(prev => Math.min(Math.ceil(userTransactions.length / transactionsPerPage), prev + 1))}
                   disabled={transactionPage >= Math.ceil(userTransactions.length / transactionsPerPage)}
+                  className="gap-2 bg-zinc-900/80 border-zinc-700 hover:bg-zinc-800 hover:border-[#d4ff00]/50 text-white disabled:opacity-30"
                 >
-                  Next →
-                </button>
+                  <span className="hidden sm:inline">Next</span>
+                  <span>→</span>
+                </Button>
               </div>
             )}
           </>
