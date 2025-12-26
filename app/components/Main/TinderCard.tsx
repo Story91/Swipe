@@ -1688,23 +1688,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   const handleSkip = (predictionId: number) => {
     console.log(`Skipping prediction ${predictionId}`);
 
-    // Record the action
-    setLastAction({
-      type: 'skip',
-      predictionId,
-      direction: 'left',
-      timestamp: Date.now()
-    });
-
-    // Show feedback
-    setShowActionFeedback(true);
-
-    // Hide feedback after 3 seconds
-    setTimeout(() => {
-      setShowActionFeedback(false);
-    }, 3000);
-
-    // Move to next card
+    // Move to next card (no notification for skip)
     setCurrentIndex(prev => {
       const next = prev + 1;
       // Reset to first card when reaching the end, or stay on last if only one card

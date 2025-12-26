@@ -322,15 +322,12 @@ export default function App() {
         <div className="flex justify-between items-center mb-3">
           <Wallet className="z-10">
             <ConnectWallet 
-              className={address 
-                ? "!px-2 !py-1.5 !text-sm !min-w-0 !text-black !border-2 !border-black !font-semibold !shadow-md !rounded-full !bg-gradient-to-r !from-[#d4ff00] !to-[#a8cc00] hover:!shadow-lg hover:!scale-105 !transition-all !duration-200" 
-                : "!px-4 !py-2 !text-sm !min-w-0 !text-black !border-2 !border-black !font-semibold !shadow-md"
-              } 
+              className="swipe-glow-button swipe-glow-green !px-3 !py-1.5 !text-sm !min-w-0 !font-semibold !rounded-full hover:!scale-105 !transition-all !duration-200" 
               text="Sign In"
             >
               {address && userProfile ? (
                 <div className="flex items-center gap-2">
-                  <ShadcnAvatar className="w-7 h-7 ring-2 ring-black/20">
+                  <ShadcnAvatar className="w-7 h-7 ring-2 ring-[#d4ff00]/30">
                     <AvatarImage 
                       src={userProfile?.pfp_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${address?.slice(2, 8)}`} 
                       alt={userProfile?.display_name || 'User'} 
@@ -339,20 +336,13 @@ export default function App() {
                       {userProfile?.display_name?.slice(0, 2).toUpperCase() || address?.slice(2, 4).toUpperCase()}
                     </AvatarFallback>
                   </ShadcnAvatar>
-                  <div className="flex flex-col">
-                    <span className="text-black font-bold text-xs leading-tight truncate max-w-[70px]">
-                      {userProfile?.display_name || userProfile?.username || `${address?.slice(0, 6)}...`}
-                    </span>
-                    {userProfile?.username && (
-                      <span className="text-black/60 text-[9px] leading-tight">
-                        @{userProfile.username}
-                      </span>
-                    )}
-                  </div>
+                  <span className="text-[#d4ff00] font-bold text-xs truncate max-w-[120px]" style={{ fontFamily: '"Spicy Rice", cursive' }}>
+                    {userProfile?.display_name || userProfile?.username}
+                  </span>
                 </div>
               ) : address ? (
                 <div className="flex items-center gap-2">
-                  <ShadcnAvatar className="w-7 h-7 ring-2 ring-black/20">
+                  <ShadcnAvatar className="w-7 h-7 ring-2 ring-[#d4ff00]/30">
                     <AvatarImage 
                       src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${address?.slice(2, 8)}`} 
                       alt="User" 
@@ -361,12 +351,12 @@ export default function App() {
                       {address?.slice(2, 4).toUpperCase()}
                     </AvatarFallback>
                   </ShadcnAvatar>
-                  <span className="text-black font-bold text-xs">
+                  <span className="text-[#d4ff00] font-bold text-xs" style={{ fontFamily: '"Spicy Rice", cursive' }}>
                     {`${address?.slice(0, 6)}...`}
                   </span>
                 </div>
               ) : (
-                <Name className="text-inherit text-xs" />
+                <span className="text-[#d4ff00]" style={{ fontFamily: '"Spicy Rice", cursive' }}>Sign In</span>
               )}
             </ConnectWallet>
             <WalletDropdown>
@@ -389,40 +379,48 @@ export default function App() {
             </WalletDropdown>
           </Wallet>
           
-          {/* Admin, Leaderboard, AI or Help Button - Top Right */}
-          <div className="flex gap-2">
-            {isAdmin && (
+          {/* Admin, Leaderboard, Help icons + How to Play button - Top Right */}
+          <div className="flex gap-2 items-center">
+            {/* Icon buttons grouped together */}
+            <div className="flex gap-1">
+              {isAdmin && (
+                <Button
+                  variant="swipeGlow"
+                  size="icon"
+                  onClick={() => setActiveDashboard('admin')}
+                  title="Admin Dashboard"
+                  className="swipe-glow-purple"
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
+              )}
               <Button
-                variant="swipe"
+                variant="swipeGlow"
                 size="icon"
-                onClick={() => setActiveDashboard('admin')}
-                title="Admin Dashboard"
+                onClick={() => setActiveDashboard('leaderboard')}
+                title="Leaderboard"
+                className="swipe-glow-gold"
               >
-                <Settings className="h-4 w-4" />
+                <Trophy className="h-4 w-4" />
               </Button>
-            )}
+              <Button
+                variant="swipeGlow"
+                size="icon"
+                onClick={() => setActiveDashboard('help-faq')}
+                title="Help & FAQ"
+                className="swipe-glow-cyan"
+              >
+                <HelpCircle className="h-4 w-4" />
+              </Button>
+            </div>
+            {/* How to Play button on the right */}
             <Button
-              variant="swipe"
-              size="icon"
-              onClick={() => setActiveDashboard('leaderboard')}
-              title="Leaderboard"
-            >
-              <Trophy className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="swipe"
+              variant="swipeGlow"
               onClick={() => setIsHowToPlayOpen(true)}
-              className="!px-3 !py-2 !text-xs !font-semibold"
+              className="!px-3 !py-2 !text-xs !font-semibold swipe-glow-green"
+              style={{ fontFamily: '"Spicy Rice", cursive' }}
             >
               How to Play
-            </Button>
-            <Button
-              variant="swipe"
-              size="icon"
-              onClick={() => setActiveDashboard('help-faq')}
-              title="Help & FAQ"
-            >
-              <HelpCircle className="h-4 w-4" />
             </Button>
           </div>
         </div>

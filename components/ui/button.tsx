@@ -21,6 +21,8 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
         swipe:
           "bg-gradient-to-br from-black via-[#d4ff00] to-black text-black border-2 border-black font-semibold hover:from-[#1a1a1a] hover:via-[#c4ef00] hover:to-[#1a1a1a] shadow-md",
+        swipeGlow:
+          "swipe-glow-button bg-[#0a0a0a] text-[#d4ff00] font-semibold hover:scale-105 transition-all duration-300",
       },
       size: {
         default: "h-9 px-4 py-2",

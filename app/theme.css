@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Exo+2:wght@100..900&family=Source+Code+Pro:wght@200..900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Exo+2:wght@100..900&family=Source+Code+Pro:wght@200..900&family=Spicy+Rice&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -215,9 +215,9 @@ button, .btn {
 }
 
 .mini-app-menu .menubar-trigger {
-  font-family: "Orbitron", sans-serif;
-  font-weight: 700;
-  font-size: 0.7rem;
+  font-family: "Spicy Rice", cursive !important;
+  font-weight: 400;
+  font-size: 0.9rem;
   letter-spacing: 0;
   padding: 0.5rem 0.1rem !important;
   min-width: 0 !important;
@@ -235,6 +235,11 @@ button, .btn {
   position: relative !important;
 }
 
+/* Apply font to span inside menubar-trigger (for Dashboard text) */
+.mini-app-menu .menubar-trigger > span:not([class*="badge"]) {
+  font-family: "Spicy Rice", cursive !important;
+}
+
 /* Badge on Dashboard button - always on top */
 .mini-app-menu .menubar-trigger .badge,
 .mini-app-menu .menubar-trigger [class*="badge"] {
@@ -243,6 +248,163 @@ button, .btn {
   right: -4px !important;
   z-index: 99999 !important;
   pointer-events: none !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+}
+
+/* Swipe Glow Button - Base styles - subtle effect */
+.swipe-glow-button {
+  position: relative;
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0a0a0a 100%);
+  border: none;
+  border-radius: 12px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  overflow: visible;
+}
+
+.swipe-glow-button::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0a0a0a 100%);
+  border-radius: 11px;
+  z-index: -1;
+}
+
+/* Trophy button - Gold/Orange - subtle */
+.swipe-glow-gold {
+  box-shadow: 0 0 4px rgba(255, 193, 7, 0.2);
+}
+
+.swipe-glow-gold::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  right: -1px;
+  bottom: -1px;
+  background: linear-gradient(90deg, #ffc107, #ff9800, #ffc107);
+  background-size: 200% 100%;
+  border-radius: 13px;
+  z-index: -1;
+  animation: subtleGlowBorder 4s linear infinite;
+}
+
+.swipe-glow-gold:hover {
+  box-shadow: 0 0 8px rgba(255, 193, 7, 0.4);
+}
+
+/* Help button - Cyan/Blue - subtle */
+.swipe-glow-cyan {
+  box-shadow: 0 0 4px rgba(0, 188, 212, 0.2);
+}
+
+.swipe-glow-cyan::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  right: -1px;
+  bottom: -1px;
+  background: linear-gradient(90deg, #00bcd4, #2196f3, #00bcd4);
+  background-size: 200% 100%;
+  border-radius: 13px;
+  z-index: -1;
+  animation: subtleGlowBorder 4s linear infinite;
+}
+
+.swipe-glow-cyan:hover {
+  box-shadow: 0 0 8px rgba(0, 188, 212, 0.4);
+}
+
+/* How to Play button - Green/Lime - subtle */
+.swipe-glow-green {
+  box-shadow: 0 0 4px rgba(212, 255, 0, 0.2);
+}
+
+.swipe-glow-green::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  right: -1px;
+  bottom: -1px;
+  background: linear-gradient(90deg, #d4ff00, #88ff00, #d4ff00);
+  background-size: 200% 100%;
+  border-radius: 13px;
+  z-index: -1;
+  animation: subtleGlowBorder 4s linear infinite;
+}
+
+.swipe-glow-green:hover {
+  box-shadow: 0 0 8px rgba(212, 255, 0, 0.4);
+}
+
+/* Admin button - Purple/Pink - subtle */
+.swipe-glow-purple {
+  box-shadow: 0 0 4px rgba(156, 39, 176, 0.2);
+}
+
+.swipe-glow-purple::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  right: -1px;
+  bottom: -1px;
+  background: linear-gradient(90deg, #9c27b0, #e91e63, #9c27b0);
+  background-size: 200% 100%;
+  border-radius: 13px;
+  z-index: -1;
+  animation: subtleGlowBorder 4s linear infinite;
+}
+
+.swipe-glow-purple:hover {
+  box-shadow: 0 0 8px rgba(156, 39, 176, 0.4);
+}
+
+@keyframes subtleGlowBorder {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+.swipe-glow-button:hover {
+  transform: translateY(-1px) scale(1.02);
+}
+
+/* Override ConnectWallet (OnchainKit) styling - wallet button */
+button.swipe-glow-button[class*="ock"],
+button.swipe-glow-button[class*="ock"]:hover,
+button.swipe-glow-button[class*="ock"]:active,
+button.swipe-glow-button[class*="ock"]:focus {
+  background: #0a0a0a !important;
+  --ock-bg-primary: #0a0a0a !important;
+  --ock-bg-primary-hover: #0a0a0a !important;
+  --ock-bg-primary-active: #0a0a0a !important;
+  border: 1px solid #d4ff00 !important;
+  box-shadow: none !important;
+}
+
+/* Remove pseudo-elements for wallet button to avoid double border */
+button.swipe-glow-button[class*="ock"]::before,
+button.swipe-glow-button[class*="ock"]::after {
+  display: none !important;
+}
+
+/* Force light text color for wallet button */
+button.swipe-glow-button[class*="ock"] span,
+button.swipe-glow-button[class*="ock"] div,
+button.swipe-glow-button[class*="ock"] *:not(img) {
+  color: #d4ff00 !important;
+  font-family: "Spicy Rice", cursive !important;
+  --ock-text-inverse: #d4ff00 !important;
+  background: transparent !important;
 }
 
 /* Animated notification badge with gradient border and pulse */
