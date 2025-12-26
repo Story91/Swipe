@@ -296,8 +296,8 @@ export default function App() {
         const containerRect = dashboardTriggerRef.current.closest('.mb-4')?.getBoundingClientRect();
         if (containerRect) {
           setBadgePosition({
-            top: rect.top - containerRect.top - 4,
-            right: containerRect.right - rect.right - 4,
+            top: rect.top - containerRect.top - 8,
+            right: containerRect.right - rect.right - 6,
           });
         }
       }
@@ -460,8 +460,14 @@ export default function App() {
               </MenubarTrigger>
             </MenubarMenu>
             <MenubarMenu>
-              <MenubarTrigger className="menubar-trigger">
+              <MenubarTrigger className="menubar-trigger relative">
                 Create
+                <Badge 
+                  variant="default" 
+                  className="absolute -top-2 -right-3 px-1 py-0 text-[9px] font-bold bg-red-500 text-white border-0 animate-pulse shadow-lg shadow-red-500/30"
+                >
+                  LIVE
+                </Badge>
               </MenubarTrigger>
               <MenubarContent>
                 <MenubarItem onSelect={() => setIsCreateModalOpen(true)}>
