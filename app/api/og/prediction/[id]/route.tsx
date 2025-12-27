@@ -169,7 +169,7 @@ export async function GET(
         ),
         {
           width: 1200,
-          height: 630,
+          height: 628,
         }
       );
     }
@@ -254,6 +254,7 @@ export async function GET(
             >
               <div
                 style={{
+                  display: 'flex',
                   fontSize: 40,
                   fontWeight: 'bold',
                   color: '#d4ff00',
@@ -285,7 +286,6 @@ export async function GET(
               display: 'flex',
               flex: 1,
               gap: 30,
-              maxWidth: 1120,
             }}
           >
             {/* Left side - Question & Stats */}
@@ -322,7 +322,6 @@ export async function GET(
                   color: '#ffffff',
                   lineHeight: 1.2,
                   marginBottom: 24,
-                  maxWidth: '100%',
                 }}
               >
                 {prediction.question.length > 70 

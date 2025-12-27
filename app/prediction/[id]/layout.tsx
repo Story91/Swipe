@@ -55,7 +55,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
           {
             url: ogImageUrl,
             width: 1200,
-            height: 630,
+            height: 628,
             alt: prediction.question,
           },
         ],
@@ -87,7 +87,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         // Additional OG tags for better Farcaster compatibility
         "og:image": ogImageUrl,
         "og:image:width": "1200",
-        "og:image:height": "630",
+        "og:image:height": "628",
       },
     };
   } catch (error) {
