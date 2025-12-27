@@ -31,8 +31,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const totalPool = prediction.yesTotalAmount + prediction.noTotalAmount;
     const yesPercentage = totalPool > 0 ? Math.round((prediction.yesTotalAmount / totalPool) * 100) : 50;
     
-    // Dynamic OG image URL - can be prediction's image or a generated one
-    const ogImageUrl = prediction.imageUrl || `${URL}/api/og/prediction/${id}`;
+    // Dynamic OG image URL
+    // For crypto predictions (includeChart or geckoterminal URL), always use generated OG image
+    // For regular predictions with an image, use that image
+    // Otherwise use generated OG image
+    const isCryptoPrediction = prediction.includeChart || prediction.imageUrl?.includes('geckoterminal.com');
+    const ogImageUrl = isCryptoPrediction 
+      ? `${URL}/api/og/prediction/${id}`
+      : (prediction.imageUrl || `${URL}/api/og/prediction/${id}`);
     
     // Prediction-specific URL
     const predictionUrl = `${URL}/prediction/${id}`;
