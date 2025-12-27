@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Trophy, HelpCircle, Settings } from "lucide-react";
 import { useAccount, useConnect } from "wagmi";
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import TinderCardComponent from "./components/Main/TinderCard";
 import { AdminPanel } from "./components/Admin/AdminPanel";
@@ -67,7 +68,7 @@ export default function App() {
   const [isHowToPlayOpen, setIsHowToPlayOpen] = useState(false);
   const { address } = useAccount();
   const { connect, connectors } = useConnect();
-  const tinderCardRef = useRef<{ refresh: () => void } | null>(null);
+  const tinderCardRef = useRef<{ refresh: () => void; goToPrediction?: (id: string) => void } | null>(null);
   const dashboardTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [hasTriedAddMiniApp, setHasTriedAddMiniApp] = useState(false);
   const [hasTriedAutoConnect, setHasTriedAutoConnect] = useState(false);
@@ -75,7 +76,23 @@ export default function App() {
   const [profileLoading, setProfileLoading] = useState(false);
   const [readyToClaimCount, setReadyToClaimCount] = useState(0);
   const [badgePosition, setBadgePosition] = useState({ top: 0, right: 0 });
+  const [initialPredictionId, setInitialPredictionId] = useState<string | null>(null);
   const viewProfile = useViewProfile();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  // Check for prediction parameter in URL
+  useEffect(() => {
+    const predictionId = searchParams.get('prediction');
+    if (predictionId) {
+      console.log('🎯 Found prediction parameter in URL:', predictionId);
+      setInitialPredictionId(predictionId);
+      setActiveDashboard('tinder');
+      
+      // Clear the URL parameter without full page reload
+      router.replace('/', { scroll: false });
+    }
+  }, [searchParams, router]);
 
   useEffect(() => {
     if (!isFrameReady) {
@@ -497,6 +514,8 @@ export default function App() {
               ref={tinderCardRef}
               activeDashboard={activeDashboard}
               onDashboardChange={setActiveDashboard}
+              initialPredictionId={initialPredictionId}
+              onInitialPredictionHandled={() => setInitialPredictionId(null)}
             />
           )}
 

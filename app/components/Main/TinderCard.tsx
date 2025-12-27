@@ -56,6 +56,8 @@ interface TinderCardProps {
   activeDashboard?: 'tinder' | 'user' | 'admin' | 'approver';
   onDashboardChange?: (dashboard: 'tinder' | 'user' | 'admin' | 'approver') => void;
   onRefresh?: () => void;
+  initialPredictionId?: string | null;
+  onInitialPredictionHandled?: () => void;
 }
 
 type DashboardType = 'tinder' | 'user' | 'admin' | 'approver';
@@ -136,7 +138,7 @@ interface TinderCardAPI {
   restoreCard: () => Promise<void>;
 }
 
-const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>(({ items, activeDashboard: propActiveDashboard, onDashboardChange }, ref) => {
+const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>(({ items, activeDashboard: propActiveDashboard, onDashboardChange, initialPredictionId, onInitialPredictionHandled }, ref) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
   const [swipeProgress, setSwipeProgress] = useState(0);
@@ -783,6 +785,49 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   useEffect(() => {
     setCurrentIndex(0);
   }, [cardItems.length]); // Reset when number of cards changes
+
+  // Handle navigation to specific prediction from URL parameter
+  useEffect(() => {
+    if (!initialPredictionId || cardItems.length === 0 || !hybridPredictions) return;
+    
+    console.log('🎯 Looking for prediction:', initialPredictionId);
+    
+    // Find the index of the prediction with matching ID
+    const targetIndex = cardItems.findIndex((card, idx) => {
+      // Get the original prediction from hybridPredictions
+      const originalPred = hybridPredictions.find(hp => {
+        const hpId = typeof hp.id === 'string' 
+          ? (hp.id.includes('v2') 
+            ? parseInt(hp.id.replace('pred_v2_', ''), 10) || 0
+            : parseInt(hp.id.replace('pred_', ''), 10) || 0)
+          : (hp.id || 0);
+        return hpId === card.id;
+      });
+      
+      // Check if the original prediction ID matches
+      if (originalPred) {
+        const matches = originalPred.id === initialPredictionId || 
+                       String(originalPred.id) === initialPredictionId;
+        if (matches) {
+          console.log('✅ Found matching prediction at index:', idx, 'id:', originalPred.id);
+        }
+        return matches;
+      }
+      return false;
+    });
+    
+    if (targetIndex !== -1) {
+      console.log('🎯 Navigating to prediction at index:', targetIndex);
+      setCurrentIndex(targetIndex);
+    } else {
+      console.log('⚠️ Prediction not found in active cards:', initialPredictionId);
+    }
+    
+    // Mark as handled
+    if (onInitialPredictionHandled) {
+      onInitialPredictionHandled();
+    }
+  }, [initialPredictionId, cardItems, hybridPredictions, onInitialPredictionHandled]);
 
   // Auto-sync after stake transaction confirmation
   useEffect(() => {
