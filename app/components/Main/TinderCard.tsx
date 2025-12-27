@@ -32,6 +32,7 @@ import ElectricBorder from '@/components/ElectricBorder';
 import ShinyText from '@/components/ShinyText';
 import GradientText from '@/components/GradientText';
 import TextType from '@/components/TextType';
+import { SharePreviewModal } from '../Modals/SharePreviewModal';
 
 interface PredictionData {
   id: number;
@@ -203,6 +204,22 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     confidence: null,
     aiProbability: null,
     error: null
+  });
+  
+  // Share Preview Modal State
+  const [sharePreviewModal, setSharePreviewModal] = useState<{
+    isOpen: boolean;
+    shareText: string;
+    shareUrl: string;
+    stakeInfo?: {
+      amount: number;
+      token: 'ETH' | 'SWIPE';
+      isYes: boolean;
+    };
+  }>({
+    isOpen: false,
+    shareText: '',
+    shareUrl: ''
   });
   
   // AI Typing animation state
@@ -1172,73 +1189,111 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     }
   };
 
+  // Helper function to get prediction ID for sharing (converts numeric ID back to Redis format)
+  const getPredictionIdForShare = useCallback((numericId: number): string => {
+    // Find the original prediction from hybridPredictions
+    const originalPred = hybridPredictions?.find(hp => {
+      const hpId = typeof hp.id === 'string' 
+        ? (hp.id.includes('v2') 
+          ? parseInt(hp.id.replace('pred_v2_', ''), 10) || 0
+          : parseInt(hp.id.replace('pred_', ''), 10) || 0)
+        : (hp.id || 0);
+      return hpId === numericId;
+    });
+    
+    if (originalPred && typeof originalPred.id === 'string') {
+      return originalPred.id; // Return original string ID (e.g., 'pred_v2_123')
+    }
+    
+    // Fallback: assume V2 format
+    return `pred_v2_${numericId}`;
+  }, [hybridPredictions]);
+
   // Function to share prediction after stake
-  const shareStakedPrediction = async (type: 'achievement' | 'challenge' | 'prediction' = 'achievement') => {
+  // Function to open share preview modal after staking
+  const shareStakedPrediction = (type: 'achievement' | 'challenge' | 'prediction' = 'achievement') => {
     // Use shareStakeData instead of stakeAmount/stakeToken (which may have been reset by auto-sync)
     if (!lastStakedPrediction || !shareStakeData) {
       console.log('Cannot share - missing data:', { lastStakedPrediction: !!lastStakedPrediction, shareStakeData });
       return;
     }
     
+    // Use full prediction text (not truncated title)
+    const fullPredictionText = lastStakedPrediction.prediction;
+    
+    // Get unique prediction URL for sharing - will show custom OG image
+    const predictionId = getPredictionIdForShare(lastStakedPrediction.id);
+    const predictionUrl = `${window.location.origin}/prediction/${predictionId}`;
+    
+    // Format stake amount for display
+    const formatStakeAmountLocal = (amount: number, token: 'ETH' | 'SWIPE') => {
+      if (token === 'SWIPE') {
+        if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M`;
+        if (amount >= 1000) return `${(amount / 1000).toFixed(0)}K`;
+        return amount.toFixed(0);
+      }
+      return amount.toString();
+    };
+    
+    const formattedAmount = formatStakeAmountLocal(shareStakeData.amount, shareStakeData.token);
+    
+    // Single unified share text with unique prediction link
+    const shareText = `🎯 I just bet on SWIPE!\n\n"${fullPredictionText}"\n\n💰 My bet: ${formattedAmount} ${shareStakeData.token}\n\nWDYT? 👀\n\nCheck it out:`;
+    
+    // Close the share prompt and open preview modal
+    setShowSharePrompt(false);
+    
+    // Open share preview modal with stake info
+    setSharePreviewModal({
+      isOpen: true,
+      shareText,
+      shareUrl: predictionUrl,
+      stakeInfo: {
+        amount: shareStakeData.amount,
+        token: shareStakeData.token,
+        isYes: shareStakeData.isYes
+      }
+    });
+  };
+  
+  // Function to handle share modal close and cleanup
+  const handleShareModalClose = () => {
+    setSharePreviewModal(prev => ({ ...prev, isOpen: false }));
+    // Clear stake data after modal is closed
+    if (sharePreviewModal.stakeInfo) {
+      setShareStakeData(null);
+    }
+  };
+
+  // Legacy function kept for notification sending (called after successful share)
+  const sendShareNotification = async (type: 'achievement' | 'challenge' | 'prediction' = 'achievement') => {
+    if (!lastStakedPrediction) return;
+    
     try {
-      // Use full prediction text (not truncated title)
-      const fullPredictionText = lastStakedPrediction.prediction;
-      const appUrl = 'https://theswipe.app';
+      console.log('Attempting to send Farcaster notification...');
+      const userFid = await getUserFid();
+      console.log('User FID for notification:', userFid);
       
-      // Format stake amount for display
-      const formatStakeAmount = (amount: number, token: 'ETH' | 'SWIPE') => {
-        if (token === 'SWIPE') {
-          if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M`;
-          if (amount >= 1000) return `${(amount / 1000).toFixed(0)}K`;
-          return amount.toFixed(0);
-        }
-        return amount.toString();
-      };
-      
-      const formattedAmount = formatStakeAmount(shareStakeData.amount, shareStakeData.token);
-      
-      // Single unified share text
-      const shareText = `🎯 I just bet on SWIPE!\n\n"${fullPredictionText}"\n\n💰 My bet: ${formattedAmount} ${shareStakeData.token}\n\nWDYT? 👀\n\nJoin the prediction market on Base:`;
-      
-      await composeCast({
-        text: shareText,
-        embeds: [appUrl]
-      });
-      
-      setShowSharePrompt(false);
-      setShareStakeData(null); // Clear after successful share
-      showNotification('success', 'Shared!', 'Your prediction has been shared on Farcaster! 🚀');
-      
-      // Send Farcaster notification if user has notifications enabled
-      try {
-        console.log('Attempting to send Farcaster notification...');
-        const userFid = await getUserFid();
-        console.log('User FID for notification:', userFid);
-        
-        if (userFid) {
-          const shareTypeNames = {
-            'achievement': 'achievement',
-            'challenge': 'challenge', 
-            'prediction': 'prediction'
-          };
+      if (userFid) {
+        const shareTypeNames = {
+          'achievement': 'achievement',
+          'challenge': 'challenge', 
+          'prediction': 'prediction'
+        };
           
-          console.log('Sending notification for FID:', userFid, 'type:', type);
-          const result = await notifyPredictionShared(
-            userFid, 
-            lastStakedPrediction.title, 
-            shareTypeNames[type] || 'prediction'
-          );
-          console.log('Notification result:', result);
-        } else {
-          console.log('No FID available, skipping notification');
-        }
-      } catch (error) {
-        console.error('Failed to send Farcaster notification:', error);
-        // Don't show error to user, just log it
+        console.log('Sending notification for FID:', userFid, 'type:', type);
+        const result = await notifyPredictionShared(
+          userFid, 
+          lastStakedPrediction.title, 
+          shareTypeNames[type] || 'prediction'
+        );
+        console.log('Notification result:', result);
+      } else {
+        console.log('No FID available, skipping notification');
       }
     } catch (error) {
-      console.error('Błąd podczas udostępniania:', error);
-      showNotification('error', 'Sharing Error', 'Failed to share prediction. Please try again.');
+      console.error('Failed to send Farcaster notification:', error);
+      // Don't show error to user, just log it
     }
   };
 
@@ -1821,6 +1876,59 @@ KEY USER-FACING CHANGES: V1 → V2
     return uniqueParticipants;
   }, [currentCard?.id, hybridPredictions]);
   
+  // Function to open share preview modal for current prediction
+  const shareCurrentPrediction = useCallback(() => {
+    if (!currentCard || currentCard.id === 0) {
+      console.log('Cannot share - no current prediction');
+      return;
+    }
+    
+    const predictionId = getPredictionIdForShare(currentCard.id);
+    const predictionUrl = `${window.location.origin}/prediction/${predictionId}`;
+    
+    // Get pool data for share text
+    const currentPred = transformedPredictions[currentIndex];
+    const totalPoolETH = currentPred ? ((currentPred.yesTotalAmount || 0) + (currentPred.noTotalAmount || 0)) / 1e18 : 0;
+    
+    let shareText = `🔮 Check out this prediction:\n\n"${currentCard.prediction}"`;
+    
+    if (totalPoolETH > 0) {
+      shareText += `\n\n💰 Pool: ${totalPoolETH.toFixed(4)} ETH`;
+    }
+    
+    if (currentCardParticipants.length > 0) {
+      shareText += `\n👥 ${currentCardParticipants.length} swipers`;
+    }
+    
+    shareText += `\n\nSwipe to predict! 🎯`;
+    
+    // Open preview modal instead of sharing directly
+    setSharePreviewModal({
+      isOpen: true,
+      shareText,
+      shareUrl: predictionUrl,
+      stakeInfo: undefined
+    });
+  }, [currentCard, currentIndex, transformedPredictions, currentCardParticipants, getPredictionIdForShare]);
+  
+  // Function to actually perform the share (called from modal)
+  const performShare = useCallback(async () => {
+    if (!sharePreviewModal.shareUrl) return;
+    
+    try {
+      await composeCast({
+        text: sharePreviewModal.shareText,
+        embeds: [sharePreviewModal.shareUrl]
+      });
+      
+      showNotification('success', 'Shared!', 'Prediction shared on Farcaster! 🚀');
+    } catch (error) {
+      console.error('Error sharing prediction:', error);
+      showNotification('error', 'Share Failed', 'Failed to share. Please try again.');
+      throw error;
+    }
+  }, [sharePreviewModal, composeCast]);
+  
   // State for user stakes/votes with full stake data
   interface UserStakeData {
     vote: 'YES' | 'NO' | 'BOTH' | 'NONE';
@@ -2300,8 +2408,30 @@ KEY USER-FACING CHANGES: V1 → V2
 
     </div>
 
-    {/* Action Buttons - ASK AI and SKIP only */}
+    {/* Action Buttons - Share, AI, and Skip */}
     <div className="action-buttons-section">
+      {/* Share Button */}
+      <button
+        className="share-button"
+        onClick={shareCurrentPrediction}
+        title="Share this prediction"
+      >
+        <svg 
+          width="18" 
+          height="18" 
+          viewBox="0 0 24 24" 
+          fill="none" 
+          stroke="#d4ff00" 
+          strokeWidth="2.5" 
+          strokeLinecap="round" 
+          strokeLinejoin="round"
+        >
+          <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+          <polyline points="16 6 12 2 8 6" />
+          <line x1="12" y1="2" x2="12" y2="15" />
+        </svg>
+      </button>
+
       <button
         className="ai-analyze-button"
         onClick={analyzeWithAI}
@@ -2321,17 +2451,13 @@ KEY USER-FACING CHANGES: V1 → V2
       <button
         className={`skip-button ${skipButtonText === 'NEXT' ? 'pulse-glow' : ''}`}
         onClick={() => handleSkip(currentCard.id)}
-        style={{ minWidth: '80px' }}
       >
         <GradientText 
-          colors={skipButtonText === 'NEXT' 
-            ? ['#1a1a1a', '#2d2d2d', '#1a1a1a', '#333333', '#1a1a1a'] 
-            : ['#1a1a1a', '#333333', '#1a1a1a', '#444444', '#1a1a1a']
-          }
+          colors={['#d4ff00', '#00ff88', '#d4ff00', '#88ff00', '#d4ff00']}
           animationSpeed={skipButtonText === 'NEXT' ? 2 : 3}
           showBorder={false}
         >
-          <span className="font-black text-base tracking-wide">
+          <span className="font-bold text-sm tracking-wide">
             {skipButtonText} →
           </span>
         </GradientText>
@@ -3648,6 +3774,36 @@ KEY USER-FACING CHANGES: V1 → V2
         </DialogContent>
         </ElectricBorder>
       </Dialog>
+
+      {/* Share Preview Modal */}
+      {currentCard && currentCard.id !== 0 && (
+        <SharePreviewModal
+          isOpen={sharePreviewModal.isOpen}
+          onClose={handleShareModalClose}
+          prediction={{
+            id: getPredictionIdForShare(currentCard.id),
+            question: currentCard.prediction,
+            category: currentCard.category,
+            totalPoolETH: transformedPredictions[currentIndex] 
+              ? ((transformedPredictions[currentIndex].yesTotalAmount || 0) + (transformedPredictions[currentIndex].noTotalAmount || 0)) / 1e18 
+              : 0,
+            participantsCount: currentCardParticipants.length,
+            imageUrl: currentCard.image,
+            yesPercentage: currentCard.votingYes,
+            noPercentage: 100 - currentCard.votingYes
+          }}
+          shareText={sharePreviewModal.shareText}
+          shareUrl={sharePreviewModal.shareUrl}
+          onShare={async () => {
+            await performShare();
+            // Send notification after successful share
+            if (sharePreviewModal.stakeInfo) {
+              await sendShareNotification('achievement');
+            }
+          }}
+          stakeInfo={sharePreviewModal.stakeInfo}
+        />
+      )}
 
       {/* Global Notification System */}
       <NotificationSystem />
