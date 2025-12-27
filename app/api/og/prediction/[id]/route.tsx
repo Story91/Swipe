@@ -4,6 +4,99 @@ import { redisHelpers } from '@/lib/redis';
 
 export const runtime = 'edge';
 
+// Crypto data with CoinGecko IDs for fetching price data
+const CRYPTO_DATA: Record<string, { logo: string; color: string; name: string; coingeckoId: string }> = {
+  'BTC': { logo: 'https://cryptologos.cc/logos/bitcoin-btc-logo.png', color: '#f7931a', name: 'Bitcoin', coingeckoId: 'bitcoin' },
+  'ETH': { logo: 'https://cryptologos.cc/logos/ethereum-eth-logo.png', color: '#627eea', name: 'Ethereum', coingeckoId: 'ethereum' },
+  'SOL': { logo: 'https://cryptologos.cc/logos/solana-sol-logo.png', color: '#9945ff', name: 'Solana', coingeckoId: 'solana' },
+  'XRP': { logo: 'https://cryptologos.cc/logos/xrp-xrp-logo.png', color: '#23292f', name: 'Ripple', coingeckoId: 'ripple' },
+  'BNB': { logo: 'https://cryptologos.cc/logos/bnb-bnb-logo.png', color: '#f3ba2f', name: 'BNB', coingeckoId: 'binancecoin' },
+  'SWIPE': { logo: 'https://theswipe.app/splash.png', color: '#d4ff00', name: 'SWIPE', coingeckoId: '' }, // No CoinGecko ID for SWIPE
+};
+
+// Detect crypto symbol from imageUrl or selectedCrypto
+function detectCrypto(prediction: { imageUrl?: string; selectedCrypto?: string; question?: string }): { logo: string; color: string; name: string; coingeckoId: string; symbol: string } | null {
+  // First check selectedCrypto
+  if (prediction.selectedCrypto) {
+    const symbol = prediction.selectedCrypto.toUpperCase();
+    if (CRYPTO_DATA[symbol]) {
+      return { ...CRYPTO_DATA[symbol], symbol };
+    }
+  }
+  
+  // Check if imageUrl contains geckoterminal
+  if (prediction.imageUrl?.includes('geckoterminal.com')) {
+    // Try to detect from question
+    const question = prediction.question?.toUpperCase() || '';
+    for (const [symbol, data] of Object.entries(CRYPTO_DATA)) {
+      if (question.includes(symbol) || question.includes(data.name.toUpperCase())) {
+        return { ...data, symbol };
+      }
+    }
+    // Default to ETH
+    return { ...CRYPTO_DATA['ETH'], symbol: 'ETH' };
+  }
+  
+  return null;
+}
+
+// Fetch price chart data from CoinGecko (last 7 days)
+async function fetchChartData(coingeckoId: string): Promise<number[] | null> {
+  if (!coingeckoId) return null;
+  
+  try {
+    const response = await fetch(
+      `https://api.coingecko.com/api/v3/coins/${coingeckoId}/market_chart?vs_currency=usd&days=7`,
+      { next: { revalidate: 300 } } // Cache for 5 minutes
+    );
+    
+    if (!response.ok) return null;
+    
+    const data = await response.json();
+    // Extract just the prices (data.prices is [[timestamp, price], ...])
+    const prices: number[] = data.prices?.map((p: [number, number]) => p[1]) || [];
+    
+    // Reduce to ~30 points for smooth chart
+    if (prices.length > 30) {
+      const step = Math.floor(prices.length / 30);
+      return prices.filter((_, i) => i % step === 0);
+    }
+    
+    return prices;
+  } catch (error) {
+    console.error('Failed to fetch chart data:', error);
+    return null;
+  }
+}
+
+// Generate SVG path for mini chart
+function generateChartPath(prices: number[], width: number, height: number): string {
+  if (prices.length < 2) return '';
+  
+  const minPrice = Math.min(...prices);
+  const maxPrice = Math.max(...prices);
+  const priceRange = maxPrice - minPrice || 1;
+  
+  const points = prices.map((price, i) => {
+    const x = (i / (prices.length - 1)) * width;
+    const y = height - ((price - minPrice) / priceRange) * height;
+    return `${x},${y}`;
+  });
+  
+  return `M ${points.join(' L ')}`;
+}
+
+// Calculate price change percentage
+function calculatePriceChange(prices: number[]): { change: number; isPositive: boolean } {
+  if (prices.length < 2) return { change: 0, isPositive: true };
+  
+  const first = prices[0];
+  const last = prices[prices.length - 1];
+  const change = ((last - first) / first) * 100;
+  
+  return { change: Math.abs(change), isPositive: change >= 0 };
+}
+
 // Generate dynamic OG image for predictions
 // This image will be shown when sharing prediction links on Farcaster/social media
 export async function GET(
@@ -44,6 +137,20 @@ export async function GET(
           height: 630,
         }
       );
+    }
+
+    // Detect crypto and fetch chart data
+    const cryptoData = detectCrypto(prediction);
+    let chartPrices: number[] | null = null;
+    let priceChange = { change: 0, isPositive: true };
+    let currentPrice = 0;
+    
+    if (cryptoData?.coingeckoId) {
+      chartPrices = await fetchChartData(cryptoData.coingeckoId);
+      if (chartPrices && chartPrices.length > 0) {
+        priceChange = calculatePriceChange(chartPrices);
+        currentPrice = chartPrices[chartPrices.length - 1];
+      }
     }
 
     // Calculate stats
@@ -263,8 +370,148 @@ export async function GET(
               </div>
             </div>
 
-            {/* Right side - Image (if available) */}
-            {prediction.imageUrl && (
+            {/* Right side - Chart or Image */}
+            {cryptoData && chartPrices && chartPrices.length > 1 ? (
+              // Crypto chart
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  width: 340,
+                  height: 300,
+                  borderRadius: 20,
+                  overflow: 'hidden',
+                  border: `3px solid ${cryptoData.color}`,
+                  backgroundColor: '#1a1a1a',
+                  padding: 16,
+                }}
+              >
+                {/* Chart header */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: 12,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {cryptoData.logo && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={cryptoData.logo}
+                        alt=""
+                        style={{ width: 32, height: 32, objectFit: 'contain' }}
+                      />
+                    )}
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ fontSize: 18, fontWeight: 'bold', color: '#ffffff' }}>
+                        {cryptoData.symbol}
+                      </div>
+                      <div style={{ fontSize: 12, color: '#888888' }}>
+                        {cryptoData.name}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                    <div style={{ fontSize: 16, fontWeight: 'bold', color: '#ffffff' }}>
+                      ${currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 'bold',
+                        color: priceChange.isPositive ? '#22c55e' : '#ef4444',
+                      }}
+                    >
+                      {priceChange.isPositive ? '▲' : '▼'} {priceChange.change.toFixed(2)}%
+                    </div>
+                  </div>
+                </div>
+
+                {/* Chart SVG */}
+                <div
+                  style={{
+                    display: 'flex',
+                    flex: 1,
+                    width: '100%',
+                    position: 'relative',
+                  }}
+                >
+                  <svg
+                    width="100%"
+                    height="100%"
+                    viewBox="0 0 300 180"
+                    style={{ overflow: 'visible' }}
+                  >
+                    {/* Grid lines */}
+                    <line x1="0" y1="0" x2="300" y2="0" stroke="#333" strokeWidth="1" />
+                    <line x1="0" y1="60" x2="300" y2="60" stroke="#333" strokeWidth="1" />
+                    <line x1="0" y1="120" x2="300" y2="120" stroke="#333" strokeWidth="1" />
+                    <line x1="0" y1="180" x2="300" y2="180" stroke="#333" strokeWidth="1" />
+                    
+                    {/* Area fill */}
+                    <path
+                      d={`${generateChartPath(chartPrices, 300, 170)} L 300,180 L 0,180 Z`}
+                      fill={`${priceChange.isPositive ? '#22c55e' : '#ef4444'}20`}
+                    />
+                    
+                    {/* Line */}
+                    <path
+                      d={generateChartPath(chartPrices, 300, 170)}
+                      fill="none"
+                      stroke={priceChange.isPositive ? '#22c55e' : '#ef4444'}
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
+
+                {/* Chart footer */}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    marginTop: 8,
+                  }}
+                >
+                  <div style={{ fontSize: 12, color: '#888888' }}>
+                    7 Day Chart
+                  </div>
+                </div>
+              </div>
+            ) : cryptoData ? (
+              // Crypto without chart data - show logo
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  width: 300,
+                  height: 300,
+                  borderRadius: 20,
+                  overflow: 'hidden',
+                  border: `3px solid ${cryptoData.color}`,
+                  backgroundColor: '#1a1a1a',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 20,
+                }}
+              >
+                {cryptoData.logo && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={cryptoData.logo}
+                    alt=""
+                    style={{ width: 120, height: 120, objectFit: 'contain' }}
+                  />
+                )}
+                <div style={{ fontSize: 32, fontWeight: 'bold', color: cryptoData.color }}>
+                  {cryptoData.name}
+                </div>
+              </div>
+            ) : prediction.imageUrl && !prediction.imageUrl.includes('geckoterminal.com') ? (
+              // Regular image
               <div
                 style={{
                   display: 'flex',
@@ -279,14 +526,10 @@ export async function GET(
                 <img
                   src={prediction.imageUrl}
                   alt=""
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                  }}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
               </div>
-            )}
+            ) : null}
           </div>
 
           {/* Footer */}
