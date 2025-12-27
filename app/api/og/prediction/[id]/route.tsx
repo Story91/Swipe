@@ -188,9 +188,10 @@ export async function GET(
       }
     }
 
-    // Calculate stats
-    const totalPool = prediction.yesTotalAmount + prediction.noTotalAmount;
-    const yesPercentage = totalPool > 0 ? Math.round((prediction.yesTotalAmount / totalPool) * 100) : 50;
+    // Calculate stats - convert from wei to ETH
+    const totalPoolWei = prediction.yesTotalAmount + prediction.noTotalAmount;
+    const totalPoolETH = totalPoolWei / 1e18;
+    const yesPercentage = totalPoolWei > 0 ? Math.round((prediction.yesTotalAmount / totalPoolWei) * 100) : 50;
     const noPercentage = 100 - yesPercentage;
     
     // Format time left
@@ -283,7 +284,8 @@ export async function GET(
             style={{
               display: 'flex',
               flex: 1,
-              gap: 40,
+              gap: 30,
+              maxWidth: 1120,
             }}
           >
             {/* Left side - Question & Stats */}
@@ -315,16 +317,16 @@ export async function GET(
               <div
                 style={{
                   display: 'flex',
-                  fontSize: 42,
+                  fontSize: 36,
                   fontWeight: 'bold',
                   color: '#ffffff',
                   lineHeight: 1.2,
-                  marginBottom: 30,
-                  maxWidth: '90%',
+                  marginBottom: 24,
+                  maxWidth: '100%',
                 }}
               >
-                {prediction.question.length > 80 
-                  ? prediction.question.substring(0, 80) + '...' 
+                {prediction.question.length > 70 
+                  ? prediction.question.substring(0, 70) + '...' 
                   : prediction.question
                 }
               </div>
@@ -340,7 +342,7 @@ export async function GET(
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <div style={{ display: 'flex', fontSize: 14, color: '#888888' }}>Total Pool</div>
                   <div style={{ display: 'flex', fontSize: 28, fontWeight: 'bold', color: '#d4ff00' }}>
-                    {totalPool.toFixed(4)} ETH
+                    {totalPoolETH.toFixed(4)} ETH
                   </div>
                 </div>
                 
@@ -411,13 +413,14 @@ export async function GET(
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
-                  width: 340,
-                  height: 300,
-                  borderRadius: 20,
+                  width: 280,
+                  height: 260,
+                  borderRadius: 16,
                   overflow: 'hidden',
-                  border: `3px solid ${cryptoData.color}`,
+                  border: `2px solid ${cryptoData.color}`,
                   backgroundColor: '#1a1a1a',
-                  padding: 16,
+                  padding: 12,
+                  flexShrink: 0,
                 }}
               >
                 {/* Chart header */}
@@ -429,45 +432,45 @@ export async function GET(
                     marginBottom: 12,
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {/* Crypto symbol circle */}
                     <div
                       style={{
                         display: 'flex',
-                        width: 36,
-                        height: 36,
-                        borderRadius: 18,
+                        width: 28,
+                        height: 28,
+                        borderRadius: 14,
                         backgroundColor: cryptoData.color,
                         alignItems: 'center',
                         justifyContent: 'center',
                       }}
                     >
-                      <div style={{ display: 'flex', fontSize: 16, fontWeight: 'bold', color: '#ffffff' }}>
+                      <div style={{ display: 'flex', fontSize: 12, fontWeight: 'bold', color: '#ffffff' }}>
                         {cryptoData.symbol.slice(0, 3)}
                       </div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <div style={{ display: 'flex', fontSize: 18, fontWeight: 'bold', color: '#ffffff' }}>
+                      <div style={{ display: 'flex', fontSize: 14, fontWeight: 'bold', color: '#ffffff' }}>
                         {cryptoData.symbol}
                       </div>
-                      <div style={{ display: 'flex', fontSize: 12, color: '#888888' }}>
+                      <div style={{ display: 'flex', fontSize: 10, color: '#888888' }}>
                         {cryptoData.name}
                       </div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                    <div style={{ display: 'flex', fontSize: 16, fontWeight: 'bold', color: '#ffffff' }}>
-                      ${currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    <div style={{ display: 'flex', fontSize: 12, fontWeight: 'bold', color: '#ffffff' }}>
+                      ${currentPrice.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                     </div>
                     <div
                       style={{
                         display: 'flex',
-                        fontSize: 14,
+                        fontSize: 11,
                         fontWeight: 'bold',
                         color: priceChange.isPositive ? '#22c55e' : '#ef4444',
                       }}
                     >
-                      {priceChange.isPositive ? '▲' : '▼'} {priceChange.change.toFixed(2)}%
+                      {priceChange.isPositive ? '▲' : '▼'} {priceChange.change.toFixed(1)}%
                     </div>
                   </div>
                 </div>
@@ -477,33 +480,33 @@ export async function GET(
                   style={{
                     display: 'flex',
                     flex: 1,
-                    width: 300,
-                    height: 180,
+                    width: 250,
+                    height: 140,
                   }}
                 >
                   <svg
-                    width={300}
-                    height={180}
-                    viewBox="0 0 300 180"
+                    width={250}
+                    height={140}
+                    viewBox="0 0 250 140"
                   >
                     {/* Grid lines */}
-                    <line x1="0" y1="0" x2="300" y2="0" stroke="#333" strokeWidth="1" />
-                    <line x1="0" y1="60" x2="300" y2="60" stroke="#333" strokeWidth="1" />
-                    <line x1="0" y1="120" x2="300" y2="120" stroke="#333" strokeWidth="1" />
-                    <line x1="0" y1="180" x2="300" y2="180" stroke="#333" strokeWidth="1" />
+                    <line x1="0" y1="0" x2="250" y2="0" stroke="#333" strokeWidth="1" />
+                    <line x1="0" y1="46" x2="250" y2="46" stroke="#333" strokeWidth="1" />
+                    <line x1="0" y1="93" x2="250" y2="93" stroke="#333" strokeWidth="1" />
+                    <line x1="0" y1="140" x2="250" y2="140" stroke="#333" strokeWidth="1" />
                     
                     {/* Area fill */}
                     <path
-                      d={`${generateChartPath(chartPrices, 300, 170)} L 300,180 L 0,180 Z`}
+                      d={`${generateChartPath(chartPrices, 250, 130)} L 250,140 L 0,140 Z`}
                       fill={`${priceChange.isPositive ? '#22c55e' : '#ef4444'}20`}
                     />
                     
                     {/* Line */}
                     <path
-                      d={generateChartPath(chartPrices, 300, 170)}
+                      d={generateChartPath(chartPrices, 250, 130)}
                       fill="none"
                       stroke={priceChange.isPositive ? '#22c55e' : '#ef4444'}
-                      strokeWidth="3"
+                      strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />

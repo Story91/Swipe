@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
+import sdk from '@farcaster/miniapp-sdk';
 import "./SharePreviewModal.css";
 
 interface SharePreviewModalProps {
@@ -54,18 +55,35 @@ export function SharePreviewModal({
     try {
       await onShare();
       onClose();
-    } catch {
-      // Fallback to Warpcast web compose
+    } catch (error) {
+      console.log('onShare failed, trying fallback...', error);
+      // Try Farcaster SDK openUrl with Warpcast compose URL
       const encodedText = encodeURIComponent(`${shareText}\n\n${shareUrl}`);
-      window.open(`https://warpcast.com/~/compose?text=${encodedText}`, '_blank');
+      const warpcastUrl = `https://warpcast.com/~/compose?text=${encodedText}`;
+      
+      try {
+        // Use SDK openUrl for better compatibility in Base app
+        await sdk.actions.openUrl(warpcastUrl);
+      } catch (sdkError) {
+        console.log('SDK openUrl failed, using window.open...', sdkError);
+        window.open(warpcastUrl, '_blank');
+      }
       onClose();
     }
   };
 
-  const handleOpenTwitter = () => {
+  const handleOpenTwitter = async () => {
     const encodedText = encodeURIComponent(`${shareText}`);
     const encodedUrl = encodeURIComponent(shareUrl);
-    window.open(`https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`, '_blank');
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`;
+    
+    try {
+      // Use SDK openUrl for better compatibility in Base app
+      await sdk.actions.openUrl(twitterUrl);
+    } catch (sdkError) {
+      console.log('SDK openUrl failed, using window.open...', sdkError);
+      window.open(twitterUrl, '_blank');
+    }
     onClose();
   };
 
