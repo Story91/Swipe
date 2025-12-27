@@ -161,8 +161,8 @@ export async function GET(
               fontFamily: 'sans-serif',
             }}
           >
-            <div style={{ fontSize: 60, fontWeight: 'bold' }}>SWIPE</div>
-            <div style={{ fontSize: 24, color: '#888888', marginTop: 20 }}>
+            <div style={{ display: 'flex', fontSize: 60, fontWeight: 'bold' }}>SWIPE</div>
+            <div style={{ display: 'flex', fontSize: 24, color: '#888888', marginTop: 20 }}>
               Prediction not found
             </div>
           </div>
@@ -306,7 +306,6 @@ export async function GET(
                   fontSize: 16,
                   fontWeight: 'bold',
                   marginBottom: 16,
-                  width: 'fit-content',
                 }}
               >
                 {prediction.category.toUpperCase()}
@@ -339,22 +338,22 @@ export async function GET(
                 }}
               >
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ fontSize: 14, color: '#888888' }}>Total Pool</div>
-                  <div style={{ fontSize: 28, fontWeight: 'bold', color: '#d4ff00' }}>
+                  <div style={{ display: 'flex', fontSize: 14, color: '#888888' }}>Total Pool</div>
+                  <div style={{ display: 'flex', fontSize: 28, fontWeight: 'bold', color: '#d4ff00' }}>
                     {totalPool.toFixed(4)} ETH
                   </div>
                 </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ fontSize: 14, color: '#888888' }}>Participants</div>
-                  <div style={{ fontSize: 28, fontWeight: 'bold', color: '#d4ff00' }}>
+                  <div style={{ display: 'flex', fontSize: 14, color: '#888888' }}>Participants</div>
+                  <div style={{ display: 'flex', fontSize: 28, fontWeight: 'bold', color: '#d4ff00' }}>
                     {prediction.participants?.length || 0}
                   </div>
                 </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ fontSize: 14, color: '#888888' }}>Time</div>
-                  <div style={{ fontSize: 28, fontWeight: 'bold', color: '#d4ff00' }}>
+                  <div style={{ display: 'flex', fontSize: 14, color: '#888888' }}>Time</div>
+                  <div style={{ display: 'flex', fontSize: 28, fontWeight: 'bold', color: '#d4ff00' }}>
                     {timeLeftText}
                   </div>
                 </div>
@@ -376,10 +375,10 @@ export async function GET(
                     marginBottom: 8,
                   }}
                 >
-                  <div style={{ fontSize: 20, fontWeight: 'bold', color: '#22c55e' }}>
+                  <div style={{ display: 'flex', fontSize: 20, fontWeight: 'bold', color: '#22c55e' }}>
                     YES {yesPercentage}%
                   </div>
-                  <div style={{ fontSize: 20, fontWeight: 'bold', color: '#ef4444' }}>
+                  <div style={{ display: 'flex', fontSize: 20, fontWeight: 'bold', color: '#ef4444' }}>
                     NO {noPercentage}%
                   </div>
                 </div>
@@ -443,25 +442,26 @@ export async function GET(
                         justifyContent: 'center',
                       }}
                     >
-                      <div style={{ fontSize: 16, fontWeight: 'bold', color: '#ffffff' }}>
+                      <div style={{ display: 'flex', fontSize: 16, fontWeight: 'bold', color: '#ffffff' }}>
                         {cryptoData.symbol.slice(0, 3)}
                       </div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <div style={{ fontSize: 18, fontWeight: 'bold', color: '#ffffff' }}>
+                      <div style={{ display: 'flex', fontSize: 18, fontWeight: 'bold', color: '#ffffff' }}>
                         {cryptoData.symbol}
                       </div>
-                      <div style={{ fontSize: 12, color: '#888888' }}>
+                      <div style={{ display: 'flex', fontSize: 12, color: '#888888' }}>
                         {cryptoData.name}
                       </div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                    <div style={{ fontSize: 16, fontWeight: 'bold', color: '#ffffff' }}>
+                    <div style={{ display: 'flex', fontSize: 16, fontWeight: 'bold', color: '#ffffff' }}>
                       ${currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
                     <div
                       style={{
+                        display: 'flex',
                         fontSize: 14,
                         fontWeight: 'bold',
                         color: priceChange.isPositive ? '#22c55e' : '#ef4444',
@@ -477,15 +477,14 @@ export async function GET(
                   style={{
                     display: 'flex',
                     flex: 1,
-                    width: '100%',
-                    position: 'relative',
+                    width: 300,
+                    height: 180,
                   }}
                 >
                   <svg
-                    width="100%"
-                    height="100%"
+                    width={300}
+                    height={180}
                     viewBox="0 0 300 180"
-                    style={{ overflow: 'visible' }}
                   >
                     {/* Grid lines */}
                     <line x1="0" y1="0" x2="300" y2="0" stroke="#333" strokeWidth="1" />
@@ -519,7 +518,7 @@ export async function GET(
                     marginTop: 8,
                   }}
                 >
-                  <div style={{ fontSize: 12, color: '#888888' }}>
+                  <div style={{ display: 'flex', fontSize: 12, color: '#888888' }}>
                     7 Day Chart
                   </div>
                 </div>
@@ -553,14 +552,14 @@ export async function GET(
                     justifyContent: 'center',
                   }}
                 >
-                  <div style={{ fontSize: 40, fontWeight: 'bold', color: '#ffffff' }}>
+                  <div style={{ display: 'flex', fontSize: 40, fontWeight: 'bold', color: '#ffffff' }}>
                     {cryptoData.symbol.slice(0, 3)}
                   </div>
                 </div>
-                <div style={{ fontSize: 32, fontWeight: 'bold', color: cryptoData.color }}>
+                <div style={{ display: 'flex', fontSize: 32, fontWeight: 'bold', color: cryptoData.color }}>
                   {cryptoData.name}
                 </div>
-                <div style={{ fontSize: 16, color: '#888888' }}>
+                <div style={{ display: 'flex', fontSize: 16, color: '#888888' }}>
                   📊 Price Chart
                 </div>
               </div>
@@ -597,8 +596,8 @@ export async function GET(
               borderTop: '1px solid #333333',
             }}
           >
-            <div style={{ fontSize: 18, color: '#888888' }}>
-              swipe-predictions.vercel.app
+            <div style={{ display: 'flex', fontSize: 18, color: '#888888' }}>
+              theswipe.app
             </div>
             <div
               style={{
@@ -640,11 +639,11 @@ export async function GET(
             fontFamily: 'sans-serif',
           }}
         >
-          <div style={{ fontSize: 60, fontWeight: 'bold' }}>🔮 SWIPE</div>
-          <div style={{ fontSize: 24, color: '#ffffff', marginTop: 20 }}>
+          <div style={{ display: 'flex', fontSize: 60, fontWeight: 'bold' }}>🔮 SWIPE</div>
+          <div style={{ display: 'flex', fontSize: 24, color: '#ffffff', marginTop: 20 }}>
             Prediction Markets
           </div>
-          <div style={{ fontSize: 18, color: '#888888', marginTop: 10 }}>
+          <div style={{ display: 'flex', fontSize: 18, color: '#888888', marginTop: 10 }}>
             Swipe to predict the future
           </div>
         </div>
