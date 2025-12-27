@@ -232,36 +232,31 @@ export async function GET(
             width: '100%',
             height: '100%',
             backgroundColor: '#0a0a0a',
-            padding: 40,
+            padding: '24px 80px',
             fontFamily: 'sans-serif',
+            alignItems: 'center',
           }}
         >
-          {/* Header */}
+          {/* Header - centered */}
           <div
             style={{
               display: 'flex',
-              justifyContent: 'space-between',
+              justifyContent: 'center',
               alignItems: 'center',
-              marginBottom: 30,
+              marginBottom: 16,
+              gap: 20,
+              width: '100%',
             }}
           >
             <div
               style={{
                 display: 'flex',
-                alignItems: 'center',
-                gap: 12,
+                fontSize: 32,
+                fontWeight: 'bold',
+                color: '#d4ff00',
               }}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  fontSize: 40,
-                  fontWeight: 'bold',
-                  color: '#d4ff00',
-                }}
-              >
-                🔮 SWIPE
-              </div>
+              🔮 SWIPE
             </div>
             
             {/* Status Badge */}
@@ -270,9 +265,9 @@ export async function GET(
                 display: 'flex',
                 backgroundColor: statusColor,
                 color: isResolved ? '#ffffff' : '#000000',
-                padding: '8px 20px',
-                borderRadius: 20,
-                fontSize: 20,
+                padding: '6px 16px',
+                borderRadius: 16,
+                fontSize: 16,
                 fontWeight: 'bold',
               }}
             >
@@ -280,12 +275,15 @@ export async function GET(
             </div>
           </div>
 
-          {/* Main Content */}
+          {/* Main Content - centered, horizontal layout */}
           <div
             style={{
               display: 'flex',
               flex: 1,
-              gap: 30,
+              gap: 24,
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%',
             }}
           >
             {/* Left side - Question & Stats */}
@@ -294,7 +292,7 @@ export async function GET(
                 display: 'flex',
                 flexDirection: 'column',
                 flex: 1,
-                justifyContent: 'center',
+                maxWidth: 580,
               }}
             >
               {/* Category */}
@@ -303,11 +301,12 @@ export async function GET(
                   display: 'flex',
                   backgroundColor: '#d4ff00',
                   color: '#000000',
-                  padding: '6px 16px',
-                  borderRadius: 12,
-                  fontSize: 16,
+                  padding: '4px 12px',
+                  borderRadius: 10,
+                  fontSize: 14,
                   fontWeight: 'bold',
-                  marginBottom: 16,
+                  marginBottom: 12,
+                  alignSelf: 'flex-start',
                 }}
               >
                 {prediction.category.toUpperCase()}
@@ -317,15 +316,15 @@ export async function GET(
               <div
                 style={{
                   display: 'flex',
-                  fontSize: 36,
+                  fontSize: 28,
                   fontWeight: 'bold',
                   color: '#ffffff',
                   lineHeight: 1.2,
-                  marginBottom: 24,
+                  marginBottom: 16,
                 }}
               >
-                {prediction.question.length > 70 
-                  ? prediction.question.substring(0, 70) + '...' 
+                {prediction.question.length > 80 
+                  ? prediction.question.substring(0, 80) + '...' 
                   : prediction.question
                 }
               </div>
@@ -334,27 +333,27 @@ export async function GET(
               <div
                 style={{
                   display: 'flex',
-                  gap: 40,
-                  marginBottom: 30,
+                  gap: 32,
+                  marginBottom: 16,
                 }}
               >
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ display: 'flex', fontSize: 14, color: '#888888' }}>Total Pool</div>
-                  <div style={{ display: 'flex', fontSize: 28, fontWeight: 'bold', color: '#d4ff00' }}>
+                  <div style={{ display: 'flex', fontSize: 12, color: '#888888' }}>Pool</div>
+                  <div style={{ display: 'flex', fontSize: 22, fontWeight: 'bold', color: '#d4ff00' }}>
                     {totalPoolETH.toFixed(4)} ETH
                   </div>
                 </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ display: 'flex', fontSize: 14, color: '#888888' }}>Participants</div>
-                  <div style={{ display: 'flex', fontSize: 28, fontWeight: 'bold', color: '#d4ff00' }}>
+                  <div style={{ display: 'flex', fontSize: 12, color: '#888888' }}>Participants</div>
+                  <div style={{ display: 'flex', fontSize: 22, fontWeight: 'bold', color: '#d4ff00' }}>
                     {prediction.participants?.length || 0}
                   </div>
                 </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ display: 'flex', fontSize: 14, color: '#888888' }}>Time</div>
-                  <div style={{ display: 'flex', fontSize: 28, fontWeight: 'bold', color: '#d4ff00' }}>
+                  <div style={{ display: 'flex', fontSize: 12, color: '#888888' }}>Time</div>
+                  <div style={{ display: 'flex', fontSize: 22, fontWeight: 'bold', color: '#d4ff00' }}>
                     {timeLeftText}
                   </div>
                 </div>
@@ -366,20 +365,19 @@ export async function GET(
                   display: 'flex',
                   flexDirection: 'column',
                   width: '100%',
-                  maxWidth: 500,
                 }}
               >
                 <div
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
-                    marginBottom: 8,
+                    marginBottom: 6,
                   }}
                 >
-                  <div style={{ display: 'flex', fontSize: 20, fontWeight: 'bold', color: '#22c55e' }}>
+                  <div style={{ display: 'flex', fontSize: 16, fontWeight: 'bold', color: '#22c55e' }}>
                     YES {yesPercentage}%
                   </div>
-                  <div style={{ display: 'flex', fontSize: 20, fontWeight: 'bold', color: '#ef4444' }}>
+                  <div style={{ display: 'flex', fontSize: 16, fontWeight: 'bold', color: '#ef4444' }}>
                     NO {noPercentage}%
                   </div>
                 </div>
@@ -388,9 +386,9 @@ export async function GET(
                   style={{
                     display: 'flex',
                     width: '100%',
-                    height: 16,
+                    height: 12,
                     backgroundColor: '#ef4444',
-                    borderRadius: 8,
+                    borderRadius: 6,
                     overflow: 'hidden',
                   }}
                 >
@@ -405,20 +403,19 @@ export async function GET(
               </div>
             </div>
 
-            {/* Right side - Chart or Image */}
+            {/* Right side - Chart */}
             {cryptoData && chartPrices && chartPrices.length > 1 ? (
-              // Crypto chart
               <div
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
-                  width: 280,
-                  height: 260,
-                  borderRadius: 16,
+                  width: 240,
+                  height: 220,
+                  borderRadius: 14,
                   overflow: 'hidden',
                   border: `2px solid ${cryptoData.color}`,
                   backgroundColor: '#1a1a1a',
-                  padding: 12,
+                  padding: 10,
                   flexShrink: 0,
                 }}
               >
@@ -479,30 +476,30 @@ export async function GET(
                   style={{
                     display: 'flex',
                     flex: 1,
-                    width: 250,
-                    height: 140,
+                    width: 210,
+                    height: 120,
                   }}
                 >
                   <svg
-                    width={250}
-                    height={140}
-                    viewBox="0 0 250 140"
+                    width={210}
+                    height={120}
+                    viewBox="0 0 210 120"
                   >
                     {/* Grid lines */}
-                    <line x1="0" y1="0" x2="250" y2="0" stroke="#333" strokeWidth="1" />
-                    <line x1="0" y1="46" x2="250" y2="46" stroke="#333" strokeWidth="1" />
-                    <line x1="0" y1="93" x2="250" y2="93" stroke="#333" strokeWidth="1" />
-                    <line x1="0" y1="140" x2="250" y2="140" stroke="#333" strokeWidth="1" />
+                    <line x1="0" y1="0" x2="210" y2="0" stroke="#333" strokeWidth="1" />
+                    <line x1="0" y1="40" x2="210" y2="40" stroke="#333" strokeWidth="1" />
+                    <line x1="0" y1="80" x2="210" y2="80" stroke="#333" strokeWidth="1" />
+                    <line x1="0" y1="120" x2="210" y2="120" stroke="#333" strokeWidth="1" />
                     
                     {/* Area fill */}
                     <path
-                      d={`${generateChartPath(chartPrices, 250, 130)} L 250,140 L 0,140 Z`}
+                      d={`${generateChartPath(chartPrices, 210, 110)} L 210,120 L 0,120 Z`}
                       fill={`${priceChange.isPositive ? '#22c55e' : '#ef4444'}20`}
                     />
                     
                     {/* Line */}
                     <path
-                      d={generateChartPath(chartPrices, 250, 130)}
+                      d={generateChartPath(chartPrices, 210, 110)}
                       fill="none"
                       stroke={priceChange.isPositive ? '#22c55e' : '#ef4444'}
                       strokeWidth="2"
@@ -531,15 +528,15 @@ export async function GET(
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
-                  width: 300,
-                  height: 300,
-                  borderRadius: 20,
+                  width: 200,
+                  height: 200,
+                  borderRadius: 16,
                   overflow: 'hidden',
-                  border: `3px solid ${cryptoData.color}`,
+                  border: `2px solid ${cryptoData.color}`,
                   backgroundColor: '#1a1a1a',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: 20,
+                  gap: 16,
                 }}
               >
                 {/* Crypto symbol circle - no external image */}
@@ -554,14 +551,14 @@ export async function GET(
                     justifyContent: 'center',
                   }}
                 >
-                  <div style={{ display: 'flex', fontSize: 40, fontWeight: 'bold', color: '#ffffff' }}>
+                  <div style={{ display: 'flex', fontSize: 32, fontWeight: 'bold', color: '#ffffff' }}>
                     {cryptoData.symbol.slice(0, 3)}
                   </div>
                 </div>
-                <div style={{ display: 'flex', fontSize: 32, fontWeight: 'bold', color: cryptoData.color }}>
+                <div style={{ display: 'flex', fontSize: 24, fontWeight: 'bold', color: cryptoData.color }}>
                   {cryptoData.name}
                 </div>
-                <div style={{ display: 'flex', fontSize: 16, color: '#888888' }}>
+                <div style={{ display: 'flex', fontSize: 14, color: '#888888' }}>
                   📊 Price Chart
                 </div>
               </div>
@@ -570,11 +567,11 @@ export async function GET(
               <div
                 style={{
                   display: 'flex',
-                  width: 300,
-                  height: 300,
-                  borderRadius: 20,
+                  width: 200,
+                  height: 200,
+                  borderRadius: 16,
                   overflow: 'hidden',
-                  border: '3px solid #d4ff00',
+                  border: '2px solid #d4ff00',
                 }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -591,14 +588,15 @@ export async function GET(
           <div
             style={{
               display: 'flex',
-              justifyContent: 'space-between',
+              justifyContent: 'center',
               alignItems: 'center',
-              marginTop: 20,
-              paddingTop: 20,
+              marginTop: 12,
+              paddingTop: 12,
               borderTop: '1px solid #333333',
+              gap: 24,
             }}
           >
-            <div style={{ display: 'flex', fontSize: 18, color: '#888888' }}>
+            <div style={{ display: 'flex', fontSize: 14, color: '#888888' }}>
               theswipe.app
             </div>
             <div
@@ -606,9 +604,9 @@ export async function GET(
                 display: 'flex',
                 backgroundColor: '#d4ff00',
                 color: '#000000',
-                padding: '10px 24px',
-                borderRadius: 12,
-                fontSize: 18,
+                padding: '8px 20px',
+                borderRadius: 10,
+                fontSize: 14,
                 fontWeight: 'bold',
               }}
             >
@@ -619,7 +617,7 @@ export async function GET(
       ),
       {
         width: 1200,
-        height: 630,
+        height: 628,
       }
     );
   } catch (error) {
