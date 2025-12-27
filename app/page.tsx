@@ -29,7 +29,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Trophy, HelpCircle, Settings } from "lucide-react";
 import { useAccount, useConnect } from "wagmi";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import TinderCardComponent from "./components/Main/TinderCard";
@@ -61,6 +61,29 @@ interface UserProfile {
   pfp_url: string | null;
 }
 
+// Component to handle URL search params (needs Suspense wrapper)
+function SearchParamsHandler({ 
+  onPredictionId 
+}: { 
+  onPredictionId: (id: string) => void 
+}) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  useEffect(() => {
+    const predictionId = searchParams.get('prediction');
+    if (predictionId) {
+      console.log('🎯 Found prediction parameter in URL:', predictionId);
+      onPredictionId(predictionId);
+      
+      // Clear the URL parameter without full page reload
+      router.replace('/', { scroll: false });
+    }
+  }, [searchParams, router, onPredictionId]);
+
+  return null;
+}
+
 export default function App() {
   const { setFrameReady, isFrameReady, context } = useMiniKit();
   const [activeDashboard, setActiveDashboard] = useState<DashboardType>('tinder');
@@ -78,21 +101,6 @@ export default function App() {
   const [badgePosition, setBadgePosition] = useState({ top: 0, right: 0 });
   const [initialPredictionId, setInitialPredictionId] = useState<string | null>(null);
   const viewProfile = useViewProfile();
-  const searchParams = useSearchParams();
-  const router = useRouter();
-
-  // Check for prediction parameter in URL
-  useEffect(() => {
-    const predictionId = searchParams.get('prediction');
-    if (predictionId) {
-      console.log('🎯 Found prediction parameter in URL:', predictionId);
-      setInitialPredictionId(predictionId);
-      setActiveDashboard('tinder');
-      
-      // Clear the URL parameter without full page reload
-      router.replace('/', { scroll: false });
-    }
-  }, [searchParams, router]);
 
   useEffect(() => {
     if (!isFrameReady) {
@@ -332,8 +340,19 @@ export default function App() {
     }
   };
 
+  // Callback for handling prediction ID from URL
+  const handlePredictionId = useCallback((id: string) => {
+    setInitialPredictionId(id);
+    setActiveDashboard('tinder');
+  }, []);
+
   return (
     <div className="flex flex-col min-h-screen font-sans text-[var(--app-foreground)] mini-app-theme from-[var(--app-background)] to-[var(--app-gray)]">
+      {/* Suspense wrapper for useSearchParams */}
+      <Suspense fallback={null}>
+        <SearchParamsHandler onPredictionId={handlePredictionId} />
+      </Suspense>
+      
       <div className="w-full max-w-[424px] mx-auto px-2 sm:px-4 py-3 overflow-x-hidden">
         {/* Wallet Connection and Admin/Help - Top */}
         <div className="flex justify-between items-center mb-3">
