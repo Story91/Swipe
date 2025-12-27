@@ -15,12 +15,31 @@ const CRYPTO_DATA: Record<string, { logo: string; color: string; name: string; c
 };
 
 // Detect crypto symbol from imageUrl or selectedCrypto
-function detectCrypto(prediction: { imageUrl?: string; selectedCrypto?: string; question?: string }): { logo: string; color: string; name: string; coingeckoId: string; symbol: string } | null {
+function detectCrypto(prediction: { imageUrl?: string; selectedCrypto?: string; question?: string; includeChart?: boolean }): { logo: string; color: string; name: string; coingeckoId: string; symbol: string } | null {
+  console.log('🔍 detectCrypto called with:', {
+    selectedCrypto: prediction.selectedCrypto,
+    includeChart: prediction.includeChart,
+    imageUrl: prediction.imageUrl?.slice(0, 50),
+  });
+  
   // First check selectedCrypto
   if (prediction.selectedCrypto) {
     const symbol = prediction.selectedCrypto.toUpperCase();
     if (CRYPTO_DATA[symbol]) {
+      console.log('✅ Found crypto from selectedCrypto:', symbol);
       return { ...CRYPTO_DATA[symbol], symbol };
+    }
+  }
+  
+  // Check if includeChart is true (crypto prediction)
+  if (prediction.includeChart) {
+    // Try to detect from question
+    const question = prediction.question?.toUpperCase() || '';
+    for (const [symbol, data] of Object.entries(CRYPTO_DATA)) {
+      if (question.includes(symbol) || question.includes(data.name.toUpperCase())) {
+        console.log('✅ Found crypto from question (includeChart):', symbol);
+        return { ...data, symbol };
+      }
     }
   }
   
@@ -30,31 +49,47 @@ function detectCrypto(prediction: { imageUrl?: string; selectedCrypto?: string; 
     const question = prediction.question?.toUpperCase() || '';
     for (const [symbol, data] of Object.entries(CRYPTO_DATA)) {
       if (question.includes(symbol) || question.includes(data.name.toUpperCase())) {
+        console.log('✅ Found crypto from question (geckoterminal):', symbol);
         return { ...data, symbol };
       }
     }
     // Default to ETH
+    console.log('⚠️ Defaulting to ETH for geckoterminal');
     return { ...CRYPTO_DATA['ETH'], symbol: 'ETH' };
   }
   
+  console.log('❌ No crypto detected');
   return null;
 }
 
 // Fetch price chart data from CoinGecko (last 7 days)
 async function fetchChartData(coingeckoId: string): Promise<number[] | null> {
-  if (!coingeckoId) return null;
+  if (!coingeckoId) {
+    console.log('⚠️ No coingeckoId provided');
+    return null;
+  }
   
   try {
+    console.log('📊 Fetching chart data for:', coingeckoId);
     const response = await fetch(
       `https://api.coingecko.com/api/v3/coins/${coingeckoId}/market_chart?vs_currency=usd&days=7`,
-      { next: { revalidate: 300 } } // Cache for 5 minutes
+      { 
+        headers: {
+          'Accept': 'application/json',
+        },
+      }
     );
     
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.error('❌ CoinGecko API error:', response.status, response.statusText);
+      return null;
+    }
     
     const data = await response.json();
     // Extract just the prices (data.prices is [[timestamp, price], ...])
     const prices: number[] = data.prices?.map((p: [number, number]) => p[1]) || [];
+    
+    console.log('✅ Got', prices.length, 'price points');
     
     // Reduce to ~30 points for smooth chart
     if (prices.length > 30) {
@@ -64,7 +99,7 @@ async function fetchChartData(coingeckoId: string): Promise<number[] | null> {
     
     return prices;
   } catch (error) {
-    console.error('Failed to fetch chart data:', error);
+    console.error('❌ Failed to fetch chart data:', error);
     return null;
   }
 }
@@ -396,14 +431,22 @@ export async function GET(
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    {cryptoData.logo && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={cryptoData.logo}
-                        alt=""
-                        style={{ width: 32, height: 32, objectFit: 'contain' }}
-                      />
-                    )}
+                    {/* Crypto symbol circle */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        width: 36,
+                        height: 36,
+                        borderRadius: 18,
+                        backgroundColor: cryptoData.color,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <div style={{ fontSize: 16, fontWeight: 'bold', color: '#ffffff' }}>
+                        {cryptoData.symbol.slice(0, 3)}
+                      </div>
+                    </div>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <div style={{ fontSize: 18, fontWeight: 'bold', color: '#ffffff' }}>
                         {cryptoData.symbol}
@@ -482,7 +525,7 @@ export async function GET(
                 </div>
               </div>
             ) : cryptoData ? (
-              // Crypto without chart data - show logo
+              // Crypto without chart data - show symbol
               <div
                 style={{
                   display: 'flex',
@@ -498,16 +541,27 @@ export async function GET(
                   gap: 20,
                 }}
               >
-                {cryptoData.logo && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={cryptoData.logo}
-                    alt=""
-                    style={{ width: 120, height: 120, objectFit: 'contain' }}
-                  />
-                )}
+                {/* Crypto symbol circle - no external image */}
+                <div
+                  style={{
+                    display: 'flex',
+                    width: 100,
+                    height: 100,
+                    borderRadius: 50,
+                    backgroundColor: cryptoData.color,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <div style={{ fontSize: 40, fontWeight: 'bold', color: '#ffffff' }}>
+                    {cryptoData.symbol.slice(0, 3)}
+                  </div>
+                </div>
                 <div style={{ fontSize: 32, fontWeight: 'bold', color: cryptoData.color }}>
                   {cryptoData.name}
+                </div>
+                <div style={{ fontSize: 16, color: '#888888' }}>
+                  📊 Price Chart
                 </div>
               </div>
             ) : prediction.imageUrl && !prediction.imageUrl.includes('geckoterminal.com') ? (
