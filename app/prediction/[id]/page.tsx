@@ -84,7 +84,7 @@ export default function PredictionPage() {
       // Fallback to Farcaster SDK
       await sdk.actions.composeCast({
         text: shareText,
-        embeds: [{ url: appUrl }]
+        embeds: [appUrl]
       });
     } catch (error) {
       console.error('Error sharing prediction:', error);

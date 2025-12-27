@@ -318,16 +318,17 @@
 
 .no-predictions-inline h3 {
   margin: 0 0 10px 0;
-  color: #d4ff00;
+  color: #1a1a1a;
   font-size: 16px;
   font-family: "Orbitron", sans-serif;
   font-weight: 700;
+  text-shadow: none;
 }
 
 .no-predictions-inline p {
   margin: 0 0 8px 0;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.7);
+  color: #333333;
   font-family: "Exo 2", sans-serif;
   line-height: 1.4;
 }
@@ -335,10 +336,10 @@
 .no-predictions-inline .cta-text {
   margin-top: 12px;
   padding: 8px 16px;
-  background: linear-gradient(135deg, rgba(212, 255, 0, 0.15), rgba(212, 255, 0, 0.05));
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.05));
   border-radius: 8px;
-  border: 1px solid rgba(212, 255, 0, 0.3);
-  color: #d4ff00;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  color: #1a1a1a;
   font-weight: 600;
   font-size: 12px;
   display: inline-block;
