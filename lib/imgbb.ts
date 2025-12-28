@@ -18,7 +18,8 @@ export interface ImgBBResponse {
 }
 
 function getApiKey(): string {
-  const key = process.env.IMGBB_API_KEY;
+  // Use NEXT_PUBLIC_ for client-side access, fallback to server-side key
+  const key = process.env.NEXT_PUBLIC_IMGBB_API_KEY || process.env.IMGBB_API_KEY;
   if (!key) {
     throw new Error('IMGBB_API_KEY environment variable is not set');
   }
