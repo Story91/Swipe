@@ -32,13 +32,27 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const yesPercentage = totalPool > 0 ? Math.round((prediction.yesTotalAmount / totalPool) * 100) : 50;
     
     // Dynamic OG image URL
-    // For crypto predictions (includeChart or geckoterminal URL), always use generated OG image
-    // For regular predictions with an image, use that image
-    // Otherwise use generated OG image
+    // Priority:
+    // 1. Use cached ImgBB URL if exists (uploaded when user shares - works on Twitter/Base App)
+    // 2. For crypto predictions, use dynamic generator (fallback)
+    // 3. For regular predictions with an image, use that image
+    // 4. Otherwise use dynamic generator
     const isCryptoPrediction = prediction.includeChart || prediction.imageUrl?.includes('geckoterminal.com');
-    const ogImageUrl = isCryptoPrediction 
-      ? `${URL}/api/og/prediction/${id}`
-      : (prediction.imageUrl || `${URL}/api/og/prediction/${id}`);
+    
+    let ogImageUrl: string;
+    if (prediction.ogImageUrl) {
+      // Cached ImgBB URL from last share - best for Twitter/Base App
+      ogImageUrl = prediction.ogImageUrl;
+    } else if (isCryptoPrediction) {
+      // Crypto prediction - use dynamic generator (works on Farcaster)
+      ogImageUrl = `${URL}/api/og/prediction/${id}`;
+    } else if (prediction.imageUrl && !prediction.imageUrl.includes('geckoterminal.com')) {
+      // Regular prediction with direct image URL
+      ogImageUrl = prediction.imageUrl;
+    } else {
+      // Fallback to dynamic generator
+      ogImageUrl = `${URL}/api/og/prediction/${id}`;
+    }
     
     // Prediction-specific URL
     const predictionUrl = `${URL}/prediction/${id}`;

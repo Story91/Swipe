@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Copy, Check } from "lucide-react";
+import { useState, useCallback } from "react";
+import { Copy, Check, Loader2 } from "lucide-react";
 import sdk from '@farcaster/miniapp-sdk';
 import "./SharePreviewModal.css";
 
@@ -17,6 +17,7 @@ interface SharePreviewModalProps {
     imageUrl?: string;
     yesPercentage?: number;
     noPercentage?: number;
+    includeChart?: boolean;
   };
   shareText: string;
   shareUrl: string;
@@ -38,6 +39,42 @@ export function SharePreviewModal({
   stakeInfo
 }: SharePreviewModalProps) {
   const [copied, setCopied] = useState(false);
+  const [isGeneratingOG, setIsGeneratingOG] = useState(false);
+  const [ogImageUrl, setOgImageUrl] = useState<string | null>(null);
+
+  // Check if this is a crypto prediction that needs OG image generation
+  const isCryptoPrediction = prediction.includeChart || 
+    prediction.imageUrl?.includes('geckoterminal.com');
+
+  // Generate OG image and upload to ImgBB for crypto predictions
+  const generateOgImage = useCallback(async (): Promise<string | null> => {
+    if (!isCryptoPrediction) return null;
+    if (ogImageUrl) return ogImageUrl; // Already generated
+    
+    setIsGeneratingOG(true);
+    try {
+      console.log('📸 Generating OG image for crypto prediction:', prediction.id);
+      
+      const response = await fetch(`/api/og/upload/${prediction.id}`, {
+        method: 'POST',
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to generate OG image:', response.status);
+        return null;
+      }
+      
+      const data = await response.json();
+      console.log('✅ OG image generated:', data.url);
+      setOgImageUrl(data.url);
+      return data.url;
+    } catch (error) {
+      console.error('Error generating OG image:', error);
+      return null;
+    } finally {
+      setIsGeneratingOG(false);
+    }
+  }, [isCryptoPrediction, ogImageUrl, prediction.id]);
 
   if (!isOpen) return null;
 
@@ -52,6 +89,11 @@ export function SharePreviewModal({
   };
 
   const handleOpenFarcaster = async () => {
+    // For crypto predictions, generate OG image first
+    if (isCryptoPrediction) {
+      await generateOgImage();
+    }
+    
     try {
       await onShare();
       onClose();
@@ -73,6 +115,14 @@ export function SharePreviewModal({
   };
 
   const handleOpenTwitter = async () => {
+    // For crypto predictions, generate OG image first so Twitter can fetch it
+    if (isCryptoPrediction) {
+      const generatedUrl = await generateOgImage();
+      if (generatedUrl) {
+        console.log('📸 Using generated OG image for Twitter:', generatedUrl);
+      }
+    }
+    
     const encodedText = encodeURIComponent(`${shareText}`);
     const encodedUrl = encodeURIComponent(shareUrl);
     const twitterUrl = `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`;
@@ -119,10 +169,22 @@ export function SharePreviewModal({
           </div>
         )}
 
+        {/* Loading indicator for OG image generation */}
+        {isGeneratingOG && (
+          <div className="share-modal-loading">
+            <Loader2 className="share-modal-loading-icon" />
+            <span>Generating preview...</span>
+          </div>
+        )}
+
         {/* Share buttons */}
         <div className="share-modal-buttons">
           {/* Farcaster + Base button - split color design */}
-          <button onClick={handleOpenFarcaster} className="share-modal-btn share-modal-btn-farcaster-base">
+          <button 
+            onClick={handleOpenFarcaster} 
+            className="share-modal-btn share-modal-btn-farcaster-base"
+            disabled={isGeneratingOG}
+          >
             <div className="share-btn-split-bg">
               <div className="share-btn-half-purple"></div>
               <div className="share-btn-half-white"></div>
@@ -138,7 +200,11 @@ export function SharePreviewModal({
           </button>
           
           {/* X/Twitter button - just logo */}
-          <button onClick={handleOpenTwitter} className="share-modal-btn share-modal-btn-twitter">
+          <button 
+            onClick={handleOpenTwitter} 
+            className="share-modal-btn share-modal-btn-twitter"
+            disabled={isGeneratingOG}
+          >
             <svg className="share-modal-btn-icon-x" viewBox="0 0 24 24" fill="currentColor">
               <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
             </svg>

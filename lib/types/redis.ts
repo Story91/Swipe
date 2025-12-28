@@ -5,6 +5,7 @@ export interface RedisPrediction {
   description: string;
   category: string;
   imageUrl: string;
+  ogImageUrl?: string; // Cached OG image URL from ImgBB for Twitter/Base App compatibility
   includeChart: boolean;
   selectedCrypto?: string;
   endDate: string;

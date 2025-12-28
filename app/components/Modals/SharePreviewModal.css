@@ -138,12 +138,49 @@
   color: #ef4444;
 }
 
+/* Loading indicator */
+.share-modal-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  margin-bottom: 14px;
+  background: rgba(212, 255, 0, 0.1);
+  border: 1px solid rgba(212, 255, 0, 0.3);
+  border-radius: 10px;
+  color: #d4ff00;
+  font-size: 13px;
+  font-family: "Exo 2", sans-serif;
+}
+
+.share-modal-loading-icon {
+  width: 16px;
+  height: 16px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Share buttons */
 .share-modal-buttons {
   display: flex;
   gap: 12px;
   margin-bottom: 14px;
   justify-content: center;
+}
+
+.share-modal-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
 }
 
 .share-modal-btn {
