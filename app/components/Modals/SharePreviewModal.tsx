@@ -127,8 +127,8 @@ export function SharePreviewModal({
     const encodedUrl = encodeURIComponent(shareUrl);
     const twitterUrl = `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`;
     
-    // Check if we're in a Farcaster miniapp context
-    const isInMiniapp = sdk.isInMiniApp || (typeof window !== 'undefined' && window.parent !== window);
+    // Check if we're in a Farcaster miniapp context (iframe)
+    const isInMiniapp = typeof window !== 'undefined' && window.parent !== window;
     
     if (isInMiniapp) {
       try {
