@@ -127,13 +127,21 @@ export function SharePreviewModal({
     const encodedUrl = encodeURIComponent(shareUrl);
     const twitterUrl = `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`;
     
-    try {
-      // Use SDK openUrl for better compatibility in Base app
-      await sdk.actions.openUrl(twitterUrl);
-    } catch (sdkError) {
-      console.log('SDK openUrl failed, using window.open...', sdkError);
-      window.open(twitterUrl, '_blank');
+    // Check if we're in a Farcaster miniapp context
+    const isInMiniapp = sdk.isInMiniApp || (typeof window !== 'undefined' && window.parent !== window);
+    
+    if (isInMiniapp) {
+      try {
+        await sdk.actions.openUrl(twitterUrl);
+        onClose();
+        return;
+      } catch (sdkError) {
+        console.log('SDK openUrl failed, using window.open...', sdkError);
+      }
     }
+    
+    // Desktop/browser fallback - always use window.open
+    window.open(twitterUrl, '_blank');
     onClose();
   };
 
