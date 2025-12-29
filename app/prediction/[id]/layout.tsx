@@ -33,24 +33,24 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     
     // Dynamic OG image URL
     // Priority:
-    // 1. Use cached ImgBB URL if exists (uploaded when user shares - works on Twitter/Base App)
-    // 2. For crypto predictions, use dynamic generator (fallback)
-    // 3. For regular predictions with an image, use that image
-    // 4. Otherwise use dynamic generator
+    // 1. For crypto predictions: use cached ImgBB URL if exists, otherwise dynamic generator
+    // 2. For regular predictions with an image: use that image directly
+    // 3. Fallback to dynamic generator
     const isCryptoPrediction = prediction.includeChart || prediction.imageUrl?.includes('geckoterminal.com');
     
     let ogImageUrl: string;
-    if (prediction.ogImageUrl) {
-      // Cached ImgBB URL from last share - best for Twitter/Base App
-      ogImageUrl = prediction.ogImageUrl;
-    } else if (isCryptoPrediction) {
-      // Crypto prediction - use dynamic generator (works on Farcaster)
-      ogImageUrl = `${URL}/api/og/prediction/${id}`;
-    } else if (prediction.imageUrl && !prediction.imageUrl.includes('geckoterminal.com')) {
-      // Regular prediction with direct image URL
+    if (isCryptoPrediction) {
+      // Crypto prediction - use cached ImgBB URL or dynamic generator
+      if (prediction.ogImageUrl) {
+        ogImageUrl = prediction.ogImageUrl;
+      } else {
+        ogImageUrl = `${URL}/api/og/prediction/${id}`;
+      }
+    } else if (prediction.imageUrl) {
+      // Regular prediction with direct image URL - use original image
       ogImageUrl = prediction.imageUrl;
     } else {
-      // Fallback to dynamic generator
+      // No image - fallback to dynamic generator
       ogImageUrl = `${URL}/api/og/prediction/${id}`;
     }
     
