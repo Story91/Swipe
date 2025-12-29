@@ -173,16 +173,38 @@ export default function PredictionPage() {
   const swipeNoPercentage = totalPoolSWIPE > 0 ? (noSWIPE / totalPoolSWIPE) * 100 : 50;
 
   return (
-    <div 
-      className="flex flex-col min-h-screen bg-cover bg-center bg-no-repeat"
-      style={{ 
-        backgroundImage: prediction.imageUrl 
-          ? `linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.8)), url(${prediction.imageUrl})`
-          : 'linear-gradient(to bottom, #1a1a1a, #0a0a0a)',
-        backgroundColor: '#0a0a0a'
-      }}
-    >
-      <div className="w-full max-w-[424px] mx-auto px-4 py-6">
+    <div className="flex flex-col min-h-screen bg-[#0a0a0a] relative">
+      {/* Desktop: Full screen background image */}
+      {prediction.imageUrl && (
+        <div 
+          className="hidden md:block fixed inset-0"
+          style={{ 
+            backgroundImage: `url(${prediction.imageUrl})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        />
+      )}
+      {/* Desktop: Gradient overlay */}
+      <div className="hidden md:block fixed inset-0 bg-gradient-to-b from-black/30 via-black/50 to-black/90" />
+      
+      <div className="w-full max-w-[424px] mx-auto min-h-screen relative">
+        {/* Mobile: Background image only in miniapp area */}
+        {prediction.imageUrl && (
+          <div 
+            className="md:hidden absolute inset-0"
+            style={{ 
+              backgroundImage: `url(${prediction.imageUrl})`,
+              backgroundSize: '100% 100%',
+              backgroundPosition: 'center',
+            }}
+          />
+        )}
+        {/* Mobile: Gradient overlay */}
+        <div className="md:hidden absolute inset-0 bg-gradient-to-b from-black/20 via-black/40 to-black/85" />
+        
+        {/* Content */}
+        <div className="relative z-10 px-4 py-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <Button 
@@ -221,7 +243,7 @@ export default function PredictionPage() {
         </div>
 
         {/* Main Card */}
-        <div className="bg-black/80 backdrop-blur-md border border-[#d4ff00]/20 rounded-2xl overflow-hidden">
+        <div className="bg-black/50 backdrop-blur-md border border-[#d4ff00]/20 rounded-2xl overflow-hidden">
           {/* Question */}
           <div className="p-4">
             <h1 className="text-xl font-bold text-white mb-2" style={{ fontFamily: '"Spicy Rice", cursive' }}>
@@ -235,7 +257,7 @@ export default function PredictionPage() {
             )}
 
             {/* Stats Row - Mini Table */}
-            <div className="flex bg-black/50 rounded-lg border border-zinc-700/50 mb-3 divide-x divide-zinc-700/50">
+            <div className="flex bg-black/30 rounded-lg border border-zinc-700/50 mb-3 divide-x divide-zinc-700/50">
               <div className="flex-1 py-2 text-center">
                 <Clock className="w-4 h-4 text-[#d4ff00] mx-auto mb-0.5" />
                 <p className="text-[9px] text-gray-400 uppercase">Time Left</p>
@@ -250,7 +272,7 @@ export default function PredictionPage() {
             </div>
 
             {/* ETH Pool Section */}
-            <div className="bg-black/60 rounded-lg p-3 mb-3 border border-zinc-700/50">
+            <div className="bg-black/40 rounded-lg p-3 mb-3 border border-zinc-700/50">
               <div className="flex items-center gap-2 mb-2">
                 <img src="/Ethereum-icon-purple.svg" alt="ETH" className="w-4 h-4" />
                 <span className="text-[10px] font-bold text-white uppercase">ETH Pool</span>
@@ -284,7 +306,7 @@ export default function PredictionPage() {
             </div>
 
             {/* SWIPE Pool Section */}
-            <div className="bg-black/60 rounded-lg p-3 mb-3 border border-[#d4ff00]/30">
+            <div className="bg-black/40 rounded-lg p-3 mb-3 border border-[#d4ff00]/30">
               <div className="flex items-center gap-2 mb-2">
                 <img src="/icon.png" alt="SWIPE" className="w-4 h-4" />
                 <span className="text-[10px] font-bold text-[#d4ff00] uppercase">SWIPE Pool</span>
@@ -337,6 +359,7 @@ export default function PredictionPage() {
           <p className="text-xs text-white/60">
             Prediction ID: {prediction.id}
           </p>
+        </div>
         </div>
       </div>
     </div>
