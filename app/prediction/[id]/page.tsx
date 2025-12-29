@@ -223,64 +223,58 @@ export default function PredictionPage() {
         {/* Main Card */}
         <div className="bg-black/80 backdrop-blur-md border border-[#d4ff00]/20 rounded-2xl overflow-hidden">
           {/* Question */}
-          <div className="p-5">
-            <h1 className="text-2xl font-bold text-white mb-3" style={{ fontFamily: '"Spicy Rice", cursive' }}>
+          <div className="p-4">
+            <h1 className="text-xl font-bold text-white mb-2" style={{ fontFamily: '"Spicy Rice", cursive' }}>
               {prediction.question}
             </h1>
             
             {prediction.description && (
-              <p className="text-gray-300 text-sm mb-4 leading-relaxed">
+              <p className="text-gray-400 text-xs mb-3 leading-relaxed" style={{ fontFamily: 'Inter, sans-serif' }}>
                 {prediction.description}
               </p>
             )}
 
-            {/* Stats Row */}
-            <div className="grid grid-cols-3 gap-3 mb-5">
-              <div className="bg-black/50 rounded-xl p-3 text-center border border-zinc-700/50">
-                <Clock className="w-5 h-5 text-[#d4ff00] mx-auto mb-1" />
-                <p className="text-[10px] text-gray-400 uppercase tracking-wider">Time Left</p>
-                <p className="text-sm font-bold text-white">{formatTimeLeft(prediction.deadline)}</p>
+            {/* Stats Row - Mini Table */}
+            <div className="flex bg-black/50 rounded-lg border border-zinc-700/50 mb-3 divide-x divide-zinc-700/50">
+              <div className="flex-1 py-2 text-center">
+                <Clock className="w-4 h-4 text-[#d4ff00] mx-auto mb-0.5" />
+                <p className="text-[9px] text-gray-400 uppercase">Time Left</p>
+                <p className="text-xs font-bold text-white">{formatTimeLeft(prediction.deadline)}</p>
               </div>
               
-              <div className="bg-black/50 rounded-xl p-3 text-center border border-zinc-700/50">
-                <Users className="w-5 h-5 text-[#d4ff00] mx-auto mb-1" />
-                <p className="text-[10px] text-gray-400 uppercase tracking-wider">Participants</p>
-                <p className="text-sm font-bold text-white">{prediction.participants?.length || 0}</p>
-              </div>
-              
-              <div className="bg-black/50 rounded-xl p-3 text-center border border-zinc-700/50">
-                <TrendingUp className="w-5 h-5 text-[#d4ff00] mx-auto mb-1" />
-                <p className="text-[10px] text-gray-400 uppercase tracking-wider">Total Pool</p>
-                <p className="text-sm font-bold text-[#d4ff00]">{totalPoolETH.toFixed(4)} ETH</p>
+              <div className="flex-1 py-2 text-center">
+                <Users className="w-4 h-4 text-[#d4ff00] mx-auto mb-0.5" />
+                <p className="text-[9px] text-gray-400 uppercase">Participants</p>
+                <p className="text-xs font-bold text-white">{prediction.participants?.length || 0}</p>
               </div>
             </div>
 
             {/* ETH Pool Section */}
-            <div className="bg-black/60 rounded-xl p-4 mb-4 border border-zinc-700/50">
-              <div className="flex items-center gap-2 mb-3">
-                <img src="/Ethereum-icon-purple.svg" alt="ETH" className="w-5 h-5" />
-                <span className="text-xs font-bold text-white uppercase tracking-wider">ETH Pool</span>
-                <span className="text-xs text-[#d4ff00] ml-auto font-bold">{totalPoolETH.toFixed(5)} ETH</span>
+            <div className="bg-black/60 rounded-lg p-3 mb-3 border border-zinc-700/50">
+              <div className="flex items-center gap-2 mb-2">
+                <img src="/Ethereum-icon-purple.svg" alt="ETH" className="w-4 h-4" />
+                <span className="text-[10px] font-bold text-white uppercase">ETH Pool</span>
+                <span className="text-[10px] text-[#d4ff00] ml-auto font-bold">{totalPoolETH.toFixed(5)} ETH</span>
               </div>
               
-              <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="grid grid-cols-2 gap-2 mb-2">
                 <div className="text-center">
-                  <p className="text-xs text-gray-400">YES</p>
-                  <p className="text-lg font-bold text-emerald-400">{yesETH.toFixed(5)}</p>
+                  <p className="text-[10px] text-gray-400">YES</p>
+                  <p className="text-sm font-bold text-emerald-400">{yesETH.toFixed(5)}</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xs text-gray-400">NO</p>
-                  <p className="text-lg font-bold text-rose-400">{noETH.toFixed(5)}</p>
+                  <p className="text-[10px] text-gray-400">NO</p>
+                  <p className="text-sm font-bold text-rose-400">{noETH.toFixed(5)}</p>
                 </div>
               </div>
               
               {/* ETH Odds Bar */}
-              <div className="mb-2">
-                <div className="flex justify-between text-xs mb-1">
+              <div>
+                <div className="flex justify-between text-[10px] mb-0.5">
                   <span className="text-emerald-400 font-bold">YES {yesPercentage.toFixed(1)}%</span>
                   <span className="text-rose-400 font-bold">NO {noPercentage.toFixed(1)}%</span>
                 </div>
-                <div className="h-2.5 bg-rose-500 rounded-full overflow-hidden">
+                <div className="h-2 bg-rose-500 rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-emerald-500 transition-all duration-500"
                     style={{ width: `${yesPercentage}%` }}
@@ -290,49 +284,47 @@ export default function PredictionPage() {
             </div>
 
             {/* SWIPE Pool Section */}
-            <div className="bg-black/60 rounded-xl p-4 mb-4 border border-[#d4ff00]/30">
-              <div className="flex items-center gap-2 mb-3">
-                <img src="/icon.png" alt="SWIPE" className="w-5 h-5" />
-                <span className="text-xs font-bold text-[#d4ff00] uppercase tracking-wider">SWIPE Pool</span>
-                <span className="text-xs text-[#d4ff00] ml-auto font-bold">{formatSwipeAmount(totalPoolSWIPE)}</span>
+            <div className="bg-black/60 rounded-lg p-3 mb-3 border border-[#d4ff00]/30">
+              <div className="flex items-center gap-2 mb-2">
+                <img src="/icon.png" alt="SWIPE" className="w-4 h-4" />
+                <span className="text-[10px] font-bold text-[#d4ff00] uppercase">SWIPE Pool</span>
+                <span className="text-[10px] text-[#d4ff00] ml-auto font-bold">{formatSwipeAmount(totalPoolSWIPE)}</span>
               </div>
               
               {totalPoolSWIPE > 0 ? (
-                <>
-                  <div className="grid grid-cols-2 gap-3 mb-3">
-                    <div className="text-center">
-                      <p className="text-xs text-gray-400">YES</p>
-                      <p className="text-lg font-bold text-emerald-400">{formatSwipeAmount(yesSWIPE)}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs text-gray-400">NO</p>
-                      <p className="text-lg font-bold text-rose-400">{formatSwipeAmount(noSWIPE)}</p>
-                    </div>
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <div className="text-center">
+                    <p className="text-[10px] text-gray-400">YES</p>
+                    <p className="text-sm font-bold text-emerald-400">{formatSwipeAmount(yesSWIPE)}</p>
                   </div>
-                  
-                  {/* SWIPE Odds Bar */}
-                  <div className="mb-2">
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-emerald-400 font-bold">YES {swipeYesPercentage.toFixed(1)}%</span>
-                      <span className="text-rose-400 font-bold">NO {swipeNoPercentage.toFixed(1)}%</span>
-                    </div>
-                    <div className="h-2.5 bg-rose-500 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-emerald-500 transition-all duration-500"
-                        style={{ width: `${swipeYesPercentage}%` }}
-                      />
-                    </div>
+                  <div className="text-center">
+                    <p className="text-[10px] text-gray-400">NO</p>
+                    <p className="text-sm font-bold text-rose-400">{formatSwipeAmount(noSWIPE)}</p>
                   </div>
-                </>
+                </div>
               ) : (
-                <p className="text-center text-zinc-500 text-sm py-2">No SWIPE stakes yet</p>
+                <p className="text-center text-zinc-500 text-xs py-1 mb-2">No SWIPE stakes yet</p>
               )}
+              
+              {/* SWIPE Odds Bar - always visible */}
+              <div>
+                <div className="flex justify-between text-[10px] mb-0.5">
+                  <span className="text-emerald-400 font-bold">YES {swipeYesPercentage.toFixed(1)}%</span>
+                  <span className="text-rose-400 font-bold">NO {swipeNoPercentage.toFixed(1)}%</span>
+                </div>
+                <div className="h-2 bg-rose-500 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-emerald-500 transition-all duration-500"
+                    style={{ width: `${swipeYesPercentage}%` }}
+                  />
+                </div>
+              </div>
             </div>
 
             {/* CTA Button */}
             <Button 
               onClick={handleOpenInApp}
-              className="w-full bg-[#d4ff00] text-black font-bold hover:bg-[#c4ef00] py-6 text-lg rounded-xl"
+              className="w-full bg-[#d4ff00] text-black font-bold hover:bg-[#c4ef00] py-4 text-base rounded-xl"
               style={{ fontFamily: '"Spicy Rice", cursive' }}
             >
               {prediction.resolved ? 'View Results' : 'Place Your Bet'}
