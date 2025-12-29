@@ -249,37 +249,25 @@ export async function GET(
             alignItems: 'center',
           }}
         >
-          {/* Header - centered */}
+          {/* Header - centered, just status badge */}
           <div
             style={{
               display: 'flex',
               justifyContent: 'center',
               alignItems: 'center',
-              marginBottom: 16,
-              gap: 20,
+              marginBottom: 20,
               width: '100%',
             }}
           >
-            {/* Logo */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="https://theswipe.app/splash.png"
-              alt="SWIPE"
-              style={{
-                height: 50,
-                width: 'auto',
-              }}
-            />
-            
             {/* Status Badge */}
             <div
               style={{
                 display: 'flex',
                 backgroundColor: isResolved ? statusColor : '#000000',
                 color: '#ffffff',
-                padding: '6px 16px',
-                borderRadius: 16,
-                fontSize: 16,
+                padding: '8px 24px',
+                borderRadius: 20,
+                fontSize: 18,
                 fontWeight: 'bold',
               }}
             >
@@ -431,13 +419,13 @@ export async function GET(
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
-                  width: 240,
-                  height: 220,
-                  borderRadius: 14,
+                  width: 280,
+                  height: 260,
+                  borderRadius: 16,
                   overflow: 'hidden',
-                  border: '2px solid #000000',
+                  border: '3px solid #000000',
                   backgroundColor: '#000000',
-                  padding: 10,
+                  padding: 14,
                   flexShrink: 0,
                 }}
               >
@@ -498,33 +486,33 @@ export async function GET(
                   style={{
                     display: 'flex',
                     flex: 1,
-                    width: 210,
-                    height: 120,
+                    width: 250,
+                    height: 150,
                   }}
                 >
                   <svg
-                    width={210}
-                    height={120}
-                    viewBox="0 0 210 120"
+                    width={250}
+                    height={150}
+                    viewBox="0 0 250 150"
                   >
                     {/* Grid lines */}
-                    <line x1="0" y1="0" x2="210" y2="0" stroke="#333" strokeWidth="1" />
-                    <line x1="0" y1="40" x2="210" y2="40" stroke="#333" strokeWidth="1" />
-                    <line x1="0" y1="80" x2="210" y2="80" stroke="#333" strokeWidth="1" />
-                    <line x1="0" y1="120" x2="210" y2="120" stroke="#333" strokeWidth="1" />
+                    <line x1="0" y1="0" x2="250" y2="0" stroke="#333" strokeWidth="1" />
+                    <line x1="0" y1="50" x2="250" y2="50" stroke="#333" strokeWidth="1" />
+                    <line x1="0" y1="100" x2="250" y2="100" stroke="#333" strokeWidth="1" />
+                    <line x1="0" y1="150" x2="250" y2="150" stroke="#333" strokeWidth="1" />
                     
                     {/* Area fill */}
                     <path
-                      d={`${generateChartPath(chartPrices, 210, 110)} L 210,120 L 0,120 Z`}
+                      d={`${generateChartPath(chartPrices, 250, 140)} L 250,150 L 0,150 Z`}
                       fill={`${priceChange.isPositive ? '#22c55e' : '#ef4444'}20`}
                     />
                     
                     {/* Line */}
                     <path
-                      d={generateChartPath(chartPrices, 210, 110)}
+                      d={generateChartPath(chartPrices, 250, 140)}
                       fill="none"
                       stroke={priceChange.isPositive ? '#22c55e' : '#ef4444'}
-                      strokeWidth="2"
+                      strokeWidth="2.5"
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />
@@ -612,27 +600,14 @@ export async function GET(
               display: 'flex',
               justifyContent: 'center',
               alignItems: 'center',
-              marginTop: 12,
-              paddingTop: 12,
-              borderTop: '1px solid #333333',
-              gap: 24,
+              marginTop: 16,
+              paddingTop: 16,
+              borderTop: '2px solid #00000020',
+              width: '100%',
             }}
           >
-            <div style={{ display: 'flex', fontSize: 14, color: '#333333' }}>
+            <div style={{ display: 'flex', fontSize: 28, fontWeight: 'bold', color: '#000000' }}>
               theswipe.app
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                backgroundColor: '#000000',
-                color: '#d4ff00',
-                padding: '8px 20px',
-                borderRadius: 10,
-                fontSize: 14,
-                fontWeight: 'bold',
-              }}
-            >
-              Place Your Bet →
             </div>
           </div>
         </div>
