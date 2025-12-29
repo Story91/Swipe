@@ -1934,11 +1934,31 @@ KEY USER-FACING CHANGES: V1 → V2
     // Get pool data for share text
     const currentPred = transformedPredictions[currentIndex];
     const totalPoolETH = currentPred ? ((currentPred.yesTotalAmount || 0) + (currentPred.noTotalAmount || 0)) / 1e18 : 0;
+    const totalSwipe = currentPred ? ((currentPred.swipeYesTotalAmount || 0) + (currentPred.swipeNoTotalAmount || 0)) / 1e18 : 0;
     
-    let shareText = `🔮 Check out this prediction:\n\n"${currentCard.prediction}"`;
+    // Format SWIPE amount
+    const formatSwipe = (amount: number): string => {
+      if (amount >= 1000000) return (amount / 1000000).toFixed(1) + 'M';
+      if (amount >= 1000) return (amount / 1000).toFixed(0) + 'K';
+      return amount.toFixed(0);
+    };
     
-    if (totalPoolETH > 0) {
-      shareText += `\n\n💰 Pool: ${totalPoolETH.toFixed(4)} ETH`;
+    // Random crypto/prediction slang intros
+    const intros = [
+      `🔮 Ape in or fade? Here's my alpha:\n\n"${currentCard.prediction}"`,
+      `📈 NFA but this looks spicy:\n\n"${currentCard.prediction}"`,
+      `🎯 WAGMI or NGMI? You decide:\n\n"${currentCard.prediction}"`,
+    ];
+    let shareText = intros[Math.floor(Math.random() * intros.length)];
+    
+    if (totalPoolETH > 0 || totalSwipe > 0) {
+      shareText += '\n';
+      if (totalPoolETH > 0) {
+        shareText += `\n💰 ETH Pool: ${totalPoolETH.toFixed(4)} ETH`;
+      }
+      if (totalSwipe > 0) {
+        shareText += `\n🎯 SWIPE Pool: ${formatSwipe(totalSwipe)}`;
+      }
     }
     
     if (currentCardParticipants.length > 0) {

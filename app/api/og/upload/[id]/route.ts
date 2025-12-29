@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { uploadBufferToImgBB } from '@/lib/imgbb';
 import { redis, redisHelpers } from '@/lib/redis';
 
-const URL = process.env.NEXT_PUBLIC_URL || 'https://theswipe.app';
+const BASE_URL = process.env.NEXT_PUBLIC_URL || 'https://theswipe.app';
 
 /**
  * Generate OG image with current chart data and upload to ImgBB
@@ -25,7 +25,9 @@ export async function POST(
     }
     
     // Generate OG image by calling our existing endpoint (gets fresh chart data)
-    const ogResponse = await fetch(`${URL}/api/og/prediction/${id}`, {
+    console.log(`🔗 Using base URL: ${BASE_URL}`);
+    
+    const ogResponse = await fetch(`${BASE_URL}/api/og/prediction/${id}`, {
       headers: {
         'Accept': 'image/png',
       },

@@ -172,14 +172,17 @@ export default function PredictionPage() {
   const swipeYesPercentage = totalPoolSWIPE > 0 ? (yesSWIPE / totalPoolSWIPE) * 100 : 50;
   const swipeNoPercentage = totalPoolSWIPE > 0 ? (noSWIPE / totalPoolSWIPE) * 100 : 50;
 
+  // Use ogImageUrl (generated chart preview) or fallback to imageUrl
+  const backgroundImageUrl = prediction.ogImageUrl || prediction.imageUrl;
+
   return (
     <div className="flex flex-col min-h-screen bg-[#0a0a0a] relative">
       {/* Desktop: Full screen background image */}
-      {prediction.imageUrl && (
+      {backgroundImageUrl && (
         <div 
           className="hidden md:block fixed inset-0"
           style={{ 
-            backgroundImage: `url(${prediction.imageUrl})`,
+            backgroundImage: `url(${backgroundImageUrl})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
           }}
@@ -190,11 +193,11 @@ export default function PredictionPage() {
       
       <div className="w-full max-w-[424px] mx-auto min-h-screen relative">
         {/* Mobile: Background image only in miniapp area */}
-        {prediction.imageUrl && (
+        {backgroundImageUrl && (
           <div 
             className="md:hidden absolute inset-0"
             style={{ 
-              backgroundImage: `url(${prediction.imageUrl})`,
+              backgroundImage: `url(${backgroundImageUrl})`,
               backgroundSize: '100% 100%',
               backgroundPosition: 'center',
             }}

@@ -194,6 +194,18 @@ export async function GET(
     const yesPercentage = totalPoolWei > 0 ? Math.round((prediction.yesTotalAmount / totalPoolWei) * 100) : 50;
     const noPercentage = 100 - yesPercentage;
     
+    // SWIPE pool stats
+    const swipeYes = (prediction.swipeYesTotalAmount || 0) / 1e18;
+    const swipeNo = (prediction.swipeNoTotalAmount || 0) / 1e18;
+    const totalSwipe = swipeYes + swipeNo;
+    
+    // Format SWIPE amount
+    const formatSwipe = (amount: number): string => {
+      if (amount >= 1000000) return (amount / 1000000).toFixed(1) + 'M';
+      if (amount >= 1000) return (amount / 1000).toFixed(0) + 'K';
+      return amount.toFixed(0);
+    };
+    
     // Format time left
     const now = Date.now() / 1000;
     const timeLeft = prediction.deadline - now;
@@ -231,7 +243,7 @@ export async function GET(
             flexDirection: 'column',
             width: '100%',
             height: '100%',
-            backgroundColor: '#0a0a0a',
+            backgroundColor: '#d4ff00',
             padding: '24px 80px',
             fontFamily: 'sans-serif',
             alignItems: 'center',
@@ -248,23 +260,23 @@ export async function GET(
               width: '100%',
             }}
           >
-            <div
+            {/* Logo */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://theswipe.app/splash.png"
+              alt="SWIPE"
               style={{
-                display: 'flex',
-                fontSize: 32,
-                fontWeight: 'bold',
-                color: '#d4ff00',
+                height: 50,
+                width: 'auto',
               }}
-            >
-              🔮 SWIPE
-            </div>
+            />
             
             {/* Status Badge */}
             <div
               style={{
                 display: 'flex',
-                backgroundColor: statusColor,
-                color: isResolved ? '#ffffff' : '#000000',
+                backgroundColor: isResolved ? statusColor : '#000000',
+                color: '#ffffff',
                 padding: '6px 16px',
                 borderRadius: 16,
                 fontSize: 16,
@@ -299,8 +311,8 @@ export async function GET(
               <div
                 style={{
                   display: 'flex',
-                  backgroundColor: '#d4ff00',
-                  color: '#000000',
+                  backgroundColor: '#000000',
+                  color: '#d4ff00',
                   padding: '4px 12px',
                   borderRadius: 10,
                   fontSize: 14,
@@ -318,7 +330,7 @@ export async function GET(
                   display: 'flex',
                   fontSize: 28,
                   fontWeight: 'bold',
-                  color: '#ffffff',
+                  color: '#000000',
                   lineHeight: 1.2,
                   marginBottom: 16,
                 }}
@@ -333,27 +345,34 @@ export async function GET(
               <div
                 style={{
                   display: 'flex',
-                  gap: 32,
+                  gap: 24,
                   marginBottom: 16,
                 }}
               >
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ display: 'flex', fontSize: 12, color: '#888888' }}>Pool</div>
-                  <div style={{ display: 'flex', fontSize: 22, fontWeight: 'bold', color: '#d4ff00' }}>
+                  <div style={{ display: 'flex', fontSize: 12, color: '#333333' }}>ETH Pool</div>
+                  <div style={{ display: 'flex', fontSize: 20, fontWeight: 'bold', color: '#000000' }}>
                     {totalPoolETH.toFixed(4)} ETH
                   </div>
                 </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ display: 'flex', fontSize: 12, color: '#888888' }}>Participants</div>
-                  <div style={{ display: 'flex', fontSize: 22, fontWeight: 'bold', color: '#d4ff00' }}>
+                  <div style={{ display: 'flex', fontSize: 12, color: '#333333' }}>SWIPE Pool</div>
+                  <div style={{ display: 'flex', fontSize: 20, fontWeight: 'bold', color: '#000000' }}>
+                    {formatSwipe(totalSwipe)}
+                  </div>
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', fontSize: 12, color: '#333333' }}>Participants</div>
+                  <div style={{ display: 'flex', fontSize: 20, fontWeight: 'bold', color: '#000000' }}>
                     {prediction.participants?.length || 0}
                   </div>
                 </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ display: 'flex', fontSize: 12, color: '#888888' }}>Time</div>
-                  <div style={{ display: 'flex', fontSize: 22, fontWeight: 'bold', color: '#d4ff00' }}>
+                  <div style={{ display: 'flex', fontSize: 12, color: '#333333' }}>Time</div>
+                  <div style={{ display: 'flex', fontSize: 20, fontWeight: 'bold', color: '#000000' }}>
                     {timeLeftText}
                   </div>
                 </div>
@@ -365,6 +384,9 @@ export async function GET(
                   display: 'flex',
                   flexDirection: 'column',
                   width: '100%',
+                  backgroundColor: '#000000',
+                  padding: 12,
+                  borderRadius: 12,
                 }}
               >
                 <div
@@ -413,8 +435,8 @@ export async function GET(
                   height: 220,
                   borderRadius: 14,
                   overflow: 'hidden',
-                  border: `2px solid ${cryptoData.color}`,
-                  backgroundColor: '#1a1a1a',
+                  border: '2px solid #000000',
+                  backgroundColor: '#000000',
                   padding: 10,
                   flexShrink: 0,
                 }}
@@ -532,8 +554,8 @@ export async function GET(
                   height: 200,
                   borderRadius: 16,
                   overflow: 'hidden',
-                  border: `2px solid ${cryptoData.color}`,
-                  backgroundColor: '#1a1a1a',
+                  border: '2px solid #000000',
+                  backgroundColor: '#000000',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: 16,
@@ -546,16 +568,16 @@ export async function GET(
                     width: 100,
                     height: 100,
                     borderRadius: 50,
-                    backgroundColor: cryptoData.color,
+                    backgroundColor: '#d4ff00',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <div style={{ display: 'flex', fontSize: 32, fontWeight: 'bold', color: '#ffffff' }}>
+                  <div style={{ display: 'flex', fontSize: 32, fontWeight: 'bold', color: '#000000' }}>
                     {cryptoData.symbol.slice(0, 3)}
                   </div>
                 </div>
-                <div style={{ display: 'flex', fontSize: 24, fontWeight: 'bold', color: cryptoData.color }}>
+                <div style={{ display: 'flex', fontSize: 24, fontWeight: 'bold', color: '#d4ff00' }}>
                   {cryptoData.name}
                 </div>
                 <div style={{ display: 'flex', fontSize: 14, color: '#888888' }}>
@@ -571,7 +593,7 @@ export async function GET(
                   height: 200,
                   borderRadius: 16,
                   overflow: 'hidden',
-                  border: '2px solid #d4ff00',
+                  border: '2px solid #000000',
                 }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -596,14 +618,14 @@ export async function GET(
               gap: 24,
             }}
           >
-            <div style={{ display: 'flex', fontSize: 14, color: '#888888' }}>
+            <div style={{ display: 'flex', fontSize: 14, color: '#333333' }}>
               theswipe.app
             </div>
             <div
               style={{
                 display: 'flex',
-                backgroundColor: '#d4ff00',
-                color: '#000000',
+                backgroundColor: '#000000',
+                color: '#d4ff00',
                 padding: '8px 20px',
                 borderRadius: 10,
                 fontSize: 14,
