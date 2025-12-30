@@ -13,6 +13,7 @@ import { LegacyCard } from './LegacyCard';
 import GradientText from '@/components/GradientText';
 import { useComposeCast } from '@coinbase/onchainkit/minikit';
 import sdk from '@farcaster/miniapp-sdk';
+import { Share2 } from 'lucide-react';
 import './EnhancedUserDashboard.css';
 
 interface PredictionWithStakes {
@@ -119,6 +120,7 @@ export function EnhancedUserDashboard() {
   
   // Modal states
   const [showModal, setShowModal] = useState(false);
+  const [showShareDropdown, setShowShareDropdown] = useState(false);
   const [modalType, setModalType] = useState<'claim' | 'success' | 'error'>('claim');
   const [modalData, setModalData] = useState<{txHash?: string, basescanUrl?: string, message?: string, predictionId?: string, tokenType?: 'ETH' | 'SWIPE', amount?: number}>({});
   
@@ -1411,17 +1413,137 @@ export function EnhancedUserDashboard() {
     );
   }
 
+  // Share stats handler - toggles dropdown
+  const handleShareStats = () => {
+    setShowShareDropdown(!showShareDropdown);
+  };
+
+  // Perform share based on selected option
+  const performShareStats = (shareType: 'full' | 'profit-only') => {
+    const ethIsProfit = ethTotalPotentialProfit >= 0;
+    const swipeIsProfit = swipeTotalPotentialProfit >= 0;
+    const overallProfit = ethIsProfit && swipeIsProfit;
+    
+    const profitIntros = [
+      "🏆 Crushing it on @swipeai!",
+      "💎 Diamond hands paying off! @swipeai",
+      "📈 To the moon with @swipeai!"
+    ];
+    
+    const lossIntros = [
+      "📉 Learning the ropes on @swipeai...",
+      "🎰 Some you win, some you learn! @swipeai",
+      "💪 NGMI? More like WAGMI soon! @swipeai"
+    ];
+    
+    const intro = overallProfit 
+      ? profitIntros[Math.floor(Math.random() * profitIntros.length)]
+      : lossIntros[Math.floor(Math.random() * lossIntros.length)];
+    
+    let shareText = `${intro}\n\n📊 My SWIPE Stats:\n`;
+    
+    if (shareType === 'full') {
+      // Full stats - show staked, payout, and profit/loss
+      if (ethTotalStaked > 0) {
+        shareText += `\n💰 ETH Staked: ${formatEth(ethTotalStaked)}`;
+        shareText += `\n   Payout: ${formatEth(ethTotalPotentialPayout)}`;
+        if (ethIsProfit) {
+          shareText += `\n   Profit: +${formatEth(ethTotalPotentialProfit)} 📈`;
+        } else {
+          shareText += `\n   At risk: ${formatEth(Math.abs(ethTotalPotentialProfit))} 🎲`;
+        }
+      }
+      
+      if (swipeTotalStaked > 0) {
+        shareText += `\n\n🎯 SWIPE Staked: ${formatSwipe(swipeTotalStaked)}`;
+        shareText += `\n   Payout: ${formatSwipe(swipeTotalPotentialPayout)}`;
+        if (swipeIsProfit) {
+          shareText += `\n   Profit: +${formatSwipe(swipeTotalPotentialProfit)} 📈`;
+        } else {
+          shareText += `\n   At risk: ${formatSwipe(Math.abs(swipeTotalPotentialProfit))} 🎲`;
+        }
+      }
+    } else {
+      // Profit only - just show the profit/loss summary
+      if (ethTotalStaked > 0 || ethTotalPotentialProfit !== 0) {
+        if (ethIsProfit) {
+          shareText += `\n💰 ETH: +${formatEth(ethTotalPotentialProfit)} profit 📈`;
+        } else {
+          shareText += `\n💰 ETH: ${formatEth(Math.abs(ethTotalPotentialProfit))} at risk 🎲`;
+        }
+      }
+      
+      if (swipeTotalStaked > 0 || swipeTotalPotentialProfit !== 0) {
+        if (swipeIsProfit) {
+          shareText += `\n🎯 SWIPE: +${formatSwipe(swipeTotalPotentialProfit)} profit 📈`;
+        } else {
+          shareText += `\n🎯 SWIPE: ${formatSwipe(Math.abs(swipeTotalPotentialProfit))} at risk 🎲`;
+        }
+      }
+    }
+    
+    shareText += `\n\nSwipe to predict! 🎯\nhttps://theswipe.app`;
+    
+    // Share via Farcaster SDK
+    const encodedText = encodeURIComponent(shareText);
+    const warpcastUrl = `https://warpcast.com/~/compose?text=${encodedText}`;
+    
+    // Check if we're in a Farcaster miniapp context
+    const isInMiniapp = typeof window !== 'undefined' && window.parent !== window;
+    
+    if (isInMiniapp) {
+      sdk.actions.openUrl(warpcastUrl).catch(() => {
+        window.open(warpcastUrl, '_blank');
+      });
+    } else {
+      window.open(warpcastUrl, '_blank');
+    }
+    
+    setShowShareDropdown(false);
+  };
+
   return (
     <div className="enhanced-user-dashboard">
       {/* Summary Stats Table */}
       <div className="stats-table-container">
+        {/* Share Stats Badge Button with Dropdown */}
+        <div className="share-stats-wrapper">
+          <button 
+            className="share-stats-badge"
+            onClick={handleShareStats}
+            title="Share your stats"
+          >
+            <Share2 size={14} />
+          </button>
+          
+          {showShareDropdown && (
+            <>
+              <div className="share-dropdown-overlay" onClick={() => setShowShareDropdown(false)} />
+              <div className="share-stats-dropdown">
+                <button 
+                  className="share-dropdown-item"
+                  onClick={() => performShareStats('profit-only')}
+                >
+                  Profit Only
+                </button>
+                <button 
+                  className="share-dropdown-item"
+                  onClick={() => performShareStats('full')}
+                >
+                  Full Stats
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+        
         <table className="stats-table">
           <thead>
             <tr>
               <th className="token-header">Token</th>
-              <th>Total Staked</th>
-              <th>Potential Payout</th>
-              <th>Potential Profit</th>
+              <th>Bets</th>
+              <th>Payout</th>
+              <th>Profit</th>
             </tr>
           </thead>
           <tbody>
@@ -1945,6 +2067,7 @@ export function EnhancedUserDashboard() {
           </div>
         </div>
       )}
+
     </div>
   );
 }

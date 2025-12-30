@@ -1263,25 +1263,25 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       return;
     }
     
-    // Use full prediction text (not truncated title)
-    const fullPredictionText = lastStakedPrediction.prediction;
+      // Use full prediction text (not truncated title)
+      const fullPredictionText = lastStakedPrediction.prediction;
     
     // Get unique prediction URL for sharing - will show custom OG image
     const predictionId = getPredictionIdForShare(lastStakedPrediction.id);
     const predictionUrl = `${window.location.origin}/prediction/${predictionId}`;
-    
-    // Format stake amount for display
+      
+      // Format stake amount for display
     const formatStakeAmountLocal = (amount: number, token: 'ETH' | 'SWIPE') => {
-      if (token === 'SWIPE') {
-        if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M`;
-        if (amount >= 1000) return `${(amount / 1000).toFixed(0)}K`;
-        return amount.toFixed(0);
-      }
-      return amount.toString();
-    };
-    
+        if (token === 'SWIPE') {
+          if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M`;
+          if (amount >= 1000) return `${(amount / 1000).toFixed(0)}K`;
+          return amount.toFixed(0);
+        }
+        return amount.toString();
+      };
+      
     const formattedAmount = formatStakeAmountLocal(shareStakeData.amount, shareStakeData.token);
-    
+      
     // Single unified share text with unique prediction link
     const shareText = `🎯 I just bet on SWIPE!\n\n"${fullPredictionText}"\n\n💰 My bet: ${formattedAmount} ${shareStakeData.token}\n\nWDYT? 👀\n\nCheck it out:`;
     
@@ -1314,31 +1314,31 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   const sendShareNotification = async (type: 'achievement' | 'challenge' | 'prediction' = 'achievement') => {
     if (!lastStakedPrediction) return;
     
-    try {
-      console.log('Attempting to send Farcaster notification...');
-      const userFid = await getUserFid();
-      console.log('User FID for notification:', userFid);
-      
-      if (userFid) {
-        const shareTypeNames = {
-          'achievement': 'achievement',
-          'challenge': 'challenge', 
-          'prediction': 'prediction'
-        };
+      try {
+        console.log('Attempting to send Farcaster notification...');
+        const userFid = await getUserFid();
+        console.log('User FID for notification:', userFid);
+        
+        if (userFid) {
+          const shareTypeNames = {
+            'achievement': 'achievement',
+            'challenge': 'challenge', 
+            'prediction': 'prediction'
+          };
           
-        console.log('Sending notification for FID:', userFid, 'type:', type);
-        const result = await notifyPredictionShared(
-          userFid, 
-          lastStakedPrediction.title, 
-          shareTypeNames[type] || 'prediction'
-        );
-        console.log('Notification result:', result);
-      } else {
-        console.log('No FID available, skipping notification');
-      }
-    } catch (error) {
-      console.error('Failed to send Farcaster notification:', error);
-      // Don't show error to user, just log it
+          console.log('Sending notification for FID:', userFid, 'type:', type);
+          const result = await notifyPredictionShared(
+            userFid, 
+            lastStakedPrediction.title, 
+            shareTypeNames[type] || 'prediction'
+          );
+          console.log('Notification result:', result);
+        } else {
+          console.log('No FID available, skipping notification');
+        }
+      } catch (error) {
+        console.error('Failed to send Farcaster notification:', error);
+        // Don't show error to user, just log it
     }
   };
 
