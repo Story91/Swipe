@@ -3856,7 +3856,7 @@ KEY USER-FACING CHANGES: V1 → V2
             imageUrl: currentCard.image,
             yesPercentage: currentCard.votingYes,
             noPercentage: 100 - currentCard.votingYes,
-            includeChart: transformedPredictions[currentIndex]?.includeChart || false
+            includeChart: currentCard.isChart || false
           }}
           shareText={sharePreviewModal.shareText}
           shareUrl={sharePreviewModal.shareUrl}
