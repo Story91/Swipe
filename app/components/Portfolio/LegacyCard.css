@@ -612,3 +612,21 @@
   height: 16px;
 }
 
+.legacy-share-option .share-platform-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.legacy-share-option .x-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.legacy-share-option.farcaster:hover {
+  background: rgba(138, 99, 210, 0.2);
+}
+
+.legacy-share-option.twitter:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+

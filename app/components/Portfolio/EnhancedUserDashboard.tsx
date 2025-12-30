@@ -1425,15 +1425,15 @@ export function EnhancedUserDashboard() {
     const overallProfit = ethIsProfit && swipeIsProfit;
     
     const profitIntros = [
-      "🏆 Crushing it on @swipeai!",
-      "💎 Diamond hands paying off! @swipeai",
-      "📈 To the moon with @swipeai!"
+      "🏆 Crushing it on @swipe_ai_ !",
+      "💎 Diamond hands paying off ! @swipe_ai_",
+      "📈 To the moon with @swipe_ai_ !"
     ];
     
     const lossIntros = [
-      "📉 Learning the ropes on @swipeai...",
-      "🎰 Some you win, some you learn! @swipeai",
-      "💪 NGMI? More like WAGMI soon! @swipeai"
+      "📉 Learning the ropes on @swipe_ai_...",
+      "🎰 Some you win, some you learn ! @swipe_ai_",
+      "💪 NGMI? More like WAGMI soon ! @swipe_ai_"
     ];
     
     const intro = overallProfit 

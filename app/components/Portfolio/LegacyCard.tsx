@@ -71,33 +71,31 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, on
   const [showShareDropdown, setShowShareDropdown] = useState(false);
   const { composeCast: minikitComposeCast } = useComposeCast();
   
-  // Random win/lose share intros
+  // Random win/lose share intros (use @swipe_ai_ for Twitter compatibility)
   const winIntros = [
-    "🏆 Called it! Just claimed my prediction win on @swipeai!",
-    "💎 Diamond hands paid off! Big W on @swipeai!",
-    "📈 WAGMI confirmed! Nailed this one on @swipeai!",
+    "🏆 Called it ! Just claimed my prediction win on @swipe_ai_",
+    "💎 Diamond hands paid off ! Big W on @swipe_ai_",
+    "📈 WAGMI confirmed ! Nailed this one on @swipe_ai_",
   ];
   
   const loseIntros = [
-    "📉 Took an L on this one, but we learn and move! @swipeai",
-    "🎲 Can't win 'em all! GG on @swipeai",
-    "💪 Down but not out! NGMI today, WAGMI tomorrow! @swipeai",
+    "📉 Took an L on this one, but we learn and move ! @swipe_ai_",
+    "🎲 Can't win 'em all ! GG on @swipe_ai_",
+    "💪 Down but not out ! NGMI today, WAGMI tomorrow ! @swipe_ai_",
   ];
   
-  // Handle share for resolved prediction
-  const handleShareResult = async (tokenType: 'ETH' | 'SWIPE') => {
-    console.log('📤 handleShareResult called with tokenType:', tokenType);
+  // Build share text for resolved prediction
+  const buildShareText = () => {
+    const ethStakeData = prediction.userStakes?.ETH;
+    const swipeStakeData = prediction.userStakes?.SWIPE;
     
-    const stake = prediction.userStakes?.[tokenType];
-    console.log('📤 Stake data:', stake);
+    const hasEth = ethStakeData && (ethStakeData.yesAmount > 0 || ethStakeData.noAmount > 0);
+    const hasSwipe = swipeStakeData && (swipeStakeData.yesAmount > 0 || swipeStakeData.noAmount > 0);
     
-    if (!stake) {
-      console.warn('No stake found for token type:', tokenType);
-      return;
-    }
+    if (!hasEth && !hasSwipe) return { text: '', url: '' };
     
-    const isWinner = stake.isWinner;
-    const profit = stake.potentialProfit;
+    // Determine overall winner status (use any stake that exists)
+    const isWinner = hasEth ? ethStakeData.isWinner : (hasSwipe ? swipeStakeData.isWinner : false);
     
     const intro = isWinner 
       ? winIntros[Math.floor(Math.random() * winIntros.length)]
@@ -107,48 +105,78 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, on
       const val = wei / 1e18;
       if (token === 'SWIPE') {
         if (Math.abs(val) >= 1000000) return (val / 1000000).toFixed(1) + 'M';
-        if (Math.abs(val) >= 1000) return (val / 1000).toFixed(0) + 'K';
+        if (Math.abs(val) >= 1000) return (val / 1000).toFixed(1) + 'K';
         return val.toFixed(0);
       }
-      return val.toFixed(4);
+      return val.toFixed(6);
     };
     
     let shareText = `${intro}\n\n"${prediction.question}"\n\n`;
     shareText += `📊 Result: ${prediction.outcome ? 'YES' : 'NO'}\n`;
     
-    if (isWinner) {
-      shareText += `💰 Profit: +${formatAmount(profit, tokenType)} ${tokenType} 📈\n`;
-    } else {
-      shareText += `📉 Loss: ${formatAmount(Math.abs(profit), tokenType)} ${tokenType}\n`;
+    // Show both tokens if user has stakes in both
+    if (hasEth) {
+      const ethProfit = ethStakeData.potentialProfit;
+      if (ethProfit >= 0) {
+        shareText += `💰 ETH: +${formatAmount(ethProfit, 'ETH')} 📈\n`;
+      } else {
+        shareText += `💰 ETH: -${formatAmount(Math.abs(ethProfit), 'ETH')} 📉\n`;
+      }
+    }
+    
+    if (hasSwipe) {
+      const swipeProfit = swipeStakeData.potentialProfit;
+      if (swipeProfit >= 0) {
+        shareText += `🎯 SWIPE: +${formatAmount(swipeProfit, 'SWIPE')} 📈`;
+      } else {
+        shareText += `🎯 SWIPE: -${formatAmount(Math.abs(swipeProfit), 'SWIPE')} 📉`;
+      }
     }
     
     const predictionUrl = `https://theswipe.app/prediction/${prediction.id}`;
     
-    console.log('📤 Share text:', shareText);
-    console.log('📤 Prediction URL:', predictionUrl);
+    return { text: shareText, url: predictionUrl };
+  };
+
+  // Handle share to Farcaster
+  const handleShareFarcaster = async () => {
+    const { text, url } = buildShareText();
+    if (!text) return;
     
-    // Always use Warpcast URL as primary method for reliability
-    const warpcastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(shareText)}&embeds[]=${encodeURIComponent(predictionUrl)}`;
+    const warpcastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(url)}`;
     
-    // Check if we're in a miniapp context
     const isInMiniApp = typeof window !== 'undefined' && window.parent !== window;
-    console.log('📤 Is in MiniApp:', isInMiniApp);
     
     if (isInMiniApp) {
       try {
-        // Try SDK openUrl for miniapp context
-        console.log('📤 Trying sdk.actions.openUrl...');
         await sdk.actions.openUrl(warpcastUrl);
-        console.log('📤 sdk.actions.openUrl succeeded');
       } catch (error) {
-        console.error('📤 sdk.actions.openUrl failed:', error);
-        // Fallback to window.open
         window.open(warpcastUrl, '_blank');
       }
     } else {
-      // Desktop - just open URL
-      console.log('📤 Opening Warpcast URL directly...');
       window.open(warpcastUrl, '_blank');
+    }
+    
+    setShowShareDropdown(false);
+  };
+  
+  // Handle share to Twitter/X
+  const handleShareTwitter = async () => {
+    const { text, url } = buildShareText();
+    if (!text) return;
+    
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+    
+    const isInMiniApp = typeof window !== 'undefined' && window.parent !== window;
+    
+    if (isInMiniApp) {
+      try {
+        await sdk.actions.openUrl(twitterUrl);
+      } catch (error) {
+        window.open(twitterUrl, '_blank');
+      }
+    } else {
+      window.open(twitterUrl, '_blank');
     }
     
     setShowShareDropdown(false);
@@ -290,24 +318,22 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, on
             <>
               <div className="legacy-share-overlay" onClick={() => setShowShareDropdown(false)} />
               <div className="legacy-share-dropdown">
-                {hasEthStake && (
-                  <button 
-                    className="legacy-share-option"
-                    onClick={() => handleShareResult('ETH')}
-                  >
-                    <img src="/Ethereum-icon-purple.svg" alt="ETH" className="share-token-icon" />
-                    Share ETH Result
-                  </button>
-                )}
-                {hasSwipeStake && (
-                  <button 
-                    className="legacy-share-option"
-                    onClick={() => handleShareResult('SWIPE')}
-                  >
-                    <img src="/splash.png" alt="SWIPE" className="share-token-icon" />
-                    Share SWIPE Result
-                  </button>
-                )}
+                <button 
+                  className="legacy-share-option farcaster"
+                  onClick={handleShareFarcaster}
+                >
+                  <img src="/farc.png" alt="Farcaster" className="share-platform-icon" />
+                  Farcaster
+                </button>
+                <button 
+                  className="legacy-share-option twitter"
+                  onClick={handleShareTwitter}
+                >
+                  <svg className="share-platform-icon x-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                  </svg>
+                  X / Twitter
+                </button>
               </div>
             </>
           )}
