@@ -121,6 +121,8 @@ export function EnhancedUserDashboard() {
   // Modal states
   const [showModal, setShowModal] = useState(false);
   const [showShareDropdown, setShowShareDropdown] = useState(false);
+  const [shareStep, setShareStep] = useState<'type' | 'platform'>('type');
+  const [selectedShareType, setSelectedShareType] = useState<'profit-only' | 'full'>('profit-only');
   const [modalType, setModalType] = useState<'claim' | 'success' | 'error'>('claim');
   const [modalData, setModalData] = useState<{txHash?: string, basescanUrl?: string, message?: string, predictionId?: string, tokenType?: 'ETH' | 'SWIPE', amount?: number}>({});
   
@@ -1416,24 +1418,39 @@ export function EnhancedUserDashboard() {
   // Share stats handler - toggles dropdown
   const handleShareStats = () => {
     setShowShareDropdown(!showShareDropdown);
+    setShareStep('type'); // Reset to first step
+  };
+  
+  // Handle share type selection (step 1)
+  const handleSelectShareType = (type: 'profit-only' | 'full') => {
+    setSelectedShareType(type);
+    setShareStep('platform');
+  };
+  
+  // Go back to type selection
+  const handleBackToType = () => {
+    setShareStep('type');
   };
 
-  // Perform share based on selected option
-  const performShareStats = (shareType: 'full' | 'profit-only') => {
+  // Perform share based on selected option and platform
+  const performShareStats = (shareType: 'full' | 'profit-only', platform: 'farcaster' | 'twitter') => {
     const ethIsProfit = ethTotalPotentialProfit >= 0;
     const swipeIsProfit = swipeTotalPotentialProfit >= 0;
     const overallProfit = ethIsProfit && swipeIsProfit;
     
+    // Use different tag based on platform: @swipeai for Farcaster, @swipe_ai_ for Twitter
+    const tag = platform === 'twitter' ? '@swipe_ai_' : '@swipeai';
+    
     const profitIntros = [
-      "🏆 Crushing it on @swipe_ai_ !",
-      "💎 Diamond hands paying off ! @swipe_ai_",
-      "📈 To the moon with @swipe_ai_ !"
+      `🏆 Crushing it on ${tag} !`,
+      `💎 Diamond hands paying off ! ${tag}`,
+      `📈 To the moon with ${tag} !`
     ];
     
     const lossIntros = [
-      "📉 Learning the ropes on @swipe_ai_...",
-      "🎰 Some you win, some you learn ! @swipe_ai_",
-      "💪 NGMI? More like WAGMI soon ! @swipe_ai_"
+      `📉 Learning the ropes on ${tag}...`,
+      `🎰 Some you win, some you learn ! ${tag}`,
+      `💪 NGMI? More like WAGMI soon ! ${tag}`
     ];
     
     const intro = overallProfit 
@@ -1482,24 +1499,30 @@ export function EnhancedUserDashboard() {
       }
     }
     
-    shareText += `\n\nSwipe to predict! 🎯\nhttps://theswipe.app`;
+    const shareUrl = 'https://theswipe.app';
+    shareText += `\n\nSwipe to predict! 🎯`;
     
-    // Share via Farcaster SDK
     const encodedText = encodeURIComponent(shareText);
-    const warpcastUrl = `https://warpcast.com/~/compose?text=${encodedText}`;
-    
-    // Check if we're in a Farcaster miniapp context
     const isInMiniapp = typeof window !== 'undefined' && window.parent !== window;
     
+    let targetUrl: string;
+    
+    if (platform === 'twitter') {
+      targetUrl = `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodeURIComponent(shareUrl)}`;
+    } else {
+      targetUrl = `https://warpcast.com/~/compose?text=${encodedText}&embeds[]=${encodeURIComponent(shareUrl)}`;
+    }
+    
     if (isInMiniapp) {
-      sdk.actions.openUrl(warpcastUrl).catch(() => {
-        window.open(warpcastUrl, '_blank');
+      sdk.actions.openUrl(targetUrl).catch(() => {
+        window.open(targetUrl, '_blank');
       });
     } else {
-      window.open(warpcastUrl, '_blank');
+      window.open(targetUrl, '_blank');
     }
     
     setShowShareDropdown(false);
+    setShareStep('type'); // Reset for next time
   };
 
   return (
@@ -1518,20 +1541,55 @@ export function EnhancedUserDashboard() {
           
           {showShareDropdown && (
             <>
-              <div className="share-dropdown-overlay" onClick={() => setShowShareDropdown(false)} />
+              <div className="share-dropdown-overlay" onClick={() => { setShowShareDropdown(false); setShareStep('type'); }} />
               <div className="share-stats-dropdown">
-                <button 
-                  className="share-dropdown-item"
-                  onClick={() => performShareStats('profit-only')}
-                >
-                  Profit Only
-                </button>
-                <button 
-                  className="share-dropdown-item"
-                  onClick={() => performShareStats('full')}
-                >
-                  Full Stats
-                </button>
+                {shareStep === 'type' ? (
+                  <>
+                    <button 
+                      className="share-dropdown-item"
+                      onClick={() => handleSelectShareType('profit-only')}
+                    >
+                      Profit Only
+                    </button>
+                    <button 
+                      className="share-dropdown-item"
+                      onClick={() => handleSelectShareType('full')}
+                    >
+                      Full Stats
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button 
+                      className="share-dropdown-back"
+                      onClick={handleBackToType}
+                    >
+                      ← Back
+                    </button>
+                    <button 
+                      className="share-dropdown-item share-btn-farcaster-split"
+                      onClick={() => performShareStats(selectedShareType, 'farcaster')}
+                    >
+                      <div className="share-btn-split-bg">
+                        <div className="share-btn-half-purple"></div>
+                        <div className="share-btn-half-white"></div>
+                      </div>
+                      <div className="share-btn-icons">
+                        <img src="/farc.png" alt="Farcaster" className="share-btn-icon-left" />
+                        <img src="/Base_square_blue.png" alt="Base" className="share-btn-icon-right" />
+                      </div>
+                    </button>
+                    <div className="share-stats-divider"></div>
+                    <button 
+                      className="share-dropdown-item share-btn-twitter"
+                      onClick={() => performShareStats(selectedShareType, 'twitter')}
+                    >
+                      <svg className="share-btn-x-icon" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                      </svg>
+                    </button>
+                  </>
+                )}
               </div>
             </>
           )}

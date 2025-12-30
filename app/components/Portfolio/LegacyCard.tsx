@@ -71,21 +71,105 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, on
   const [showShareDropdown, setShowShareDropdown] = useState(false);
   const { composeCast: minikitComposeCast } = useComposeCast();
   
-  // Random win/lose share intros (use @swipe_ai_ for Twitter compatibility)
-  const winIntros = [
-    "🏆 Called it ! Just claimed my prediction win on @swipe_ai_",
-    "💎 Diamond hands paid off ! Big W on @swipe_ai_",
-    "📈 WAGMI confirmed ! Nailed this one on @swipe_ai_",
+  // Get mention tag based on platform
+  const getMention = (platform: 'farcaster' | 'twitter') => platform === 'twitter' ? '@swipe_ai_' : '@swipeai';
+  
+  // Random win/lose share intros (tag placeholder will be replaced)
+  const getWinIntros = (tag: string) => [
+    `🏆 Called it ! Just claimed my prediction win on ${tag}`,
+    `💎 Diamond hands paid off ! Big W on ${tag}`,
+    `📈 WAGMI confirmed ! Nailed this one on ${tag}`,
   ];
   
-  const loseIntros = [
-    "📉 Took an L on this one, but we learn and move ! @swipe_ai_",
-    "🎲 Can't win 'em all ! GG on @swipe_ai_",
-    "💪 Down but not out ! NGMI today, WAGMI tomorrow ! @swipe_ai_",
+  const getLoseIntros = (tag: string) => [
+    `📉 Took an L on this one, but we learn and move ! ${tag}`,
+    `🎲 Can't win 'em all ! GG on ${tag}`,
+    `💪 Down but not out ! NGMI today, WAGMI tomorrow ! ${tag}`,
   ];
   
-  // Build share text for resolved prediction
-  const buildShareText = () => {
+  // Random active prediction share intros (user already bet, waiting for result)
+  const getActiveIntros = (tag: string) => [
+    `⏳ Waiting for the outcome ! My bet is in on ${tag}`,
+    `🎲 Skin in the game ! Let's see how this plays out ${tag}`,
+    `🔮 Made my call ! Now we wait... ${tag}`,
+  ];
+  
+  // Format amount helper
+  const formatAmount = (wei: number, token: 'ETH' | 'SWIPE') => {
+    const val = wei / 1e18;
+    if (token === 'SWIPE') {
+      if (Math.abs(val) >= 1000000) return (val / 1000000).toFixed(1) + 'M';
+      if (Math.abs(val) >= 1000) return (val / 1000).toFixed(1) + 'K';
+      return val.toFixed(0);
+    }
+    return val.toFixed(6);
+  };
+  
+  // Format time left helper
+  const formatTimeLeft = (deadline: number): string => {
+    const now = Date.now() / 1000;
+    const timeLeft = deadline - now;
+    
+    if (timeLeft <= 0) return 'Expired';
+    
+    const days = Math.floor(timeLeft / (24 * 60 * 60));
+    const hours = Math.floor((timeLeft % (24 * 60 * 60)) / (60 * 60));
+    const minutes = Math.floor((timeLeft % (60 * 60)) / 60);
+    
+    if (days > 0) return `${days}d ${hours}h`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+  };
+  
+  // Build share text for ACTIVE prediction (user already bet, waiting for result)
+  const buildActiveShareText = (platform: 'farcaster' | 'twitter') => {
+    const tag = getMention(platform);
+    const activeIntros = getActiveIntros(tag);
+    const intro = activeIntros[Math.floor(Math.random() * activeIntros.length)];
+    
+    let shareText = `${intro}\n\n"${prediction.question}"\n`;
+    
+    // Show user's bet
+    const ethStakeData = prediction.userStakes?.ETH;
+    const swipeStakeData = prediction.userStakes?.SWIPE;
+    const hasEth = ethStakeData && (ethStakeData.yesAmount > 0 || ethStakeData.noAmount > 0);
+    const hasSwipe = swipeStakeData && (swipeStakeData.yesAmount > 0 || swipeStakeData.noAmount > 0);
+    
+    if (hasEth) {
+      const myBet = ethStakeData.yesAmount > ethStakeData.noAmount ? 'YES' : 'NO';
+      const myAmount = Math.max(ethStakeData.yesAmount, ethStakeData.noAmount) / 1e18;
+      shareText += `\n🎯 My bet: ${myBet} (${myAmount.toFixed(6)} ETH)`;
+    }
+    
+    if (hasSwipe) {
+      const myBet = swipeStakeData.yesAmount > swipeStakeData.noAmount ? 'YES' : 'NO';
+      const myAmount = Math.max(swipeStakeData.yesAmount, swipeStakeData.noAmount) / 1e18;
+      shareText += `\n🎯 My bet: ${myBet} (${formatAmount(myAmount * 1e18, 'SWIPE')} SWIPE)`;
+    }
+    
+    // Add time left
+    shareText += `\n⏰ ${formatTimeLeft(prediction.deadline)} left`;
+    
+    // Add pool info
+    const totalPoolETH = (prediction.yesTotalAmount + prediction.noTotalAmount) / 1e18;
+    
+    if (totalPoolETH > 0) {
+      shareText += `\n💰 Pool: ${totalPoolETH.toFixed(4)} ETH`;
+    }
+    
+    if (prediction.participants && prediction.participants.length > 0) {
+      shareText += `\n👥 ${prediction.participants.length} swipers`;
+    }
+    
+    shareText += `\n\nJoin the action 👀`;
+    
+    const predictionUrl = `https://theswipe.app/prediction/${prediction.id}`;
+    
+    return { text: shareText, url: predictionUrl };
+  };
+  
+  // Build share text for RESOLVED prediction
+  const buildShareText = (platform: 'farcaster' | 'twitter') => {
     const ethStakeData = prediction.userStakes?.ETH;
     const swipeStakeData = prediction.userStakes?.SWIPE;
     
@@ -97,19 +181,13 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, on
     // Determine overall winner status (use any stake that exists)
     const isWinner = hasEth ? ethStakeData.isWinner : (hasSwipe ? swipeStakeData.isWinner : false);
     
+    const tag = getMention(platform);
+    const winIntros = getWinIntros(tag);
+    const loseIntros = getLoseIntros(tag);
+    
     const intro = isWinner 
       ? winIntros[Math.floor(Math.random() * winIntros.length)]
       : loseIntros[Math.floor(Math.random() * loseIntros.length)];
-    
-    const formatAmount = (wei: number, token: 'ETH' | 'SWIPE') => {
-      const val = wei / 1e18;
-      if (token === 'SWIPE') {
-        if (Math.abs(val) >= 1000000) return (val / 1000000).toFixed(1) + 'M';
-        if (Math.abs(val) >= 1000) return (val / 1000).toFixed(1) + 'K';
-        return val.toFixed(0);
-      }
-      return val.toFixed(6);
-    };
     
     let shareText = `${intro}\n\n"${prediction.question}"\n\n`;
     shareText += `📊 Result: ${prediction.outcome ? 'YES' : 'NO'}\n`;
@@ -140,7 +218,8 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, on
 
   // Handle share to Farcaster
   const handleShareFarcaster = async () => {
-    const { text, url } = buildShareText();
+    // Use different share text based on prediction status, with Farcaster tag
+    const { text, url } = prediction.status === 'active' ? buildActiveShareText('farcaster') : buildShareText('farcaster');
     if (!text) return;
     
     const warpcastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(url)}`;
@@ -162,7 +241,8 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, on
   
   // Handle share to Twitter/X
   const handleShareTwitter = async () => {
-    const { text, url } = buildShareText();
+    // Use different share text based on prediction status, with Twitter tag
+    const { text, url } = prediction.status === 'active' ? buildActiveShareText('twitter') : buildShareText('twitter');
     if (!text) return;
     
     const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
@@ -303,13 +383,13 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, on
         <span className="legacy-status-text">{getStatusText(prediction.status)}</span>
       </div>
       
-      {/* Share Badge - Only for resolved predictions with stakes */}
-      {prediction.status === 'resolved' && (hasEthStake || hasSwipeStake) && (
+      {/* Share Badge - For resolved predictions with stakes OR active predictions */}
+      {((prediction.status === 'resolved' && (hasEthStake || hasSwipeStake)) || prediction.status === 'active') && (
         <div className="legacy-share-wrapper">
           <button 
             className="legacy-share-badge"
             onClick={() => setShowShareDropdown(!showShareDropdown)}
-            title="Share your result"
+            title={prediction.status === 'active' ? "Share this prediction" : "Share your result"}
           >
             <Share2 size={14} />
           </button>
@@ -319,20 +399,26 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, on
               <div className="legacy-share-overlay" onClick={() => setShowShareDropdown(false)} />
               <div className="legacy-share-dropdown">
                 <button 
-                  className="legacy-share-option farcaster"
+                  className="legacy-share-option share-btn-farcaster-split"
                   onClick={handleShareFarcaster}
                 >
-                  <img src="/farc.png" alt="Farcaster" className="share-platform-icon" />
-                  Farcaster
+                  <div className="share-btn-split-bg">
+                    <div className="share-btn-half-purple"></div>
+                    <div className="share-btn-half-white"></div>
+                  </div>
+                  <div className="share-btn-icons">
+                    <img src="/farc.png" alt="Farcaster" className="share-btn-icon-left" />
+                    <img src="/Base_square_blue.png" alt="Base" className="share-btn-icon-right" />
+                  </div>
                 </button>
+                <div className="legacy-share-divider"></div>
                 <button 
-                  className="legacy-share-option twitter"
+                  className="legacy-share-option share-btn-twitter"
                   onClick={handleShareTwitter}
                 >
-                  <svg className="share-platform-icon x-icon" viewBox="0 0 24 24" fill="currentColor">
+                  <svg className="share-btn-x-icon" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                   </svg>
-                  X / Twitter
                 </button>
               </div>
             </>

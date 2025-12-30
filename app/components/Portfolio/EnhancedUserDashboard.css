@@ -2432,6 +2432,107 @@
   color: #d4ff00;
 }
 
+/* Gradient divider between platform buttons */
+.share-stats-divider {
+  height: 1px;
+  margin: 6px 0;
+  background: linear-gradient(90deg, transparent, rgba(212, 255, 0, 0.5), transparent);
+}
+
+/* Farcaster/Base split button */
+.share-btn-farcaster-split {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  padding: 0 !important;
+}
+
+.share-btn-farcaster-split .share-btn-split-bg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+
+.share-btn-farcaster-split .share-btn-half-purple {
+  flex: 1;
+  background-color: #8A63D2;
+}
+
+.share-btn-farcaster-split .share-btn-half-white {
+  flex: 1;
+  background-color: #ffffff;
+}
+
+.share-btn-farcaster-split .share-btn-icons {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.share-btn-farcaster-split .share-btn-icon-left,
+.share-btn-farcaster-split .share-btn-icon-right {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.share-btn-farcaster-split:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(138, 99, 210, 0.3);
+}
+
+/* Twitter/X button */
+.share-btn-twitter {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  background: #000 !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 6px;
+  margin-top: 0;
+}
+
+.share-btn-twitter .share-btn-x-icon {
+  width: 16px;
+  height: 16px;
+  fill: #fff;
+}
+
+.share-btn-twitter:hover {
+  background: #1a1a1a !important;
+  transform: scale(1.02);
+}
+
+.share-dropdown-back {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 4px;
+}
+
+.share-dropdown-back:hover {
+  color: #fff;
+}
+
 /* Mobile responsive for predictions pagination */
 @media (max-width: 480px) {
   .predictions-pagination {
