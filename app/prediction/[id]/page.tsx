@@ -98,8 +98,13 @@ export default function PredictionPage() {
   };
 
   const handleOpenInApp = () => {
-    // Redirect to main app with prediction context - this will scroll to specific prediction
-    router.push(`/?prediction=${predictionId}`);
+    if (prediction?.resolved) {
+      // For resolved predictions, go to dashboard to see results
+      router.push('/?dashboard=user');
+    } else {
+      // For active predictions, go to main app with prediction context
+      router.push(`/?prediction=${predictionId}`);
+    }
   };
 
   const formatTimeLeft = (deadline: number) => {
