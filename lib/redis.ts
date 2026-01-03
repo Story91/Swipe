@@ -38,7 +38,19 @@ export const REDIS_KEYS = {
   REAL_LEADERBOARD: 'leaderboard:real_data',
   USER_PORTFOLIO: (userId: string) => `user:portfolio:${userId}`,
   SWIPE_CLAIM_HISTORY: (userId: string) => `swipe_claim_history:${userId}`,
+  // Farcaster profile cache (TTL: 7 days)
+  FARCASTER_PROFILE: (address: string) => `farcaster_profile:${address.toLowerCase()}`,
 } as const;
+
+// Farcaster profile cache type
+export interface CachedFarcasterProfile {
+  fid: string | null;
+  username: string | null;
+  display_name: string | null;
+  pfp_url: string | null;
+  address: string;
+  cached_at: number;
+}
 
 // Import types from separate file
 export type { 

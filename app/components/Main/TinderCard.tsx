@@ -1060,6 +1060,23 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     setStakeModal(prev => ({ ...prev, isOpen: false }));
     setIsTransactionLoading(false);
     
+    // Cache user's Farcaster profile to Redis (reduces Neynar API calls)
+    if (address && context?.user) {
+      try {
+        console.log('💾 Caching user Farcaster profile to Redis...');
+        fetch('/api/farcaster/cache-profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            address: address,
+            profile: context.user
+          })
+        }).catch(err => console.warn('Profile cache failed:', err));
+      } catch (error) {
+        console.warn('Failed to cache user profile:', error);
+      }
+    }
+    
     // Move to next card after successful stake
     console.log('✅ Stake successful, moving to next card...');
     setCurrentIndex(prev => {

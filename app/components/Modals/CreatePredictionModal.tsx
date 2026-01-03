@@ -253,6 +253,23 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
         onClose();
         setShowSuccessModal(true);
         
+        // Cache user's Farcaster profile to Redis (reduces Neynar API calls)
+        if (address && context?.user) {
+          try {
+            console.log('💾 Caching user Farcaster profile to Redis...');
+            fetch('/api/farcaster/cache-profile', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                address: address,
+                profile: context.user
+              })
+            }).catch(err => console.warn('Profile cache failed:', err));
+          } catch (error) {
+            console.warn('Failed to cache user profile:', error);
+          }
+        }
+        
         try {
           console.log('⏳ Waiting for blockchain propagation before auto-sync...');
           await new Promise(resolve => setTimeout(resolve, 3000));

@@ -1,4 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { redis, REDIS_KEYS, CachedFarcasterProfile } from '../../../../lib/redis';
+
+// TTL for cached profiles: 7 days in seconds
+const PROFILE_CACHE_TTL = 7 * 24 * 60 * 60;
+
+interface FarcasterProfile {
+  fid: string | null;
+  address: string;
+  username: string | null;
+  display_name: string | null;
+  pfp_url: string | null;
+  verified_addresses?: {
+    eth_addresses: string[];
+    sol_addresses: string[];
+  };
+  isBaseVerified?: boolean;
+  isWalletOnly?: boolean;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,34 +29,90 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!process.env.NEYNAR_API_KEY) {
-      return NextResponse.json(
-        { success: false, error: 'Neynar API key not configured' },
-        { status: 500 }
-      );
+    if (addresses.length === 0) {
+      return NextResponse.json({
+        success: true,
+        profiles: []
+      });
     }
 
-    // Try to fetch real Farcaster profiles using Neynar API
-    try {
-      const profiles = [];
+    const normalizedAddresses = addresses.map((a: string) => a.toLowerCase());
+    const profiles: FarcasterProfile[] = [];
+    let cachedCount = 0;
+    let neynarCount = 0;
+
+    // Step 1: Check Redis cache first (batch read with MGET)
+    console.log(`🔍 Checking Redis cache for ${normalizedAddresses.length} addresses...`);
+    
+    const cacheKeys = normalizedAddresses.map(addr => REDIS_KEYS.FARCASTER_PROFILE(addr));
+    const cachedResults = await redis.mget<(string | null)[]>(...cacheKeys);
+    
+    const missingAddresses: string[] = [];
+    const addressToOriginal: Record<string, string> = {};
+    
+    // Map normalized to original addresses
+    addresses.forEach((addr: string) => {
+      addressToOriginal[addr.toLowerCase()] = addr;
+    });
+
+    // Process cached results
+    cachedResults.forEach((result, index) => {
+      const normalizedAddr = normalizedAddresses[index];
+      const originalAddr = addressToOriginal[normalizedAddr] || normalizedAddr;
+      
+      if (result) {
+        try {
+          const cached: CachedFarcasterProfile = typeof result === 'string' ? JSON.parse(result) : result;
+          
+          // Check if cache is still valid (within TTL)
+          const cacheAge = Date.now() - cached.cached_at;
+          const maxAge = PROFILE_CACHE_TTL * 1000; // Convert to milliseconds
+          
+          if (cacheAge < maxAge) {
+            profiles.push({
+              fid: cached.fid,
+              address: originalAddr,
+              username: cached.username,
+              display_name: cached.display_name,
+              pfp_url: cached.pfp_url,
+              verified_addresses: {
+                eth_addresses: [originalAddr],
+                sol_addresses: []
+              },
+              isBaseVerified: false,
+              isWalletOnly: !cached.fid
+            });
+            cachedCount++;
+            return;
+          }
+        } catch (parseError) {
+          console.warn(`⚠️ Failed to parse cached profile for ${normalizedAddr}:`, parseError);
+        }
+      }
+      
+      // Add to missing addresses list
+      missingAddresses.push(originalAddr);
+    });
+
+    console.log(`📊 Cache results: ${cachedCount} cached, ${missingAddresses.length} missing`);
+
+    // Step 2: Fetch missing addresses from Neynar API
+    if (missingAddresses.length > 0 && process.env.NEYNAR_API_KEY) {
+      console.log(`🌐 Fetching ${missingAddresses.length} profiles from Neynar API...`);
       
       // Split addresses into chunks of 10 to avoid API limits
       const chunkSize = 10;
-      const addressChunks = [];
-      for (let i = 0; i < addresses.length; i += chunkSize) {
-        addressChunks.push(addresses.slice(i, i + chunkSize));
+      const addressChunks: string[][] = [];
+      for (let i = 0; i < missingAddresses.length; i += chunkSize) {
+        addressChunks.push(missingAddresses.slice(i, i + chunkSize));
       }
-      
-      console.log(`🔍 Fetching Farcaster profiles for ${addresses.length} addresses in ${addressChunks.length} chunks`);
-      
+
       // Process each chunk
       for (let chunkIndex = 0; chunkIndex < addressChunks.length; chunkIndex++) {
         const chunk = addressChunks[chunkIndex];
         const addressesParam = chunk.join(',');
         const neynarUrl = `https://api.neynar.com/v2/farcaster/user/bulk-by-address?addresses=${addressesParam}`;
-        
-        console.log(`🔍 Fetching chunk ${chunkIndex + 1}/${addressChunks.length}: ${chunk.length} addresses`);
-        
+
         try {
           const response = await fetch(neynarUrl, {
             method: 'GET',
@@ -47,35 +121,12 @@ export async function POST(request: NextRequest) {
               'api_key': process.env.NEYNAR_API_KEY
             }
           });
-          
+
           if (!response.ok) {
             console.warn(`⚠️ Neynar API error for chunk ${chunkIndex + 1}: ${response.status} ${response.statusText}`);
-            continue; // Skip this chunk and continue with next
-          }
-          
-          const data = await response.json();
-          console.log(`✅ Neynar API response for chunk ${chunkIndex + 1}:`, data);
-          
-          // Process each address in this chunk
-          for (const address of chunk) {
-            const addressLower = address.toLowerCase();
-            const userData = data[addressLower];
-        
-            if (userData && userData.length > 0) {
-              // Found real Farcaster profile
-              const user = userData[0]; // Take the first user if multiple found
-              profiles.push({
-                fid: user.fid.toString(),
-                address: address,
-                username: user.username,
-                display_name: user.display_name,
-                pfp_url: user.pfp_url,
-                verified_addresses: user.verified_addresses,
-                isBaseVerified: false
-              });
-              console.log(`✅ Found Farcaster profile for ${address}: ${user.display_name} (@${user.username}) - FID: ${user.fid}`);
-            } else {
-              // No Farcaster profile found - return wallet info with Base verification check
+            
+            // For failed chunks, add wallet-only profiles
+            for (const address of chunk) {
               profiles.push({
                 fid: null,
                 address: address,
@@ -86,56 +137,132 @@ export async function POST(request: NextRequest) {
                   eth_addresses: [address],
                   sol_addresses: []
                 },
-                isBaseVerified: false, // We'll check this separately
+                isBaseVerified: false,
                 isWalletOnly: true
               });
-              console.log(`⚠️ No Farcaster profile found for ${address}, will show wallet avatar`);
             }
+            continue;
           }
-          
+
+          const data = await response.json();
+
+          // Process each address in this chunk
+          for (const address of chunk) {
+            const addressLower = address.toLowerCase();
+            const userData = data[addressLower];
+
+            let profile: FarcasterProfile;
+
+            if (userData && userData.length > 0) {
+              // Found real Farcaster profile
+              const user = userData[0];
+              profile = {
+                fid: user.fid.toString(),
+                address: address,
+                username: user.username,
+                display_name: user.display_name,
+                pfp_url: user.pfp_url,
+                verified_addresses: user.verified_addresses,
+                isBaseVerified: false,
+                isWalletOnly: false
+              };
+              neynarCount++;
+              console.log(`✅ Found Farcaster profile for ${address}: ${user.display_name} (@${user.username})`);
+            } else {
+              // No Farcaster profile found
+              profile = {
+                fid: null,
+                address: address,
+                username: null,
+                display_name: null,
+                pfp_url: null,
+                verified_addresses: {
+                  eth_addresses: [address],
+                  sol_addresses: []
+                },
+                isBaseVerified: false,
+                isWalletOnly: true
+              };
+            }
+
+            profiles.push(profile);
+
+            // Cache the profile in Redis for future requests
+            const cachedProfile: CachedFarcasterProfile = {
+              fid: profile.fid,
+              username: profile.username,
+              display_name: profile.display_name,
+              pfp_url: profile.pfp_url,
+              address: addressLower,
+              cached_at: Date.now()
+            };
+
+            // Fire and forget - don't wait for cache write
+            redis.set(
+              REDIS_KEYS.FARCASTER_PROFILE(addressLower), 
+              JSON.stringify(cachedProfile), 
+              { ex: PROFILE_CACHE_TTL }
+            ).catch(err => console.warn('Cache write failed:', err));
+          }
+
           // Add delay between chunks to avoid rate limiting
           if (chunkIndex < addressChunks.length - 1) {
-            console.log(`⏳ Waiting 1 second before next chunk...`);
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 500));
           }
         } catch (chunkError) {
           console.warn(`⚠️ Error processing chunk ${chunkIndex + 1}:`, chunkError);
-          continue; // Skip this chunk and continue with next
+          
+          // For failed chunks, add wallet-only profiles
+          for (const address of chunk) {
+            profiles.push({
+              fid: null,
+              address: address,
+              username: null,
+              display_name: null,
+              pfp_url: null,
+              verified_addresses: {
+                eth_addresses: [address],
+                sol_addresses: []
+              },
+              isBaseVerified: false,
+              isWalletOnly: true
+            });
+          }
         }
       }
+    } else if (missingAddresses.length > 0) {
+      // No Neynar API key - add wallet-only profiles for missing addresses
+      console.log(`⚠️ No Neynar API key, adding ${missingAddresses.length} wallet-only profiles`);
       
-      console.log(`✅ Processed ${addressChunks.length} chunks, found ${profiles.length} profiles`);
-      
-      return NextResponse.json({
-        success: true,
-        profiles: profiles
-      });
-
-    } catch (neynarError) {
-      console.error('Neynar API error:', neynarError);
-      
-      // Fallback to mock profiles if Neynar API fails
-      const mockProfiles = addresses.map((address, index) => ({
-        fid: Math.abs(address.split('').reduce((a: number, b: string) => {
-          a = ((a << 5) - a) + b.charCodeAt(0);
-          return a & a;
-        }, 0)).toString(),
-        address: address,
-        username: `user_${address.slice(2, 6)}`,
-        display_name: `User ${address.slice(2, 6)}`,
-        pfp_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${address.slice(2, 6)}`,
-        verified_addresses: {
-          eth_addresses: [address],
-          sol_addresses: []
-        }
-      }));
-
-      return NextResponse.json({
-        success: true,
-        profiles: mockProfiles,
-        fallback: true
-      });
+      for (const address of missingAddresses) {
+        profiles.push({
+          fid: null,
+          address: address,
+          username: null,
+          display_name: null,
+          pfp_url: null,
+          verified_addresses: {
+            eth_addresses: [address],
+            sol_addresses: []
+          },
+          isBaseVerified: false,
+          isWalletOnly: true
+        });
+      }
     }
+
+    console.log(`✅ Total profiles: ${profiles.length} (${cachedCount} from cache, ${neynarCount} from Neynar)`);
+
+    return NextResponse.json({
+      success: true,
+      profiles: profiles,
+      stats: {
+        total: profiles.length,
+        fromCache: cachedCount,
+        fromNeynar: neynarCount,
+        walletOnly: profiles.filter(p => p.isWalletOnly).length
+      }
+    });
 
   } catch (error) {
     console.error('Error fetching Farcaster profiles:', error);
