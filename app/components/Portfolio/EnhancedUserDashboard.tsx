@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { LegacyCard } from './LegacyCard';
 import GradientText from '@/components/GradientText';
-import { useComposeCast } from '@coinbase/onchainkit/minikit';
+import { useComposeCast, useOpenUrl } from '@coinbase/onchainkit/minikit';
 import sdk from '@farcaster/miniapp-sdk';
 import { Share2 } from 'lucide-react';
 import './EnhancedUserDashboard.css';
@@ -75,6 +75,30 @@ export function EnhancedUserDashboard() {
   const { address } = useAccount();
   const { writeContract } = useWriteContract();
   const { composeCast: minikitComposeCast } = useComposeCast();
+  const minikitOpenUrl = useOpenUrl();
+  
+  // Universal openUrl function - works on both MiniKit (Base app) and Farcaster SDK (Warpcast)
+  const openUrl = useCallback(async (url: string) => {
+    // Try MiniKit first (Base app)
+    try {
+      if (minikitOpenUrl) {
+        console.log('📱 Using MiniKit openUrl...');
+        minikitOpenUrl(url);
+        return;
+      }
+    } catch (error) {
+      console.log('MiniKit openUrl failed, trying Farcaster SDK...', error);
+    }
+    
+    // Fallback to Farcaster SDK (Warpcast and other clients)
+    try {
+      console.log('📱 Using Farcaster SDK openUrl...');
+      await sdk.actions.openUrl(url);
+    } catch (error) {
+      console.error('Both openUrl methods failed, using window.open:', error);
+      window.open(url, '_blank');
+    }
+  }, [minikitOpenUrl]);
   
   // Universal share function - works on both MiniKit (Base app) and Farcaster SDK (Warpcast)
   const composeCast = useCallback(async (params: { text: string; embeds?: string[] }) => {
@@ -1433,7 +1457,7 @@ export function EnhancedUserDashboard() {
   };
 
   // Perform share based on selected option and platform
-  const performShareStats = (shareType: 'full' | 'profit-only', platform: 'farcaster' | 'twitter') => {
+  const performShareStats = async (shareType: 'full' | 'profit-only', platform: 'farcaster' | 'twitter') => {
     const ethIsProfit = ethTotalPotentialProfit >= 0;
     const swipeIsProfit = swipeTotalPotentialProfit >= 0;
     const overallProfit = ethIsProfit && swipeIsProfit;
@@ -1502,23 +1526,24 @@ export function EnhancedUserDashboard() {
     const shareUrl = 'https://theswipe.app';
     shareText += `\n\nSwipe to predict! 🎯`;
     
-    const encodedText = encodeURIComponent(shareText);
-    const isInMiniapp = typeof window !== 'undefined' && window.parent !== window;
-    
-    let targetUrl: string;
-    
-    if (platform === 'twitter') {
-      targetUrl = `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodeURIComponent(shareUrl)}`;
+    if (platform === 'farcaster') {
+      // Use native composeCast for Farcaster - opens in-app compose dialog
+      try {
+        await composeCast({
+          text: shareText,
+          embeds: [shareUrl]
+        });
+        console.log('✅ Stats shared via native composeCast');
+      } catch (error) {
+        console.error('Failed to share stats via composeCast, falling back to URL:', error);
+        // Fallback to URL only if composeCast completely fails
+        const warpcastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(shareText)}&embeds[]=${encodeURIComponent(shareUrl)}`;
+        window.open(warpcastUrl, '_blank');
+      }
     } else {
-      targetUrl = `https://warpcast.com/~/compose?text=${encodedText}&embeds[]=${encodeURIComponent(shareUrl)}`;
-    }
-    
-    if (isInMiniapp) {
-      sdk.actions.openUrl(targetUrl).catch(() => {
-        window.open(targetUrl, '_blank');
-      });
-    } else {
-      window.open(targetUrl, '_blank');
+      // Twitter - use universal openUrl (MiniKit or Farcaster SDK)
+      const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
+      await openUrl(twitterUrl);
     }
     
     setShowShareDropdown(false);

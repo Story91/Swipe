@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { RedisPrediction } from '../../../lib/types/redis';
 import { Share2 } from 'lucide-react';
 import sdk from '@farcaster/miniapp-sdk';
-import { useComposeCast } from '@coinbase/onchainkit/minikit';
+import { useComposeCast, useOpenUrl } from '@coinbase/onchainkit/minikit';
 import './LegacyCard.css';
 
 interface LegacyCardProps {
@@ -70,6 +70,57 @@ interface LegacyCardProps {
 export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, onShareResult }: LegacyCardProps) {
   const [showShareDropdown, setShowShareDropdown] = useState(false);
   const { composeCast: minikitComposeCast } = useComposeCast();
+  const minikitOpenUrl = useOpenUrl();
+  
+  // Universal openUrl function - works on both MiniKit (Base app) and Farcaster SDK (Warpcast)
+  const openUrl = async (url: string) => {
+    // Try MiniKit first (Base app)
+    try {
+      if (minikitOpenUrl) {
+        console.log('📱 Using MiniKit openUrl for legacy card...');
+        minikitOpenUrl(url);
+        return;
+      }
+    } catch (error) {
+      console.log('MiniKit openUrl failed, trying Farcaster SDK...', error);
+    }
+    
+    // Fallback to Farcaster SDK (Warpcast and other clients)
+    try {
+      console.log('📱 Using Farcaster SDK openUrl for legacy card...');
+      await sdk.actions.openUrl(url);
+    } catch (error) {
+      console.error('Both openUrl methods failed, using window.open:', error);
+      window.open(url, '_blank');
+    }
+  };
+  
+  // Universal share function - works on both MiniKit (Base app) and Farcaster SDK (Warpcast)
+  const composeCast = async (params: { text: string; embeds?: string[] }) => {
+    // Try MiniKit first (Base app)
+    try {
+      if (minikitComposeCast) {
+        console.log('📱 Using MiniKit composeCast for legacy card share...');
+        const embedsParam = params.embeds?.slice(0, 2) as [] | [string] | [string, string] | undefined;
+        await minikitComposeCast({ text: params.text, embeds: embedsParam });
+        return;
+      }
+    } catch (error) {
+      console.log('MiniKit composeCast failed, trying Farcaster SDK...', error);
+    }
+    
+    // Fallback to Farcaster SDK (Warpcast and other clients)
+    try {
+      console.log('📱 Using Farcaster SDK composeCast for legacy card share...');
+      await sdk.actions.composeCast({
+        text: params.text,
+        embeds: params.embeds?.map(url => ({ url })) as any
+      });
+    } catch (error) {
+      console.error('Both composeCast methods failed:', error);
+      throw error;
+    }
+  };
   
   // Get mention tag based on platform
   const getMention = (platform: 'farcaster' | 'twitter') => platform === 'twitter' ? '@swipe_ai_' : '@swipeai';
@@ -216,30 +267,30 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, on
     return { text: shareText, url: predictionUrl };
   };
 
-  // Handle share to Farcaster
+  // Handle share to Farcaster - uses native composeCast for in-app experience
   const handleShareFarcaster = async () => {
     // Use different share text based on prediction status, with Farcaster tag
     const { text, url } = prediction.status === 'active' ? buildActiveShareText('farcaster') : buildShareText('farcaster');
     if (!text) return;
     
-    const warpcastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(url)}`;
-    
-    const isInMiniApp = typeof window !== 'undefined' && window.parent !== window;
-    
-    if (isInMiniApp) {
-      try {
-        await sdk.actions.openUrl(warpcastUrl);
-      } catch (error) {
-        window.open(warpcastUrl, '_blank');
-      }
-    } else {
+    try {
+      // Use native composeCast - opens in-app compose dialog
+      await composeCast({
+        text: text,
+        embeds: [url]
+      });
+      console.log('✅ Shared via native composeCast');
+    } catch (error) {
+      console.error('Failed to share via composeCast, falling back to URL:', error);
+      // Fallback to URL only if composeCast completely fails
+      const warpcastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(url)}`;
       window.open(warpcastUrl, '_blank');
     }
     
     setShowShareDropdown(false);
   };
   
-  // Handle share to Twitter/X
+  // Handle share to Twitter/X - opens Twitter intent URL
   const handleShareTwitter = async () => {
     // Use different share text based on prediction status, with Twitter tag
     const { text, url } = prediction.status === 'active' ? buildActiveShareText('twitter') : buildShareText('twitter');
@@ -247,17 +298,8 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, on
     
     const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
     
-    const isInMiniApp = typeof window !== 'undefined' && window.parent !== window;
-    
-    if (isInMiniApp) {
-      try {
-        await sdk.actions.openUrl(twitterUrl);
-      } catch (error) {
-        window.open(twitterUrl, '_blank');
-      }
-    } else {
-      window.open(twitterUrl, '_blank');
-    }
+    // Use universal openUrl (MiniKit or Farcaster SDK)
+    await openUrl(twitterUrl);
     
     setShowShareDropdown(false);
   };
