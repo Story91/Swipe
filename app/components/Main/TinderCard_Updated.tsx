@@ -547,12 +547,14 @@ export default function TinderCardComponent({ items, activeDashboard: propActive
     const envApprover1 = process.env.NEXT_PUBLIC_APPROVER_1?.toLowerCase();
     const envApprover2 = process.env.NEXT_PUBLIC_APPROVER_2?.toLowerCase();
     const envApprover3 = process.env.NEXT_PUBLIC_APPROVER_3?.toLowerCase();
+    const envApprover4 = process.env.NEXT_PUBLIC_APPROVER_4?.toLowerCase();
     const envAdmin = process.env.NEXT_PUBLIC_ADMIN_1?.toLowerCase();
 
     const isEnvApprover = address && (
       envApprover1 === address.toLowerCase() ||
       envApprover2 === address.toLowerCase() ||
-      envApprover3 === address.toLowerCase()
+      envApprover3 === address.toLowerCase() ||
+      envApprover4 === address.toLowerCase()
     );
     const isEnvAdmin = address && envAdmin === address.toLowerCase();
 

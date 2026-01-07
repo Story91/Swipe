@@ -144,10 +144,12 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
   const approver1 = process.env.NEXT_PUBLIC_APPROVER_1?.toLowerCase();
   const approver2 = process.env.NEXT_PUBLIC_APPROVER_2?.toLowerCase();
   const approver3 = process.env.NEXT_PUBLIC_APPROVER_3?.toLowerCase();
+  const approver4 = process.env.NEXT_PUBLIC_APPROVER_4?.toLowerCase();
   const isApprovedCreator = address && (
     approver1 === address.toLowerCase() || 
     approver2 === address.toLowerCase() ||
-    approver3 === address.toLowerCase()
+    approver3 === address.toLowerCase() ||
+    approver4 === address.toLowerCase()
   );
 
   const { data: contractOwner } = useReadContract({
