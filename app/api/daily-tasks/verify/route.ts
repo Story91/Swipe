@@ -55,15 +55,26 @@ export async function POST(request: NextRequest) {
 
     const redis = (await import('../../../../lib/redis')).default;
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-    const taskKey = `daily-tasks:${address.toLowerCase()}:${taskType}:${today}`;
+    
+    // Achievements (one-time rewards) vs Daily Tasks
+    const isAchievement = ['BETA_TESTER', 'FOLLOW_SOCIALS', 'STREAK_7', 'STREAK_30'].includes(taskType);
+    
+    // For achievements, use a permanent key (not daily)
+    // For daily tasks, use a daily key that expires
+    const taskKey = isAchievement 
+      ? `achievements:${address.toLowerCase()}:${taskType}`
+      : `daily-tasks:${address.toLowerCase()}:${taskType}:${today}`;
     
     // For checkOnly mode, skip the "already completed" check - we just want to verify status
     if (!checkOnly) {
-      // Check if task was already completed today
+      // Check if task/achievement was already completed
       const alreadyCompleted = await redis.get(taskKey);
       if (alreadyCompleted) {
+        const errorMsg = isAchievement 
+          ? 'Achievement already claimed' 
+          : 'Task already completed today';
         return NextResponse.json(
-          { success: false, error: 'Task already completed today', alreadyCompleted: true },
+          { success: false, error: errorMsg, alreadyCompleted: true },
           { status: 400 }
         );
       }
@@ -147,9 +158,15 @@ export async function POST(request: NextRequest) {
 
     const signature = await generateTaskSignature(address, taskType);
 
-    // Mark task as completed for today (expire at midnight)
-    const secondsUntilMidnight = getSecondsUntilMidnight();
-    await redis.set(taskKey, 'completed', { ex: secondsUntilMidnight });
+    // Mark task/achievement as completed
+    if (isAchievement) {
+      // Achievements are permanent (no expiry)
+      await redis.set(taskKey, 'completed');
+    } else {
+      // Daily tasks expire at midnight
+      const secondsUntilMidnight = getSecondsUntilMidnight();
+      await redis.set(taskKey, 'completed', { ex: secondsUntilMidnight });
+    }
 
     // Track completion in stats
     await redis.hincrby('daily-tasks:stats', `${taskType}:completions`, 1);
