@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useWalletClient } from "wagmi";
 import { formatEther, parseEther } from "viem";
-import { useNotification } from "@coinbase/onchainkit/minikit";
+import { useNotification, useComposeCast } from "@coinbase/onchainkit/minikit";
+import sdk from "@farcaster/miniapp-sdk";
 import Image from "next/image";
 import { Share2 } from "lucide-react";
 import "./DailyTasks.css";
@@ -28,10 +29,9 @@ const SHARE_TEXTS = [
   "The future is clear when you're swiping on @swipeai 🔮 $SWIPE",
 ];
 
-// Get random share text
+// Get random share text (returns plain text, not encoded)
 const getRandomShareText = () => {
-  const text = SHARE_TEXTS[Math.floor(Math.random() * SHARE_TEXTS.length)];
-  return encodeURIComponent(text + "\n\nhttps://theswipe.app");
+  return SHARE_TEXTS[Math.floor(Math.random() * SHARE_TEXTS.length)];
 };
 
 // Contract ABI (only functions we need)
@@ -183,6 +183,34 @@ export function DailyTasks() {
   const { address, isConnected } = useAccount();
   const sendNotification = useNotification();
   const publicClient = usePublicClient();
+  const { composeCast: minikitComposeCast } = useComposeCast();
+  
+  // Universal composeCast function - works on both MiniKit (Base app) and Farcaster SDK (Warpcast)
+  const composeCast = useCallback(async (params: { text: string; embeds?: string[] }) => {
+    // Try MiniKit first (Base app)
+    try {
+      if (minikitComposeCast) {
+        console.log('📱 Using MiniKit composeCast for share...');
+        const embedsParam = params.embeds?.slice(0, 2) as [] | [string] | [string, string] | undefined;
+        await minikitComposeCast({ text: params.text, embeds: embedsParam });
+        return;
+      }
+    } catch (error) {
+      console.log('MiniKit composeCast failed, trying Farcaster SDK...', error);
+    }
+    
+    // Fallback to Farcaster SDK (Warpcast and other clients)
+    try {
+      console.log('📱 Using Farcaster SDK composeCast for share...');
+      await sdk.actions.composeCast({
+        text: params.text,
+        embeds: params.embeds?.map(url => ({ url })) as any
+      });
+    } catch (error) {
+      console.error('Both composeCast methods failed:', error);
+      throw error;
+    }
+  }, [minikitComposeCast]);
   
   const [countdown, setCountdown] = useState<string>("");
   const [isClaimLoading, setIsClaimLoading] = useState(false);
@@ -780,14 +808,26 @@ export function DailyTasks() {
                   </div>
                 ) : (
                   <div className="task-buttons">
-                    <a 
-                      href={`https://warpcast.com/~/compose?text=${getRandomShareText()}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button 
                       className="task-action-btn"
+                      onClick={async () => {
+                        try {
+                          const shareText = getRandomShareText();
+                          await composeCast({
+                            text: shareText,
+                            embeds: ['https://theswipe.app']
+                          });
+                        } catch (error) {
+                          console.error('Failed to share, falling back to URL:', error);
+                          // Fallback to window.open if SDK fails completely
+                          const shareText = getRandomShareText();
+                          const warpcastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(shareText + '\n\nhttps://theswipe.app')}`;
+                          window.open(warpcastUrl, '_blank');
+                        }
+                      }}
                     >
                       <Share2 size={14} /> Share
-                    </a>
+                    </button>
                     <button 
                       className="task-verify-btn"
                       onClick={() => setShowCastInput(true)}
