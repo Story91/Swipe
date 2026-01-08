@@ -253,7 +253,7 @@ async function verifyFarcasterCast(
       {
         headers: {
           'accept': 'application/json',
-          'api_key': NEYNAR_API_KEY,
+          'x-api-key': NEYNAR_API_KEY,
         },
       }
     );
@@ -481,29 +481,49 @@ async function verifyBetaTester(address: string): Promise<boolean> {
 
 /**
  * Get Farcaster FID from Ethereum address
+ * Uses multiple methods to find user's FID
  */
 async function getFidFromAddress(address: string): Promise<number | null> {
   if (!NEYNAR_API_KEY) {
+    console.log('⚠️ NEYNAR_API_KEY not set');
     return null;
   }
 
   try {
+    // Method 1: Try by_verification endpoint (for verified addresses)
+    console.log(`🔍 Looking up FID for address: ${address}`);
+    
     const response = await fetch(
-      `https://api.neynar.com/v2/farcaster/user/by_verification?address=${address}`,
+      `https://api.neynar.com/v2/farcaster/user/bulk-by-address?addresses=${address}`,
       {
         headers: {
           'accept': 'application/json',
-          'api_key': NEYNAR_API_KEY,
+          'x-api-key': NEYNAR_API_KEY,
         },
       }
     );
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.log(`❌ Neynar API error: ${response.status}`);
+      return null;
+    }
 
     const data = await response.json();
-    return data.user?.fid || null;
+    console.log(`📊 Neynar response:`, JSON.stringify(data).slice(0, 500));
+    
+    // Response format: { [address]: [users] }
+    const users = data[address.toLowerCase()] || data[address];
+    if (users && users.length > 0) {
+      const fid = users[0].fid;
+      console.log(`✅ Found FID ${fid} for address ${address}`);
+      return fid;
+    }
+    
+    console.log(`❌ No FID found for address ${address}`);
+    return null;
 
-  } catch {
+  } catch (error) {
+    console.error('getFidFromAddress error:', error);
     return null;
   }
 }
@@ -513,42 +533,52 @@ async function getFidFromAddress(address: string): Promise<number | null> {
  * Uses fetchBulkUsers with viewer_fid to check if user follows swipeai
  */
 async function verifyFollowsSwipeAI(fid: number): Promise<boolean> {
+  console.log(`🔍 Checking if FID ${fid} follows @swipeai (FID: ${SWIPEAI_FID})`);
+  
   if (!NEYNAR_API_KEY || !SWIPEAI_FID) {
     console.log('⚠️ Neynar/SwipeAI FID not configured, auto-approving for testing');
+    console.log(`   NEYNAR_API_KEY set: ${!!NEYNAR_API_KEY}`);
+    console.log(`   SWIPEAI_FID set: ${!!SWIPEAI_FID} (value: ${SWIPEAI_FID})`);
     return true;
   }
 
   try {
     // Use fetchBulkUsers API with viewer_fid to get viewer_context
     // We check if user (viewer) follows swipeai (target)
-    const response = await fetch(
-      `https://api.neynar.com/v2/farcaster/user/bulk?fids=${SWIPEAI_FID}&viewer_fid=${fid}`,
-      {
-        headers: {
-          'accept': 'application/json',
-          'api_key': NEYNAR_API_KEY,
-        },
-      }
-    );
+    const url = `https://api.neynar.com/v2/farcaster/user/bulk?fids=${SWIPEAI_FID}&viewer_fid=${fid}`;
+    console.log(`🌐 Calling Neynar API: ${url}`);
+    
+    const response = await fetch(url, {
+      headers: {
+        'accept': 'application/json',
+        'x-api-key': NEYNAR_API_KEY,
+      },
+    });
 
     if (!response.ok) {
-      console.error('Neynar API error:', response.status, await response.text());
+      const errorText = await response.text();
+      console.error(`❌ Neynar API error: ${response.status}`, errorText);
       return false;
     }
 
     const data = await response.json();
+    console.log(`📊 Neynar response:`, JSON.stringify(data).slice(0, 1000));
+    
     const users = data.users || [];
     
     if (users.length === 0) {
-      console.log('❌ SwipeAI user not found in Neynar');
+      console.log('❌ SwipeAI user not found in Neynar response');
       return false;
     }
     
     // Check viewer_context.following - this tells us if the viewer (fid) follows swipeai
     const swipeaiUser = users[0];
-    const isFollowing = swipeaiUser.viewer_context?.following === true;
+    const viewerContext = swipeaiUser.viewer_context;
+    console.log(`📊 Viewer context:`, JSON.stringify(viewerContext));
     
-    console.log(`📱 User ${fid} follows @swipeai: ${isFollowing}`);
+    const isFollowing = viewerContext?.following === true;
+    
+    console.log(`📱 User FID ${fid} follows @swipeai: ${isFollowing}`);
     return isFollowing;
 
   } catch (error) {
