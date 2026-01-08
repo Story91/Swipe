@@ -88,10 +88,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Update average streak
-    const avgStreak = await redis.hget(statsKey, 'avgStreak') || '0';
-    const totalClaims = await redis.hget(statsKey, 'totalClaims') || '1';
-    const newAvg = (parseFloat(avgStreak) * (parseInt(totalClaims) - 1) + streak) / parseInt(totalClaims);
-    await redis.hset(statsKey, 'avgStreak', newAvg.toString());
+    const avgStreakStr = (await redis.hget(statsKey, 'avgStreak') as string | null) || '0';
+    const totalClaimsStr = (await redis.hget(statsKey, 'totalClaims') as string | null) || '1';
+    const newAvg = (parseFloat(avgStreakStr) * (parseInt(totalClaimsStr) - 1) + streak) / parseInt(totalClaimsStr);
+    await redis.hset(statsKey, { avgStreak: newAvg.toString() });
 
     return NextResponse.json({
       success: true,
