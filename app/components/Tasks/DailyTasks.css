@@ -903,38 +903,47 @@
 /* ============ STATS FOOTER ============ */
 .stats-footer {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
-  gap: 20px;
-  padding: 20px;
-  background: rgba(0, 0, 0, 0.3);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  gap: 12px;
+  padding: 16px 20px;
+  background: #1a1a2e;
+  border-top: 1px solid rgba(212, 255, 0, 0.3);
 }
 
 .stat-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  padding: 16px 12px;
+  background: #252540;
+  border: 2px solid #d4ff00;
+  border-radius: 16px;
 }
 
 .stat-value {
   font-family: 'Spicy Rice', cursive;
   font-size: 20px;
-  color: #d4ff00;
+  color: #0a0a0a;
+  background: #d4ff00;
+  padding: 8px 16px;
+  border-radius: 8px;
+  display: inline-block;
 }
 
 .stat-label {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.4);
+  color: #d4ff00 !important;
   text-transform: uppercase;
   letter-spacing: 1px;
+  font-weight: 600;
 }
 
 .stat-divider {
-  width: 1px;
-  height: 30px;
-  background: rgba(255, 255, 255, 0.1);
+  display: none;
 }
 
 /* ============ POOL INFO ============ */
@@ -1113,7 +1122,13 @@
   }
 
   .stats-footer {
-    gap: 12px;
+    gap: 8px;
+    padding: 12px 16px;
+  }
+
+  .stat-item {
+    padding: 12px 8px;
+    border-radius: 12px;
   }
 
   .stat-value {
