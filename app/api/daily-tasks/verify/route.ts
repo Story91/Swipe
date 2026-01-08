@@ -158,24 +158,15 @@ export async function POST(request: NextRequest) {
 
     const signature = await generateTaskSignature(address, taskType);
 
-    // Mark task/achievement as completed
-    if (isAchievement) {
-      // Achievements are permanent (no expiry)
-      await redis.set(taskKey, 'completed');
-    } else {
-      // Daily tasks expire at midnight
-      const secondsUntilMidnight = getSecondsUntilMidnight();
-      await redis.set(taskKey, 'completed', { ex: secondsUntilMidnight });
-    }
-
-    // Track completion in stats
-    await redis.hincrby('daily-tasks:stats', `${taskType}:completions`, 1);
+    // DON'T mark as completed here - wait for on-chain transaction confirmation
+    // The /api/daily-tasks/confirm endpoint will mark it after successful tx
 
     return NextResponse.json({
       success: true,
       signature,
       taskType,
       address,
+      isAchievement, // Pass this so frontend knows
       message: getTaskSuccessMessage(taskType),
     });
 

@@ -250,6 +250,7 @@ export function DailyTasks() {
   const [referralCode, setReferralCode] = useState("");
   const [isClaimingTask, setIsClaimingTask] = useState<string | null>(null);
   const [showCastInput, setShowCastInput] = useState(false);
+  const [pendingConfirmTask, setPendingConfirmTask] = useState<string | null>(null); // Track which task to confirm after tx success
   
   // Follow status (checked via API, independent from claim status)
   const [isFollowingSwipeAI, setIsFollowingSwipeAI] = useState<boolean | null>(null);
@@ -348,20 +349,58 @@ export function DailyTasks() {
   }, [address, achievements]);
 
   // Contract write
-  const { writeContract, data: hash, isPending } = useWriteContract();
+  const { writeContract, data: hash, isPending, error: writeError, reset: resetWrite } = useWriteContract();
   
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+  const { isLoading: isConfirming, isSuccess, isError: isTxError } = useWaitForTransactionReceipt({
     hash,
   });
-
-  // Handle successful claim
+  
+  // Handle transaction errors (user rejected, failed, etc.)
   useEffect(() => {
-    if (isSuccess) {
+    if (writeError || isTxError) {
+      // User rejected or tx failed - clear pending confirm task
+      setPendingConfirmTask(null);
+      setIsClaimingTask(null);
+      setIsClaimLoading(false);
+      
+      if (writeError) {
+        console.log('Transaction rejected or failed:', writeError.message);
+      }
+    }
+  }, [writeError, isTxError]);
+
+  // Handle successful transaction - confirm task in Redis
+  useEffect(() => {
+    if (isSuccess && hash) {
       setShowConfetti(true);
       sendNotification({
-        title: "🎉 Daily Claim Successful!",
+        title: "🎉 Claim Successful!",
         body: `You received your SWIPE rewards!`,
       });
+      
+      // If we have a pending task to confirm, call /confirm endpoint
+      if (pendingConfirmTask && address) {
+        const confirmTask = async () => {
+          try {
+            await fetch('/api/daily-tasks/confirm', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                address,
+                taskType: pendingConfirmTask,
+                txHash: hash,
+              }),
+            });
+            console.log(`✅ Task ${pendingConfirmTask} confirmed in Redis with tx ${hash}`);
+          } catch (error) {
+            console.error('Failed to confirm task in Redis:', error);
+          } finally {
+            setPendingConfirmTask(null);
+            setIsClaimingTask(null);
+          }
+        };
+        confirmTask();
+      }
       
       // Refetch all data
       refetchStats();
@@ -371,7 +410,7 @@ export function DailyTasks() {
       // Hide confetti after animation
       setTimeout(() => setShowConfetti(false), 3000);
     }
-  }, [isSuccess, sendNotification, refetchStats, refetchTasks, refetchAchievements]);
+  }, [isSuccess, hash, pendingConfirmTask, address, sendNotification, refetchStats, refetchTasks, refetchAchievements]);
 
   // Countdown timer
   useEffect(() => {
@@ -479,6 +518,7 @@ export function DailyTasks() {
     if (!address || !verifiedTasks[taskType]) return;
     
     setIsClaimingTask(taskType);
+    setPendingConfirmTask(taskType); // Track which task to confirm after tx success
     
     try {
       if (DAILY_REWARDS_CONTRACT !== "0x0000000000000000000000000000000000000000") {
@@ -489,7 +529,7 @@ export function DailyTasks() {
           args: [taskType, verifiedTasks[taskType].signature as `0x${string}`],
         });
         
-        // Mark as completed locally
+        // Mark as completed locally (UI optimistic update)
         setCompletedTasksLocal(prev => ({ ...prev, [taskType]: true }));
         setVerifiedTasks(prev => {
           const updated = { ...prev };
@@ -563,10 +603,11 @@ export function DailyTasks() {
     if (!address) return;
     
     setIsClaimingTask(achievementType);
+    setPendingConfirmTask(achievementType); // Track which achievement to confirm after tx success
     setTaskError(null);
     
     try {
-      // First verify with backend to get signature
+      // First verify with backend to get signature (does NOT save to Redis yet)
       const response = await fetch('/api/daily-tasks/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -580,10 +621,12 @@ export function DailyTasks() {
 
       if (!data.success) {
         setTaskError(data.error || 'Verification failed');
+        setPendingConfirmTask(null);
         return;
       }
 
       // Now claim on-chain with signature
+      // Redis will be updated after successful tx via /confirm endpoint
       if (DAILY_REWARDS_CONTRACT !== "0x0000000000000000000000000000000000000000") {
         writeContract({
           address: DAILY_REWARDS_CONTRACT,
@@ -591,13 +634,6 @@ export function DailyTasks() {
           functionName: "claimAchievement",
           args: [achievementType, data.signature as `0x${string}`],
         });
-        
-        sendNotification({
-          title: "🏆 Achievement Unlocked!",
-          body: `You claimed your ${achievementType} reward!`,
-        });
-        
-        refetchAchievements();
       }
       
     } catch (error) {
