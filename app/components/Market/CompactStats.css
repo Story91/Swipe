@@ -25,11 +25,46 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 20px;
+  padding: 60px 20px;
   text-align: center;
   color: #d4ff00;
+  min-height: 300px;
 }
 
+/* Spinning Logo for Loading */
+.loading-logo {
+  margin-bottom: 24px;
+}
+
+.loading-logo .spinning-logo {
+  width: 80px;
+  height: 80px;
+  animation: spinLogo 1.5s linear infinite;
+  filter: drop-shadow(0 0 20px rgba(212, 255, 0, 0.5));
+}
+
+.loading-text {
+  font-size: 18px;
+  font-weight: 600;
+  color: #d4ff00;
+  font-family: "Orbitron", "Exo 2", sans-serif;
+  text-shadow: 0 0 10px rgba(212, 255, 0, 0.3);
+  margin: 0;
+}
+
+@keyframes spinLogo {
+  0% { 
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.05);
+  }
+  100% { 
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+/* Legacy spinner (fallback) */
 .loading-spinner {
   width: 36px;
   height: 36px;

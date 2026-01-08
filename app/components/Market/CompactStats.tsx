@@ -99,8 +99,10 @@ export function CompactStats() {
       <div className="compact-stats">
         <Card className="stats-loading-card">
           <CardContent className="loading-container">
-            <div className="loading-spinner"></div>
-            <p>Loading market data...</p>
+            <div className="loading-logo">
+              <img src="/splash.png" alt="Loading..." className="spinning-logo" />
+            </div>
+            <p className="loading-text">Loading market data...</p>
           </CardContent>
         </Card>
       </div>
