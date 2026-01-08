@@ -445,8 +445,11 @@ async function verifyTradingActivity(address: string): Promise<boolean> {
     // 2. Check blockchain V2 contract for StakePlaced events
     const V2_CONTRACT = process.env.NEXT_PUBLIC_CONTRACT_V2_ADDRESS as `0x${string}`;
     
-    if (V2_CONTRACT) {
+    if (V2_CONTRACT && V2_CONTRACT !== '0x0000000000000000000000000000000000000000') {
       try {
+        console.log(`🔍 Checking blockchain for StakePlaced events from ${address}...`);
+        console.log(`📍 Contract: ${V2_CONTRACT}`);
+        
         const publicClient = createPublicClient({
           chain: base,
           transport: http(process.env.ALCHEMY_RPC_URL || 'https://mainnet.base.org'),
@@ -457,9 +460,12 @@ async function verifyTradingActivity(address: string): Promise<boolean> {
         const blocksPerDay = BigInt(43200); // ~24 hours worth of blocks
         const fromBlock = currentBlock > blocksPerDay ? currentBlock - blocksPerDay : BigInt(0);
         
-        // StakePlaced event signature
+        console.log(`📊 Searching blocks ${fromBlock} to ${currentBlock}`);
+        
+        // StakePlaced event signature from PredictionMarket_V2.sol:
+        // event StakePlaced(uint256 indexed predictionId, address indexed user, bool isYes, uint256 amount, uint256 newYesTotal, uint256 newNoTotal)
         const stakePlacedEvent = parseAbiItem(
-          'event StakePlaced(uint256 indexed predictionId, address indexed user, bool isYes, uint256 amount, bool isSwipe)'
+          'event StakePlaced(uint256 indexed predictionId, address indexed user, bool isYes, uint256 amount, uint256 newYesTotal, uint256 newNoTotal)'
         );
         
         const logs = await publicClient.getLogs({
@@ -472,14 +478,27 @@ async function verifyTradingActivity(address: string): Promise<boolean> {
           toBlock: currentBlock,
         });
         
+        console.log(`📊 Found ${logs.length} StakePlaced events for ${address}`);
+        
         if (logs.length > 0) {
-          console.log(`✅ Found ${logs.length} StakePlaced events on blockchain for ${address} today`);
-          return true;
+          // Verify that at least one stake was made today (UTC)
+          for (const log of logs) {
+            const block = await publicClient.getBlock({ blockNumber: log.blockNumber });
+            const blockTimestamp = Number(block.timestamp) * 1000; // Convert to ms
+            
+            if (blockTimestamp >= todayTimestamp) {
+              console.log(`✅ Found stake from today: block ${log.blockNumber}, tx ${log.transactionHash}`);
+              return true;
+            }
+          }
+          console.log(`⚠️ Found stakes but none from today (UTC)`);
         }
       } catch (blockchainError) {
         console.error('Blockchain check error:', blockchainError);
-        // Continue - blockchain check is optional
+        // Continue - blockchain check is optional, Redis check above may have found it
       }
+    } else {
+      console.log('⚠️ V2_CONTRACT not configured, skipping blockchain check');
     }
 
     console.log(`❌ No trading activity found for ${address} today`);
