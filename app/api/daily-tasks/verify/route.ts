@@ -232,37 +232,45 @@ async function verifyFarcasterCast(
   castHashOrUrl: string
 ): Promise<{ valid: boolean; error?: string }> {
   
-  // Extract cast hash from URL if needed
+  const input = castHashOrUrl.trim();
+  
+  // Determine if input is a URL or a hash
+  // According to Neynar docs: Cast URLs don't contain full hash, so we must use type=url for URLs
   // Supported URL formats:
   // - https://warpcast.com/username/0x123abc
-  // - https://farcaster.xyz/username/0x123abc
+  // - https://farcaster.xyz/username/0x123abc  
   // - https://base.app/post/0x123abc
-  // - Direct hash: 0x123abc
-  let castHash = castHashOrUrl.trim();
+  // - Direct hash: 0x123abc (full 64-char hash)
   
-  // Check if it's a URL (contains / and looks like a URL)
-  if (castHash.includes('/')) {
-    const parts = castHash.split('/');
-    // Get the last part which should be the hash
-    castHash = parts[parts.length - 1];
+  const isUrl = input.includes('://') || input.includes('warpcast.com') || 
+                input.includes('farcaster.xyz') || input.includes('base.app');
+  
+  let identifier: string;
+  let lookupType: 'url' | 'hash';
+  
+  if (isUrl) {
+    // Use the full URL for Neynar lookup (they resolve it to full hash internally)
+    identifier = encodeURIComponent(input);
+    lookupType = 'url';
+    console.log(`🔍 Verifying cast by URL: ${input}`);
+  } else {
+    // Direct hash input
+    let castHash = input;
     
-    // Handle query params if any (e.g., ?something=value)
-    if (castHash.includes('?')) {
-      castHash = castHash.split('?')[0];
+    // Validate hash format
+    if (!castHash.startsWith('0x') && !castHash.match(/^[a-fA-F0-9]+$/)) {
+      return { valid: false, error: 'Invalid cast URL or hash format' };
     }
+    
+    // Remove 0x prefix if present for Neynar API call
+    if (castHash.startsWith('0x')) {
+      castHash = castHash.slice(2);
+    }
+    
+    identifier = castHash;
+    lookupType = 'hash';
+    console.log(`🔍 Verifying cast by hash: ${castHash}`);
   }
-  
-  // Validate hash format
-  if (!castHash.startsWith('0x') && !castHash.match(/^[a-fA-F0-9]+$/)) {
-    return { valid: false, error: 'Invalid cast URL or hash format' };
-  }
-  
-  // Remove 0x prefix if present for Neynar API call
-  if (castHash.startsWith('0x')) {
-    castHash = castHash.slice(2);
-  }
-  
-  console.log(`🔍 Verifying cast hash: ${castHash} from URL: ${castHashOrUrl}`);
 
   if (!NEYNAR_API_KEY) {
     console.log('⚠️ Neynar API key not configured, auto-approving for testing');
@@ -271,8 +279,10 @@ async function verifyFarcasterCast(
 
   try {
     // Fetch cast details from Neynar
+    // Use type=url for URLs (Neynar resolves short hash to full hash)
+    // Use type=hash for direct hash input
     const response = await fetch(
-      `https://api.neynar.com/v2/farcaster/cast?identifier=${castHash}&type=hash`,
+      `https://api.neynar.com/v2/farcaster/cast?identifier=${identifier}&type=${lookupType}`,
       {
         headers: {
           'accept': 'application/json',
