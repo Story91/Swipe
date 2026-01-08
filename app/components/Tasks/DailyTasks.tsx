@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useWalletClient } from "wagmi";
 import { formatEther, parseEther } from "viem";
-import { useNotification, useComposeCast } from "@coinbase/onchainkit/minikit";
+import { useNotification, useComposeCast, useOpenUrl } from "@coinbase/onchainkit/minikit";
 import sdk from "@farcaster/miniapp-sdk";
 import Image from "next/image";
 import { Share2 } from "lucide-react";
@@ -184,6 +184,30 @@ export function DailyTasks() {
   const sendNotification = useNotification();
   const publicClient = usePublicClient();
   const { composeCast: minikitComposeCast } = useComposeCast();
+  const minikitOpenUrl = useOpenUrl();
+  
+  // Universal openUrl function - works on both MiniKit (Base app) and Farcaster SDK (Warpcast)
+  const openUrl = useCallback(async (url: string) => {
+    // Try MiniKit first (Base app)
+    try {
+      if (minikitOpenUrl) {
+        console.log('📱 Using MiniKit openUrl...');
+        minikitOpenUrl(url);
+        return;
+      }
+    } catch (error) {
+      console.log('MiniKit openUrl failed, trying Farcaster SDK...', error);
+    }
+    
+    // Fallback to Farcaster SDK (Warpcast and other clients)
+    try {
+      console.log('📱 Using Farcaster SDK openUrl...');
+      await sdk.actions.openUrl(url);
+    } catch (error) {
+      console.error('Both openUrl methods failed, using window.open:', error);
+      window.open(url, '_blank');
+    }
+  }, [minikitOpenUrl]);
   
   // Universal composeCast function - works on both MiniKit (Base app) and Farcaster SDK (Warpcast)
   const composeCast = useCallback(async (params: { text: string; embeds?: string[] }) => {
@@ -226,6 +250,10 @@ export function DailyTasks() {
   const [referralCode, setReferralCode] = useState("");
   const [isClaimingTask, setIsClaimingTask] = useState<string | null>(null);
   const [showCastInput, setShowCastInput] = useState(false);
+  
+  // Follow status (checked via API, independent from claim status)
+  const [isFollowingSwipeAI, setIsFollowingSwipeAI] = useState<boolean | null>(null);
+  const [isCheckingFollow, setIsCheckingFollow] = useState(false);
   
   // Contract reads
   const { data: userStats, refetch: refetchStats } = useReadContract({
@@ -279,6 +307,44 @@ export function DailyTasks() {
   });
 
   const hasUsedReferral = hasUsedReferralData as boolean | undefined;
+
+  // Check if user follows @swipeai (for showing Follow vs Claim button)
+  useEffect(() => {
+    const checkFollowStatus = async () => {
+      if (!address) return;
+      
+      // Skip if already claimed (hasFollowedSocials from contract)
+      const hasClaimedFollow = achievements ? (achievements as any)[1] as boolean : false;
+      if (hasClaimedFollow) {
+        setIsFollowingSwipeAI(true);
+        return;
+      }
+      
+      setIsCheckingFollow(true);
+      try {
+        // Try to verify follow via API (will return success if user follows)
+        const response = await fetch('/api/daily-tasks/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            address,
+            taskType: 'FOLLOW_SOCIALS',
+          }),
+        });
+        
+        const data = await response.json();
+        // If API returns success, user is following
+        setIsFollowingSwipeAI(data.success === true);
+      } catch (error) {
+        console.error('Failed to check follow status:', error);
+        setIsFollowingSwipeAI(false);
+      } finally {
+        setIsCheckingFollow(false);
+      }
+    };
+    
+    checkFollowStatus();
+  }, [address, achievements]);
 
   // Contract write
   const { writeContract, data: hash, isPending } = useWriteContract();
@@ -935,30 +1001,34 @@ export function DailyTasks() {
             </div>
 
             {/* Follow Socials - claimable */}
-            <div className={`achievement-badge ${achievementData?.hasFollowedSocials ? 'unlocked' : 'locked'}`}>
+            <div className={`achievement-badge ${achievementData?.hasFollowedSocials ? 'unlocked' : isFollowingSwipeAI ? 'ready-to-claim' : 'locked'}`}>
               <span className="badge-icon">👥</span>
               <span className="badge-name">Follow @swipeai</span>
               <span className="badge-reward">100k SWIPE</span>
-              {!achievementData?.hasFollowedSocials && (
-                <div className="achievement-actions">
-                  <a 
-                    href="https://warpcast.com/swipeai" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="achievement-follow-btn"
-                  >
-                    Follow
-                  </a>
-                  <button 
-                    className="achievement-claim-btn"
-                    onClick={() => handleClaimAchievement('FOLLOW_SOCIALS')}
-                    disabled={isClaimingTask === 'FOLLOW_SOCIALS'}
-                  >
-                    {isClaimingTask === 'FOLLOW_SOCIALS' ? '...' : 'Claim'}
-                  </button>
-                </div>
-              )}
+              
+              {/* Already claimed */}
               {achievementData?.hasFollowedSocials && <span className="achievement-done">✅</span>}
+              
+              {/* Following but not claimed yet - show Claim button */}
+              {!achievementData?.hasFollowedSocials && isFollowingSwipeAI && (
+                <button 
+                  className="achievement-claim-btn pulse-claim"
+                  onClick={() => handleClaimAchievement('FOLLOW_SOCIALS')}
+                  disabled={isClaimingTask === 'FOLLOW_SOCIALS'}
+                >
+                  {isClaimingTask === 'FOLLOW_SOCIALS' ? '...' : 'Claim'}
+                </button>
+              )}
+              
+              {/* Not following yet - show Follow button */}
+              {!achievementData?.hasFollowedSocials && !isFollowingSwipeAI && (
+                <button 
+                  className="achievement-follow-btn"
+                  onClick={() => openUrl('https://warpcast.com/swipeai')}
+                >
+                  {isCheckingFollow ? '...' : 'Follow'}
+                </button>
+              )}
             </div>
 
             {/* 7-Day Streak - automatic */}
