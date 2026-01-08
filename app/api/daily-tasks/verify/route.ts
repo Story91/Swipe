@@ -333,40 +333,41 @@ async function verifyPredictionCreated(address: string): Promise<boolean> {
 
 /**
  * Verify user has trading activity today (placed a bet)
+ * Checks both Redis and blockchain (V2 contract)
  */
 async function verifyTradingActivity(address: string): Promise<boolean> {
   try {
     const redis = (await import('../../../../lib/redis')).default;
+    const { createPublicClient, http, parseAbiItem } = await import('viem');
+    const { base } = await import('viem/chains');
     
-    // Check user's stakes in predictions
-    const predictions = await redis.hgetall('predictions');
-    
-    if (!predictions || Object.keys(predictions).length === 0) {
-      return false;
-    }
-
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayTimestamp = today.getTime();
-
-    for (const [, value] of Object.entries(predictions)) {
-      try {
-        const prediction = JSON.parse(value as string);
-        
-        // Check if user has any stakes in this prediction
-        if (prediction.stakes) {
-          for (const stake of prediction.stakes) {
-            const stakeMatch = stake.user?.toLowerCase() === address.toLowerCase();
-            const stakedToday = new Date(stake.timestamp || stake.createdAt).getTime() >= todayTimestamp;
-            
-            if (stakeMatch && stakedToday) {
-              console.log(`✅ Found stake by ${address} today in prediction:`, prediction.id);
-              return true;
+    
+    // 1. First check Redis for faster results
+    const predictions = await redis.hgetall('predictions');
+    
+    if (predictions && Object.keys(predictions).length > 0) {
+      for (const [, value] of Object.entries(predictions)) {
+        try {
+          const prediction = JSON.parse(value as string);
+          
+          // Check if user has any stakes in this prediction
+          if (prediction.stakes) {
+            for (const stake of prediction.stakes) {
+              const stakeMatch = stake.user?.toLowerCase() === address.toLowerCase();
+              const stakedToday = new Date(stake.timestamp || stake.createdAt).getTime() >= todayTimestamp;
+              
+              if (stakeMatch && stakedToday) {
+                console.log(`✅ Found stake by ${address} today in Redis prediction:`, prediction.id);
+                return true;
+              }
             }
           }
+        } catch {
+          continue;
         }
-      } catch {
-        continue;
       }
     }
 
@@ -381,6 +382,7 @@ async function verifyTradingActivity(address: string): Promise<boolean> {
           activity.type === 'stake' && 
           new Date(activity.timestamp).getTime() >= todayTimestamp
         ) {
+          console.log(`✅ Found stake by ${address} today in activity log`);
           return true;
         }
       } catch {
@@ -388,6 +390,47 @@ async function verifyTradingActivity(address: string): Promise<boolean> {
       }
     }
 
+    // 2. Check blockchain V2 contract for StakePlaced events
+    const V2_CONTRACT = process.env.NEXT_PUBLIC_CONTRACT_V2_ADDRESS as `0x${string}`;
+    
+    if (V2_CONTRACT) {
+      try {
+        const publicClient = createPublicClient({
+          chain: base,
+          transport: http(process.env.ALCHEMY_RPC_URL || 'https://mainnet.base.org'),
+        });
+        
+        // Get current block and calculate start block for today (~2 seconds per block on Base)
+        const currentBlock = await publicClient.getBlockNumber();
+        const blocksPerDay = BigInt(43200); // ~24 hours worth of blocks
+        const fromBlock = currentBlock > blocksPerDay ? currentBlock - blocksPerDay : BigInt(0);
+        
+        // StakePlaced event signature
+        const stakePlacedEvent = parseAbiItem(
+          'event StakePlaced(uint256 indexed predictionId, address indexed user, bool isYes, uint256 amount, bool isSwipe)'
+        );
+        
+        const logs = await publicClient.getLogs({
+          address: V2_CONTRACT,
+          event: stakePlacedEvent,
+          args: {
+            user: address as `0x${string}`,
+          },
+          fromBlock,
+          toBlock: currentBlock,
+        });
+        
+        if (logs.length > 0) {
+          console.log(`✅ Found ${logs.length} StakePlaced events on blockchain for ${address} today`);
+          return true;
+        }
+      } catch (blockchainError) {
+        console.error('Blockchain check error:', blockchainError);
+        // Continue - blockchain check is optional
+      }
+    }
+
+    console.log(`❌ No trading activity found for ${address} today`);
     return false;
 
   } catch (error) {
@@ -448,6 +491,7 @@ async function getFidFromAddress(address: string): Promise<number | null> {
 
 /**
  * Verify user follows @swipeai on Farcaster
+ * Uses fetchBulkUsers with viewer_fid to check if user follows swipeai
  */
 async function verifyFollowsSwipeAI(fid: number): Promise<boolean> {
   if (!NEYNAR_API_KEY || !SWIPEAI_FID) {
@@ -456,9 +500,10 @@ async function verifyFollowsSwipeAI(fid: number): Promise<boolean> {
   }
 
   try {
-    // Check if user follows SwipeAI
+    // Use fetchBulkUsers API with viewer_fid to get viewer_context
+    // We check if user (viewer) follows swipeai (target)
     const response = await fetch(
-      `https://api.neynar.com/v2/farcaster/followers?fid=${SWIPEAI_FID}&limit=1000`,
+      `https://api.neynar.com/v2/farcaster/user/bulk?fids=${SWIPEAI_FID}&viewer_fid=${fid}`,
       {
         headers: {
           'accept': 'application/json',
@@ -467,13 +512,25 @@ async function verifyFollowsSwipeAI(fid: number): Promise<boolean> {
       }
     );
 
-    if (!response.ok) return false;
+    if (!response.ok) {
+      console.error('Neynar API error:', response.status, await response.text());
+      return false;
+    }
 
     const data = await response.json();
-    const followers = data.users || [];
+    const users = data.users || [];
     
-    // Check if user's FID is in followers list
-    return followers.some((follower: any) => follower.fid === fid);
+    if (users.length === 0) {
+      console.log('❌ SwipeAI user not found in Neynar');
+      return false;
+    }
+    
+    // Check viewer_context.following - this tells us if the viewer (fid) follows swipeai
+    const swipeaiUser = users[0];
+    const isFollowing = swipeaiUser.viewer_context?.following === true;
+    
+    console.log(`📱 User ${fid} follows @swipeai: ${isFollowing}`);
+    return isFollowing;
 
   } catch (error) {
     console.error('Follow verification error:', error);
