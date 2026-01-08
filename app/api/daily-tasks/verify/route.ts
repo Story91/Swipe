@@ -213,7 +213,7 @@ async function verifyFarcasterCast(
   // Supported URL formats:
   // - https://warpcast.com/username/0x123abc
   // - https://farcaster.xyz/username/0x123abc
-  // - https://supercast.xyz/c/0x123abc
+  // - https://base.app/post/0x123abc
   // - Direct hash: 0x123abc
   let castHash = castHashOrUrl.trim();
   
