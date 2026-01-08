@@ -26,6 +26,7 @@ const SWIPEAI_FID = process.env.SWIPEAI_FID || '';
 interface VerifyTaskRequest {
   address: string;
   taskType: string;
+  checkOnly?: boolean; // If true, only check status without marking as completed
   proof?: {
     castHash?: string;  // For SHARE_CAST - user provides cast hash
     fid?: number;       // For FOLLOW_SOCIALS - user's Farcaster ID
@@ -35,7 +36,7 @@ interface VerifyTaskRequest {
 export async function POST(request: NextRequest) {
   try {
     const body: VerifyTaskRequest = await request.json();
-    const { address, taskType, proof } = body;
+    const { address, taskType, proof, checkOnly } = body;
 
     if (!address || !taskType) {
       return NextResponse.json(
@@ -52,17 +53,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if task was already completed today
     const redis = (await import('../../../../lib/redis')).default;
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     const taskKey = `daily-tasks:${address.toLowerCase()}:${taskType}:${today}`;
     
-    const alreadyCompleted = await redis.get(taskKey);
-    if (alreadyCompleted) {
-      return NextResponse.json(
-        { success: false, error: 'Task already completed today', alreadyCompleted: true },
-        { status: 400 }
-      );
+    // For checkOnly mode, skip the "already completed" check - we just want to verify status
+    if (!checkOnly) {
+      // Check if task was already completed today
+      const alreadyCompleted = await redis.get(taskKey);
+      if (alreadyCompleted) {
+        return NextResponse.json(
+          { success: false, error: 'Task already completed today', alreadyCompleted: true },
+          { status: 400 }
+        );
+      }
     }
 
     // Verify the task based on type
@@ -120,6 +124,17 @@ export async function POST(request: NextRequest) {
         { success: false, error: errorMessage },
         { status: 400 }
       );
+    }
+
+    // For checkOnly mode, just return success without generating signature or marking completed
+    if (checkOnly) {
+      return NextResponse.json({
+        success: true,
+        checkOnly: true,
+        taskType,
+        address,
+        message: 'Task verification passed',
+      });
     }
 
     // Generate signature for on-chain verification

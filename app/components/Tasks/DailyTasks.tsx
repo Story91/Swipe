@@ -322,13 +322,14 @@ export function DailyTasks() {
       
       setIsCheckingFollow(true);
       try {
-        // Try to verify follow via API (will return success if user follows)
+        // Check follow status via API with checkOnly=true (won't mark as completed)
         const response = await fetch('/api/daily-tasks/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             address,
             taskType: 'FOLLOW_SOCIALS',
+            checkOnly: true, // Just check, don't mark as completed
           }),
         });
         
