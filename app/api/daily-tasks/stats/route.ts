@@ -17,10 +17,10 @@ export async function GET(request: NextRequest) {
     
     // Get leaderboard (top 10 by score, descending)
     const leaderboardKey = 'daily-tasks:leaderboard';
-    const topUsers = await redis.zrange(leaderboardKey, 0, 9, { rev: true, withScores: true });
+    const topUsers = await redis.zrange(leaderboardKey, 0, 9, { rev: true, withScores: true }) as { value: string; score: number }[];
     
     // Parse leaderboard into array
-    const leaderboard = [];
+    const leaderboard: { address: string; totalClaimed: number }[] = [];
     for (const item of topUsers) {
       leaderboard.push({
         address: item.value,
