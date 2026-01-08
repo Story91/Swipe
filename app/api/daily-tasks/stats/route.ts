@@ -15,16 +15,16 @@ export async function GET(request: NextRequest) {
     const statsKey = 'daily-tasks:stats';
     const stats = await redis.hgetall(statsKey);
     
-    // Get leaderboard
+    // Get leaderboard (top 10 by score, descending)
     const leaderboardKey = 'daily-tasks:leaderboard';
-    const topUsers = await redis.zrevrange(leaderboardKey, 0, 9, 'WITHSCORES');
+    const topUsers = await redis.zrange(leaderboardKey, 0, 9, { rev: true, withScores: true });
     
     // Parse leaderboard into array
     const leaderboard = [];
-    for (let i = 0; i < topUsers.length; i += 2) {
+    for (const item of topUsers) {
       leaderboard.push({
-        address: topUsers[i],
-        totalClaimed: parseFloat(topUsers[i + 1]),
+        address: item.value,
+        totalClaimed: item.score,
       });
     }
 
