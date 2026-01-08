@@ -380,6 +380,16 @@ export function DailyTasks() {
       
       // If we have a pending task to confirm, call /confirm endpoint
       if (pendingConfirmTask && address) {
+        // Special handling for REFERRAL - clear input and show specific notification
+        if (pendingConfirmTask === 'REFERRAL') {
+          setReferralCode("");
+          setIsVerifyingTask(null);
+          sendNotification({
+            title: "🎉 Referral Registered!",
+            body: "You both received 150k SWIPE!",
+          });
+        }
+        
         const confirmTask = async () => {
           try {
             await fetch('/api/daily-tasks/confirm', {
@@ -556,7 +566,7 @@ export function DailyTasks() {
     }
   };
 
-  // Register referral
+  // Register referral (with Farcaster verification to prevent Sybil attacks)
   const handleRegisterReferral = async () => {
     if (!address || !referralCode) return;
     
@@ -575,6 +585,25 @@ export function DailyTasks() {
     setTaskError(null);
     
     try {
+      // First verify both accounts have Farcaster (anti-Sybil check)
+      const verifyResponse = await fetch('/api/daily-tasks/verify-referral', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userAddress: address,
+          referrerAddress: referralCode,
+        }),
+      });
+      
+      const verifyResult = await verifyResponse.json();
+      
+      if (!verifyResult.success) {
+        setTaskError(verifyResult.error || 'Referral verification failed');
+        setIsVerifyingTask(null);
+        return;
+      }
+      
+      // Verification passed - proceed with on-chain transaction
       if (DAILY_REWARDS_CONTRACT !== "0x0000000000000000000000000000000000000000") {
         writeContract({
           address: DAILY_REWARDS_CONTRACT,
@@ -583,17 +612,11 @@ export function DailyTasks() {
           args: [referralCode as `0x${string}`],
         });
         
-        sendNotification({
-          title: "🎉 Referral Registered!",
-          body: "You both received 150k SWIPE!",
-        });
-        
-        setReferralCode("");
+        setPendingConfirmTask('REFERRAL');
       }
     } catch (error) {
       console.error("Referral failed:", error);
       setTaskError(error instanceof Error ? error.message : 'Referral failed');
-    } finally {
       setIsVerifyingTask(null);
     }
   };
