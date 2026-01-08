@@ -780,41 +780,41 @@
   color: #d4ff00;
 }
 
-/* DEX Links Section */
-.swipe-token-dex-links {
-  margin-bottom: 16px;
+/* DEX Icons */
+.swipe-token-dex-icons {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  padding: 20px 0;
+  margin-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.swipe-token-dex-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.6);
-  font-family: "Orbitron", sans-serif;
-  margin-bottom: 12px;
-}
-
-.swipe-token-uniswap-link {
+.swipe-token-dex-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  background: linear-gradient(135deg, rgba(212, 255, 0, 0.2), rgba(212, 255, 0, 0.1));
-  border: 2px solid rgba(212, 255, 0, 0.4);
-  border-radius: 12px;
-  padding: 14px;
-  text-decoration: none;
-  color: #d4ff00;
-  font-size: 14px;
-  font-weight: 700;
-  font-family: "Exo 2", sans-serif;
-  transition: all 0.3s ease;
-  margin-bottom: 10px;
+  width: 56px;
+  height: 56px;
+  background: #000000;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  padding: 0;
 }
 
-.swipe-token-uniswap-link:hover {
-  background: linear-gradient(135deg, rgba(212, 255, 0, 0.3), rgba(212, 255, 0, 0.2));
-  transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(212, 255, 0, 0.3);
+.swipe-token-dex-icon img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+  border-radius: 0;
+}
+
+.swipe-token-dex-icon:hover {
+  border-color: rgba(212, 255, 0, 0.6);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(212, 255, 0, 0.25);
 }
 
 /* Wallet Notice */

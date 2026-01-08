@@ -608,47 +608,36 @@ export function SwipeTokenCard() {
             </div>
           </a>
 
-          {/* SWIPE Token on Flaunch */}
+        </div>
+
+        {/* DEX Icons */}
+        <div className="swipe-token-dex-icons">
           <a
             href="https://flaunch.gg/base/coin/0xd0187d77af0ed6a44f0a631b406c78b30e160aa9"
             target="_blank"
             rel="noopener noreferrer"
-            className="swipe-token-secondary-link"
+            className="swipe-token-dex-icon"
+            title="Flaunch"
           >
-            <span>🚀</span>
-            <span>View SWIPE Token on Flaunch</span>
-            <span>↗️</span>
+            <Image src="/flaunch.jpg" alt="Flaunch" width={56} height={56} />
           </a>
-        </div>
-
-        {/* DEX Links */}
-        <div className="swipe-token-dex-links">
-          <div className="swipe-token-dex-title">
-            Alternative DEX Options
-          </div>
-          
-          {/* Uniswap ETH → SWIPE */}
           <a
             href={`https://app.uniswap.org/#/swap?inputCurrency=ETH&outputCurrency=${SWIPE_TOKEN.address}&chain=base`}
             target="_blank"
             rel="noopener noreferrer"
-            className="swipe-token-uniswap-link"
+            className="swipe-token-dex-icon"
+            title="Uniswap"
           >
-            <span>🦄</span>
-            <span>Swap ETH → SWIPE on Uniswap</span>
-            <span>↗️</span>
+            <Image src="/uni.png" alt="Uniswap" width={56} height={56} />
           </a>
-
-          {/* DexScreener */}
           <a
             href={`https://dexscreener.com/base/${SWIPE_TOKEN.address}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="swipe-token-secondary-link"
+            className="swipe-token-dex-icon"
+            title="DexScreener"
           >
-            <span>📊</span>
-            <span>View SWIPE on DexScreener</span>
-            <span>↗️</span>
+            <Image src="/dexscreen.png" alt="DexScreener" width={56} height={56} />
           </a>
         </div>
 
