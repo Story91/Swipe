@@ -385,19 +385,47 @@ async function verifyPredictionCreated(address: string): Promise<boolean> {
 
 /**
  * Verify user has trading activity today (placed a bet)
- * Checks both Redis and blockchain (V2 contract)
+ * Checks user-transactions in Redis (saved after each bet in TinderCard.tsx)
  */
 async function verifyTradingActivity(address: string): Promise<boolean> {
   try {
-    const redis = (await import('../../../../lib/redis')).default;
-    const { createPublicClient, http, parseAbiItem } = await import('viem');
-    const { base } = await import('viem/chains');
+    const { redisHelpers } = await import('../../../../lib/redis');
     
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayTimestamp = today.getTime();
     
-    // 1. First check Redis for faster results
+    console.log(`🔍 Checking trading activity for ${address}...`);
+    console.log(`📅 Today timestamp (UTC midnight): ${todayTimestamp} (${new Date(todayTimestamp).toISOString()})`);
+    
+    // 1. PRIMARY: Check user-transactions (saved after each successful bet)
+    try {
+      const transactions = await redisHelpers.getUserTransactions(address.toLowerCase());
+      console.log(`📊 Found ${transactions?.length || 0} total transactions for user`);
+      
+      if (transactions && transactions.length > 0) {
+        for (const tx of transactions) {
+          // Check if it's a stake transaction from today
+          const isStake = tx.type === 'stake';
+          const txTime = new Date(tx.timestamp).getTime();
+          const isToday = txTime >= todayTimestamp;
+          const isSuccess = tx.status === 'success';
+          
+          console.log(`  - TX: type=${tx.type}, time=${new Date(tx.timestamp).toISOString()}, isToday=${isToday}, status=${tx.status}`);
+          
+          if (isStake && isToday && isSuccess) {
+            console.log(`✅ Found successful stake transaction from today: ${tx.txHash}`);
+            return true;
+          }
+        }
+        console.log(`⚠️ No stake transactions from today found`);
+      }
+    } catch (txError) {
+      console.error('Error checking user transactions:', txError);
+    }
+    
+    // 2. FALLBACK: Check predictions stakes in Redis
+    const redis = (await import('../../../../lib/redis')).default;
     const predictions = await redis.hgetall('predictions');
     
     if (predictions && Object.keys(predictions).length > 0) {
@@ -423,32 +451,16 @@ async function verifyTradingActivity(address: string): Promise<boolean> {
       }
     }
 
-    // Also check activity log if exists
-    const activityKey = `user:${address.toLowerCase()}:activity`;
-    const recentActivity = await redis.lrange(activityKey, 0, 50);
-    
-    for (const activityStr of recentActivity) {
-      try {
-        const activity = JSON.parse(activityStr);
-        if (
-          activity.type === 'stake' && 
-          new Date(activity.timestamp).getTime() >= todayTimestamp
-        ) {
-          console.log(`✅ Found stake by ${address} today in activity log`);
-          return true;
-        }
-      } catch {
-        continue;
-      }
-    }
-
-    // 2. Check blockchain V2 contract for StakePlaced events
+    // 3. LAST RESORT: Check blockchain V2 contract for StakePlaced events
     const V2_CONTRACT = process.env.NEXT_PUBLIC_CONTRACT_V2_ADDRESS as `0x${string}`;
     
     if (V2_CONTRACT && V2_CONTRACT !== '0x0000000000000000000000000000000000000000') {
       try {
         console.log(`🔍 Checking blockchain for StakePlaced events from ${address}...`);
         console.log(`📍 Contract: ${V2_CONTRACT}`);
+        
+        const { createPublicClient, http, parseAbiItem } = await import('viem');
+        const { base } = await import('viem/chains');
         
         const publicClient = createPublicClient({
           chain: base,
