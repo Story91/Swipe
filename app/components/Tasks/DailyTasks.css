@@ -1,0 +1,1176 @@
+/* DailyTasks.css - Stunning Daily Rewards UI */
+
+/* ============ PAGE CONTAINER ============ */
+.daily-tasks-page {
+  width: 100%;
+  max-width: 424px;
+  margin: 0 auto;
+  padding: 8px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ============ MAIN CARD ============ */
+.daily-tasks-card {
+  background: linear-gradient(180deg, #0a0a0a 0%, #111111 50%, #0a0a0a 100%);
+  border-radius: 24px;
+  border: 2px solid rgba(212, 255, 0, 0.3);
+  box-shadow: 
+    0 0 40px rgba(212, 255, 0, 0.1),
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  position: relative;
+}
+
+/* Basescan Badge on Logo */
+.logo-basescan-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: #0052ff;
+  border: 2px solid #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.logo-basescan-badge:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 10px rgba(0, 82, 255, 0.5);
+}
+
+.logo-basescan-badge img {
+  border-radius: 2px;
+  width: 12px !important;
+  height: 12px !important;
+}
+
+/* ============ HEADER ============ */
+.daily-tasks-header {
+  padding: 20px 16px;
+  background: linear-gradient(180deg, rgba(212, 255, 0, 0.08) 0%, transparent 100%);
+  border-bottom: 1px solid rgba(212, 255, 0, 0.15);
+}
+
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.header-logo-side {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.header-streak-side {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.daily-tasks-logo-wrapper {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #d4ff00 0%, #9acd32 50%, #d4ff00 100%);
+  padding: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 
+    0 0 20px rgba(212, 255, 0, 0.4),
+    0 0 40px rgba(212, 255, 0, 0.2);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.daily-tasks-logo-wrapper.pulse-glow {
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 
+      0 0 20px rgba(212, 255, 0, 0.4),
+      0 0 40px rgba(212, 255, 0, 0.2);
+  }
+  50% {
+    box-shadow: 
+      0 0 35px rgba(212, 255, 0, 0.6),
+      0 0 70px rgba(212, 255, 0, 0.3);
+  }
+}
+
+.daily-tasks-logo {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.daily-tasks-title {
+  font-family: 'Spicy Rice', cursive;
+  font-size: 22px;
+  color: #d4ff00;
+  margin: 0;
+  text-shadow: 0 0 15px rgba(212, 255, 0, 0.5);
+  white-space: nowrap;
+}
+
+.daily-tasks-subtitle {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0;
+}
+
+/* ============ STREAK DISPLAY (now in header) ============ */
+.streak-fire {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%);
+  border: 2.5px solid rgba(255, 100, 50, 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.streak-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.streak-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.streak-best {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.streak-fire.fire-warm {
+  border-color: rgba(255, 150, 0, 0.7);
+  box-shadow: 0 0 15px rgba(255, 150, 0, 0.3);
+}
+
+.streak-fire.fire-hot {
+  border-color: rgba(255, 100, 0, 0.8);
+  box-shadow: 0 0 20px rgba(255, 100, 0, 0.4);
+  animation: fireGlow 1s ease-in-out infinite;
+}
+
+.streak-fire.fire-epic {
+  border-color: rgba(255, 50, 0, 0.9);
+  box-shadow: 0 0 25px rgba(255, 50, 0, 0.5);
+  animation: fireGlow 0.7s ease-in-out infinite;
+}
+
+.streak-fire.fire-legendary {
+  border-color: #d4ff00;
+  box-shadow: 
+    0 0 30px rgba(212, 255, 0, 0.6),
+    0 0 50px rgba(255, 50, 0, 0.4);
+  animation: legendaryFire 0.5s ease-in-out infinite;
+}
+
+@keyframes fireGlow {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes legendaryFire {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+    filter: hue-rotate(0deg);
+  }
+  50% {
+    transform: scale(1.08) rotate(2deg);
+    filter: hue-rotate(10deg);
+  }
+}
+
+.fire-emoji {
+  font-size: 18px;
+  position: absolute;
+  top: -10px;
+  right: -6px;
+  animation: flicker 0.3s ease-in-out infinite alternate;
+}
+
+@keyframes flicker {
+  from { transform: scale(1) rotate(-5deg); }
+  to { transform: scale(1.1) rotate(5deg); }
+}
+
+.streak-number {
+  font-family: 'Spicy Rice', cursive;
+  font-size: 26px;
+  color: #fff;
+  text-shadow: 0 0 8px rgba(255, 100, 0, 0.5);
+}
+
+.streak-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.streak-label {
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.streak-best {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* ============ CLAIM SECTION ============ */
+.claim-section {
+  padding: 20px;
+  text-align: center;
+  background: radial-gradient(ellipse at center, rgba(212, 255, 0, 0.05) 0%, transparent 70%);
+}
+
+.claim-reward-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 20px;
+}
+
+.reward-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.reward-amount {
+  font-family: 'Spicy Rice', cursive;
+  font-size: 42px;
+  color: #d4ff00;
+  text-shadow: 0 0 30px rgba(212, 255, 0, 0.5);
+  line-height: 1;
+}
+
+.reward-breakdown {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.claim-button {
+  width: 100%;
+  padding: 18px 32px;
+  font-family: 'Spicy Rice', cursive;
+  font-size: 20px;
+  color: #000;
+  background: linear-gradient(135deg, #d4ff00 0%, #b8e600 50%, #d4ff00 100%);
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  transition: all 0.3s ease;
+  box-shadow: 
+    0 4px 20px rgba(212, 255, 0, 0.4),
+    0 0 0 2px rgba(212, 255, 0, 0.2);
+}
+
+.claim-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 6px 30px rgba(212, 255, 0, 0.5),
+    0 0 0 3px rgba(212, 255, 0, 0.3);
+}
+
+.claim-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.claim-button.pulse-button {
+  animation: pulseButton 2s ease-in-out infinite;
+}
+
+@keyframes pulseButton {
+  0%, 100% {
+    box-shadow: 
+      0 4px 20px rgba(212, 255, 0, 0.4),
+      0 0 0 2px rgba(212, 255, 0, 0.2);
+  }
+  50% {
+    box-shadow: 
+      0 4px 30px rgba(212, 255, 0, 0.6),
+      0 0 0 4px rgba(212, 255, 0, 0.3);
+  }
+}
+
+.claim-icon {
+  font-size: 24px;
+}
+
+.claim-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(0, 0, 0, 0.2);
+  border-top-color: #000;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.claim-cooldown {
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.cooldown-label {
+  display: block;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 8px;
+}
+
+.cooldown-timer {
+  font-family: 'SF Mono', 'Consolas', monospace;
+  font-size: 36px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 4px;
+}
+
+.jackpot-chance {
+  margin-top: 16px;
+  padding: 10px 16px;
+  background: linear-gradient(90deg, rgba(255, 200, 0, 0.1) 0%, rgba(255, 100, 0, 0.1) 100%);
+  border-radius: 8px;
+  font-size: 12px;
+  color: rgba(255, 200, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.jackpot-icon {
+  font-size: 16px;
+}
+
+/* ============ TASKS SECTION ============ */
+.tasks-section {
+  padding: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 16px;
+}
+
+.section-title span:first-child {
+  font-size: 20px;
+}
+
+.reset-info {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.task-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.3s ease;
+}
+
+.task-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(212, 255, 0, 0.2);
+}
+
+.task-item.completed {
+  background: rgba(212, 255, 0, 0.08);
+  border-color: rgba(212, 255, 0, 0.3);
+}
+
+.task-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.task-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.task-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.task-description {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.task-reward {
+  font-family: 'Spicy Rice', cursive;
+  font-size: 14px;
+  color: #d4ff00;
+  white-space: nowrap;
+}
+
+.task-item.completed .task-reward {
+  color: #4ade80;
+  font-size: 20px;
+}
+
+.task-verify-btn {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #d4ff00 0%, #b8e600 100%);
+  border: none;
+  border-radius: 8px;
+  color: #000;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.task-verify-btn:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 0 15px rgba(212, 255, 0, 0.4);
+}
+
+.task-verify-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.task-error {
+  padding: 12px 16px;
+  background: rgba(255, 100, 100, 0.1);
+  border: 1px solid rgba(255, 100, 100, 0.3);
+  border-radius: 8px;
+  color: #ff6b6b;
+  font-size: 12px;
+  text-align: center;
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.task-error-close {
+  background: none;
+  border: none;
+  color: #ff6b6b;
+  cursor: pointer;
+  padding: 4px;
+  font-size: 14px;
+}
+
+/* Task Actions Container */
+.task-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.task-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.task-action-btn {
+  padding: 6px 12px;
+  background: rgba(212, 255, 0, 0.15);
+  border: 1px solid rgba(212, 255, 0, 0.3);
+  border-radius: 6px;
+  color: #d4ff00;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.task-action-btn:hover {
+  background: rgba(212, 255, 0, 0.25);
+  border-color: rgba(212, 255, 0, 0.5);
+}
+
+/* Task Input Group */
+.task-input-group {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.task-input {
+  width: 120px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 11px;
+}
+
+.task-input:focus {
+  outline: none;
+  border-color: rgba(212, 255, 0, 0.5);
+}
+
+.task-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* Claim Button - Highlighted */
+.task-claim-btn {
+  padding: 8px 14px;
+  background: linear-gradient(135deg, #d4ff00 0%, #9acd32 100%);
+  border: none;
+  border-radius: 8px;
+  color: #000;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.task-claim-btn:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 0 20px rgba(212, 255, 0, 0.5);
+}
+
+.task-claim-btn.pulse-claim {
+  animation: pulseClaim 1.5s ease-in-out infinite;
+}
+
+@keyframes pulseClaim {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(212, 255, 0, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(212, 255, 0, 0.7);
+  }
+}
+
+.task-claim-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.task-done {
+  font-size: 14px;
+  color: #4ade80;
+  font-weight: 600;
+}
+
+/* Verified state */
+.task-item.verified {
+  background: rgba(212, 255, 0, 0.05);
+  border-color: rgba(212, 255, 0, 0.4);
+}
+
+/* ============ ACHIEVEMENTS ============ */
+.achievements-section {
+  padding: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.achievements-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.achievement-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.achievement-badge.locked {
+  opacity: 0.5;
+  filter: grayscale(0.5);
+}
+
+.achievement-badge.unlocked {
+  background: linear-gradient(135deg, rgba(212, 255, 0, 0.1) 0%, rgba(255, 200, 0, 0.1) 100%);
+  border-color: rgba(212, 255, 0, 0.3);
+  box-shadow: 0 0 20px rgba(212, 255, 0, 0.1);
+}
+
+.badge-icon {
+  font-size: 28px;
+}
+
+.badge-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.badge-reward {
+  font-size: 10px;
+  color: rgba(212, 255, 0, 0.8);
+}
+
+.achievement-badge.unlocked .badge-reward {
+  color: #4ade80;
+}
+
+/* ============ REFERRAL SECTION ============ */
+.referral-section {
+  padding: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.referral-info {
+  text-align: center;
+}
+
+.referral-info p {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0 0 16px;
+}
+
+.referral-info strong {
+  color: #d4ff00;
+}
+
+.referral-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.referral-count {
+  font-family: 'Spicy Rice', cursive;
+  font-size: 32px;
+  color: #d4ff00;
+}
+
+.referral-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.referral-button {
+  width: 100%;
+  padding: 14px;
+  background: rgba(212, 255, 0, 0.1);
+  border: 2px solid rgba(212, 255, 0, 0.3);
+  border-radius: 12px;
+  color: #d4ff00;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.referral-button:hover {
+  background: rgba(212, 255, 0, 0.2);
+  border-color: rgba(212, 255, 0, 0.5);
+}
+
+/* Your Referral Code */
+.referral-your-code {
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.referral-code-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.referral-code-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(212, 255, 0, 0.3);
+  border-radius: 8px;
+}
+
+.referral-code-box code {
+  font-family: 'SF Mono', 'Consolas', monospace;
+  font-size: 14px;
+  color: #d4ff00;
+}
+
+.referral-copy-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px;
+  transition: transform 0.2s;
+}
+
+.referral-copy-btn:hover {
+  transform: scale(1.2);
+}
+
+/* Referral Divider */
+.referral-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.referral-divider::before,
+.referral-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.referral-divider span {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Referral Input */
+.referral-input-group {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.referral-input {
+  flex: 1;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 12px;
+}
+
+.referral-input:focus {
+  outline: none;
+  border-color: rgba(212, 255, 0, 0.5);
+}
+
+.referral-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.referral-submit-btn {
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #d4ff00 0%, #9acd32 100%);
+  border: none;
+  border-radius: 10px;
+  color: #000;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.referral-submit-btn:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 0 15px rgba(212, 255, 0, 0.4);
+}
+
+.referral-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ============ STATS FOOTER ============ */
+.stats-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.3);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.stat-value {
+  font-family: 'Spicy Rice', cursive;
+  font-size: 20px;
+  color: #d4ff00;
+}
+
+.stat-label {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.stat-divider {
+  width: 1px;
+  height: 30px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ============ POOL INFO ============ */
+.pool-info {
+  padding: 16px 20px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.pool-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.pool-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #d4ff00, #9acd32);
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.pool-stats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* ============ CONNECT WALLET STATE ============ */
+.daily-tasks-connect {
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.connect-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.daily-tasks-connect p {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ============ COMING SOON STATE ============ */
+.daily-tasks-coming-soon {
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.coming-soon-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.daily-tasks-coming-soon h3 {
+  font-family: 'Spicy Rice', cursive;
+  font-size: 24px;
+  color: #d4ff00;
+  margin: 0 0 12px;
+}
+
+.daily-tasks-coming-soon > p {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0 0 24px;
+}
+
+.coming-soon-features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  max-width: 300px;
+  margin: 0 auto;
+}
+
+.coming-soon-features li {
+  padding: 10px 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.coming-soon-features li:last-child {
+  border-bottom: none;
+}
+
+/* ============ CONFETTI ============ */
+.confetti-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.confetti {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  top: -10px;
+  animation: confettiFall 3s ease-out forwards;
+}
+
+.confetti-0 { background: #d4ff00; }
+.confetti-1 { background: #ff6b6b; }
+.confetti-2 { background: #4ecdc4; }
+.confetti-3 { background: #ffe66d; }
+.confetti-4 { background: #95e1d3; }
+.confetti-5 { background: #f38181; }
+
+@keyframes confettiFall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 380px) {
+  .daily-tasks-card {
+    border-radius: 20px;
+  }
+
+  .daily-tasks-title {
+    font-size: 24px;
+  }
+
+  .reward-amount {
+    font-size: 36px;
+  }
+
+  .streak-fire {
+    width: 44px;
+    height: 44px;
+  }
+
+  .streak-number {
+    font-size: 16px;
+  }
+  
+  .header-row {
+    gap: 10px;
+  }
+  
+  .daily-tasks-title {
+    font-size: 18px;
+  }
+  
+  .daily-tasks-logo-wrapper {
+    width: 48px;
+    height: 48px;
+  }
+
+  .achievements-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .achievement-badge {
+    padding: 12px 8px;
+  }
+
+  .badge-icon {
+    font-size: 24px;
+  }
+
+  .stats-footer {
+    gap: 12px;
+  }
+
+  .stat-value {
+    font-size: 16px;
+  }
+}
+
+/* ============ ACHIEVEMENT BUTTONS ============ */
+.achievement-claim-btn {
+  margin-top: 8px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #d4ff00 0%, #9acd32 100%);
+  border: none;
+  border-radius: 6px;
+  color: #000;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.achievement-claim-btn:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 0 10px rgba(212, 255, 0, 0.4);
+}
+
+.achievement-claim-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.achievement-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.achievement-follow-btn {
+  padding: 4px 10px;
+  background: rgba(138, 43, 226, 0.3);
+  border: 1px solid rgba(138, 43, 226, 0.5);
+  border-radius: 4px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  text-decoration: none;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.achievement-follow-btn:hover {
+  background: rgba(138, 43, 226, 0.5);
+}
+
+.achievement-done {
+  margin-top: 8px;
+  font-size: 18px;
+}
+
+.achievement-progress {
+  margin-top: 8px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* Referral Used Message */
+.referral-used-message {
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(76, 175, 80, 0.1);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  border-radius: 8px;
+  color: rgba(76, 175, 80, 0.9);
+  font-size: 12px;
+  text-align: center;
+}
+

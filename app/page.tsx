@@ -50,8 +50,9 @@ import { CreatePredictionModal } from "./components/Modals/CreatePredictionModal
 import { HowToPlayModal } from "./components/Modals/HowToPlayModal";
 import { SwipeTokenCard } from "./components/Market/SwipeTokenCard";
 import { SwipeClaim } from "./components/Portfolio/SwipeClaim";
+import { DailyTasks } from "./components/Tasks/DailyTasks";
 
-type DashboardType = 'tinder' | 'user' | 'admin' | 'approver' | 'market-stats' | 'analytics' | 'settings' | 'audit-logs' | 'my-portfolio' | 'active-bets' | 'bet-history' | 'help-faq' | 'leaderboard' | 'recent-activity' | 'swipe-token' | 'claim';
+type DashboardType = 'tinder' | 'user' | 'admin' | 'approver' | 'market-stats' | 'analytics' | 'settings' | 'audit-logs' | 'my-portfolio' | 'active-bets' | 'bet-history' | 'help-faq' | 'leaderboard' | 'recent-activity' | 'swipe-token' | 'claim' | 'daily-tasks';
 
 // User profile type
 interface UserProfile {
@@ -490,6 +491,14 @@ export default function App() {
               </MenubarTrigger>
             </MenubarMenu>
             <MenubarMenu>
+              <MenubarTrigger 
+                className="menubar-trigger !bg-gradient-to-r !from-orange-500 !to-yellow-500 !text-black !font-bold hover:!from-orange-400 hover:!to-yellow-400" 
+                onClick={() => setActiveDashboard('daily-tasks')}
+              >
+                🎁 Tasks
+              </MenubarTrigger>
+            </MenubarMenu>
+            <MenubarMenu>
               <MenubarTrigger className="menubar-trigger" onClick={() => setActiveDashboard('market-stats')}>
                 Stats
               </MenubarTrigger>
@@ -545,6 +554,9 @@ export default function App() {
 
           {/* SWIPE Token Card */}
           {activeDashboard === 'swipe-token' && <SwipeTokenCard />}
+
+          {/* Daily Tasks */}
+          {activeDashboard === 'daily-tasks' && <DailyTasks />}
 
           {/* Dashboard - moved from 'user' to replace CLAIM */}
           {activeDashboard === 'user' && (

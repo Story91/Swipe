@@ -75,8 +75,8 @@
       ]
     },
     "C:\\Users\\Cezary\\Documents\\MiniApps\\Predict\\Dexter\\contracts\\SwipeClaim.sol": {
-      "lastModificationDate": 1766372202652,
-      "contentHash": "3e367069079f349734aee3f951da54c7",
+      "lastModificationDate": 1766378348218,
+      "contentHash": "80468dd74accdeea4b992b22d5e7334f",
       "sourceName": "contracts/SwipeClaim.sol",
       "solcConfig": {
         "version": "0.8.19",
@@ -110,6 +110,43 @@
         "IERC20",
         "IV2Contract",
         "SwipeClaim"
+      ]
+    },
+    "C:\\Users\\Cezary\\Documents\\MiniApps\\Predict\\Dexter\\contracts\\SwipeDailyRewards.sol": {
+      "lastModificationDate": 1767835458995,
+      "contentHash": "cce2e3cbc14564ed409cd36cf018b92e",
+      "sourceName": "contracts/SwipeDailyRewards.sol",
+      "solcConfig": {
+        "version": "0.8.19",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "viaIR": true,
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.19"
+      ],
+      "artifacts": [
+        "IERC20",
+        "SwipeDailyRewards"
       ]
     }
   }
