@@ -345,36 +345,51 @@ async function verifyFarcasterCast(
  */
 async function verifyPredictionCreated(address: string): Promise<boolean> {
   try {
-    const redis = (await import('../../../../lib/redis')).default;
+    const { redisHelpers } = await import('../../../../lib/redis');
     
-    // Get all predictions from Redis
-    const predictions = await redis.hgetall('predictions');
+    // Get all predictions from Redis using the proper helper
+    const predictions = await redisHelpers.getAllPredictions();
     
-    if (!predictions || Object.keys(predictions).length === 0) {
+    if (!predictions || predictions.length === 0) {
+      console.log('❌ No predictions found in Redis');
       return false;
     }
     
+    // Get today's start timestamp (UTC)
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayTimestamp = today.getTime();
+    today.setUTCHours(0, 0, 0, 0);
+    const todayTimestampSeconds = Math.floor(today.getTime() / 1000); // Convert to seconds
 
-    for (const [, value] of Object.entries(predictions)) {
+    console.log(`🔍 Checking ${predictions.length} predictions for creator ${address}`);
+    console.log(`📅 Today starts at: ${todayTimestampSeconds} (${today.toISOString()})`);
+
+    for (const prediction of predictions) {
       try {
-        const prediction = JSON.parse(value as string);
-        
-        // Check if created by this user today
+        // Check if created by this user
         const creatorMatch = prediction.creator?.toLowerCase() === address.toLowerCase();
-        const createdToday = new Date(prediction.createdAt).getTime() >= todayTimestamp;
+        
+        // createdAt is in seconds (blockchain timestamp)
+        const createdAtSeconds = typeof prediction.createdAt === 'number' 
+          ? prediction.createdAt 
+          : parseInt(String(prediction.createdAt)) || 0;
+        
+        const createdToday = createdAtSeconds >= todayTimestampSeconds;
+        
+        if (creatorMatch) {
+          console.log(`🔍 Found prediction by ${address}: id=${prediction.id}, createdAt=${createdAtSeconds}, todayStart=${todayTimestampSeconds}, createdToday=${createdToday}`);
+        }
         
         if (creatorMatch && createdToday) {
-          console.log(`✅ Found prediction created by ${address} today:`, prediction.id);
+          console.log(`✅ Found prediction created by ${address} today: ${prediction.id}`);
           return true;
         }
-      } catch {
+      } catch (err) {
+        console.warn(`⚠️ Error processing prediction:`, err);
         continue;
       }
     }
 
+    console.log(`❌ No predictions created by ${address} today`);
     return false;
 
   } catch (error) {
