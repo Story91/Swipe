@@ -579,35 +579,20 @@ export function SwipeTokenCard() {
           </div>
         )}
 
-        {/* SWIPERS Community Section */}
-        <div className="swipe-token-community">
-          <div className="swipe-token-community-title">
-            🚀 Join SWIPERS Community
+        {/* SWIPERS Community - Compact */}
+        <div className="swipe-token-swipers">
+          <div className="swipe-token-swipers-info">
+            💰 Earn ETH from trading fees • 👑 Owner 20% • ⚡ Creators 30% • 💎 Members 50%
           </div>
-          
-          {/* SWIPERS Group */}
           <a
             href="https://flaunch.gg/base/group/0x7d96076c750e65b60561491278280e3c324e1944"
             target="_blank"
             rel="noopener noreferrer"
-            className="swipe-token-flaunch-card"
+            className="swipe-token-swipers-btn"
           >
-            <div className="swipe-token-flaunch-title">💰 Earn ETH from subcoin trading fees</div>
-            <div className="swipe-token-flaunch-desc">
-              🤝 Members receive pro-rata ETH rewards<br/>
-              🧠 Coin creators &amp; holders win together
-            </div>
-            <div className="swipe-token-fee-split">
-              <div className="swipe-token-fee-split-title">Fee Split</div>
-              <div className="swipe-token-fee-split-row">👑 Owner – 20%</div>
-              <div className="swipe-token-fee-split-row">⚡️ Creators – 30%</div>
-              <div className="swipe-token-fee-split-row">💎 Members – 50%</div>
-            </div>
-            <div className="swipe-token-flaunch-cta">
-              Join SWIPERS Group on Flaunch →
-            </div>
+            <Image src="/flaunch.jpg" alt="Flaunch" width={18} height={18} className="swipe-token-swipers-btn-icon" />
+            Join SWIPERS
           </a>
-
         </div>
 
         {/* DEX Icons */}
