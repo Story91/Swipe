@@ -13,7 +13,8 @@ export async function GET(request: NextRequest) {
     
     // Get or initialize stats
     const statsKey = 'daily-tasks:stats';
-    const stats = await redis.hgetall(statsKey);
+    const statsData = await redis.hgetall(statsKey) as Record<string, string> | null;
+    const stats = statsData || {};
     
     // Get leaderboard (top 10 by score, descending)
     const leaderboardKey = 'daily-tasks:leaderboard';
@@ -31,11 +32,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       stats: {
-        totalUsers: parseInt(stats?.totalUsers || '0'),
-        totalClaims: parseInt(stats?.totalClaims || '0'),
-        totalDistributed: stats?.totalDistributed || '0',
-        avgStreak: parseFloat(stats?.avgStreak || '0'),
-        jackpotsHit: parseInt(stats?.jackpotsHit || '0'),
+        totalUsers: parseInt(stats.totalUsers || '0'),
+        totalClaims: parseInt(stats.totalClaims || '0'),
+        totalDistributed: stats.totalDistributed || '0',
+        avgStreak: parseFloat(stats.avgStreak || '0'),
+        jackpotsHit: parseInt(stats.jackpotsHit || '0'),
       },
       leaderboard,
     });
