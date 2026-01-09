@@ -62,36 +62,52 @@ export async function GET(request: NextRequest) {
           
           if (!prediction) return null;
 
-          // Must be resolved (not cancelled)
-          const isResolved = prediction.resolved && !prediction.cancelled;
-          if (!isResolved || processedPredictions.has(predictionId)) {
+          // Must be resolved OR cancelled
+          const isResolvedOrCancelled = (prediction.resolved && !prediction.cancelled) || prediction.cancelled;
+          if (!isResolvedOrCancelled || processedPredictions.has(predictionId)) {
             return null;
           }
 
           // Check if user can claim (same logic as EnhancedUserDashboard)
           const stakes = [];
-          
+
           // Handle multi-token stake (V2)
           if (stake.ETH || stake.SWIPE) {
             if (stake.ETH && !stake.ETH.claimed) {
               const yesAmount = Number(stake.ETH.yesAmount) || 0;
               const noAmount = Number(stake.ETH.noAmount) || 0;
-              if (yesAmount > 0 || noAmount > 0) {
-                const userWon = (yesAmount > 0 && prediction.outcome === true) || 
-                              (noAmount > 0 && prediction.outcome === false);
-                if (userWon) {
+              const hasStake = yesAmount > 0 || noAmount > 0;
+
+              if (hasStake) {
+                if (prediction.cancelled) {
+                  // For cancelled predictions, user can always claim refund
                   stakes.push('ETH');
+                } else {
+                  // For resolved predictions, check if user won
+                  const userWon = (yesAmount > 0 && prediction.outcome === true) ||
+                                (noAmount > 0 && prediction.outcome === false);
+                  if (userWon) {
+                    stakes.push('ETH');
+                  }
                 }
               }
             }
             if (stake.SWIPE && !stake.SWIPE.claimed) {
               const yesAmount = Number(stake.SWIPE.yesAmount) || 0;
               const noAmount = Number(stake.SWIPE.noAmount) || 0;
-              if (yesAmount > 0 || noAmount > 0) {
-                const userWon = (yesAmount > 0 && prediction.outcome === true) || 
-                              (noAmount > 0 && prediction.outcome === false);
-                if (userWon) {
+              const hasStake = yesAmount > 0 || noAmount > 0;
+
+              if (hasStake) {
+                if (prediction.cancelled) {
+                  // For cancelled predictions, user can always claim refund
                   stakes.push('SWIPE');
+                } else {
+                  // For resolved predictions, check if user won
+                  const userWon = (yesAmount > 0 && prediction.outcome === true) ||
+                                (noAmount > 0 && prediction.outcome === false);
+                  if (userWon) {
+                    stakes.push('SWIPE');
+                  }
                 }
               }
             }
@@ -100,11 +116,19 @@ export async function GET(request: NextRequest) {
             if (!stake.claimed) {
               const yesAmount = Number(stake.yesAmount) || 0;
               const noAmount = Number(stake.noAmount) || 0;
-              if (yesAmount > 0 || noAmount > 0) {
-                const userWon = (yesAmount > 0 && prediction.outcome === true) || 
-                              (noAmount > 0 && prediction.outcome === false);
-                if (userWon) {
+              const hasStake = yesAmount > 0 || noAmount > 0;
+
+              if (hasStake) {
+                if (prediction.cancelled) {
+                  // For cancelled predictions, user can always claim refund
                   stakes.push('ETH');
+                } else {
+                  // For resolved predictions, check if user won
+                  const userWon = (yesAmount > 0 && prediction.outcome === true) ||
+                                (noAmount > 0 && prediction.outcome === false);
+                  if (userWon) {
+                    stakes.push('ETH');
+                  }
                 }
               }
             }

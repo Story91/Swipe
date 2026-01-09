@@ -580,46 +580,46 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, on
       <div className="legacy-card-actions">
         {/* ETH Claim Button */}
         {hasEthStake && (
-          <button 
+          <button
             onClick={() => onClaimReward(prediction.id, 'ETH')}
             disabled={isTransactionLoading || ethStake?.claimed || !ethStake?.canClaim}
             className={`legacy-claim-btn eth-claim-btn ${ethStake?.claimed || !ethStake?.canClaim ? 'disabled' : ''}`}
             title={
-              ethStake?.claimed 
-                ? 'Already claimed' 
+              ethStake?.claimed
+                ? 'Already claimed'
                 : !ethStake?.canClaim
-                  ? prediction.status === 'active' 
+                  ? prediction.status === 'active'
                     ? 'Wait for prediction to be resolved'
                     : 'Cannot claim - you lost this prediction'
                   : 'Claim ETH reward'
             }
           >
-            {isTransactionLoading ? '...' : 
+            {isTransactionLoading ? '...' :
              ethStake?.claimed ? '✅ ETH Claimed' :
-             ethStake?.canClaim ? '💰 Claim ETH' : 
+             ethStake?.canClaim ? '💰 Claim ETH' :
              prediction.status === 'active' ? '⏳ Wait' : '❌ Lost'}
           </button>
         )}
         
         {/* SWIPE Claim Button */}
         {hasSwipeStake && (
-          <button 
+          <button
             onClick={() => onClaimReward(prediction.id, 'SWIPE')}
             disabled={isTransactionLoading || swipeStake?.claimed || !swipeStake?.canClaim}
             className={`legacy-claim-btn swipe-claim-btn ${swipeStake?.claimed || !swipeStake?.canClaim ? 'disabled' : ''}`}
             title={
-              swipeStake?.claimed 
-                ? 'Already claimed' 
+              swipeStake?.claimed
+                ? 'Already claimed'
                 : !swipeStake?.canClaim
-                  ? prediction.status === 'active' 
+                  ? prediction.status === 'active'
                     ? 'Wait for prediction to be resolved'
                     : 'Cannot claim - you lost this prediction'
                   : 'Claim SWIPE reward'
             }
           >
-            {isTransactionLoading ? '...' : 
+            {isTransactionLoading ? '...' :
              swipeStake?.claimed ? '✅ SWIPE Claimed' :
-             swipeStake?.canClaim ? '💰 Claim SWIPE' : 
+             swipeStake?.canClaim ? '💰 Claim SWIPE' :
              prediction.status === 'active' ? '⏳ Wait' : '❌ Lost'}
           </button>
         )}
