@@ -1389,16 +1389,20 @@ export function EnhancedUserDashboard() {
   const canClaimCount = allUserPredictions.filter(p => {
     const ethStake = p.userStakes?.ETH;
     const swipeStake = p.userStakes?.SWIPE;
-    
+
     // Check local claimed state first
     const ethClaimed = claimedStakes.has(`${p.id}-ETH`) || ethStake?.claimed;
     const swipeClaimed = claimedStakes.has(`${p.id}-SWIPE`) || swipeStake?.claimed;
-    
+
     // Must be resolved, user must have won, and not already claimed
     const ethCanClaim = ethStake && ethStake.isWinner && ethStake.canClaim && !ethClaimed;
     const swipeCanClaim = swipeStake && swipeStake.isWinner && swipeStake.canClaim && !swipeClaimed;
-    
-    return ethCanClaim || swipeCanClaim;
+
+    // Also include cancelled predictions where user can claim refund
+    const ethCanClaimRefund = p.cancelled && ethStake && !ethClaimed && (ethStake.yesAmount > 0 || ethStake.noAmount > 0);
+    const swipeCanClaimRefund = p.cancelled && swipeStake && !swipeClaimed && (swipeStake.yesAmount > 0 || swipeStake.noAmount > 0);
+
+    return ethCanClaim || swipeCanClaim || ethCanClaimRefund || swipeCanClaimRefund;
   }).length;
 
   if (!address) {
