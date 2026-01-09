@@ -267,10 +267,119 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, on
     return { text: shareText, url: predictionUrl };
   };
 
+  // Build share text for EXPIRED prediction
+  const buildExpiredShareText = (platform: 'farcaster' | 'twitter') => {
+    const ethStakeData = prediction.userStakes?.ETH;
+    const swipeStakeData = prediction.userStakes?.SWIPE;
+    const hasEth = ethStakeData && (ethStakeData.yesAmount > 0 || ethStakeData.noAmount > 0);
+    const hasSwipe = swipeStakeData && (swipeStakeData.yesAmount > 0 || swipeStakeData.noAmount > 0);
+
+    if (!hasEth && !hasSwipe) return { text: '', url: '' };
+
+    const tag = getMention(platform);
+    const expiredIntros = [
+      `⏰ Prediction expired ${tag}`,
+      `⌛ Time's up on this one ${tag}`,
+      `🏁 This prediction didn't resolve ${tag}`
+    ];
+    const intro = expiredIntros[Math.floor(Math.random() * expiredIntros.length)];
+
+    let shareText = `${intro}\n\n"${prediction.question}"\n\n`;
+
+    // Show user's bets
+    if (hasEth) {
+      const myBet = ethStakeData.yesAmount > ethStakeData.noAmount ? 'YES' : 'NO';
+      const myAmount = Math.max(ethStakeData.yesAmount, ethStakeData.noAmount) / 1e18;
+      shareText += `🎯 My bet: ${myBet} (${myAmount.toFixed(6)} ETH)\n`;
+    }
+
+    if (hasSwipe) {
+      const myBet = swipeStakeData.yesAmount > swipeStakeData.noAmount ? 'YES' : 'NO';
+      const myAmount = Math.max(swipeStakeData.yesAmount, swipeStakeData.noAmount) / 1e18;
+      shareText += `🎯 My bet: ${myBet} (${formatAmount(myAmount * 1e18, 'SWIPE')} SWIPE)\n`;
+    }
+
+    // Add pool info
+    const totalPoolETH = (prediction.yesTotalAmount + prediction.noTotalAmount) / 1e18;
+    if (totalPoolETH > 0) {
+      shareText += `\n💰 Final pool: ${totalPoolETH.toFixed(4)} ETH`;
+    }
+
+    if (prediction.participants && prediction.participants.length > 0) {
+      shareText += `\n👥 ${prediction.participants.length} swipers`;
+    }
+
+    shareText += `\n\nWhat do you think the outcome should have been? 🤔`;
+
+    const predictionUrl = `https://theswipe.app/prediction/${prediction.id}`;
+
+    return { text: shareText, url: predictionUrl };
+  };
+
+  // Build share text for CANCELLED prediction
+  const buildCancelledShareText = (platform: 'farcaster' | 'twitter') => {
+    const ethStakeData = prediction.userStakes?.ETH;
+    const swipeStakeData = prediction.userStakes?.SWIPE;
+    const hasEth = ethStakeData && (ethStakeData.yesAmount > 0 || ethStakeData.noAmount > 0);
+    const hasSwipe = swipeStakeData && (swipeStakeData.yesAmount > 0 || swipeStakeData.noAmount > 0);
+
+    if (!hasEth && !hasSwipe) return { text: '', url: '' };
+
+    const tag = getMention(platform);
+    const cancelledIntros = [
+      `🚫 Prediction cancelled ${tag}`,
+      `❌ This prediction was cancelled ${tag}`,
+      `🔄 Got my refund from cancelled prediction ${tag}`
+    ];
+    const intro = cancelledIntros[Math.floor(Math.random() * cancelledIntros.length)];
+
+    let shareText = `${intro}\n\n"${prediction.question}"\n\n`;
+
+    // Show user's bets (they get refunded)
+    if (hasEth) {
+      const myBet = ethStakeData.yesAmount > ethStakeData.noAmount ? 'YES' : 'NO';
+      const myAmount = Math.max(ethStakeData.yesAmount, ethStakeData.noAmount) / 1e18;
+      shareText += `🎯 My bet: ${myBet} (${myAmount.toFixed(6)} ETH) - REFUNDED ✅\n`;
+    }
+
+    if (hasSwipe) {
+      const myBet = swipeStakeData.yesAmount > swipeStakeData.noAmount ? 'YES' : 'NO';
+      const myAmount = Math.max(swipeStakeData.yesAmount, swipeStakeData.noAmount) / 1e18;
+      shareText += `🎯 My bet: ${myBet} (${formatAmount(myAmount * 1e18, 'SWIPE')} SWIPE) - REFUNDED ✅\n`;
+    }
+
+    // Add pool info
+    const totalPoolETH = (prediction.yesTotalAmount + prediction.noTotalAmount) / 1e18;
+    if (totalPoolETH > 0) {
+      shareText += `\n💰 Pool was: ${totalPoolETH.toFixed(4)} ETH`;
+    }
+
+    if (prediction.participants && prediction.participants.length > 0) {
+      shareText += `\n👥 ${prediction.participants.length} swipers`;
+    }
+
+    shareText += `\n\nFair play! Everyone got their money back 💰`;
+
+    const predictionUrl = `https://theswipe.app/prediction/${prediction.id}`;
+
+    return { text: shareText, url: predictionUrl };
+  };
+
   // Handle share to Farcaster - uses native composeCast for in-app experience
   const handleShareFarcaster = async () => {
     // Use different share text based on prediction status, with Farcaster tag
-    const { text, url } = prediction.status === 'active' ? buildActiveShareText('farcaster') : buildShareText('farcaster');
+    let shareData;
+    if (prediction.status === 'active') {
+      shareData = buildActiveShareText('farcaster');
+    } else if (prediction.status === 'expired') {
+      shareData = buildExpiredShareText('farcaster');
+    } else if (prediction.status === 'cancelled') {
+      shareData = buildCancelledShareText('farcaster');
+    } else {
+      shareData = buildShareText('farcaster');
+    }
+
+    const { text, url } = shareData;
     if (!text) return;
     
     try {
@@ -293,7 +402,18 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, on
   // Handle share to Twitter/X - opens Twitter intent URL
   const handleShareTwitter = async () => {
     // Use different share text based on prediction status, with Twitter tag
-    const { text, url } = prediction.status === 'active' ? buildActiveShareText('twitter') : buildShareText('twitter');
+    let shareData;
+    if (prediction.status === 'active') {
+      shareData = buildActiveShareText('twitter');
+    } else if (prediction.status === 'expired') {
+      shareData = buildExpiredShareText('twitter');
+    } else if (prediction.status === 'cancelled') {
+      shareData = buildCancelledShareText('twitter');
+    } else {
+      shareData = buildShareText('twitter');
+    }
+
+    const { text, url } = shareData;
     if (!text) return;
     
     const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
@@ -425,13 +545,17 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, on
         <span className="legacy-status-text">{getStatusText(prediction.status)}</span>
       </div>
       
-      {/* Share Badge - For resolved predictions with stakes OR active predictions */}
-      {((prediction.status === 'resolved' && (hasEthStake || hasSwipeStake)) || prediction.status === 'active') && (
+      {/* Share Badge - For all predictions */}
+      {true && (
         <div className="legacy-share-wrapper">
-          <button 
+          <button
             className="legacy-share-badge"
             onClick={() => setShowShareDropdown(!showShareDropdown)}
-            title={prediction.status === 'active' ? "Share this prediction" : "Share your result"}
+            title={
+              prediction.status === 'active' ? "Share this prediction" :
+              prediction.status === 'cancelled' ? "Share refund info" :
+              "Share your result"
+            }
           >
             <Share2 size={14} />
           </button>
