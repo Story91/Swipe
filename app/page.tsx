@@ -242,11 +242,13 @@ export default function App() {
         try {
           const result = await sdk.actions.addMiniApp();
           console.log('✅ Add Mini App result:', result);
-          
-          if (result.notificationDetails) {
+
+          if (result && result.notificationDetails) {
             console.log('✅ Notifications enabled!');
-          } else {
+          } else if (result) {
             console.log('⚠️ Mini App added but notifications not enabled');
+          } else {
+            console.log('⚠️ Add Mini App returned undefined');
           }
         } catch (error: any) {
           console.error('❌ Add Mini App failed:', error);
