@@ -642,20 +642,24 @@ export function EnhancedUserDashboard() {
     
     switch (filterType) {
       case 'ready-to-claim':
-        // Show only predictions that can be claimed (won + not claimed)
+        // Show only predictions that can be claimed (won + not claimed OR cancelled with unclaimed stakes)
         filteredPredictions = allUserPredictions.filter(p => {
           const ethStake = p.userStakes?.ETH;
           const swipeStake = p.userStakes?.SWIPE;
-          
+
           // Check local claimed state first
           const ethClaimed = claimedStakes.has(`${p.id}-ETH`) || ethStake?.claimed;
           const swipeClaimed = claimedStakes.has(`${p.id}-SWIPE`) || swipeStake?.claimed;
-          
-          // Must be resolved, user must have won, and not already claimed
+
+          // Must be resolved and user must have won, and not already claimed
           const ethCanClaim = ethStake && ethStake.isWinner && ethStake.canClaim && !ethClaimed;
           const swipeCanClaim = swipeStake && swipeStake.isWinner && swipeStake.canClaim && !swipeClaimed;
-          
-          return ethCanClaim || swipeCanClaim;
+
+          // Also include cancelled predictions where user can claim refund
+          const ethCanClaimRefund = p.cancelled && ethStake && !ethClaimed && (ethStake.yesAmount > 0 || ethStake.noAmount > 0);
+          const swipeCanClaimRefund = p.cancelled && swipeStake && !swipeClaimed && (swipeStake.yesAmount > 0 || swipeStake.noAmount > 0);
+
+          return ethCanClaim || swipeCanClaim || ethCanClaimRefund || swipeCanClaimRefund;
         });
         break;
         
@@ -1359,6 +1363,20 @@ export function EnhancedUserDashboard() {
     const ethAmount = (ethStake?.yesAmount || 0) + (ethStake?.noAmount || 0);
     return sum + ethAmount;
   }, 0);
+
+  // Count cancelled predictions that can be claimed (for filter badge)
+  const cancelledCanClaimCount = allUserPredictions.filter(p => {
+    const ethStake = p.userStakes?.ETH;
+    const swipeStake = p.userStakes?.SWIPE;
+
+    const ethClaimed = claimedStakes.has(`${p.id}-ETH`) || ethStake?.claimed;
+    const swipeClaimed = claimedStakes.has(`${p.id}-SWIPE`) || swipeStake?.claimed;
+
+    const ethCanClaimRefund = p.cancelled && ethStake && !ethClaimed && (ethStake.yesAmount > 0 || ethStake.noAmount > 0);
+    const swipeCanClaimRefund = p.cancelled && swipeStake && !swipeClaimed && (swipeStake.yesAmount > 0 || swipeStake.noAmount > 0);
+
+    return ethCanClaimRefund || swipeCanClaimRefund;
+  }).length;
   
   const swipeTotalStaked = allUserPredictions.reduce((sum, p) => {
     const swipeStake = p.userStakes?.SWIPE;
@@ -1699,7 +1717,9 @@ export function EnhancedUserDashboard() {
                 <SelectItem value="won">🏆 Won</SelectItem>
                 <SelectItem value="lost">💔 Lost</SelectItem>
                 <SelectItem value="expired">⏰ Expired</SelectItem>
-                <SelectItem value="cancelled">❌ Cancelled</SelectItem>
+                <SelectItem value="cancelled">
+                  ❌ Cancelled {cancelledCanClaimCount > 0 && <span className="filter-badge">{cancelledCanClaimCount}</span>}
+                </SelectItem>
                 <SelectItem value="claimed">✅ Claimed</SelectItem>
                 <SelectItem value="all">📊 All</SelectItem>
               </SelectContent>
