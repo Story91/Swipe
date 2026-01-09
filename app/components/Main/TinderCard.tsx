@@ -401,6 +401,9 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   
   // Token prices for USD conversion
   const { formatUsdValue, getUsdValue } = useTokenPrices();
+
+  // State for category filtering
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   
   // Format large SWIPE numbers to K/M format
   const formatSwipeAmount = (amount: number): string => {
@@ -739,47 +742,55 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   // Use real predictions from Redis - filter only active predictions
   const cardItems = useMemo(() => {
     const allItems = realCardItems.length > 0 ? realCardItems : (items && items.length ? items : []);
-    
+
     // Filter only active predictions (not resolved, not cancelled, not expired)
-    const activeItems = allItems.filter((item, index) => {
+    let activeItems = allItems.filter((item, index) => {
       const prediction = transformedPredictions[index];
       if (!prediction) return false;
-      
+
       // Check if prediction is active
       const now = Date.now() / 1000;
       const isNotExpired = prediction.deadline > now;
       const isNotResolved = !prediction.resolved;
       const isNotCancelled = !prediction.cancelled;
       const isApproved = !prediction.needsApproval;
-      
+
       return isNotExpired && isNotResolved && isNotCancelled && isApproved;
     });
-    
+
+    // Apply category filter if not 'all'
+    if (selectedCategory !== 'all') {
+      activeItems = activeItems.filter(item => {
+        const prediction = transformedPredictions.find(p => p.id === item.id);
+        return prediction?.category?.toLowerCase() === selectedCategory.toLowerCase();
+      });
+    }
+
     // Sort active items by deadline (closest deadline first), then by ID as tiebreaker
     const sortedItems = activeItems.sort((a, b) => {
       // Find corresponding predictions for sorting
       const predictionA = transformedPredictions.find(p => p.id === a.id);
       const predictionB = transformedPredictions.find(p => p.id === b.id);
-      
+
       // Sort by deadline (closest first)
       const deadlineA = predictionA?.deadline || 0;
       const deadlineB = predictionB?.deadline || 0;
-      
+
       if (deadlineA !== deadlineB) {
         return deadlineA - deadlineB; // Closest deadline first
       }
-      
+
       // If deadlines are equal, sort by ID
       return a.id - b.id;
     });
-    
+
     // Log only when the actual data changes, not every second
     if (sortedItems.length > 0) {
-      console.log(`📊 Total predictions: ${allItems.length}, Active predictions: ${sortedItems.length}`);
+      console.log(`📊 Total predictions: ${allItems.length}, Active predictions: ${activeItems.length}, Filtered: ${sortedItems.length} (${selectedCategory !== 'all' ? `Category: ${selectedCategory}` : 'All categories'})`);
       console.log(`📊 Card order:`, sortedItems.map(item => `ID:${item.id}`));
     }
     return sortedItems;
-  }, [realCardItems, items, transformedPredictions]);
+  }, [realCardItems, items, transformedPredictions, selectedCategory]);
 
   // Reset currentIndex when cardItems change (new data loaded)
   useEffect(() => {
@@ -2490,6 +2501,70 @@ KEY USER-FACING CHANGES: V1 → V2
         </TinderCard>
       </div>
 
+    </div>
+
+    {/* Category Filter Buttons */}
+    <div className="category-filter-section">
+      <div className="category-filter-container">
+        <button
+          onClick={() => setSelectedCategory('all')}
+          className={`category-filter-btn ${selectedCategory === 'all' ? 'active' : ''}`}
+        >
+          <span className="text-xs font-bold">ALL</span>
+          <span className="text-[10px] opacity-70 ml-1">
+            ({realCardItems.filter(item => {
+              const prediction = transformedPredictions.find(p => p.id === item.id);
+              if (!prediction) return false;
+              const now = Date.now() / 1000;
+              return prediction.deadline > now && !prediction.resolved && !prediction.cancelled && !prediction.needsApproval;
+            }).length})
+          </span>
+        </button>
+
+        {/* Dynamic category buttons based on available categories */}
+        {(() => {
+          const availableCategories = [...new Set(
+            realCardItems
+              .filter(item => {
+                const prediction = transformedPredictions.find(p => p.id === item.id);
+                if (!prediction) return false;
+                const now = Date.now() / 1000;
+                return prediction.deadline > now && !prediction.resolved && !prediction.cancelled && !prediction.needsApproval;
+              })
+              .map(item => {
+                const prediction = transformedPredictions.find(p => p.id === item.id);
+                return prediction?.category || 'Unknown';
+              })
+              .filter(Boolean)
+          )].sort();
+
+          return availableCategories.map(category => {
+            const count = realCardItems.filter(item => {
+              const prediction = transformedPredictions.find(p => p.id === item.id);
+              if (!prediction) return false;
+              const now = Date.now() / 1000;
+              return prediction.category === category &&
+                     prediction.deadline > now &&
+                     !prediction.resolved &&
+                     !prediction.cancelled &&
+                     !prediction.needsApproval;
+            }).length;
+
+            if (count === 0) return null;
+
+            return (
+              <button
+                key={category}
+                onClick={() => setSelectedCategory(category)}
+                className={`category-filter-btn ${selectedCategory === category ? 'active' : ''}`}
+              >
+                <span className="text-xs font-bold">{category.toUpperCase()}</span>
+                <span className="text-[10px] opacity-70 ml-1">({count})</span>
+              </button>
+            );
+          });
+        })()}
+      </div>
     </div>
 
     {/* Action Buttons - Share, AI, and Skip */}
