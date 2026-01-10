@@ -352,39 +352,43 @@ export function DailyTasks() {
     checkFollowStatus();
   }, [address, achievements]);
 
-  // Check if user is eligible for beta tester reward (for showing highlighted Claim button)
-  useEffect(() => {
-    const checkBetaTesterEligibility = async () => {
-      if (!address) return;
+  // Manual check for beta tester eligibility (called by button click)
+  const handleCheckBetaTesterEligibility = async () => {
+    if (!address) return;
 
-      // Skip if already claimed (isBetaTester from contract)
-      const hasClaimedBetaTester = achievements ? (achievements as any)[0] as boolean : false;
-      if (hasClaimedBetaTester) {
-        setIsBetaTesterEligible(false); // Already claimed, no need to show highlighted button
-        return;
+    // Skip if already claimed (isBetaTester from contract)
+    const hasClaimedBetaTester = achievements ? (achievements as any)[0] as boolean : false;
+    if (hasClaimedBetaTester) {
+      setIsBetaTesterEligible(false); // Already claimed, no need to check
+      return;
+    }
+
+    setIsCheckingBetaTester(true);
+    try {
+      // Call our API to check beta tester eligibility (POST with body, not GET with query)
+      const response = await fetch('/api/daily-tasks/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          address,
+          taskType: 'BETA_TESTER',
+          checkOnly: true, // Just check, don't mark as completed
+        }),
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setIsBetaTesterEligible(true); // User is eligible, show highlighted button and claim
+      } else {
+        setIsBetaTesterEligible(false); // User is not eligible
       }
-
-      setIsCheckingBetaTester(true);
-      try {
-        // Call our API to check beta tester eligibility
-        const response = await fetch(`/api/daily-tasks/verify?address=${address}&taskType=BETA_TESTER&checkOnly=true`);
-        const data = await response.json();
-
-        if (data.success) {
-          setIsBetaTesterEligible(true); // User is eligible, show highlighted button
-        } else {
-          setIsBetaTesterEligible(false); // User is not eligible
-        }
-      } catch (error) {
-        console.error('Error checking beta tester eligibility:', error);
-        setIsBetaTesterEligible(false);
-      } finally {
-        setIsCheckingBetaTester(false);
-      }
-    };
-
-    checkBetaTesterEligibility();
-  }, [address, achievements]);
+    } catch (error) {
+      console.error('Error checking beta tester eligibility:', error);
+      setIsBetaTesterEligible(false);
+    } finally {
+      setIsCheckingBetaTester(false);
+    }
+  };
 
   // Contract write
   const { writeContract, data: hash, isPending, error: writeError, reset: resetWrite } = useWriteContract();
@@ -411,12 +415,8 @@ export function DailyTasks() {
   useEffect(() => {
     if (isSuccess && hash) {
       setShowConfetti(true);
-      sendNotification({
-        title: "🎉 Claim Successful!",
-        body: `You received your SWIPE rewards!`,
-      });
       
-      // If we have a pending task to confirm, call /confirm endpoint
+      // If we have a pending task/achievement to confirm, call /confirm endpoint
       if (pendingConfirmTask && address) {
         // Special handling for REFERRAL - clear input and show specific notification
         if (pendingConfirmTask === 'REFERRAL') {
@@ -426,8 +426,14 @@ export function DailyTasks() {
             title: "🎉 Referral Registered!",
             body: "You both received 150k SWIPE!",
           });
+        } else {
+          sendNotification({
+            title: "🎉 Claim Successful!",
+            body: `You received your SWIPE rewards!`,
+          });
         }
         
+        // Confirm task/achievement in Redis AFTER transaction is confirmed on blockchain
         const confirmTask = async () => {
           try {
             await fetch('/api/daily-tasks/confirm', {
@@ -440,20 +446,40 @@ export function DailyTasks() {
               }),
             });
             console.log(`✅ Task ${pendingConfirmTask} confirmed in Redis with tx ${hash}`);
+            
+            // Only refetch data AFTER confirmation in Redis is successful
+            // This ensures achievement is marked as completed only after full confirmation
+            refetchStats();
+            refetchTasks();
+            refetchAchievements();
+            
+            // Reset states after successful confirmation
+            setPendingConfirmTask(null);
+            setIsClaimingTask(null);
           } catch (error) {
             console.error('Failed to confirm task in Redis:', error);
-          } finally {
+            // Still refetch to update from blockchain, but achievement is already on blockchain
+            refetchStats();
+            refetchTasks();
+            refetchAchievements();
+            // Clear states after refetch (achievement is already on blockchain)
             setPendingConfirmTask(null);
             setIsClaimingTask(null);
           }
         };
         confirmTask();
+      } else {
+        // Daily claim (claimDaily) - no Redis confirmation needed, just refetch
+        sendNotification({
+          title: "🎉 Claim Successful!",
+          body: `You received your SWIPE rewards!`,
+        });
+        
+        // Refetch data immediately for daily claim
+        refetchStats();
+        refetchTasks();
+        refetchAchievements();
       }
-      
-      // Refetch all data
-      refetchStats();
-      refetchTasks();
-      refetchAchievements();
       
       // Hide confetti after animation
       setTimeout(() => setShowConfetti(false), 3000);
@@ -683,11 +709,13 @@ export function DailyTasks() {
       if (!data.success) {
         setTaskError(data.error || 'Verification failed');
         setPendingConfirmTask(null);
+        setIsClaimingTask(null);
         return;
       }
 
       // Now claim on-chain with signature
-      // Redis will be updated after successful tx via /confirm endpoint
+      // Redis will be updated after successful tx via /confirm endpoint in useEffect
+      // DO NOT mark as completed here - wait for transaction confirmation
       if (DAILY_REWARDS_CONTRACT !== "0x0000000000000000000000000000000000000000") {
         writeContract({
           address: DAILY_REWARDS_CONTRACT,
@@ -695,12 +723,19 @@ export function DailyTasks() {
           functionName: "claimAchievement",
           args: [achievementType, data.signature as `0x${string}`],
         });
+        // Keep setIsClaimingTask(achievementType) and setPendingConfirmTask(achievementType) active
+        // They will be cleared in useEffect when transaction is confirmed or fails
+      } else {
+        // Contract not deployed - clear states
+        setPendingConfirmTask(null);
+        setIsClaimingTask(null);
       }
       
     } catch (error) {
       console.error("Achievement claim failed:", error);
       setTaskError(error instanceof Error ? error.message : 'Claim failed');
-    } finally {
+      // Clear states on error (transaction not sent)
+      setPendingConfirmTask(null);
       setIsClaimingTask(null);
     }
   };
@@ -1082,7 +1117,13 @@ export function DailyTasks() {
           
           <div className="achievements-grid">
             {/* Beta Tester - claimable if eligible */}
-            <div className={`achievement-badge ${achievementData?.isBetaTester ? 'unlocked' : 'locked'}`}>
+            <div className={`achievement-badge ${
+              achievementData?.isBetaTester 
+                ? 'unlocked' 
+                : isBetaTesterEligible === false
+                  ? 'locked' 
+                  : 'ready-to-claim'
+            }`}>
               <span className="badge-icon">🧪</span>
               <span className="badge-name">Beta Tester</span>
               <span className="badge-reward">500k SWIPE</span>
@@ -1090,26 +1131,31 @@ export function DailyTasks() {
               {/* Already claimed */}
               {achievementData?.isBetaTester && <span className="achievement-done">✅</span>}
 
-              {/* Eligible but not claimed yet - show highlighted Claim button */}
-              {!achievementData?.isBetaTester && isBetaTesterEligible && (
+              {/* Not checked yet - show Check Eligibility button */}
+              {!achievementData?.isBetaTester && isBetaTesterEligible === null && (
                 <button
-                  className="achievement-claim-btn pulse-claim"
-                  onClick={() => handleClaimAchievement('BETA_TESTER')}
-                  disabled={isClaimingTask === 'BETA_TESTER'}
+                  className="achievement-check-btn"
+                  onClick={handleCheckBetaTesterEligibility}
+                  disabled={!address || isCheckingBetaTester}
                 >
-                  {isClaimingTask === 'BETA_TESTER' ? '...' : 'Claim'}
+                  {isCheckingBetaTester ? 'Checking...' : 'Check Eligibility'}
                 </button>
               )}
 
-              {/* Not eligible or still checking - show regular Claim button */}
-              {!achievementData?.isBetaTester && !isBetaTesterEligible && (
+              {/* Eligible but not claimed yet - show highlighted Claim button */}
+              {!achievementData?.isBetaTester && isBetaTesterEligible === true && (
                 <button
-                  className="achievement-claim-btn"
+                  className="achievement-claim-btn pulse-claim"
                   onClick={() => handleClaimAchievement('BETA_TESTER')}
-                  disabled={isClaimingTask === 'BETA_TESTER' || isCheckingBetaTester}
+                  disabled={isClaimingTask === 'BETA_TESTER' || isPending || isConfirming}
                 >
-                  {isCheckingBetaTester ? '...' : isClaimingTask === 'BETA_TESTER' ? '...' : 'Claim'}
+                  {isClaimingTask === 'BETA_TESTER' || isPending || isConfirming ? '...' : 'Claim'}
                 </button>
+              )}
+
+              {/* Not eligible (checked and failed) - show message */}
+              {!achievementData?.isBetaTester && isBetaTesterEligible === false && (
+                <span className="achievement-not-eligible">Not eligible</span>
               )}
             </div>
 
@@ -1127,9 +1173,9 @@ export function DailyTasks() {
                 <button 
                   className="achievement-claim-btn pulse-claim"
                   onClick={() => handleClaimAchievement('FOLLOW_SOCIALS')}
-                  disabled={isClaimingTask === 'FOLLOW_SOCIALS'}
+                  disabled={isClaimingTask === 'FOLLOW_SOCIALS' || isPending || isConfirming}
                 >
-                  {isClaimingTask === 'FOLLOW_SOCIALS' ? '...' : 'Claim'}
+                  {isClaimingTask === 'FOLLOW_SOCIALS' || isPending || isConfirming ? '...' : 'Claim'}
                 </button>
               )}
               

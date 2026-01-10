@@ -54,25 +54,38 @@ export async function POST(request: NextRequest) {
     // Check if already confirmed (prevent double counting)
     const alreadyConfirmed = await redis.get(taskKey);
     if (alreadyConfirmed) {
+      console.log(`⚠️ Task ${taskType} already confirmed for ${address} (tx: ${txHash})`);
       return NextResponse.json({
         success: true,
         message: 'Task already confirmed',
         alreadyConfirmed: true,
+        taskType,
+        address,
       });
     }
 
     // Mark task/achievement as completed
+    const now = new Date().toISOString();
     if (isAchievement) {
       // Achievements are permanent (no expiry)
       await redis.set(taskKey, `completed:${txHash}`);
+      // Store timestamp for achievements (useful for tracking)
+      await redis.set(`${taskKey}:timestamp`, now);
     } else {
       // Daily tasks expire at midnight
       const secondsUntilMidnight = getSecondsUntilMidnight();
       await redis.set(taskKey, `completed:${txHash}`, { ex: secondsUntilMidnight });
     }
 
-    // Track completion in stats
+    // Track completion in stats - ONLY increase if not already confirmed
+    // This prevents double counting if somehow the same user claims multiple times
+    // (should be prevented by alreadyConfirmed check above, but this is extra safety)
     await redis.hincrby('daily-tasks:stats', `${taskType}:completions`, 1);
+    
+    // For achievements, also track unique users in a set
+    if (isAchievement) {
+      await redis.sadd(`achievements:${taskType}:users`, address.toLowerCase());
+    }
 
     // Also track unique users
     await redis.sadd('daily-tasks:unique-users', address.toLowerCase());
