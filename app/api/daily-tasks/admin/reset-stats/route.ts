@@ -31,7 +31,8 @@ export async function POST(request: NextRequest) {
     const statsKey = 'daily-tasks:stats';
 
     // Get current stats before reset
-    const currentCompletions = await redis.hget(statsKey, `${taskType}:completions`) || '0';
+    const currentCompletionsValue = await redis.hget(statsKey, `${taskType}:completions`);
+    const currentCompletions = typeof currentCompletionsValue === 'string' ? currentCompletionsValue : '0';
     
     // Count actual users who claimed the achievement
     const pattern = `achievements:*:${taskType}`;
@@ -53,7 +54,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify the reset
-    const newCompletions = await redis.hget(statsKey, `${taskType}:completions`) || '0';
+    const newCompletionsValue = await redis.hget(statsKey, `${taskType}:completions`);
+    const newCompletions = typeof newCompletionsValue === 'string' ? newCompletionsValue : '0';
 
     console.log(`✅ Reset ${taskType}:completions from ${currentCompletions} to ${newCompletions}`);
 
@@ -61,8 +63,8 @@ export async function POST(request: NextRequest) {
       success: true,
       taskType,
       stats: {
-        before: parseInt(currentCompletions),
-        after: parseInt(newCompletions),
+        before: parseInt(currentCompletions) || 0,
+        after: parseInt(newCompletions) || 0,
         actualUsers,
       },
       usersSetReset,
