@@ -80,7 +80,8 @@ export async function POST(request: NextRequest) {
     const remainingKeys = await redis.keys(pattern);
     const remainingTimestamps = await redis.keys(timestampPattern);
     const remainingUsers = await redis.smembers(usersSetKey);
-    const completionsAfter = await redis.hget(statsKey, `${taskType}:completions`) || '0';
+    const completionsAfterValue = await redis.hget(statsKey, `${taskType}:completions`);
+    const completionsAfter = typeof completionsAfterValue === 'string' ? completionsAfterValue : '0';
     
     console.log(`🧹 Cleaned ${taskType} achievement data:`);
     console.log(`   - Deleted ${deletedKeys} achievement keys`);
@@ -104,7 +105,7 @@ export async function POST(request: NextRequest) {
         usersInSet: usersSetCount,
       },
       after: {
-        completions: parseInt(completionsAfter),
+        completions: parseInt(completionsAfter) || 0,
         remainingKeys: remainingKeys.length,
         remainingTimestamps: remainingTimestamps.length,
         remainingUsers: remainingUsers.length,
