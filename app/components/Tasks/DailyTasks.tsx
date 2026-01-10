@@ -255,6 +255,10 @@ export function DailyTasks() {
   // Follow status (checked via API, independent from claim status)
   const [isFollowingSwipeAI, setIsFollowingSwipeAI] = useState<boolean | null>(null);
   const [isCheckingFollow, setIsCheckingFollow] = useState(false);
+
+  // Beta tester eligibility (checked via API, independent from claim status)
+  const [isBetaTesterEligible, setIsBetaTesterEligible] = useState<boolean | null>(null);
+  const [isCheckingBetaTester, setIsCheckingBetaTester] = useState(false);
   
   // Contract reads
   const { data: userStats, refetch: refetchStats } = useReadContract({
@@ -346,6 +350,40 @@ export function DailyTasks() {
     };
     
     checkFollowStatus();
+  }, [address, achievements]);
+
+  // Check if user is eligible for beta tester reward (for showing highlighted Claim button)
+  useEffect(() => {
+    const checkBetaTesterEligibility = async () => {
+      if (!address) return;
+
+      // Skip if already claimed (isBetaTester from contract)
+      const hasClaimedBetaTester = achievements ? (achievements as any)[0] as boolean : false;
+      if (hasClaimedBetaTester) {
+        setIsBetaTesterEligible(false); // Already claimed, no need to show highlighted button
+        return;
+      }
+
+      setIsCheckingBetaTester(true);
+      try {
+        // Call our API to check beta tester eligibility
+        const response = await fetch(`/api/daily-tasks/verify?address=${address}&taskType=BETA_TESTER&checkOnly=true`);
+        const data = await response.json();
+
+        if (data.success) {
+          setIsBetaTesterEligible(true); // User is eligible, show highlighted button
+        } else {
+          setIsBetaTesterEligible(false); // User is not eligible
+        }
+      } catch (error) {
+        console.error('Error checking beta tester eligibility:', error);
+        setIsBetaTesterEligible(false);
+      } finally {
+        setIsCheckingBetaTester(false);
+      }
+    };
+
+    checkBetaTesterEligibility();
   }, [address, achievements]);
 
   // Contract write
@@ -1048,16 +1086,31 @@ export function DailyTasks() {
               <span className="badge-icon">🧪</span>
               <span className="badge-name">Beta Tester</span>
               <span className="badge-reward">500k SWIPE</span>
-              {!achievementData?.isBetaTester && (
-                <button 
-                  className="achievement-claim-btn"
+
+              {/* Already claimed */}
+              {achievementData?.isBetaTester && <span className="achievement-done">✅</span>}
+
+              {/* Eligible but not claimed yet - show highlighted Claim button */}
+              {!achievementData?.isBetaTester && isBetaTesterEligible && (
+                <button
+                  className="achievement-claim-btn pulse-claim"
                   onClick={() => handleClaimAchievement('BETA_TESTER')}
                   disabled={isClaimingTask === 'BETA_TESTER'}
                 >
                   {isClaimingTask === 'BETA_TESTER' ? '...' : 'Claim'}
                 </button>
               )}
-              {achievementData?.isBetaTester && <span className="achievement-done">✅</span>}
+
+              {/* Not eligible or still checking - show regular Claim button */}
+              {!achievementData?.isBetaTester && !isBetaTesterEligible && (
+                <button
+                  className="achievement-claim-btn"
+                  onClick={() => handleClaimAchievement('BETA_TESTER')}
+                  disabled={isClaimingTask === 'BETA_TESTER' || isCheckingBetaTester}
+                >
+                  {isCheckingBetaTester ? '...' : isClaimingTask === 'BETA_TESTER' ? '...' : 'Claim'}
+                </button>
+              )}
             </div>
 
             {/* Follow Socials - claimable */}
