@@ -112,6 +112,7 @@ contract SwipeDailyRewards {
     event Paused(bool isPaused);
     event EmergencyWithdraw(address indexed to, uint256 amount);
     event SwipeDeposited(address indexed from, uint256 amount);
+    event DepositCapReached(uint256 totalDeposited);  // Warn at 90% capacity
     
     // Modifiers
     modifier onlyOwner() {
@@ -583,13 +584,43 @@ contract SwipeDailyRewards {
         emit Paused(_paused);
     }
     
-    function depositSwipe(uint256 amount) external {
-        require(
-            swipeToken.transferFrom(msg.sender, address(this), amount),
-            "Transfer failed"
-        );
-        emit SwipeDeposited(msg.sender, amount);
+  function depositSwipe(uint256 amount) external {
+    require(amount > 0, "Amount must be greater than 0");
+    require(amount <= MAX_DEPOSIT_PER_TX, "Exceeds maximum deposit per transaction");
+    
+    // Check deposit won't exceed total cap
+    uint256 newTotalDeposited = totalDeposited + amount;
+    require(newTotalDeposited <= MAX_TOTAL_DEPOSITS, "Exceeds maximum total deposits");
+    
+    // Check sender has sufficient balance
+    require(
+        swipeToken.balanceOf(msg.sender) >= amount,
+        "Insufficient token balance"
+    );
+    
+    // Check allowance
+    require(
+        swipeToken.allowance(msg.sender, address(this)) >= amount,
+        "Insufficient allowance"
+    );
+    
+    // Update state before external call (Checks-Effects-Interactions pattern)
+    totalDeposited = newTotalDeposited;
+    
+    // Transfer tokens
+    require(
+        swipeToken.transferFrom(msg.sender, address(this), amount),
+        "Token transfer failed"
+    );
+    
+    // Emit deposit event
+    emit SwipeDeposited(msg.sender, amount);
+    
+    // Emit capacity warning if approaching cap (90% full or more)
+    if (newTotalDeposited >= MAX_TOTAL_DEPOSITS * 9 / 10) {
+        emit DepositCapReached(newTotalDeposited);
     }
+}
     
     function emergencyWithdraw() external onlyOwner {
         uint256 balance = swipeToken.balanceOf(address(this));
