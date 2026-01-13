@@ -45,6 +45,29 @@ export function SwipeTokenCard() {
     return ethValue.toFixed(6);
   }, [ethPrice]);
 
+  // Calculate SWIPE tokens received for buy amount (ETH or USD)
+  const calculateSwipeReceived = useCallback((amount: string, isUsd: boolean = false) => {
+    if (!swipePrice || !ethPrice || !amount) return null;
+    let usdValue: number;
+    if (isUsd) {
+      usdValue = parseFloat(amount);
+    } else {
+      const ethValue = parseFloat(amount);
+      usdValue = ethValue * ethPrice;
+    }
+    const swipeAmount = usdValue / swipePrice;
+    return swipeAmount;
+  }, [swipePrice, ethPrice]);
+
+  // Calculate ETH received for sell amount
+  const calculateEthReceived = useCallback((swipeAmount: string) => {
+    if (!swipePrice || !ethPrice || !swipeAmount) return null;
+    const swipeValue = parseFloat(swipeAmount);
+    const usdValue = swipeValue * swipePrice;
+    const ethAmount = usdValue / ethPrice;
+    return ethAmount;
+  }, [swipePrice, ethPrice]);
+
   // Handle ETH amount change
   const handleEthAmountChange = useCallback((value: string) => {
     setBuyAmount(value);
@@ -364,6 +387,14 @@ export function SwipeTokenCard() {
                           <span>{(10 / ethPrice).toFixed(4)}</span>
                         </div>
                       )}
+                      {swipePrice && (
+                        <div className="swipe-token-quick-btn-swipe">
+                          ~{calculateSwipeReceived("10", true)?.toLocaleString('en-US', { 
+                            maximumFractionDigits: 0,
+                            minimumFractionDigits: 0
+                          })} SWIPE
+                        </div>
+                      )}
                     </>
                   )}
                 </button>
@@ -385,6 +416,14 @@ export function SwipeTokenCard() {
                           <span>{(50 / ethPrice).toFixed(4)}</span>
                         </div>
                       )}
+                      {swipePrice && (
+                        <div className="swipe-token-quick-btn-swipe">
+                          ~{calculateSwipeReceived("50", true)?.toLocaleString('en-US', { 
+                            maximumFractionDigits: 0,
+                            minimumFractionDigits: 0
+                          })} SWIPE
+                        </div>
+                      )}
                     </>
                   )}
                 </button>
@@ -404,6 +443,14 @@ export function SwipeTokenCard() {
                         <div className="swipe-token-quick-btn-eth-small">
                           <Image src="/Ethereum-icon-purple.svg" alt="ETH" width={12} height={12} />
                           <span>{(100 / ethPrice).toFixed(4)}</span>
+                        </div>
+                      )}
+                      {swipePrice && (
+                        <div className="swipe-token-quick-btn-swipe">
+                          ~{calculateSwipeReceived("100", true)?.toLocaleString('en-US', { 
+                            maximumFractionDigits: 0,
+                            minimumFractionDigits: 0
+                          })} SWIPE
                         </div>
                       )}
                     </>
@@ -499,6 +546,18 @@ export function SwipeTokenCard() {
                       ≈ {calculateEthValue(buyAmountUsd)} ETH
                     </div>
                   )}
+                  {/* Show SWIPE tokens received */}
+                  {((inputMode === "eth" && buyAmount) || (inputMode === "usd" && buyAmountUsd)) && swipePrice && ethPrice && (
+                    <div className="swipe-token-receive-info">
+                      You will receive ~{calculateSwipeReceived(
+                        inputMode === "eth" ? buyAmount : buyAmountUsd,
+                        inputMode === "usd"
+                      )?.toLocaleString('en-US', { 
+                        maximumFractionDigits: 0,
+                        minimumFractionDigits: 0
+                      })} SWIPE
+                    </div>
+                  )}
                 </div>
                 <button
                   onClick={() => buyWithETH(buyAmount)}
@@ -519,16 +578,29 @@ export function SwipeTokenCard() {
               SWIPE Amount to Sell
             </div>
             <div className="swipe-token-input-row">
-              <input
-                type="number"
-                step="1000"
-                value={sellAmount}
-                onChange={(e) => setSellAmount(e.target.value)}
-                className="swipe-token-input"
-                placeholder="10000"
-                disabled={isLoading}
-                style={{ flex: 1 }}
-              />
+              <div className="swipe-token-input-wrapper" style={{ flex: 1 }}>
+                <input
+                  type="number"
+                  step="1000"
+                  value={sellAmount}
+                  onChange={(e) => setSellAmount(e.target.value)}
+                  className="swipe-token-input"
+                  placeholder="10000"
+                  disabled={isLoading}
+                />
+                {/* Show ETH and USD received */}
+                {sellAmount && swipePrice && ethPrice && parseFloat(sellAmount) > 0 && (
+                  <div className="swipe-token-receive-info">
+                    You will receive ~{calculateEthReceived(sellAmount)?.toFixed(6)} ETH
+                    {calculateEthReceived(sellAmount) && ethPrice && (
+                      <span> (~${(parseFloat(calculateEthReceived(sellAmount) || "0") * ethPrice).toLocaleString('en-US', { 
+                        minimumFractionDigits: 2, 
+                        maximumFractionDigits: 2 
+                      })} USD)</span>
+                    )}
+                  </div>
+                )}
+              </div>
               <button
                 onClick={sellSWIPETokens}
                 disabled={isLoading || !flaunchSDK || !address || !sellAmount}
