@@ -593,7 +593,7 @@ export function SwipeTokenCard() {
                   <div className="swipe-token-receive-info">
                     You will receive ~{calculateEthReceived(sellAmount)?.toFixed(6)} ETH
                     {calculateEthReceived(sellAmount) && ethPrice && (
-                      <span> (~${(parseFloat(calculateEthReceived(sellAmount) || "0") * ethPrice).toLocaleString('en-US', { 
+                      <span> (~${((calculateEthReceived(sellAmount) ?? 0) * ethPrice).toLocaleString('en-US', { 
                         minimumFractionDigits: 2, 
                         maximumFractionDigits: 2 
                       })} USD)</span>
