@@ -14,8 +14,8 @@ import { HackScreen } from "../HackScreen/HackScreen";
 const DAILY_REWARDS_CONTRACT = process.env.NEXT_PUBLIC_DAILY_REWARDS_CONTRACT as `0x${string}` || "0x0000000000000000000000000000000000000000";
 const SWIPE_TOKEN = "0xd0187D77Af0ED6a44F0A631B406c78b30E160aA9";
 
-// Minimum SWIPE balance required (10M SWIPE)
-const MIN_SWIPE_BALANCE = parseEther("10000000"); // 10,000,000 SWIPE
+// Minimum SWIPE balance required (1M SWIPE)
+const MIN_SWIPE_BALANCE = parseEther("1000000"); // 1,000,000 SWIPE
 
 // Share text variants for Farcaster casts
 const SHARE_TEXTS = [
@@ -324,7 +324,7 @@ export function DailyTasks() {
     args: address ? [address] : undefined,
   });
 
-  // Check if user has minimum balance (10M SWIPE)
+  // Check if user has minimum balance (1M SWIPE)
   const hasMinimumBalance = swipeBalance ? swipeBalance >= MIN_SWIPE_BALANCE : false;
 
   // Check if user has already used a referral code
@@ -572,12 +572,12 @@ export function DailyTasks() {
   const handleClaim = async () => {
     if (!address || !userStats) return;
     
-    // Check minimum balance requirement (10M SWIPE)
+    // Check minimum balance requirement (1M SWIPE)
     if (!hasMinimumBalance) {
-      setTaskError('Minimum 10M SWIPE required to claim daily rewards');
+      setTaskError('Minimum 1M SWIPE required to claim daily rewards');
       sendNotification({
         title: "❌ Insufficient Balance",
-        body: "You need at least 10M SWIPE to use Daily Tasks",
+        body: "You need at least 1M SWIPE to use Daily Tasks",
       });
       return;
     }
@@ -695,9 +695,9 @@ export function DailyTasks() {
   const handleRegisterReferral = async () => {
     if (!address || !referralCode) return;
     
-    // Check minimum balance requirement (10M SWIPE)
+    // Check minimum balance requirement (1M SWIPE)
     if (!hasMinimumBalance) {
-      setTaskError('Minimum 10M SWIPE required to use referral system');
+      setTaskError('Minimum 1M SWIPE required to use referral system');
       return;
     }
     
@@ -994,7 +994,7 @@ export function DailyTasks() {
             </span>
             {!hasMinimumBalance && (
               <span className="daily-tasks-balance-requirement">
-                10M min. required
+                1M min. required
               </span>
             )}
           </div>
