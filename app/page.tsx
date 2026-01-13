@@ -51,6 +51,7 @@ import { HowToPlayModal } from "./components/Modals/HowToPlayModal";
 import { SwipeTokenCard } from "./components/Market/SwipeTokenCard";
 import { SwipeClaim } from "./components/Portfolio/SwipeClaim";
 import { DailyTasks } from "./components/Tasks/DailyTasks";
+import { SidePanels } from "./components/SidePanels/SidePanels";
 
 type DashboardType = 'tinder' | 'user' | 'admin' | 'approver' | 'market-stats' | 'analytics' | 'settings' | 'audit-logs' | 'my-portfolio' | 'active-bets' | 'bet-history' | 'help-faq' | 'leaderboard' | 'recent-activity' | 'swipe-token' | 'claim' | 'daily-tasks';
 
@@ -357,7 +358,10 @@ export default function App() {
         <SearchParamsHandler onPredictionId={handlePredictionId} />
       </Suspense>
       
-      <div className="w-full max-w-[424px] mx-auto px-2 sm:px-4 py-3 overflow-x-hidden">
+      {/* Side Panels - Desktop Only */}
+      <SidePanels />
+      
+      <div className="w-full max-w-[424px] mx-auto px-2 sm:px-4 py-3 overflow-x-hidden main-content-wrapper">
         {/* Wallet Connection and Admin/Help - Top */}
         <div className="flex justify-between items-center mb-3">
           <Wallet className="z-10">
