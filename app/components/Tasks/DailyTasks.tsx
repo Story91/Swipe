@@ -1303,8 +1303,8 @@ export function DailyTasks() {
           </div>
         </div>
 
-        {/* Referral Section */}
-        <div className="referral-section">
+        {/* Referral Section - TEMPORARILY DISABLED */}
+        {/* <div className="referral-section">
           <h3 className="section-title">
             <span>🤝</span> Invite Friends
           </h3>
@@ -1312,7 +1312,6 @@ export function DailyTasks() {
           <div className="referral-info">
             <p>Share your referral link and both get <strong>150,000 SWIPE</strong>!</p>
             
-            {/* Your referral code */}
             <div className="referral-your-code">
               <span className="referral-code-label">Your referral code:</span>
               <div className="referral-code-box">
@@ -1353,7 +1352,6 @@ export function DailyTasks() {
               📋 Copy Referral Link
             </button>
             
-            {/* Enter referral code */}
             {hasUsedReferral ? (
               <div className="referral-used-message">
                 ✅ You've already used a referral code
@@ -1383,7 +1381,7 @@ export function DailyTasks() {
               </>
             )}
           </div>
-        </div>
+        </div> */}
 
         {/* Stats Footer */}
         <div className="stats-footer">

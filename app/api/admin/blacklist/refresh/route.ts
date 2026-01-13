@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { invalidateBlacklistCache } from '../../../../lib/blacklist';
+import { invalidateBlacklistCache } from '../../../../../lib/blacklist';
 
 /**
  * POST /api/admin/blacklist/refresh
