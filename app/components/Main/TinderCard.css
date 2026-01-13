@@ -3356,6 +3356,9 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
   box-shadow: 
     0 4px 20px rgba(212, 255, 0, 0.3),
     0 0 40px rgba(212, 255, 0, 0.15) !important;
+  min-height: auto !important;
+  height: auto !important;
+  display: block;
 }
 
 .terminal-header {
@@ -3388,13 +3391,22 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 }
 
 .terminal-body {
-  padding: 16px;
-  position: relative;
+  padding: 12px 16px;
   background: transparent !important;
+  min-height: auto !important;
+  height: auto !important;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .terminal-body p {
   color: #1a1a1a !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: auto !important;
+  height: auto !important;
+  line-height: 1.5;
 }
 
 .terminal-cursor {
