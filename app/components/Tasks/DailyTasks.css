@@ -406,6 +406,29 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.claim-banned {
+  padding: 20px;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 16px;
+  border: 2px solid rgba(239, 68, 68, 0.3);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.banned-icon {
+  font-size: 32px;
+}
+
+.banned-message {
+  color: #ef4444;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
 .cooldown-label {
   display: block;
   font-size: 12px;

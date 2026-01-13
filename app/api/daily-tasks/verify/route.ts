@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ethers } from 'ethers';
+import { isBlacklisted } from '../../../../lib/blacklist';
 
 /**
  * API Route: /api/daily-tasks/verify
@@ -50,6 +51,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Invalid address' },
         { status: 400 }
+      );
+    }
+
+    // Check if address is blacklisted
+    if (isBlacklisted(address)) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'This address is blacklisted and cannot claim rewards',
+          blacklisted: true
+        },
+        { status: 403 }
       );
     }
 

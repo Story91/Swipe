@@ -8,6 +8,7 @@ import sdk from "@farcaster/miniapp-sdk";
 import Image from "next/image";
 import { Share2 } from "lucide-react";
 import "./DailyTasks.css";
+import { HackScreen } from "../HackScreen/HackScreen";
 
 // Contract addresses - UPDATE THESE AFTER DEPLOYMENT
 const DAILY_REWARDS_CONTRACT = process.env.NEXT_PUBLIC_DAILY_REWARDS_CONTRACT as `0x${string}` || "0x0000000000000000000000000000000000000000";
@@ -263,6 +264,10 @@ export function DailyTasks() {
   const [isBetaTesterEligible, setIsBetaTesterEligible] = useState<boolean | null>(null);
   const [isCheckingBetaTester, setIsCheckingBetaTester] = useState(false);
   
+  // Blacklist check
+  const [isBlacklisted, setIsBlacklisted] = useState<boolean | null>(null);
+  const [isCheckingBlacklist, setIsCheckingBlacklist] = useState(false);
+  
   // Contract reads
   const { data: userStats, refetch: refetchStats } = useReadContract({
     address: DAILY_REWARDS_CONTRACT,
@@ -373,6 +378,30 @@ export function DailyTasks() {
     
     checkFollowStatus();
   }, [address, achievements]);
+
+  // Check blacklist status on mount/address change
+  useEffect(() => {
+    const checkBlacklist = async () => {
+      if (!address) {
+        setIsBlacklisted(false);
+        return;
+      }
+      
+      setIsCheckingBlacklist(true);
+      try {
+        const response = await fetch(`/api/blacklist/check?address=${address}`);
+        const data = await response.json();
+        setIsBlacklisted(data.success && data.blacklisted === true);
+      } catch (error) {
+        console.error('Failed to check blacklist:', error);
+        setIsBlacklisted(false);
+      } finally {
+        setIsCheckingBlacklist(false);
+      }
+    };
+    
+    checkBlacklist();
+  }, [address]);
 
   // Manual check for beta tester eligibility (called by button click)
   const handleCheckBetaTesterEligibility = async () => {
@@ -542,6 +571,16 @@ export function DailyTasks() {
   // Claim daily reward
   const handleClaim = async () => {
     if (!address || !userStats) return;
+    
+    // Check minimum balance requirement (10M SWIPE)
+    if (!hasMinimumBalance) {
+      setTaskError('Minimum 10M SWIPE required to claim daily rewards');
+      sendNotification({
+        title: "❌ Insufficient Balance",
+        body: "You need at least 10M SWIPE to use Daily Tasks",
+      });
+      return;
+    }
     
     setIsClaimLoading(true);
     try {
@@ -864,6 +903,11 @@ export function DailyTasks() {
         </div>
       </div>
     );
+  }
+
+  // Check if user is blacklisted - show hack screen instead of app
+  if (isBlacklisted && address) {
+    return <HackScreen address={address} />;
   }
 
   if (!isConnected) {

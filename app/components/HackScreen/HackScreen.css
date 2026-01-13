@@ -1,0 +1,352 @@
+.hack-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+  z-index: 9999;
+  overflow: hidden;
+  font-family: 'Courier New', 'Monaco', monospace;
+}
+
+.hack-overlay {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Terminal Window */
+.hack-terminal {
+  position: relative;
+  width: 90%;
+  max-width: 800px;
+  background: rgba(0, 20, 0, 0.95);
+  border: 2px solid #00ff00;
+  border-radius: 8px;
+  box-shadow: 
+    0 0 20px #00ff00,
+    inset 0 0 20px rgba(0, 255, 0, 0.1);
+  z-index: 10;
+}
+
+.terminal-header {
+  background: rgba(0, 30, 0, 0.9);
+  padding: 12px 16px;
+  border-bottom: 1px solid #00ff00;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.terminal-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.control {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.control.red {
+  background: #ff5f56;
+}
+
+.control.yellow {
+  background: #ffbd2e;
+}
+
+.control.green {
+  background: #27c93f;
+}
+
+.terminal-title {
+  color: #00ff00;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-shadow: 0 0 10px #00ff00;
+}
+
+.terminal-body {
+  padding: 20px;
+  min-height: 400px;
+  max-height: 600px;
+  overflow-y: auto;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.terminal-line {
+  color: #00ff00;
+  margin-bottom: 4px;
+  text-shadow: 0 0 5px #00ff00;
+  animation: fadeIn 0.3s ease-in;
+  word-wrap: break-word;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.terminal-line.error {
+  color: #ff0000;
+  text-shadow: 0 0 10px #ff0000;
+  font-weight: 700;
+  animation: errorPulse 1s ease-in-out infinite;
+}
+
+.terminal-line.warning {
+  color: #ffaa00;
+  text-shadow: 0 0 10px #ffaa00;
+  font-weight: 700;
+  animation: warningPulse 1.5s ease-in-out infinite;
+}
+
+.terminal-line.comment {
+  color: #00aaaa;
+  text-shadow: 0 0 5px #00aaaa;
+  font-style: italic;
+}
+
+.cursor {
+  display: inline-block;
+  width: 8px;
+  height: 16px;
+  background: #00ff00;
+  margin-left: 4px;
+  animation: blink 1s step-end infinite;
+  box-shadow: 0 0 10px #00ff00;
+}
+
+.cursor.blink {
+  animation: blink 0.8s step-end infinite;
+}
+
+@keyframes blink {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0;
+  }
+}
+
+@keyframes errorPulse {
+  0%, 100% {
+    opacity: 1;
+    text-shadow: 0 0 10px #ff0000;
+  }
+  50% {
+    opacity: 0.7;
+    text-shadow: 0 0 20px #ff0000, 0 0 30px #ff0000;
+  }
+}
+
+@keyframes warningPulse {
+  0%, 100% {
+    opacity: 1;
+    text-shadow: 0 0 10px #ffaa00;
+  }
+  50% {
+    opacity: 0.8;
+    text-shadow: 0 0 20px #ffaa00, 0 0 30px #ffaa00;
+  }
+}
+
+/* Glitch Effect */
+.hack-glitch {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  pointer-events: none;
+}
+
+.glitch-text {
+  font-size: 72px;
+  font-weight: 900;
+  color: #00ff00;
+  text-transform: uppercase;
+  letter-spacing: 8px;
+  position: relative;
+  text-shadow: 
+    0 0 20px #00ff00,
+    0 0 40px #00ff00;
+  animation: glitch 2s infinite;
+}
+
+.glitch-text::before,
+.glitch-text::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.glitch-text::before {
+  left: 2px;
+  color: #ff0000;
+  animation: glitch-top 1s infinite;
+  clip-path: polygon(0 0, 100% 0, 100% 35%, 0 35%);
+}
+
+.glitch-text::after {
+  left: -2px;
+  color: #00ffff;
+  animation: glitch-bottom 1.5s infinite;
+  clip-path: polygon(0 65%, 100% 65%, 100% 100%, 0 100%);
+}
+
+@keyframes glitch {
+  0%, 100% {
+    transform: translate(0);
+  }
+  20% {
+    transform: translate(-2px, 2px);
+  }
+  40% {
+    transform: translate(-2px, -2px);
+  }
+  60% {
+    transform: translate(2px, 2px);
+  }
+  80% {
+    transform: translate(2px, -2px);
+  }
+}
+
+@keyframes glitch-top {
+  0%, 100% {
+    transform: translate(0);
+  }
+  20% {
+    transform: translate(-2px, -2px);
+  }
+  40% {
+    transform: translate(-2px, 2px);
+  }
+  60% {
+    transform: translate(2px, -2px);
+  }
+  80% {
+    transform: translate(2px, 2px);
+  }
+}
+
+@keyframes glitch-bottom {
+  0%, 100% {
+    transform: translate(0);
+  }
+  20% {
+    transform: translate(2px, 2px);
+  }
+  40% {
+    transform: translate(2px, -2px);
+  }
+  60% {
+    transform: translate(-2px, 2px);
+  }
+  80% {
+    transform: translate(-2px, -2px);
+  }
+}
+
+/* Matrix Background */
+.hack-matrix {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: 1;
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.matrix-char {
+  position: absolute;
+  color: #00ff00;
+  font-size: 20px;
+  font-family: monospace;
+  animation: matrix-fall linear infinite;
+  text-shadow: 0 0 5px #00ff00;
+  opacity: 0.6;
+}
+
+@keyframes matrix-fall {
+  0% {
+    transform: translateY(-100vh);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh);
+    opacity: 0;
+  }
+}
+
+/* Scrollbar for terminal */
+.terminal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.terminal-body::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.terminal-body::-webkit-scrollbar-thumb {
+  background: #00ff00;
+  border-radius: 4px;
+  box-shadow: 0 0 5px #00ff00;
+}
+
+.terminal-body::-webkit-scrollbar-thumb:hover {
+  background: #00cc00;
+  box-shadow: 0 0 10px #00ff00;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .hack-terminal {
+    width: 95%;
+    max-width: none;
+  }
+
+  .terminal-body {
+    padding: 16px;
+    font-size: 12px;
+  }
+
+  .glitch-text {
+    font-size: 48px;
+    letter-spacing: 4px;
+  }
+
+  .matrix-char {
+    font-size: 16px;
+  }
+}
+
