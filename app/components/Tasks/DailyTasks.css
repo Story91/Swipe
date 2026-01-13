@@ -139,6 +139,46 @@
   margin: 0;
 }
 
+/* ============ BALANCE DISPLAY (Thin line like jackpot) ============ */
+.daily-tasks-balance {
+  margin-top: 16px;
+  margin-left: 20px;
+  margin-right: 20px;
+  margin-bottom: 0;
+  padding: 10px 16px;
+  background: linear-gradient(90deg, rgba(212, 255, 0, 0.1) 0%, rgba(212, 255, 0, 0.05) 100%);
+  border-radius: 8px;
+  font-size: 12px;
+  color: rgba(212, 255, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.daily-tasks-balance-label {
+  font-size: 12px;
+  color: #d4ff00;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.daily-tasks-balance-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+.daily-tasks-balance-requirement {
+  font-size: 11px;
+  color: rgba(255, 150, 0, 0.9);
+  font-weight: 400;
+  white-space: nowrap;
+}
+
 /* ============ STREAK DISPLAY (now in header) ============ */
 .streak-fire {
   width: 58px;

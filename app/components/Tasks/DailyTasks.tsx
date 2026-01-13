@@ -13,6 +13,9 @@ import "./DailyTasks.css";
 const DAILY_REWARDS_CONTRACT = process.env.NEXT_PUBLIC_DAILY_REWARDS_CONTRACT as `0x${string}` || "0x0000000000000000000000000000000000000000";
 const SWIPE_TOKEN = "0xd0187D77Af0ED6a44F0A631B406c78b30E160aA9";
 
+// Minimum SWIPE balance required (10M SWIPE)
+const MIN_SWIPE_BALANCE = parseEther("10000000"); // 10,000,000 SWIPE
+
 // Share text variants for Farcaster casts
 const SHARE_TEXTS = [
   "Swiping my way to crypto glory 🎴 Who else is making predictions on @swipeai? $SWIPE",
@@ -299,6 +302,25 @@ export function DailyTasks() {
       enabled: DAILY_REWARDS_CONTRACT !== "0x0000000000000000000000000000000000000000",
     }
   });
+
+  // Read SWIPE token balance
+  const { data: swipeBalance } = useReadContract({
+    address: SWIPE_TOKEN as `0x${string}`,
+    abi: [
+      {
+        "inputs": [{ "internalType": "address", "name": "account", "type": "address" }],
+        "name": "balanceOf",
+        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+        "stateMutability": "view",
+        "type": "function"
+      }
+    ],
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+  });
+
+  // Check if user has minimum balance (10M SWIPE)
+  const hasMinimumBalance = swipeBalance ? swipeBalance >= MIN_SWIPE_BALANCE : false;
 
   // Check if user has already used a referral code
   const { data: hasUsedReferralData } = useReadContract({
@@ -634,6 +656,12 @@ export function DailyTasks() {
   const handleRegisterReferral = async () => {
     if (!address || !referralCode) return;
     
+    // Check minimum balance requirement (10M SWIPE)
+    if (!hasMinimumBalance) {
+      setTaskError('Minimum 10M SWIPE required to use referral system');
+      return;
+    }
+    
     // Validate referral code is a valid address
     if (!referralCode.startsWith('0x') || referralCode.length !== 42) {
       setTaskError('Invalid referral code. Must be a wallet address.');
@@ -913,6 +941,21 @@ export function DailyTasks() {
           </div>
         </div>
 
+        {/* SWIPE Balance Display - Thin line like jackpot */}
+        {address && swipeBalance !== undefined && (
+          <div className="daily-tasks-balance">
+            <span className="daily-tasks-balance-label">Your Balance:</span>
+            <span className="daily-tasks-balance-value">
+              {Math.floor(parseFloat(formatEther(swipeBalance as bigint))).toLocaleString()} SWIPE
+            </span>
+            {!hasMinimumBalance && (
+              <span className="daily-tasks-balance-requirement">
+                10M min. required
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Main Claim Section */}
         <div className="claim-section">
           <div className="claim-reward-preview">
@@ -935,7 +978,7 @@ export function DailyTasks() {
             <button 
               className="claim-button pulse-button"
               onClick={handleClaim}
-              disabled={isPending || isConfirming}
+              disabled={isPending || isConfirming || !hasMinimumBalance}
             >
               {isPending || isConfirming ? (
                 <span className="claim-loading">
@@ -984,7 +1027,7 @@ export function DailyTasks() {
                   <button 
                     className="task-claim-btn pulse-claim"
                     onClick={() => handleClaimTask('SHARE_CAST')}
-                    disabled={isClaimingTask === 'SHARE_CAST'}
+                    disabled={isClaimingTask === 'SHARE_CAST' || !hasMinimumBalance}
                   >
                     {isClaimingTask === 'SHARE_CAST' ? '...' : '🎁 Claim 50k'}
                   </button>
@@ -1000,7 +1043,7 @@ export function DailyTasks() {
                     <button 
                       className="task-verify-btn"
                       onClick={() => handleVerifyTask('SHARE_CAST', { castHash: castUrl })}
-                      disabled={isVerifyingTask === 'SHARE_CAST' || !castUrl}
+                      disabled={isVerifyingTask === 'SHARE_CAST' || !castUrl || !hasMinimumBalance}
                     >
                       {isVerifyingTask === 'SHARE_CAST' ? '...' : '✓'}
                     </button>
@@ -1049,19 +1092,19 @@ export function DailyTasks() {
                 {getTaskState('CREATE_PREDICTION') === 'claimed' ? (
                   <span className="task-done">✅ Done</span>
                 ) : getTaskState('CREATE_PREDICTION') === 'verified' ? (
-                  <button 
-                    className="task-claim-btn pulse-claim"
-                    onClick={() => handleClaimTask('CREATE_PREDICTION')}
-                    disabled={isClaimingTask === 'CREATE_PREDICTION'}
-                  >
-                    {isClaimingTask === 'CREATE_PREDICTION' ? '...' : '🎁 Claim 75k'}
-                  </button>
-                ) : (
-                  <button 
-                    className="task-verify-btn"
-                    onClick={() => handleVerifyTask('CREATE_PREDICTION')}
-                    disabled={isVerifyingTask === 'CREATE_PREDICTION'}
-                  >
+                    <button 
+                      className="task-claim-btn pulse-claim"
+                      onClick={() => handleClaimTask('CREATE_PREDICTION')}
+                      disabled={isClaimingTask === 'CREATE_PREDICTION' || !hasMinimumBalance}
+                    >
+                      {isClaimingTask === 'CREATE_PREDICTION' ? '...' : '🎁 Claim 75k'}
+                    </button>
+                  ) : (
+                    <button 
+                      className="task-verify-btn"
+                      onClick={() => handleVerifyTask('CREATE_PREDICTION')}
+                      disabled={isVerifyingTask === 'CREATE_PREDICTION' || !hasMinimumBalance}
+                    >
                     {isVerifyingTask === 'CREATE_PREDICTION' ? '...' : 'Check'}
                   </button>
                 )}
@@ -1079,19 +1122,19 @@ export function DailyTasks() {
                 {getTaskState('TRADING_VOLUME') === 'claimed' ? (
                   <span className="task-done">✅ Done</span>
                 ) : getTaskState('TRADING_VOLUME') === 'verified' ? (
-                  <button 
-                    className="task-claim-btn pulse-claim"
-                    onClick={() => handleClaimTask('TRADING_VOLUME')}
-                    disabled={isClaimingTask === 'TRADING_VOLUME'}
-                  >
-                    {isClaimingTask === 'TRADING_VOLUME' ? '...' : '🎁 Claim 100k'}
-                  </button>
-                ) : (
-                  <button 
-                    className="task-verify-btn"
-                    onClick={() => handleVerifyTask('TRADING_VOLUME')}
-                    disabled={isVerifyingTask === 'TRADING_VOLUME'}
-                  >
+                    <button 
+                      className="task-claim-btn pulse-claim"
+                      onClick={() => handleClaimTask('TRADING_VOLUME')}
+                      disabled={isClaimingTask === 'TRADING_VOLUME' || !hasMinimumBalance}
+                    >
+                      {isClaimingTask === 'TRADING_VOLUME' ? '...' : '🎁 Claim 100k'}
+                    </button>
+                  ) : (
+                    <button 
+                      className="task-verify-btn"
+                      onClick={() => handleVerifyTask('TRADING_VOLUME')}
+                      disabled={isVerifyingTask === 'TRADING_VOLUME' || !hasMinimumBalance}
+                    >
                     {isVerifyingTask === 'TRADING_VOLUME' ? '...' : 'Check'}
                   </button>
                 )}
@@ -1147,7 +1190,7 @@ export function DailyTasks() {
                 <button
                   className="achievement-claim-btn pulse-claim"
                   onClick={() => handleClaimAchievement('BETA_TESTER')}
-                  disabled={isClaimingTask === 'BETA_TESTER' || isPending || isConfirming}
+                  disabled={isClaimingTask === 'BETA_TESTER' || isPending || isConfirming || !hasMinimumBalance}
                 >
                   {isClaimingTask === 'BETA_TESTER' || isPending || isConfirming ? '...' : 'Claim'}
                 </button>
@@ -1288,7 +1331,7 @@ export function DailyTasks() {
                   <button 
                     className="referral-submit-btn"
                     onClick={handleRegisterReferral}
-                    disabled={!referralCode || isVerifyingTask === 'REFERRAL'}
+                    disabled={!referralCode || isVerifyingTask === 'REFERRAL' || !hasMinimumBalance}
                   >
                     {isVerifyingTask === 'REFERRAL' ? '...' : '🎁 Claim'}
                   </button>
