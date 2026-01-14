@@ -3,6 +3,8 @@
 import React, { useState, useCallback } from 'react';
 import { useOpenUrl } from '@coinbase/onchainkit/minikit';
 import sdk from '@farcaster/miniapp-sdk';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 import './HelpAndFaq.css';
 
 interface FAQItem {
@@ -39,42 +41,48 @@ export function HelpAndFaq() {
   const faqData: FAQItem[] = [
     {
       id: 1,
+      question: "How long does it take to resolve a prediction?",
+      answer: "After a prediction's deadline passes, administrators have up to 7 days to resolve it. Don't worry - your predictions are safe and visible in your dashboard under the 'Expired' filter while waiting for resolution. Stay calm, the resolution process is in progress!",
+      category: "payouts"
+    },
+    {
+      id: 2,
       question: "How do I create a prediction?",
       answer: "To create a prediction, click on 'Create Prediction' in the Actions menu. Fill in the question, description, category, and set a duration. You'll need to pay a small creation fee if you're not an approved creator.",
       category: "getting-started"
     },
     {
-      id: 2,
+      id: 3,
       question: "What is a prediction market?",
       answer: "A prediction market is a platform where users can bet on the outcome of future events. Users place ETH on 'YES' or 'NO' for predictions, and winners share the losing pool proportionally to their stake.",
       category: "basics"
     },
     {
-      id: 3,
+      id: 4,
       question: "How do I place a bet?",
       answer: "Browse predictions in Tinder Mode or Market Stats. Choose YES or NO and enter your stake amount in ETH. Confirm the transaction and your bet will be placed immediately.",
       category: "betting"
     },
     {
-      id: 4,
+      id: 5,
       question: "How are payouts calculated?",
       answer: "Winners share the entire losing pool proportionally to their stake. For example, if you bet 1 ETH on YES and YES wins, you get your 1 ETH back plus a share of the NO pool based on your stake percentage.",
       category: "payouts"
     },
     {
-      id: 5,
+      id: 6,
       question: "How do I claim my winnings?",
       answer: "After a prediction is resolved, winners can claim their payouts from their dashboard. Look for predictions with 'Claim Reward' buttons in your portfolio.",
       category: "payouts"
     },
     {
-      id: 6,
+      id: 7,
       question: "How does the Tinder-style interface work?",
       answer: "Swipe right (YES) or left (NO) on predictions to place quick bets. It's designed for fast decision-making on trending predictions.",
       category: "interface"
     },
     {
-      id: 7,
+      id: 8,
       question: "How do I connect my wallet?",
       answer: "Click the 'Connect Wallet' button in the top-left corner. Choose your preferred wallet (MetaMask, Coinbase Wallet, etc.) and approve the connection.",
       category: "getting-started"
@@ -126,7 +134,120 @@ export function HelpAndFaq() {
         </div>
       </div>
 
+      {/* How It Works Section */}
+      <div className="modern-faq-section">
+        <h3 className="faq-section-title contract-example-section-title">How the Contract Works - Example</h3>
+        
+        <Card className="contract-example-card">
+          <CardHeader>
+            <CardTitle className="contract-example-title">Example: Prediction "Bitcoin reaches $100k by end of 2024?"</CardTitle>
+            <CardDescription className="contract-example-description">
+              Below you'll find a detailed example showing how bets, wins, losses, and platform fees work.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="contract-example-content">
+            <div className="example-scenario">
+              <h4 className="example-title">📊 Initial Situation:</h4>
+              <div className="example-pools">
+                <div className="pool-yes">
+                  <strong>YES Pool (10 ETH):</strong>
+                  <ul>
+                    <li>Alice: 5 ETH</li>
+                    <li>Bob: 3 ETH</li>
+                    <li>Charlie: 2 ETH</li>
+                  </ul>
+                </div>
+                <div className="pool-no">
+                  <strong>NO Pool (6 ETH):</strong>
+                  <ul>
+                    <li>David: 4 ETH</li>
+                    <li>Eve: 2 ETH</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
 
+            <Separator className="my-6" />
+
+            <div className="example-resolution">
+              <h4 className="example-title">✅ Outcome: YES wins!</h4>
+              <div className="resolution-details">
+                <div className="platform-fee">
+                  <strong>Platform Fee (1%):</strong>
+                  <p>6 ETH × 1% = 0.06 ETH</p>
+                </div>
+                <div className="distributable-pool">
+                  <strong>Distributed to Winners:</strong>
+                  <p>6 ETH - 0.06 ETH = 5.94 ETH</p>
+                </div>
+              </div>
+            </div>
+
+            <Separator className="my-6" />
+
+            <div className="example-payouts">
+              <h4 className="example-title">💰 Payouts for Winners:</h4>
+              <div className="payouts-list">
+                <div className="payout-item winner">
+                  <div className="payout-header">
+                    <strong>Alice</strong> (50% of YES pool)
+                  </div>
+                  <div className="payout-details">
+                    <div>Stake: 5 ETH</div>
+                    <div>Profit: (5/10) × 5.94 ETH = 2.97 ETH</div>
+                    <div className="payout-total"><strong>Total Payout: 7.97 ETH</strong></div>
+                    <div className="payout-profit">Profit: +59.4%</div>
+                  </div>
+                </div>
+                <div className="payout-item winner">
+                  <div className="payout-header">
+                    <strong>Bob</strong> (30% of YES pool)
+                  </div>
+                  <div className="payout-details">
+                    <div>Stake: 3 ETH</div>
+                    <div>Profit: (3/10) × 5.94 ETH = 1.782 ETH</div>
+                    <div className="payout-total"><strong>Total Payout: 4.782 ETH</strong></div>
+                    <div className="payout-profit">Profit: +59.4%</div>
+                  </div>
+                </div>
+                <div className="payout-item winner">
+                  <div className="payout-header">
+                    <strong>Charlie</strong> (20% of YES pool)
+                  </div>
+                  <div className="payout-details">
+                    <div>Stake: 2 ETH</div>
+                    <div>Profit: (2/10) × 5.94 ETH = 1.188 ETH</div>
+                    <div className="payout-total"><strong>Total Payout: 3.188 ETH</strong></div>
+                    <div className="payout-profit">Profit: +59.4%</div>
+                  </div>
+                </div>
+                <div className="payout-item loser">
+                  <div className="payout-header">
+                    <strong>David and Eve</strong> (NO pool)
+                  </div>
+                  <div className="payout-details">
+                    <div>David: loses 4 ETH</div>
+                    <div>Eve: loses 2 ETH</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <Separator className="my-6" />
+
+            <div className="example-summary">
+              <h4 className="example-title">📝 Key Information:</h4>
+              <ul className="summary-list">
+                <li>✅ All winners receive the same percentage profit (59.4% in this example)</li>
+                <li>✅ Larger stake = larger absolute profit, but same percentage</li>
+                <li>⚠️ Platform takes 1% from the losing pool</li>
+                <li>⚠️ If you bet on the losing side, you lose your entire stake</li>
+                <li>💡 Always bet responsibly - you can lose your entire stake!</li>
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* FAQ List */}
       <div className="modern-faq-section">

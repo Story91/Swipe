@@ -232,6 +232,34 @@
   letter-spacing: 0.5px;
 }
 
+.contract-example-section-title {
+  font-size: 20px !important;
+  color: #ff0000 !important;
+  text-shadow: 0 0 10px rgba(255, 0, 0, 0.8),
+               0 0 20px rgba(255, 0, 0, 0.6),
+               0 0 30px rgba(255, 0, 0, 0.4),
+               0 0 40px rgba(255, 0, 0, 0.3);
+  animation: redNeonGlow 2s ease-in-out infinite alternate;
+  white-space: normal;
+  line-height: 1.4 !important;
+  word-wrap: break-word;
+}
+
+@keyframes redNeonGlow {
+  from {
+    text-shadow: 0 0 10px rgba(255, 0, 0, 0.8),
+                 0 0 20px rgba(255, 0, 0, 0.6),
+                 0 0 30px rgba(255, 0, 0, 0.4),
+                 0 0 40px rgba(255, 0, 0, 0.3);
+  }
+  to {
+    text-shadow: 0 0 15px rgba(255, 0, 0, 1),
+                 0 0 25px rgba(255, 0, 0, 0.8),
+                 0 0 35px rgba(255, 0, 0, 0.6),
+                 0 0 50px rgba(255, 0, 0, 0.4);
+  }
+}
+
 .modern-faq-list {
   max-width: 800px;
   margin: 0 auto;
@@ -460,6 +488,249 @@
   }
 }
 
+/* Contract Example Section */
+.contract-example-card {
+  max-width: 900px;
+  margin: 0 auto;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+.contract-example-title {
+  font-size: 16px !important;
+  line-height: 1.4 !important;
+  color: #d4ff00 !important;
+  text-shadow: 0 0 10px rgba(212, 255, 0, 0.5),
+               0 0 20px rgba(212, 255, 0, 0.3),
+               0 0 30px rgba(212, 255, 0, 0.2);
+  animation: glow 2s ease-in-out infinite alternate;
+  white-space: normal;
+  word-wrap: break-word;
+}
+
+@keyframes glow {
+  from {
+    text-shadow: 0 0 10px rgba(212, 255, 0, 0.5),
+                 0 0 20px rgba(212, 255, 0, 0.3),
+                 0 0 30px rgba(212, 255, 0, 0.2);
+  }
+  to {
+    text-shadow: 0 0 15px rgba(212, 255, 0, 0.7),
+                 0 0 25px rgba(212, 255, 0, 0.5),
+                 0 0 35px rgba(212, 255, 0, 0.3);
+  }
+}
+
+.contract-example-description {
+  color: rgba(255, 255, 255, 0.7) !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  margin-top: 8px;
+}
+
+.contract-example-content {
+  padding: 24px;
+}
+
+.example-scenario,
+.example-resolution,
+.example-payouts,
+.example-summary {
+  margin-bottom: 24px;
+}
+
+.example-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #d4ff00;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.example-pools {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-top: 16px;
+}
+
+.pool-yes,
+.pool-no {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.pool-yes {
+  border-left: 3px solid #4caf50;
+}
+
+.pool-no {
+  border-left: 3px solid #f44336;
+}
+
+.pool-yes strong,
+.pool-no strong {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 16px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.pool-yes ul,
+.pool-no ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.pool-yes li,
+.pool-no li {
+  color: rgba(255, 255, 255, 0.8);
+  padding: 6px 0;
+  font-size: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.pool-yes li:last-child,
+.pool-no li:last-child {
+  border-bottom: none;
+}
+
+.resolution-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-top: 16px;
+}
+
+.platform-fee,
+.distributable-pool {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.platform-fee {
+  border-left: 3px solid #ff9800;
+}
+
+.distributable-pool {
+  border-left: 3px solid #2196f3;
+}
+
+.platform-fee strong,
+.distributable-pool strong {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 16px;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.platform-fee p,
+.distributable-pool p {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.payouts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.payout-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.3s ease;
+}
+
+.payout-item.winner {
+  border-left: 3px solid #4caf50;
+}
+
+.payout-item.loser {
+  border-left: 3px solid #f44336;
+  opacity: 0.7;
+}
+
+.payout-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  transform: translateX(4px);
+}
+
+.payout-header {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 16px;
+  margin-bottom: 12px;
+}
+
+.payout-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+}
+
+.payout-total {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 16px;
+}
+
+.payout-profit {
+  color: #4caf50;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.payout-item.loser .payout-profit {
+  color: #f44336;
+}
+
+.summary-list {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.summary-list li {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  line-height: 1.6;
+  padding-left: 24px;
+  position: relative;
+}
+
+.summary-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #d4ff00;
+}
+
 /* Mobile Responsive */
 @media (max-width: 768px) {
   .modern-help-faq {
@@ -505,6 +776,12 @@
     font-size: 15px;
   }
 
+  .faq-section-title {
+    font-size: 18px !important;
+    white-space: normal;
+    line-height: 1.4 !important;
+  }
+
   .modern-search-input {
     padding: 14px 45px 14px 16px;
     font-size: 15px;
@@ -532,5 +809,46 @@
   .social-icon-link svg {
     width: 20px;
     height: 20px;
+  }
+
+  /* Contract Example Mobile */
+  .example-pools {
+    grid-template-columns: 1fr;
+  }
+
+  .resolution-details {
+    grid-template-columns: 1fr;
+  }
+
+  .contract-example-content {
+    padding: 16px;
+  }
+
+  .example-title {
+    font-size: 16px;
+  }
+
+  .payout-details {
+    font-size: 13px;
+  }
+
+  .payout-total {
+    font-size: 14px;
+  }
+
+  .contract-example-title {
+    font-size: 16px !important;
+    white-space: normal;
+    line-height: 1.4 !important;
+  }
+
+  .contract-example-description {
+    font-size: 13px !important;
+  }
+
+  .contract-example-section-title {
+    font-size: 18px !important;
+    white-space: normal;
+    line-height: 1.4 !important;
   }
 }
