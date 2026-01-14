@@ -714,14 +714,18 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, on
                 : !ethStake?.canClaim
                   ? prediction.status === 'active'
                     ? 'Wait for prediction to be resolved'
-                    : 'Cannot claim - you lost this prediction'
+                    : prediction.status === 'expired'
+                      ? 'Waiting for prediction to be resolved'
+                      : 'Cannot claim - you lost this prediction'
                   : 'Claim ETH reward'
             }
           >
             {isTransactionLoading ? '...' :
              ethStake?.claimed ? '✅ ETH Claimed' :
              ethStake?.canClaim ? '💰 Claim ETH' :
-             prediction.status === 'active' ? '⏳ Wait' : '❌ Lost'}
+             prediction.status === 'active' ? '⏳ Wait' :
+             prediction.status === 'expired' ? '⏰ In Waiting' :
+             '❌ Lost'}
           </button>
         )}
         
@@ -737,14 +741,18 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, on
                 : !swipeStake?.canClaim
                   ? prediction.status === 'active'
                     ? 'Wait for prediction to be resolved'
-                    : 'Cannot claim - you lost this prediction'
+                    : prediction.status === 'expired'
+                      ? 'Waiting for prediction to be resolved'
+                      : 'Cannot claim - you lost this prediction'
                   : 'Claim SWIPE reward'
             }
           >
             {isTransactionLoading ? '...' :
              swipeStake?.claimed ? '✅ SWIPE Claimed' :
              swipeStake?.canClaim ? '💰 Claim SWIPE' :
-             prediction.status === 'active' ? '⏳ Wait' : '❌ Lost'}
+             prediction.status === 'active' ? '⏳ Wait' :
+             prediction.status === 'expired' ? '⏰ In Waiting' :
+             '❌ Lost'}
           </button>
         )}
       </div>
