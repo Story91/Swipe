@@ -1368,19 +1368,13 @@ export function EnhancedUserDashboard() {
     return sum + ethAmount;
   }, 0);
 
-  // Count cancelled predictions that can be claimed (for filter badge)
-  const cancelledCanClaimCount = allUserPredictions.filter(p => {
-    const ethStake = p.userStakes?.ETH;
-    const swipeStake = p.userStakes?.SWIPE;
-
-    const ethClaimed = claimedStakes.has(`${p.id}-ETH`) || ethStake?.claimed;
-    const swipeClaimed = claimedStakes.has(`${p.id}-SWIPE`) || swipeStake?.claimed;
-
-    const ethCanClaimRefund = p.cancelled && ethStake && !ethClaimed && (ethStake.yesAmount > 0 || ethStake.noAmount > 0);
-    const swipeCanClaimRefund = p.cancelled && swipeStake && !swipeClaimed && (swipeStake.yesAmount > 0 || swipeStake.noAmount > 0);
-
-    return ethCanClaimRefund || swipeCanClaimRefund;
+  // Count predictions in waiting (expired but not resolved)
+  const inWaitingCount = allUserPredictions.filter(p => {
+    return !p.resolved && !p.cancelled && p.deadline <= Date.now() / 1000;
   }).length;
+
+  // Count all cancelled predictions (for filter badge)
+  const cancelledCount = allUserPredictions.filter(p => p.cancelled).length;
   
   const swipeTotalStaked = allUserPredictions.reduce((sum, p) => {
     const swipeStake = p.userStakes?.SWIPE;
@@ -1720,9 +1714,11 @@ export function EnhancedUserDashboard() {
                 <SelectItem value="active">⏳ Active</SelectItem>
                 <SelectItem value="won">🏆 Won</SelectItem>
                 <SelectItem value="lost">💔 Lost</SelectItem>
-                <SelectItem value="expired">⏰ Expired</SelectItem>
+                <SelectItem value="expired">
+                  ⏰ In Waiting {inWaitingCount > 0 && <span className="filter-badge">{inWaitingCount}</span>}
+                </SelectItem>
                 <SelectItem value="cancelled">
-                  ❌ Cancelled {cancelledCanClaimCount > 0 && <span className="filter-badge">{cancelledCanClaimCount}</span>}
+                  ❌ Cancelled {cancelledCount > 0 && <span className="filter-badge">{cancelledCount}</span>}
                 </SelectItem>
                 <SelectItem value="claimed">✅ Claimed</SelectItem>
                 <SelectItem value="all">📊 All</SelectItem>
@@ -1759,6 +1755,18 @@ export function EnhancedUserDashboard() {
               <p>Great news! You haven't lost any predictions.</p>
               <p className="cta-text">Keep up the winning streak!</p>
             </>
+          ) : selectedFilter === 'expired' ? (
+            <>
+              <h3>⏰ No Predictions In Waiting</h3>
+              <p>You don't have any predictions waiting for resolution.</p>
+              <p className="cta-text">All your predictions have been resolved!</p>
+            </>
+          ) : selectedFilter === 'cancelled' ? (
+            <>
+              <h3>❌ No Cancelled Predictions</h3>
+              <p>You don't have any cancelled predictions.</p>
+              <p className="cta-text">All your predictions are active or resolved!</p>
+            </>
           ) : selectedFilter === 'claimed' ? (
             <>
               <h3>✅ No Claimed Rewards</h3>
@@ -1783,7 +1791,7 @@ export function EnhancedUserDashboard() {
             {selectedFilter === 'active' && '⏳ Active Predictions'}
             {selectedFilter === 'won' && '🏆 Won Predictions'}
             {selectedFilter === 'lost' && '💔 Lost Predictions'}
-            {selectedFilter === 'expired' && '⏰ Expired Predictions (Waiting for Resolution)'}
+            {selectedFilter === 'expired' && '⏰ In Waiting Predictions'}
             {selectedFilter === 'cancelled' && '❌ Cancelled Predictions'}
             {selectedFilter === 'claimed' && '✅ Claimed Predictions'}
             {selectedFilter === 'all' && '📊 All Predictions'}
