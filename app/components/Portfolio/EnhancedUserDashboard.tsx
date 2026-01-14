@@ -1372,9 +1372,6 @@ export function EnhancedUserDashboard() {
   const inWaitingCount = allUserPredictions.filter(p => {
     return !p.resolved && !p.cancelled && p.deadline <= Date.now() / 1000;
   }).length;
-
-  // Count all cancelled predictions (for filter badge)
-  const cancelledCount = allUserPredictions.filter(p => p.cancelled).length;
   
   const swipeTotalStaked = allUserPredictions.reduce((sum, p) => {
     const swipeStake = p.userStakes?.SWIPE;
@@ -1706,8 +1703,11 @@ export function EnhancedUserDashboard() {
           <div className="filter-row-content">
             <span className="filter-row-label">🔻 Filters:</span>
             <Select value={selectedFilter} onValueChange={handleFilterChange}>
-              <SelectTrigger className="filter-row-select">
+              <SelectTrigger className={`filter-row-select ${inWaitingCount > 0 ? 'has-waiting-badge' : ''}`}>
                 <SelectValue placeholder="Select" />
+                {inWaitingCount > 0 && (
+                  <span className="filter-badge-select-trigger">{inWaitingCount}</span>
+                )}
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ready-to-claim">🎉 Ready to Claim</SelectItem>
@@ -1717,9 +1717,7 @@ export function EnhancedUserDashboard() {
                 <SelectItem value="expired">
                   ⏰ In Waiting {inWaitingCount > 0 && <span className="filter-badge">{inWaitingCount}</span>}
                 </SelectItem>
-                <SelectItem value="cancelled">
-                  ❌ Cancelled {cancelledCount > 0 && <span className="filter-badge">{cancelledCount}</span>}
-                </SelectItem>
+                <SelectItem value="cancelled">❌ Cancelled</SelectItem>
                 <SelectItem value="claimed">✅ Claimed</SelectItem>
                 <SelectItem value="all">📊 All</SelectItem>
               </SelectContent>

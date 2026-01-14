@@ -281,6 +281,31 @@
   background: rgba(212, 255, 0, 0.1) !important;
 }
 
+/* Filter Badge on SelectTrigger */
+.filter-row-select {
+  position: relative;
+}
+
+.filter-badge-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 5px;
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 8px;
+  margin-left: 4px;
+  font-family: "Orbitron", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+  box-shadow: 0 2px 4px rgba(139, 92, 246, 0.4);
+  flex-shrink: 0;
+}
+
 /* Filter Badge */
 .filter-badge {
   display: inline-flex;
