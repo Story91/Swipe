@@ -1702,14 +1702,12 @@ export function EnhancedUserDashboard() {
           <div className="filter-row-divider"></div>
           <div className="filter-row-content">
             <span className="filter-row-label">🔻 Filters:</span>
-            <Select value={selectedFilter} onValueChange={handleFilterChange}>
-              <SelectTrigger className={`filter-row-select ${inWaitingCount > 0 ? 'has-waiting-badge' : ''}`}>
-                <SelectValue placeholder="Select" />
-                {inWaitingCount > 0 && (
-                  <span className="filter-badge-select-trigger">{inWaitingCount}</span>
-                )}
-              </SelectTrigger>
-              <SelectContent>
+            <div className="filter-select-wrapper">
+              <Select value={selectedFilter} onValueChange={handleFilterChange}>
+                <SelectTrigger className="filter-row-select">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
                 <SelectItem value="ready-to-claim">🎉 Ready to Claim</SelectItem>
                 <SelectItem value="active">⏳ Active</SelectItem>
                 <SelectItem value="won">🏆 Won</SelectItem>
@@ -1722,6 +1720,10 @@ export function EnhancedUserDashboard() {
                 <SelectItem value="all">📊 All</SelectItem>
               </SelectContent>
             </Select>
+            {inWaitingCount > 0 && selectedFilter !== 'expired' && (
+              <span className="filter-badge-overlay">{inWaitingCount}</span>
+            )}
+            </div>
           </div>
         </div>
       </div>
