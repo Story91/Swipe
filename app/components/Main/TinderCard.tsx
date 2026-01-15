@@ -3280,7 +3280,7 @@ KEY USER-FACING CHANGES: V1 → V2
 
       {/* Modern Professional Stake Modal - Compact for Mini App */}
       <Dialog open={stakeModal.isOpen} onOpenChange={(open) => !open && handleCloseStakeModal()}>
-        <DialogContent className="stake-dialog sm:max-w-[500px] max-h-[90vh] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 border border-slate-800/80 text-white p-0 gap-0 overflow-y-auto shadow-2xl backdrop-blur-xl">
+        <DialogContent className="stake-dialog sm:max-w-[500px] max-h-[85vh] top-[45%] sm:top-[50%] translate-y-[-50%] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 border border-slate-800/80 text-white p-0 gap-0 overflow-y-auto shadow-2xl backdrop-blur-xl">
           {/* Enhanced Glassmorphic Header with Neon Glow Effects */}
           <div className={`relative overflow-hidden border-b ${stakeModal.isYes ? 'border-lime-400/30' : 'border-red-500/30'} bg-gradient-to-r from-slate-900/95 via-slate-800/80 to-slate-900/95 backdrop-blur-xl`}>
             {/* Animated neon gradient overlay with pulse - More intense for YES */}
@@ -3756,7 +3756,7 @@ KEY USER-FACING CHANGES: V1 → V2
               </div>
 
           {/* Modern Footer Actions - Compact */}
-          <DialogFooter className="p-4 pt-3 gap-2 border-t border-slate-800/80 bg-slate-900/40 backdrop-blur-sm">
+          <DialogFooter className="p-3 pt-2 gap-2 border-t border-slate-800/80 bg-slate-900/40 backdrop-blur-sm sticky bottom-0 z-10">
             <Button
               variant="outline"
               onClick={handleCloseStakeModal}

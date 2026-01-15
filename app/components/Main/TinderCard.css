@@ -3154,6 +3154,12 @@ html, body {
 
 /* Professional Stake Dialog Styles */
 .stake-dialog {
+  /* Move modal up on mobile to ensure footer is visible */
+  @media (max-width: 640px) {
+    top: 45% !important;
+    transform: translate(-50%, -50%) !important;
+    max-height: 85vh !important;
+  }
   animation: dialogSlideIn 0.3s ease-out;
 }
 
