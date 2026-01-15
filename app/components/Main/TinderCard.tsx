@@ -3776,7 +3776,7 @@ KEY USER-FACING CHANGES: V1 → V2
                     return (
                       <div className="flex items-center gap-2">
                         <Zap className="w-5 h-5" />
-                        <span>Approve & Bet {amount.toLocaleString()} SWIPE</span>
+                        <span>Approve & Bet {formatSwipeAmount(amount)} SWIPE</span>
                       </div>
                     );
                   }
