@@ -3756,7 +3756,7 @@ KEY USER-FACING CHANGES: V1 → V2
               </div>
 
           {/* Modern Footer Actions - Compact */}
-          <DialogFooter className="p-3 pt-2 gap-2 border-t border-slate-800/80 bg-slate-900/40 backdrop-blur-sm sticky bottom-0 z-10">
+          <DialogFooter className="p-4 pt-3 gap-2 border-t border-slate-800/80 bg-slate-900/40 backdrop-blur-sm">
             <Button
               variant="outline"
               onClick={handleCloseStakeModal}
