@@ -115,6 +115,7 @@ contract SwipeClaim {
      * @return rewardAmount SWIPE amount user can claim (0 if not eligible)
      */
     function getRewardForBetCount(uint256 betCount) public pure returns (uint256 rewardAmount) {
+
         if (betCount >= TIER_100_BETS) {
             return REWARD_100_BETS; // 25M SWIPE - max tier
         } else if (betCount >= TIER_50_BETS) {
@@ -223,7 +224,9 @@ contract SwipeClaim {
      * @param _betCount Number of bets user has made
      */
     function setUserBetCount(address _user, uint256 _betCount) external onlyOwner {
-        require(_betCount >= 0, "Invalid bet count");
+        require(_user != address(0), "Invalid user address");
+        require(_betCount > 0, "Bet count must be > 0");
+        require(_betCount <= maxPredictionId, "Bet count cannot exceed total number of predictions");
         userBetCounts[_user] = _betCount;
         betCountSet[_user] = true;
         emit BetCountSet(_user, _betCount);
@@ -245,8 +248,10 @@ contract SwipeClaim {
      * @dev Set maximum prediction ID to check (for gas optimization)
      */
     function setMaxPredictionId(uint256 _maxId) external onlyOwner {
+        
         require(_maxId > 0, "Invalid max ID");
         maxPredictionId = _maxId;
+       
         emit MaxPredictionIdUpdated(_maxId);
     }
     
