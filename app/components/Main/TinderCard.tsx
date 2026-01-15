@@ -27,7 +27,7 @@ import SharePredictionButton from '../Actions/SharePredictionButton';
 import { notifyPredictionShared, notifyStakeSuccess } from '../../../lib/notification-helpers';
 import { generateTransactionId, generateBasescanUrl } from '../../../lib/utils/redis-utils';
 import { useTokenPrices } from '../../../lib/hooks/useTokenPrices';
-import { Bot, Loader2, Sparkles, X, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
+import { Bot, Loader2, Sparkles, X, TrendingUp, TrendingDown, AlertTriangle, DollarSign, Coins, PieChart, ArrowUpRight, ArrowDownRight, Info, Zap, Target, Award, Wallet, Calculator } from 'lucide-react';
 import ElectricBorder from '@/components/ElectricBorder';
 import ShinyText from '@/components/ShinyText';
 import GradientText from '@/components/GradientText';
@@ -415,6 +415,24 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     }
     return amount.toLocaleString();
   };
+
+  const formatEthAmount = (amount: number): string => {
+    if (!Number.isFinite(amount)) return '0';
+    const fixed = amount.toFixed(6);
+    return fixed.replace(/\.?0+$/, '');
+  };
+
+  const formatTokenAmount = (amount: number, token: 'ETH' | 'SWIPE'): string => {
+    return token === 'ETH' ? formatEthAmount(amount) : formatSwipeAmount(amount);
+  };
+
+  const formatUsdValueLocal = (amount: number, token: 'ETH' | 'SWIPE'): string | null => {
+    const usdValue = getUsdValue(amount, token);
+    if (usdValue === null || !Number.isFinite(usdValue)) return null;
+    if (usdValue < 0.01) return usdValue.toFixed(4);
+    if (usdValue < 1) return usdValue.toFixed(3);
+    return usdValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
   
   // Wait for stake transaction confirmation
   const { isLoading: isStakeConfirming, isSuccess: isStakeConfirmed, isError: isStakeError } = useWaitForTransactionReceipt({
@@ -625,6 +643,53 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     includeChart: pred.includeChart,
     selectedCrypto: pred.selectedCrypto
   })), [hybridPredictions]);
+
+  const potentialEarnings = useMemo(() => {
+    const amount = parseFloat(stakeModal.stakeAmount);
+    if (!amount || amount <= 0) return null;
+
+    const currentPred = transformedPredictions[currentIndex];
+    if (!currentPred) return null;
+
+    const isEth = stakeModal.selectedToken === 'ETH';
+    const yesPool = isEth
+      ? (currentPred.yesTotalAmount || 0) / 1e18
+      : (currentPred.swipeYesTotalAmount || 0) / 1e18;
+    const noPool = isEth
+      ? (currentPred.noTotalAmount || 0) / 1e18
+      : (currentPred.swipeNoTotalAmount || 0) / 1e18;
+
+    const platformFee = 0.01;
+    const winningPool = stakeModal.isYes ? yesPool : noPool;
+    const losingPool = stakeModal.isYes ? noPool : yesPool;
+    const winningPoolAfter = winningPool + amount;
+    const netLosingPool = losingPool * (1 - platformFee);
+
+    const payout = amount + (winningPoolAfter > 0 ? (amount / winningPoolAfter) * netLosingPool : 0);
+    const profit = payout - amount;
+    const profitPercent = amount > 0 ? (profit / amount) * 100 : 0;
+    const sharePercent = winningPoolAfter > 0 ? (amount / winningPoolAfter) * 100 : 0;
+    const totalPoolAfter = winningPoolAfter + losingPool;
+
+    return {
+      token: stakeModal.selectedToken,
+      amount,
+      payout,
+      profit,
+      profitPercent,
+      sharePercent,
+      totalPoolAfter,
+      platformFee,
+      yesPool,
+      noPool,
+    };
+  }, [
+    stakeModal.stakeAmount,
+    stakeModal.selectedToken,
+    stakeModal.isYes,
+    transformedPredictions,
+    currentIndex,
+  ]);
   
   // Transform real predictions to match TinderCard format (memoized for performance)
   const realCardItems: PredictionData[] = useMemo(() => transformedPredictions.map((pred) => {
@@ -3213,90 +3278,94 @@ KEY USER-FACING CHANGES: V1 → V2
       )}
         </div>
 
-      {/* Professional Stake Modal with shadcn */}
+      {/* Modern Professional Stake Modal */}
       <Dialog open={stakeModal.isOpen} onOpenChange={(open) => !open && handleCloseStakeModal()}>
-        <DialogContent className="stake-dialog sm:max-w-[480px] bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 border-zinc-700/50 text-white p-0 gap-0 overflow-hidden">
-          {/* Animated Header */}
-          <div className="relative overflow-hidden">
-            <div className={`absolute inset-0 ${stakeModal.isYes ? 'bg-gradient-to-r from-emerald-500/20 via-emerald-400/10 to-transparent' : 'bg-gradient-to-r from-rose-500/20 via-rose-400/10 to-transparent'}`} />
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/5 via-transparent to-transparent" />
+        <DialogContent className="stake-dialog sm:max-w-[500px] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 border border-slate-800/80 text-white p-0 gap-0 overflow-hidden shadow-2xl backdrop-blur-xl">
+          {/* Modern Glassmorphic Header */}
+          <div className="relative overflow-hidden border-b border-slate-800/80 bg-gradient-to-r from-slate-900/90 via-slate-800/70 to-slate-900/90 backdrop-blur-xl">
+            {/* Animated gradient overlay */}
+            <div className={`absolute inset-0 bg-gradient-to-r ${stakeModal.isYes ? 'from-emerald-500/20 via-emerald-400/10 to-transparent' : 'from-rose-500/20 via-rose-400/10 to-transparent'} animate-pulse`} />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(255,255,255,0.03)_0%,_transparent_70%)]" />
             
-            <DialogHeader className="relative p-6 pb-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-bold shadow-lg ${stakeModal.isYes ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-emerald-500/30' : 'bg-gradient-to-br from-rose-500 to-rose-600 shadow-rose-500/30'}`}>
-                    {stakeModal.isYes ? '↑' : '↓'}
+            <DialogHeader className="relative p-6 pb-5">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  {/* Icon with glow effect */}
+                  <div className="relative">
+                    <div className={`absolute inset-0 ${stakeModal.isYes ? 'bg-emerald-500' : 'bg-rose-500'} blur-xl opacity-40 rounded-2xl`} />
+                    <div className={`relative w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-bold shadow-2xl ${stakeModal.isYes ? 'bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-700 shadow-emerald-500/50' : 'bg-gradient-to-br from-rose-500 via-rose-600 to-rose-700 shadow-rose-500/50'} border border-white/10`}>
+                      {stakeModal.isYes ? <TrendingUp className="w-7 h-7" /> : <TrendingDown className="w-7 h-7" />}
               </div>
-                  <div>
-                    <DialogTitle className="text-xl font-bold text-white">
+                  </div>
+                  <div className="flex-1">
+                    <DialogTitle className="text-xl font-bold text-white mb-1 tracking-tight">
                       Prediction #{stakeModal.predictionId}
                     </DialogTitle>
-                    <DialogDescription className="text-zinc-400 text-sm">
-                      You're betting <span className={`font-semibold ${stakeModal.isYes ? 'text-emerald-400' : 'text-rose-400'}`}>{stakeModal.isYes ? 'YES' : 'NO'}</span>
+                    <DialogDescription className="text-slate-400 text-sm flex items-center gap-2">
+                      <Target className="w-3.5 h-3.5" />
+                      You're betting <span className={`font-bold ${stakeModal.isYes ? 'text-emerald-400' : 'text-rose-400'}`}>{stakeModal.isYes ? 'YES' : 'NO'}</span>
                     </DialogDescription>
                   </div>
                 </div>
-                <Badge variant="outline" className={`px-3 py-1 text-sm font-semibold border-2 ${stakeModal.isYes ? 'border-emerald-500/50 text-emerald-400 bg-emerald-500/10' : 'border-rose-500/50 text-rose-400 bg-rose-500/10'}`}>
-                  {stakeModal.isYes ? 'BULLISH' : 'BEARISH'}
+                <Badge variant="outline" className={`px-4 py-1.5 text-xs font-bold border-2 backdrop-blur-sm ${stakeModal.isYes ? 'border-emerald-500/60 text-emerald-300 bg-emerald-500/15 shadow-lg shadow-emerald-500/20' : 'border-rose-500/60 text-rose-300 bg-rose-500/15 shadow-lg shadow-rose-500/20'}`}>
+                  {stakeModal.isYes ? 'BULLISH ↗' : 'BEARISH ↘'}
                 </Badge>
               </div>
             </DialogHeader>
             </div>
 
-          <Separator className="bg-zinc-700/50" />
+          <Separator className="bg-gradient-to-r from-transparent via-slate-700/50 to-transparent h-px" />
 
-          {/* Token Selection Tabs */}
-          <div className="p-6 pt-4">
+          {/* Modern Token Selection Tabs */}
+          <div className="p-6 pt-5">
             <Tabs 
               value={stakeModal.selectedToken} 
               onValueChange={(value) => handleTokenChange(value as 'ETH' | 'SWIPE')}
               className="w-full"
             >
-              <TabsList className="grid w-full grid-cols-2 bg-zinc-800/50 p-1 h-14 rounded-xl">
+              <TabsList className="grid w-full grid-cols-2 bg-slate-900/80 backdrop-blur-sm p-1.5 h-14 rounded-2xl border border-slate-800/80 shadow-inner">
                 <TabsTrigger 
                   value="ETH" 
-                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-blue-500/25 rounded-lg h-12 transition-all duration-300"
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:via-blue-600 data-[state=active]:to-blue-500 data-[state=active]:text-white data-[state=active]:shadow-xl data-[state=active]:shadow-blue-500/30 rounded-xl h-11 transition-all duration-300 data-[state=inactive]:hover:bg-slate-800/50"
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">⟠</span>
-                    <span className="font-semibold">ETH</span>
-                </div>
+                  <span className="font-bold text-sm">ETH</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="SWIPE" 
-                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#d4ff00] data-[state=active]:to-[#a8cc00] data-[state=active]:text-black data-[state=active]:shadow-lg data-[state=active]:shadow-[#d4ff00]/25 rounded-lg h-12 transition-all duration-300"
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#d4ff00] data-[state=active]:via-[#b8e600] data-[state=active]:to-[#d4ff00] data-[state=active]:text-black data-[state=active]:shadow-xl data-[state=active]:shadow-[#d4ff00]/30 rounded-xl h-11 transition-all duration-300 data-[state=inactive]:hover:bg-slate-800/50 font-bold"
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold">$SWIPE</span>
-              </div>
+                  <span className="font-bold text-sm">$SWIPE</span>
                 </TabsTrigger>
               </TabsList>
 
               {/* ETH Content */}
-              <TabsContent value="ETH" className="mt-4 space-y-4">
-                <Card className="bg-zinc-800/30 border-zinc-700/50">
-                  <CardContent className="p-4">
-                    <div className="space-y-4">
+              <TabsContent value="ETH" className="mt-5 space-y-5">
+                <Card className="bg-gradient-to-br from-slate-900/90 via-slate-800/60 to-slate-900/90 border-slate-700/60 backdrop-blur-xl shadow-xl">
+                  <CardContent className="p-5">
+                    <div className="space-y-5">
                       <div className="flex items-center justify-between">
-                        <label className="text-sm text-zinc-400 font-medium">Bet Amount</label>
-                        {/* Input Mode Toggle */}
-                        <div className="flex bg-zinc-800 rounded-lg p-0.5 border border-zinc-700">
+                        <label className="text-sm text-slate-300 font-semibold flex items-center gap-2">
+                          <Wallet className="w-4 h-4" />
+                          Bet Amount
+                        </label>
+                        {/* Modern Input Mode Toggle */}
+                        <div className="flex bg-slate-900/80 backdrop-blur-sm rounded-xl p-1 border border-slate-700/60 shadow-inner">
                     <button
                             onClick={() => setEthInputMode('eth')}
-                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 ${
                               ethInputMode === 'eth'
-                                ? 'bg-blue-500 text-white'
-                                : 'text-zinc-400 hover:text-white'
+                                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30'
+                                : 'text-slate-400 hover:text-slate-200'
                             }`}
                           >
                             ETH
                     </button>
                     <button
                             onClick={() => setEthInputMode('usd')}
-                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 ${
                               ethInputMode === 'usd'
-                                ? 'bg-green-500 text-white'
-                                : 'text-zinc-400 hover:text-white'
+                                ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30'
+                                : 'text-slate-400 hover:text-slate-200'
                             }`}
                           >
                             USD
@@ -3304,20 +3373,21 @@ KEY USER-FACING CHANGES: V1 → V2
                       </div>
                       </div>
                       
-                      {/* Quick Amount Buttons */}
-                      <div className="grid grid-cols-4 gap-2">
+                      {/* Modern Quick Amount Buttons */}
+                      <div className="grid grid-cols-4 gap-2.5">
                         {ethInputMode === 'eth' 
                           ? ['0.00001', '0.0001', '0.001', '0.01'].map((amount) => (
-                              <button
+                              <Button
                                 key={amount}
                                 onClick={() => handleStakeAmountChange(amount)}
-                                className="py-2.5 px-1 rounded-lg border-2 border-blue-500 bg-transparent text-white font-semibold text-[10px] hover:bg-blue-500/20 transition-all duration-200"
+                                variant="outline"
+                                className="h-10 rounded-xl border-2 border-[#d4ff00]/50 bg-slate-900/50 text-white font-bold text-[10px] hover:bg-[#d4ff00]/20 hover:border-[#d4ff00]/80 hover:scale-105 transition-all duration-200 backdrop-blur-sm"
                               >
                                 {amount}
-                    </button>
+                              </Button>
                             ))
                           : ['1', '5', '10', '50'].map((amount) => (
-                              <button
+                              <Button
                                 key={amount}
                                 onClick={() => {
                                   const usdAmount = parseFloat(amount);
@@ -3327,17 +3397,19 @@ KEY USER-FACING CHANGES: V1 → V2
                                     handleStakeAmountChange(ethAmount.toFixed(6));
                                   }
                                 }}
-                                className="py-2.5 px-3 rounded-lg border-2 border-green-500 bg-transparent text-white font-semibold text-sm hover:bg-green-500/20 transition-all duration-200"
+                                variant="outline"
+                                className="h-10 rounded-xl border-2 border-[#d4ff00]/50 bg-slate-900/50 text-white font-bold text-xs hover:bg-[#d4ff00]/20 hover:border-[#d4ff00]/80 hover:scale-105 transition-all duration-200 backdrop-blur-sm"
                               >
                                 ${amount}
-                              </button>
+                              </Button>
                             ))
                         }
                       </div>
 
-                      {/* Manual Input - Full width, no spinners */}
-                      <div className="mt-4">
-                        <input
+                      {/* Modern Manual Input */}
+                      <div className="mt-5 relative">
+                        <div className="relative">
+                          <Input
                           type="text"
                           inputMode="decimal"
                           value={ethInputMode === 'eth' 
@@ -3358,37 +3430,51 @@ KEY USER-FACING CHANGES: V1 → V2
                             }
                           }}
                           placeholder={ethInputMode === 'eth' ? '0.00001' : '10.00'}
-                          className="w-full h-14 text-2xl font-bold bg-zinc-900/50 border border-zinc-600 rounded-lg text-white text-center placeholder:text-zinc-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
+                            className="w-full h-16 text-3xl font-extrabold bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-2 border-[#d4ff00]/40 rounded-2xl text-[#d4ff00] text-center placeholder:text-slate-600 focus:border-[#d4ff00] focus:ring-4 focus:ring-[#d4ff00]/20 focus:shadow-xl focus:shadow-[#d4ff00]/10 transition-all duration-300 backdrop-blur-sm"
                           style={{ 
                             WebkitAppearance: 'none', 
                             MozAppearance: 'textfield',
                           }}
                         />
-                        <div className="text-center mt-1 text-zinc-400 text-sm font-medium">
-                          {ethInputMode === 'eth' ? 'ETH' : 'USD'}
+                          <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[#d4ff00]/0 via-[#d4ff00]/5 to-[#d4ff00]/0 pointer-events-none" />
+                        </div>
+                        <div className="text-center mt-2 text-[#d4ff00] text-sm font-semibold flex items-center justify-center gap-1.5">
+                          {ethInputMode === 'eth' ? (
+                            <>
+                              <Coins className="w-3.5 h-3.5" />
+                              ETH
+                            </>
+                          ) : (
+                            <>
+                              <DollarSign className="w-3.5 h-3.5" />
+                              USD
+                            </>
+                          )}
                   </div>
                 </div>
 
-                      {/* Conversion Display */}
+                      {/* Modern Conversion Display */}
                       {(() => {
                         const amount = parseFloat(stakeModal.stakeAmount) || 0;
                         const usdValue = getUsdValue(amount, 'ETH');
                         if (usdValue !== null && amount > 0) {
                           return (
-                            <div className="flex items-center justify-center gap-2 py-2 px-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                            <div className="flex items-center justify-center gap-2.5 py-3 px-5 bg-gradient-to-r from-blue-500/15 via-blue-500/10 to-blue-500/15 rounded-xl border border-blue-500/30 backdrop-blur-sm shadow-lg shadow-blue-500/10">
                               {ethInputMode === 'eth' ? (
                                 <>
-                                  <span className="text-blue-400 font-semibold text-lg">
+                                  <DollarSign className="w-4 h-4 text-[#d4ff00]" />
+                                  <span className="text-[#d4ff00] font-bold text-xl">
                                     ≈ ${usdValue < 0.01 ? usdValue.toFixed(4) : usdValue < 1 ? usdValue.toFixed(3) : usdValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </span>
-                                  <span className="text-zinc-500 text-sm">USD</span>
+                                  <span className="text-slate-400 text-xs font-medium">USD</span>
                                 </>
                               ) : (
                                 <>
-                                  <span className="text-blue-400 font-semibold text-lg">
+                                  <Coins className="w-4 h-4 text-[#d4ff00]" />
+                                  <span className="text-[#d4ff00] font-bold text-xl">
                                     ≈ {amount.toFixed(6)}
                                   </span>
-                                  <span className="text-zinc-500 text-sm">ETH</span>
+                                  <span className="text-slate-400 text-xs font-medium">ETH</span>
                                 </>
                               )}
                             </div>
@@ -3398,155 +3484,308 @@ KEY USER-FACING CHANGES: V1 → V2
                       })()}
                     </div>
 
-                    <Separator className="my-4 bg-zinc-700/30" />
+                    {/* Modern Potential Earnings Card */}
+                    <Card className="bg-gradient-to-br from-slate-900/90 via-emerald-950/30 to-slate-900/90 border-2 border-emerald-500/20 backdrop-blur-xl shadow-2xl">
+                      <CardContent className="p-5 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Calculator className="w-4 h-4 text-emerald-400" />
+                            <span className="text-sm font-bold text-slate-200">Potential Earnings</span>
+                          </div>
+                          <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-400 bg-emerald-500/10 font-semibold">EST.</Badge>
+                        </div>
+                        {potentialEarnings ? (
+                          <>
+                            <div className="grid grid-cols-2 gap-3">
+                              {/* Payout Card */}
+                              <div className="relative rounded-xl bg-gradient-to-br from-slate-950/90 via-slate-900/70 to-slate-950/90 border border-slate-700/60 p-4 backdrop-blur-sm shadow-lg">
+                                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent rounded-xl" />
+                                <div className="relative">
+                                  <div className="flex items-center gap-1.5 mb-1.5">
+                                    <ArrowUpRight className="w-3 h-3 text-blue-400" />
+                                    <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">Payout</div>
+                                  </div>
+                                  <div className="text-xl font-extrabold text-[#d4ff00] mb-1">
+                                    {formatTokenAmount(potentialEarnings.payout, 'ETH')} ETH
+                                  </div>
+                                  {(() => {
+                                    const usd = formatUsdValueLocal(potentialEarnings.payout, 'ETH');
+                                    return usd ? (
+                                      <div className="flex items-center gap-1 text-[10px] text-[#d4ff00]">
+                                        <DollarSign className="w-3 h-3" />
+                                        <span>≈ ${usd}</span>
+                                      </div>
+                                    ) : null;
+                                  })()}
+                                </div>
+                              </div>
+                              
+                              {/* Profit Card */}
+                              <div className="relative rounded-xl bg-gradient-to-br from-slate-950/90 via-emerald-950/70 to-slate-950/90 border border-emerald-500/40 p-4 backdrop-blur-sm shadow-lg">
+                                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-xl" />
+                                <div className="relative">
+                                  <div className="flex items-center gap-1.5 mb-1.5">
+                                    <TrendingUp className="w-3 h-3 text-emerald-400" />
+                                    <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">Profit</div>
+                                  </div>
+                                  <div className="text-xl font-extrabold text-[#d4ff00] mb-1">
+                                    +{formatTokenAmount(potentialEarnings.profit, 'ETH')} ETH
+                                  </div>
+                                  <div className="flex items-center gap-1 text-[10px] text-[#d4ff00] font-semibold">
+                                    <Award className="w-3 h-3" />
+                                    <span>{potentialEarnings.profitPercent.toFixed(1)}% ROI</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Share Progress */}
+                            <div className="space-y-2 pt-2 border-t border-slate-700/50">
+                              <div className="flex items-center justify-between text-xs">
+                                <div className="flex items-center gap-1.5 text-slate-300">
+                                  <PieChart className="w-3.5 h-3.5 text-[#d4ff00]" />
+                                  <span className="font-medium">Your share of winning pool</span>
+                                </div>
+                                <span className="text-[#d4ff00] font-bold">{potentialEarnings.sharePercent.toFixed(2)}%</span>
+                              </div>
+                              <Progress value={Math.min(potentialEarnings.sharePercent, 100)} className="h-2.5 bg-slate-800/60" />
+                            </div>
+                            
+                            {/* Pool Info */}
+                            <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-700/50">
+                              <div className="flex items-center gap-1.5 text-slate-300">
+                                <Info className="w-3.5 h-3.5 text-[#d4ff00]" />
+                                <span>Pool after your bet</span>
+                              </div>
+                              <span className="text-[#d4ff00] font-bold">{formatTokenAmount(potentialEarnings.totalPoolAfter, 'ETH')} ETH</span>
+                            </div>
+                            
+                            <div className="text-[10px] text-slate-300 bg-slate-900/50 rounded-lg p-2 border border-slate-800/60">
+                              <Info className="w-3 h-3 inline mr-1.5 mb-0.5 text-[#d4ff00]" />
+                              Estimation uses current pools and a {Math.round(potentialEarnings.platformFee * 100)}% platform fee on the losing side.
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-center py-6 text-slate-500 text-sm flex items-center justify-center gap-2">
+                            <Info className="w-4 h-4" />
+                            Enter an amount to preview potential payout
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
 
-                    {/* Info Table */}
-                    <Table>
-                      <TableBody>
-                        <TableRow className="border-zinc-700/30 hover:bg-zinc-800/30">
-                          <TableCell className="text-zinc-400 py-2">Min Bet</TableCell>
-                          <TableCell className="text-right text-white font-medium py-2">0.00001 ETH</TableCell>
-                        </TableRow>
-                        <TableRow className="border-zinc-700/30 hover:bg-zinc-800/30">
-                          <TableCell className="text-zinc-400 py-2">Max Bet</TableCell>
-                          <TableCell className="text-right text-white font-medium py-2">100 ETH</TableCell>
-                        </TableRow>
-                        <TableRow className="border-zinc-700/30 hover:bg-zinc-800/30">
-                          <TableCell className="text-zinc-400 py-2">Network</TableCell>
-                          <TableCell className="text-right py-2">
-                            <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">Base</Badge>
-                          </TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
                   </CardContent>
                 </Card>
               </TabsContent>
 
               {/* SWIPE Content */}
-              <TabsContent value="SWIPE" className="mt-4 space-y-4">
-                <Card className="bg-zinc-800/30 border-zinc-700/50">
-                  <CardContent className="p-4">
-                    <div className="space-y-4">
-                      <label className="text-sm text-zinc-400 font-medium">Bet Amount</label>
+              <TabsContent value="SWIPE" className="mt-5 space-y-5">
+                <Card className="bg-gradient-to-br from-slate-900/90 via-slate-800/60 to-slate-900/90 border-slate-700/60 backdrop-blur-xl shadow-xl">
+                  <CardContent className="p-5">
+                    <div className="space-y-5">
+                      <label className="text-sm text-[#d4ff00] font-semibold flex items-center gap-2">
+                        <Wallet className="w-4 h-4" />
+                        Bet Amount
+                      </label>
                       
-                      {/* Range Slider */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-xs text-zinc-500">
-                          <span>100K</span>
-                          <span>100M SWIPE</span>
-                        </div>
-                    <input
-                          type="range"
-                          min="100000"
-                          max="100000000"
-                          step="100000"
+                      {/* Modern Manual Input for SWIPE */}
+                      <div className="mt-5 relative">
+                        <div className="relative">
+                          <Input
+                            type="text"
+                            inputMode="numeric"
                           value={stakeModal.stakeAmount || "100000"}
-                      onChange={(e) => handleStakeAmountChange(e.target.value)}
-                          className="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer slider-swipe"
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/[^0-9]/g, '');
+                              if (value === '' || parseFloat(value) >= 100000) {
+                                handleStakeAmountChange(value || "100000");
+                              }
+                            }}
+                            placeholder="100000"
+                            className="w-full h-16 text-3xl font-extrabold bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-2 border-[#d4ff00]/40 rounded-2xl text-[#d4ff00] text-center placeholder:text-slate-600 focus:border-[#d4ff00] focus:ring-4 focus:ring-[#d4ff00]/20 focus:shadow-xl focus:shadow-[#d4ff00]/10 transition-all duration-300 backdrop-blur-sm"
                           style={{
-                            background: `linear-gradient(to right, #d4ff00 0%, #d4ff00 ${
-                              ((parseFloat(stakeModal.stakeAmount || "100000") - 100000) / (100000000 - 100000)) * 100
-                            }%, #3f3f46 ${
-                              ((parseFloat(stakeModal.stakeAmount || "100000") - 100000) / (100000000 - 100000)) * 100
-                            }%, #3f3f46 100%)`
-                          }}
-                        />
-                        <div className="text-center">
-                          <span className="text-2xl font-bold text-white">{parseInt(stakeModal.stakeAmount || "100000").toLocaleString()}</span>
-                          <span className="text-zinc-400 ml-2">SWIPE</span>
+                              WebkitAppearance: 'none', 
+                              MozAppearance: 'textfield',
+                            }}
+                          />
+                          <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[#d4ff00]/0 via-[#d4ff00]/5 to-[#d4ff00]/0 pointer-events-none" />
+                        </div>
+                        <div className="text-center mt-2 text-[#d4ff00] text-sm font-semibold flex items-center justify-center gap-1.5">
+                          <Zap className="w-3.5 h-3.5" />
+                          SWIPE
                   </div>
                       </div>
                       
-                      {/* USD Equivalent */}
+                      {/* Modern USD Equivalent */}
                       {(() => {
                         const amount = parseFloat(stakeModal.stakeAmount) || 0;
                         const usdValue = getUsdValue(amount, 'SWIPE');
                         if (usdValue !== null && amount > 0) {
                           return (
-                            <div className="flex items-center justify-center gap-2 py-2 px-4 bg-[#d4ff00]/10 rounded-lg border border-[#d4ff00]/20">
-                              <span className="text-[#d4ff00] font-semibold text-lg">
+                            <div className="flex items-center justify-center gap-2.5 py-3 px-5 bg-gradient-to-r from-[#d4ff00]/15 via-[#d4ff00]/10 to-[#d4ff00]/15 rounded-xl border border-[#d4ff00]/30 backdrop-blur-sm shadow-lg shadow-[#d4ff00]/10">
+                              <DollarSign className="w-4 h-4 text-[#d4ff00]" />
+                              <span className="text-[#d4ff00] font-bold text-xl">
                                 ≈ ${usdValue < 0.01 ? usdValue.toFixed(4) : usdValue < 1 ? usdValue.toFixed(3) : usdValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </span>
-                              <span className="text-zinc-500 text-sm">USD</span>
+                              <span className="text-slate-400 text-xs font-medium">USD</span>
                             </div>
                           );
                         }
                         return null;
                       })()}
 
-                      {/* Quick Amount Buttons */}
-                      <div className="grid grid-cols-4 gap-2">
+                      {/* Modern Quick Amount Buttons */}
+                      <div className="grid grid-cols-4 gap-2.5">
                         {['100000', '500000', '1000000', '5000000'].map((amount) => (
-                          <button
+                          <Button
                             key={amount}
                             onClick={() => handleStakeAmountChange(amount)}
-                            className="py-2 px-2 rounded-lg border-2 border-[#d4ff00] bg-transparent text-white font-semibold text-xs hover:bg-[#d4ff00]/20 transition-all duration-200"
+                            variant="outline"
+                            className="h-10 rounded-xl border-2 border-[#d4ff00]/50 bg-slate-900/50 text-white font-bold text-[10px] hover:bg-[#d4ff00]/20 hover:border-[#d4ff00]/80 hover:scale-105 transition-all duration-200 backdrop-blur-sm"
                           >
                             {parseInt(amount) >= 1000000 ? `${parseInt(amount) / 1000000}M` : `${parseInt(amount) / 1000}K`}
-                          </button>
+                          </Button>
                         ))}
                   </div>
                 </div>
 
-                    <Separator className="my-4 bg-zinc-700/30" />
+                    {/* Modern Potential Earnings Card for SWIPE */}
+                    <Card className="bg-gradient-to-br from-slate-900/90 via-emerald-950/30 to-slate-900/90 border-2 border-emerald-500/20 backdrop-blur-xl shadow-2xl">
+                      <CardContent className="p-5 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Calculator className="w-4 h-4 text-[#d4ff00]" />
+                            <span className="text-sm font-bold text-[#d4ff00]">Potential Earnings</span>
+                          </div>
+                          <Badge variant="outline" className="text-[10px] border-[#d4ff00]/40 text-[#d4ff00] bg-[#d4ff00]/10 font-semibold">EST.</Badge>
+                        </div>
+                        {potentialEarnings ? (
+                          <>
+                            <div className="grid grid-cols-2 gap-3">
+                              {/* Payout Card */}
+                              <div className="relative rounded-xl bg-gradient-to-br from-slate-950/90 via-slate-900/70 to-slate-950/90 border border-slate-700/60 p-4 backdrop-blur-sm shadow-lg">
+                                <div className="absolute inset-0 bg-gradient-to-br from-[#d4ff00]/5 to-transparent rounded-xl" />
+                                <div className="relative">
+                                  <div className="flex items-center gap-1.5 mb-1.5">
+                                    <ArrowUpRight className="w-3 h-3 text-[#d4ff00]" />
+                                    <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">Payout</div>
+                                  </div>
+                                  <div className="text-xl font-extrabold text-[#d4ff00] mb-1">
+                                    {formatTokenAmount(potentialEarnings.payout, 'SWIPE')} SWIPE
+                                  </div>
+                                  {(() => {
+                                    const usd = formatUsdValueLocal(potentialEarnings.payout, 'SWIPE');
+                                    return usd ? (
+                                      <div className="flex items-center gap-1 text-[10px] text-[#d4ff00]">
+                                        <DollarSign className="w-3 h-3" />
+                                        <span>≈ ${usd}</span>
+                                      </div>
+                                    ) : null;
+                                  })()}
+                                </div>
+                              </div>
+                              
+                              {/* Profit Card */}
+                              <div className="relative rounded-xl bg-gradient-to-br from-slate-950/90 via-emerald-950/70 to-slate-950/90 border border-emerald-500/40 p-4 backdrop-blur-sm shadow-lg">
+                                <div className="absolute inset-0 bg-gradient-to-br from-[#d4ff00]/10 to-transparent rounded-xl" />
+                                <div className="relative">
+                                  <div className="flex items-center gap-1.5 mb-1.5">
+                                    <TrendingUp className="w-3 h-3 text-[#d4ff00]" />
+                                    <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">Profit</div>
+                                  </div>
+                                  <div className="text-xl font-extrabold text-[#d4ff00] mb-1">
+                                    +{formatTokenAmount(potentialEarnings.profit, 'SWIPE')} SWIPE
+                                  </div>
+                                  <div className="flex items-center gap-1 text-[10px] text-[#d4ff00] font-semibold">
+                                    <Award className="w-3 h-3" />
+                                    <span>{potentialEarnings.profitPercent.toFixed(1)}% ROI</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Share Progress */}
+                            <div className="space-y-2 pt-2 border-t border-slate-700/50">
+                              <div className="flex items-center justify-between text-xs">
+                                <div className="flex items-center gap-1.5 text-slate-300">
+                                  <PieChart className="w-3.5 h-3.5 text-[#d4ff00]" />
+                                  <span className="font-medium">Your share of winning pool</span>
+                                </div>
+                                <span className="text-[#d4ff00] font-bold">{potentialEarnings.sharePercent.toFixed(2)}%</span>
+                              </div>
+                              <Progress value={Math.min(potentialEarnings.sharePercent, 100)} className="h-2.5 bg-slate-800/60" />
+                            </div>
+                            
+                            {/* Pool Info */}
+                            <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-700/50">
+                              <div className="flex items-center gap-1.5 text-slate-300">
+                                <Info className="w-3.5 h-3.5 text-[#d4ff00]" />
+                                <span>Pool after your bet</span>
+                              </div>
+                              <span className="text-[#d4ff00] font-bold">{formatTokenAmount(potentialEarnings.totalPoolAfter, 'SWIPE')} SWIPE</span>
+                            </div>
+                            
+                            <div className="text-[10px] text-slate-300 bg-slate-900/50 rounded-lg p-2 border border-slate-800/60">
+                              <Info className="w-3 h-3 inline mr-1.5 mb-0.5 text-[#d4ff00]" />
+                              Estimation uses current pools and a {Math.round(potentialEarnings.platformFee * 100)}% platform fee on the losing side.
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-center py-6 text-slate-500 text-sm flex items-center justify-center gap-2">
+                            <Info className="w-4 h-4" />
+                            Enter an amount to preview potential payout
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
 
-                    {/* Info Table */}
-                    <Table>
-                      <TableBody>
-                        <TableRow className="border-zinc-700/30 hover:bg-zinc-800/30">
-                          <TableCell className="text-zinc-400 py-2">Min Bet</TableCell>
-                          <TableCell className="text-right text-white font-medium py-2">100,000 SWIPE</TableCell>
-                        </TableRow>
-                        <TableRow className="border-zinc-700/30 hover:bg-zinc-800/30">
-                          <TableCell className="text-zinc-400 py-2">Max Bet</TableCell>
-                          <TableCell className="text-right text-white font-medium py-2">Unlimited ∞</TableCell>
-                        </TableRow>
-                        <TableRow className="border-zinc-700/30 hover:bg-zinc-800/30">
-                          <TableCell className="text-zinc-400 py-2">Token</TableCell>
-                          <TableCell className="text-right py-2">
-                            <Badge className="bg-[#d4ff00]/20 text-[#d4ff00] border-[#d4ff00]/30">$SWIPE</Badge>
-                          </TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
                   </CardContent>
                 </Card>
               </TabsContent>
             </Tabs>
               </div>
 
-          {/* Footer Actions */}
-          <DialogFooter className="p-6 pt-2 gap-3 sm:gap-3">
+          {/* Modern Footer Actions */}
+          <DialogFooter className="p-6 pt-4 gap-3 border-t border-slate-800/80 bg-slate-900/40 backdrop-blur-sm">
             <Button
               variant="outline"
               onClick={handleCloseStakeModal}
               disabled={isTransactionLoading}
-              className="flex-1 h-12 bg-zinc-800/50 border-zinc-600 hover:bg-zinc-700 text-white"
+              className="flex-1 h-14 bg-slate-900/60 border-2 border-slate-700/60 hover:bg-slate-800/80 hover:border-slate-600 text-white font-semibold rounded-xl transition-all duration-200 backdrop-blur-sm"
             >
                   Cancel
             </Button>
             <Button
                   onClick={handleConfirmStake}
                   disabled={isTransactionLoading}
-              className={`flex-1 h-12 font-semibold text-base transition-all duration-300 ${
+              className={`flex-1 h-14 font-bold text-base rounded-xl transition-all duration-300 shadow-xl hover:scale-[1.02] active:scale-[0.98] ${
                 stakeModal.selectedToken === 'ETH' 
-                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg shadow-blue-500/25' 
-                  : 'bg-gradient-to-r from-[#d4ff00] to-[#a8cc00] hover:from-[#c4ef00] hover:to-[#98bc00] text-black shadow-lg shadow-[#d4ff00]/25'
+                  ? 'bg-gradient-to-r from-[#d4ff00] via-[#b8e600] to-[#d4ff00] hover:from-[#c4ef00] hover:via-[#a8cc00] hover:to-[#c4ef00] text-black shadow-[#d4ff00]/30' 
+                  : 'bg-gradient-to-r from-[#d4ff00] via-[#b8e600] to-[#d4ff00] hover:from-[#c4ef00] hover:via-[#a8cc00] hover:to-[#c4ef00] text-black shadow-[#d4ff00]/30'
               }`}
                 >
                   {isTransactionLoading ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                <div className="flex items-center gap-3">
+                  <div className={`w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin ${stakeModal.selectedToken === 'ETH' ? 'border-black' : 'border-black'}`} />
                   <span>Processing...</span>
                 </div>
                   ) : (
                     (() => {
                       if (stakeModal.selectedToken === 'SWIPE') {
                         const amount = parseFloat(stakeModal.stakeAmount);
-                    return `Approve & Bet ${amount.toLocaleString()} SWIPE`;
+                    return (
+                      <div className="flex items-center gap-2">
+                        <Zap className="w-5 h-5" />
+                        <span>Approve & Bet {amount.toLocaleString()} SWIPE</span>
+                      </div>
+                    );
                   }
-                  return 'Confirm Bet';
+                  return (
+                    <div className="flex items-center gap-2">
+                      <Target className="w-5 h-5" />
+                      <span>Confirm Bet</span>
+                    </div>
+                  );
                     })()
                   )}
             </Button>
