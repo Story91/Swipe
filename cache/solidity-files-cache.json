@@ -148,6 +148,83 @@
         "IERC20",
         "SwipeDailyRewards"
       ]
+    },
+    "C:\\Users\\Cezary\\Documents\\MiniApps\\Predict\\Dexter\\contracts\\SwipeDailyRewards_V2.sol": {
+      "lastModificationDate": 1768743686972,
+      "contentHash": "7742889b76082e6dba473ab1655002eb",
+      "sourceName": "contracts/SwipeDailyRewards_V2.sol",
+      "solcConfig": {
+        "version": "0.8.19",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "viaIR": true,
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.19"
+      ],
+      "artifacts": [
+        "IERC20",
+        "ISwipeDailyRewardsV1",
+        "SwipeDailyRewards_V2"
+      ]
+    },
+    "C:\\Users\\Cezary\\Documents\\MiniApps\\Predict\\Dexter\\contracts\\SwipeDailyRewards_V3.sol": {
+      "lastModificationDate": 1768743686987,
+      "contentHash": "5bb96a2c8c6651431d0fd03f660566db",
+      "sourceName": "contracts/SwipeDailyRewards_V3.sol",
+      "solcConfig": {
+        "version": "0.8.19",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "viaIR": true,
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.19"
+      ],
+      "artifacts": [
+        "IERC20",
+        "ISwipeDailyRewardsV1",
+        "ISwipeDailyRewardsV2",
+        "SwipeDailyRewards_V3"
+      ]
     }
   }
 }

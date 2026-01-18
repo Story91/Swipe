@@ -7,11 +7,17 @@ import { useNotification, useComposeCast, useOpenUrl } from "@coinbase/onchainki
 import sdk from "@farcaster/miniapp-sdk";
 import Image from "next/image";
 import { Share2 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import "./DailyTasks.css";
 import { HackScreen } from "../HackScreen/HackScreen";
 
 // Contract addresses - UPDATE THESE AFTER DEPLOYMENT
-const DAILY_REWARDS_CONTRACT = process.env.NEXT_PUBLIC_DAILY_REWARDS_CONTRACT as `0x${string}` || "0x0000000000000000000000000000000000000000";
+// Use V3 if available, fallback to V2 (UI will still show "V1 to V2" for users)
+const DAILY_REWARDS_CONTRACT = (
+  (process.env.NEXT_PUBLIC_DAILY_REWARDS_V3_CONTRACT as `0x${string}`) ||
+  (process.env.NEXT_PUBLIC_DAILY_REWARDS_V2_CONTRACT as `0x${string}`) ||
+  "0x0000000000000000000000000000000000000000"
+);
 const SWIPE_TOKEN = "0xd0187D77Af0ED6a44F0A631B406c78b30E160aA9";
 
 // Minimum SWIPE balance required (1M SWIPE)
@@ -41,7 +47,7 @@ const getRandomShareText = () => {
 // Contract ABI (only functions we need)
 const DAILY_REWARDS_ABI = [
   {
-    "inputs": [],
+    "inputs": [{"name": "signature", "type": "bytes"}],
     "name": "claimDaily",
     "outputs": [],
     "stateMutability": "nonpayable",
@@ -58,7 +64,8 @@ const DAILY_REWARDS_ABI = [
       {"name": "jackpotsWon", "type": "uint256"},
       {"name": "canClaimToday", "type": "bool"},
       {"name": "nextClaimTime", "type": "uint256"},
-      {"name": "potentialReward", "type": "uint256"}
+      {"name": "potentialReward", "type": "uint256"},
+      {"name": "isMigrated", "type": "bool"}
     ],
     "stateMutability": "view",
     "type": "function"
@@ -111,7 +118,10 @@ const DAILY_REWARDS_ABI = [
     "type": "function"
   },
   {
-    "inputs": [{"name": "referrer", "type": "address"}],
+    "inputs": [
+      {"name": "referrer", "type": "address"},
+      {"name": "signature", "type": "bytes"}
+    ],
     "name": "registerReferral",
     "outputs": [],
     "stateMutability": "nonpayable",
@@ -147,6 +157,13 @@ const DAILY_REWARDS_ABI = [
     "outputs": [{"type": "bool"}],
     "stateMutability": "view",
     "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "migrateFromV1",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   }
 ] as const;
 
@@ -159,6 +176,7 @@ interface UserStats {
   canClaimToday: boolean;
   nextClaimTime: bigint;
   potentialReward: bigint;
+  isMigrated: boolean;
 }
 
 interface DailyTasksStatus {
@@ -189,6 +207,7 @@ export function DailyTasks() {
   const publicClient = usePublicClient();
   const { composeCast: minikitComposeCast } = useComposeCast();
   const minikitOpenUrl = useOpenUrl();
+  const searchParams = useSearchParams();
   
   // Universal openUrl function - works on both MiniKit (Base app) and Farcaster SDK (Warpcast)
   const openUrl = useCallback(async (url: string) => {
@@ -267,6 +286,9 @@ export function DailyTasks() {
   // Blacklist check
   const [isBlacklisted, setIsBlacklisted] = useState<boolean | null>(null);
   const [isCheckingBlacklist, setIsCheckingBlacklist] = useState(false);
+  
+  // Migration state
+  const [isMigrating, setIsMigrating] = useState(false);
   
   // Contract reads
   const { data: userStats, refetch: refetchStats } = useReadContract({
@@ -403,6 +425,20 @@ export function DailyTasks() {
     checkBlacklist();
   }, [address]);
 
+  // Auto-fill referral code from URL parameter ?ref=
+  useEffect(() => {
+    if (!hasUsedReferral && searchParams) {
+      const refParam = searchParams.get('ref');
+      if (refParam && refParam.startsWith('0x') && refParam.length === 42) {
+        // Validate it's a valid address and not the user's own address
+        if (address && refParam.toLowerCase() !== address.toLowerCase()) {
+          setReferralCode(refParam);
+          console.log('📋 Auto-filled referral code from URL:', refParam);
+        }
+      }
+    }
+  }, [searchParams, hasUsedReferral, address]);
+
   // Manual check for beta tester eligibility (called by button click)
   const handleCheckBetaTesterEligibility = async () => {
     if (!address) return;
@@ -475,7 +511,7 @@ export function DailyTasks() {
           setIsVerifyingTask(null);
           sendNotification({
             title: "🎉 Referral Registered!",
-            body: "You both received 150k SWIPE!",
+            body: "You both received 10k SWIPE!",
           });
         } else {
           sendNotification({
@@ -519,6 +555,18 @@ export function DailyTasks() {
           }
         };
         confirmTask();
+      } else if (isMigrating) {
+        // Migration successful
+        sendNotification({
+          title: "✅ Migration Successful!",
+          body: "Your data has been migrated from V1 to V2!",
+        });
+        
+        setIsMigrating(false);
+        // Refetch data to update isMigrated status
+        refetchStats();
+        refetchTasks();
+        refetchAchievements();
       } else {
         // Daily claim (claimDaily) - no Redis confirmation needed, just refetch
         sendNotification({
@@ -568,7 +616,31 @@ export function DailyTasks() {
     return () => clearInterval(interval);
   }, [userStats, refetchStats]);
 
-  // Claim daily reward
+  // Migrate from V1 to V2
+  const handleMigrate = async () => {
+    if (!address) return;
+    
+    setIsMigrating(true);
+    setTaskError(null);
+    
+    try {
+      writeContract({
+        address: DAILY_REWARDS_CONTRACT,
+        abi: DAILY_REWARDS_ABI,
+        functionName: "migrateFromV1",
+      });
+    } catch (error) {
+      console.error("Migration failed:", error);
+      setTaskError(error instanceof Error ? error.message : "Migration failed");
+      sendNotification({
+        title: "❌ Migration Failed",
+        body: error instanceof Error ? error.message : "Transaction failed",
+      });
+      setIsMigrating(false);
+    }
+  };
+
+  // Claim daily reward (with signature verification for V3)
   const handleClaim = async () => {
     if (!address || !userStats) return;
     
@@ -583,19 +655,44 @@ export function DailyTasks() {
     }
     
     setIsClaimLoading(true);
+    setTaskError(null);
+    
     try {
+      // Step 1: Get signature from backend
+      const verifyResponse = await fetch('/api/daily-claims/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          address,
+        }),
+      });
+
+      const verifyResult = await verifyResponse.json();
+
+      if (!verifyResult.success) {
+        setTaskError(verifyResult.error || 'Daily claim verification failed');
+        sendNotification({
+          title: "❌ Verification Failed",
+          body: verifyResult.error || 'Could not verify daily claim',
+        });
+        setIsClaimLoading(false);
+        return;
+      }
+
+      // Step 2: Call contract with signature
       writeContract({
         address: DAILY_REWARDS_CONTRACT,
         abi: DAILY_REWARDS_ABI,
         functionName: "claimDaily",
+        args: [verifyResult.signature as `0x${string}`],
       });
     } catch (error) {
       console.error("Claim failed:", error);
+      setTaskError(error instanceof Error ? error.message : "Transaction failed");
       sendNotification({
         title: "❌ Claim Failed",
         body: error instanceof Error ? error.message : "Transaction failed",
       });
-    } finally {
       setIsClaimLoading(false);
     }
   };
@@ -716,13 +813,13 @@ export function DailyTasks() {
     setTaskError(null);
     
     try {
-      // First verify both accounts have Farcaster (anti-Sybil check)
-      const verifyResponse = await fetch('/api/daily-tasks/verify-referral', {
+      // Verify referral and get signature from backend
+      const verifyResponse = await fetch('/api/referrals/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userAddress: address,
-          referrerAddress: referralCode,
+          referred: address,
+          referrer: referralCode,
         }),
       });
       
@@ -734,13 +831,16 @@ export function DailyTasks() {
         return;
       }
       
-      // Verification passed - proceed with on-chain transaction
+      // Verification passed - proceed with on-chain transaction with signature
       if (DAILY_REWARDS_CONTRACT !== "0x0000000000000000000000000000000000000000") {
         writeContract({
           address: DAILY_REWARDS_CONTRACT,
           abi: DAILY_REWARDS_ABI,
           functionName: "registerReferral",
-          args: [referralCode as `0x${string}`],
+          args: [
+            referralCode as `0x${string}`,
+            verifyResult.signature as `0x${string}`
+          ],
         });
         
         setPendingConfirmTask('REFERRAL');
@@ -835,6 +935,7 @@ export function DailyTasks() {
     jackpotsWon: Number((userStats as any)[4]),
     canClaimToday: (userStats as any)[5] as boolean,
     potentialReward: (userStats as any)[7] as bigint,
+    isMigrated: (userStats as any)[8] as boolean,
   } : null;
 
   // Parse daily tasks
@@ -896,7 +997,7 @@ export function DailyTasks() {
               <li>📣 Share on Farcaster: +50k SWIPE</li>
               <li>🎯 Create predictions: +75k SWIPE</li>
               <li>💰 Trading volume bonus: +100k SWIPE</li>
-              <li>👥 Invite friends: +150k SWIPE each</li>
+              <li>👥 Invite friends: +10k SWIPE each</li>
               <li>🏆 Achievement badges with rewards up to 1M</li>
             </ul>
           </div>
@@ -996,6 +1097,55 @@ export function DailyTasks() {
               <span className="daily-tasks-balance-requirement">
                 1M min. required
               </span>
+            )}
+          </div>
+        )}
+
+        {/* Migration Banner - Show if user has not migrated from V1 */}
+        {stats && !stats.isMigrated && (
+          <div className="migration-banner" style={{
+            backgroundColor: '#FFE5B4',
+            border: '2px solid #FFA500',
+            borderRadius: '12px',
+            padding: '16px',
+            marginBottom: '20px',
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: '24px', marginBottom: '8px' }}>🔄</div>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', color: '#8B4513' }}>
+              Migrate Your Data from V1
+            </h3>
+            <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: '#654321' }}>
+              Transfer your streaks and achievements to the new V2 contract
+            </p>
+            <button
+              onClick={handleMigrate}
+              disabled={isPending || isConfirming || isMigrating}
+              style={{
+                backgroundColor: '#FFA500',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '12px 24px',
+                fontSize: '16px',
+                fontWeight: 'bold',
+                cursor: isPending || isConfirming || isMigrating ? 'not-allowed' : 'pointer',
+                opacity: isPending || isConfirming || isMigrating ? 0.6 : 1
+              }}
+            >
+              {isMigrating || isPending || isConfirming ? (
+                <>
+                  <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⏳</span>
+                  {' Migrating...'}
+                </>
+              ) : (
+                'Migrate Now'
+              )}
+            </button>
+            {taskError && (
+              <p style={{ marginTop: '12px', color: '#d32f2f', fontSize: '13px' }}>
+                {taskError}
+              </p>
             )}
           </div>
         )}
@@ -1303,35 +1453,14 @@ export function DailyTasks() {
           </div>
         </div>
 
-        {/* Referral Section - TEMPORARILY DISABLED */}
-        {/* <div className="referral-section">
+        {/* Referral Section */}
+        <div className="referral-section">
           <h3 className="section-title">
             <span>🤝</span> Invite Friends
           </h3>
           
           <div className="referral-info">
-            <p>Share your referral link and both get <strong>150,000 SWIPE</strong>!</p>
-            
-            <div className="referral-your-code">
-              <span className="referral-code-label">Your referral code:</span>
-              <div className="referral-code-box">
-                <code>{address?.slice(0, 6)}...{address?.slice(-4)}</code>
-                <button 
-                  className="referral-copy-btn"
-                  onClick={() => {
-                    if (address) {
-                      navigator.clipboard.writeText(address);
-                      sendNotification({
-                        title: "📋 Copied!",
-                        body: "Your referral code copied!",
-                      });
-                    }
-                  }}
-                >
-                  📋
-                </button>
-              </div>
-            </div>
+            <p>Share your referral link and both get <strong>10,000 SWIPE</strong>!</p>
             
             <div className="referral-stats">
               <span className="referral-count">{achievementData?.referrals || 0}</span>
@@ -1381,7 +1510,7 @@ export function DailyTasks() {
               </>
             )}
           </div>
-        </div> */}
+        </div>
 
         {/* Stats Footer */}
         <div className="stats-footer">
