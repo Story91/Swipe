@@ -10,11 +10,36 @@ export const viewport: Viewport = {
 };
 
 export async function generateMetadata(): Promise<Metadata> {
-  const URL = process.env.NEXT_PUBLIC_URL;
+  const URL = process.env.NEXT_PUBLIC_URL || 'https://theswipe.app';
+  const title = process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME || "Swipe";
+  const description = "Swipe - Betting on the Future. Predict, Swipe, Win!";
+  const ogImage = process.env.NEXT_PUBLIC_APP_HERO_IMAGE || `${URL}/hero.png`;
+  
   return {
-    title: process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME,
-    description:
-      "Swipe - Betting on the Future",
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url: URL,
+      siteName: "Swipe Predictions",
+      images: [
+        {
+          url: ogImage,
+          width: 1200,
+          height: 628,
+          alt: "Swipe - Predict, Swipe, Win!",
+        },
+      ],
+      locale: "en_US",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [ogImage],
+    },
     other: {
       "fc:frame": JSON.stringify({
         version: "next",
@@ -30,6 +55,10 @@ export async function generateMetadata(): Promise<Metadata> {
           },
         },
       }),
+      // Additional OG tags for better Farcaster compatibility
+      "og:image": ogImage,
+      "og:image:width": "1200",
+      "og:image:height": "628",
     },
   };
 }

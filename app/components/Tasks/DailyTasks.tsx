@@ -1287,15 +1287,17 @@ export function DailyTasks() {
                       onClick={async () => {
                         try {
                           const shareText = getRandomShareText();
+                          const shareUrl = window.location.origin;
                           await composeCast({
                             text: shareText,
-                            embeds: ['https://theswipe.app']
+                            embeds: [shareUrl]
                           });
                         } catch (error) {
                           console.error('Failed to share, falling back to URL:', error);
                           // Fallback to window.open if SDK fails completely
                           const shareText = getRandomShareText();
-                          const warpcastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(shareText + '\n\nhttps://theswipe.app')}`;
+                          const shareUrl = window.location.origin;
+                          const warpcastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(shareText + '\n\n' + shareUrl)}`;
                           window.open(warpcastUrl, '_blank');
                         }
                       }}
