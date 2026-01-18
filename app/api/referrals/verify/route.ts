@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
         const userData = await contract.users(referrerAddr);
 
         // Check if referrer has claimed at least once
-        if (userData.lastClaimTimestamp === 0n) {
+        if (userData.lastClaimTimestamp === BigInt(0)) {
           return NextResponse.json(
             { success: false, error: 'Referrer must be an active user (has claimed at least once)' },
             { status: 400 }
