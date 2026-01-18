@@ -330,6 +330,44 @@ export function DailyTasks() {
     }
   });
 
+  // Read baseDailyReward from contract (try both names - V2/V3 has public var, V1 has constant)
+  const { data: baseDailyReward } = useReadContract({
+    address: DAILY_REWARDS_CONTRACT,
+    abi: [
+      ...DAILY_REWARDS_ABI,
+      {
+        "inputs": [],
+        "name": "baseDailyReward",
+        "outputs": [{"type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function"
+      }
+    ],
+    functionName: "baseDailyReward",
+    query: {
+      enabled: DAILY_REWARDS_CONTRACT !== "0x0000000000000000000000000000000000000000",
+    }
+  });
+
+  // Read streakBonusPerDay from contract
+  const { data: streakBonusPerDay } = useReadContract({
+    address: DAILY_REWARDS_CONTRACT,
+    abi: [
+      ...DAILY_REWARDS_ABI,
+      {
+        "inputs": [],
+        "name": "streakBonusPerDay",
+        "outputs": [{"type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function"
+      }
+    ],
+    functionName: "streakBonusPerDay",
+    query: {
+      enabled: DAILY_REWARDS_CONTRACT !== "0x0000000000000000000000000000000000000000",
+    }
+  });
+
   // Read SWIPE token balance
   const { data: swipeBalance } = useReadContract({
     address: SWIPE_TOKEN as `0x${string}`,
@@ -992,9 +1030,9 @@ export function DailyTasks() {
             <h3>Daily Rewards System</h3>
             <p>Earn SWIPE tokens every day by completing tasks!</p>
             <ul className="coming-soon-features">
-              <li>✨ Daily claims: 50k SWIPE + streak bonuses</li>
+              <li>✨ Daily claims: 25k SWIPE + streak bonuses</li>
               <li>🎰 5% chance for 250k SWIPE jackpot</li>
-              <li>📣 Share on Farcaster: +50k SWIPE</li>
+              <li>📣 Share on Farcaster: +25k SWIPE</li>
               <li>🎯 Create predictions: +75k SWIPE</li>
               <li>💰 Trading volume bonus: +100k SWIPE</li>
               <li>👥 Invite friends: +10k SWIPE each</li>
@@ -1161,8 +1199,8 @@ export function DailyTasks() {
               } SWIPE
             </span>
             <span className="reward-breakdown">
-              50k base {stats?.currentStreak && stats.currentStreak > 0 ? 
-                `+ ${Math.min(stats.currentStreak, 10) * 10}k streak bonus` : 
+              {baseDailyReward ? Math.floor(parseFloat(formatEther(baseDailyReward)) / 1000) : 25}k base {stats?.currentStreak && stats.currentStreak > 0 ? 
+                `+ ${Math.min(stats.currentStreak, 10) * (streakBonusPerDay ? Math.floor(parseFloat(formatEther(streakBonusPerDay)) / 1000) : 10)}k streak bonus` : 
                 ""
               }
             </span>
@@ -1223,7 +1261,7 @@ export function DailyTasks() {
                     onClick={() => handleClaimTask('SHARE_CAST')}
                     disabled={isClaimingTask === 'SHARE_CAST' || !hasMinimumBalance}
                   >
-                    {isClaimingTask === 'SHARE_CAST' ? '...' : '🎁 Claim 50k'}
+                      {isClaimingTask === 'SHARE_CAST' ? '...' : '🎁 Claim 25k'}
                   </button>
                 ) : showCastInput ? (
                   <div className="task-input-group">
@@ -1291,7 +1329,7 @@ export function DailyTasks() {
                       onClick={() => handleClaimTask('CREATE_PREDICTION')}
                       disabled={isClaimingTask === 'CREATE_PREDICTION' || !hasMinimumBalance}
                     >
-                      {isClaimingTask === 'CREATE_PREDICTION' ? '...' : '🎁 Claim 75k'}
+                      {isClaimingTask === 'CREATE_PREDICTION' ? '...' : '🎁 Claim 37.5k'}
                     </button>
                   ) : (
                     <button 
@@ -1321,7 +1359,7 @@ export function DailyTasks() {
                       onClick={() => handleClaimTask('TRADING_VOLUME')}
                       disabled={isClaimingTask === 'TRADING_VOLUME' || !hasMinimumBalance}
                     >
-                      {isClaimingTask === 'TRADING_VOLUME' ? '...' : '🎁 Claim 100k'}
+                      {isClaimingTask === 'TRADING_VOLUME' ? '...' : '🎁 Claim 50k'}
                     </button>
                   ) : (
                     <button 
