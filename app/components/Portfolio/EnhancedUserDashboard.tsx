@@ -14,6 +14,7 @@ import GradientText from '@/components/GradientText';
 import { useComposeCast, useOpenUrl } from '@coinbase/onchainkit/minikit';
 import sdk from '@farcaster/miniapp-sdk';
 import { Share2 } from 'lucide-react';
+import { PNLTable } from './WinLossPNL/PNLTable';
 import './EnhancedUserDashboard.css';
 
 interface PredictionWithStakes {
@@ -141,6 +142,9 @@ export function EnhancedUserDashboard() {
   
   // Filter state
   const [selectedFilter, setSelectedFilter] = useState<string>('ready-to-claim');
+  
+  // Dashboard view state (main, pnl)
+  const [activeView, setActiveView] = useState<'main' | 'pnl'>('main');
   
   // Modal states
   const [showModal, setShowModal] = useState(false);
@@ -1682,7 +1686,7 @@ export function EnhancedUserDashboard() {
           </tbody>
         </table>
         
-        {/* Ready to Claim Badge */}
+        {/* Ready to Claim Badge with Navigation Icons */}
         <div className="claim-badge-container">
           <div className="claim-badge">
             <span className="claim-icon">🎉</span>
@@ -1695,6 +1699,26 @@ export function EnhancedUserDashboard() {
               <span className="claim-label">READY TO CLAIM</span>
             </GradientText>
           </div>
+          {allUserPredictions.length > 0 && (
+            <div className="dashboard-nav-icons">
+              <button
+                className={`nav-icon-btn pnl-btn ${activeView === 'pnl' ? 'active' : ''}`}
+                onClick={() => setActiveView('pnl')}
+                title="Profit & Loss"
+              >
+                <span className="nav-label">PNL %</span>
+              </button>
+              {activeView === 'pnl' && (
+                <button
+                  className="nav-icon-btn nav-back-btn"
+                  onClick={() => setActiveView('main')}
+                  title="Back to Dashboard"
+                >
+                  <span className="nav-label">← Back</span>
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Filter Row - inline with separator */}
@@ -1728,7 +1752,10 @@ export function EnhancedUserDashboard() {
         </div>
       </div>
 
-      {/* No predictions message */}
+      {/* Conditional View Rendering */}
+      {activeView === 'main' && (
+        <>
+          {/* No predictions message */}
       {filteredPredictions.length === 0 && (
         <div className="no-predictions-inline">
           {selectedFilter === 'ready-to-claim' ? (
@@ -2051,6 +2078,13 @@ export function EnhancedUserDashboard() {
           </div>
         )}
       </div>
+        </>
+      )}
+
+      {/* PNL View */}
+      {activeView === 'pnl' && allUserPredictions.length > 0 && (
+        <PNLTable allUserPredictions={allUserPredictions} />
+      )}
 
       {/* Custom Modal - Dark Theme */}
       {showModal && (
