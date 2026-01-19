@@ -380,7 +380,6 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
             </div>
             <div className="pnl-percentages-container">
               <div className="pnl-percentage-main">
-                <div className="pnl-percentage-label">ROI</div>
                 <div className="pnl-percentage-value" style={{ color: isProfit ? '#00ff41' : '#ff0040' }}>
                   {isProfit ? '+' : ''}{Math.round(roi)}%
                 </div>
