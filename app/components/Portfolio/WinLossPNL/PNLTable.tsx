@@ -279,9 +279,12 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
 
           // Upload to ImgBB
           const uploadResult = await uploadToImgBB(file);
+          // Use direct image URL from ImgBB - this will be rendered as image embed in Farcaster
+          // data.url is the direct image URL that ends with .png/.jpg/.gif
           ogImageUrl = uploadResult.data.url;
           
           console.log('✅ PNL card screenshot uploaded to ImgBB:', ogImageUrl);
+          console.log('📸 Image URL ends with:', ogImageUrl.split('.').pop());
           
           // Also save URL to Redis for layout.tsx metadata (like crypto predictions)
           const userAddressLower = address.toLowerCase();
@@ -324,12 +327,13 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
       }
 
       if (platform === 'farcaster') {
-        // Share to Farcaster/Base - OG image URL as first embed, PNL page link as second (like crypto predictions)
-        // This matches how crypto predictions work - image as first embed, link as second
-        const embeds = ogImageUrl ? [ogImageUrl, pnlUrl] : [pnlUrl];
+        // Share to Farcaster/Base - only PNL page link as embed (like prediction links)
+        // Farcaster will automatically fetch OG image from page metadata (layout.tsx)
+        // The OG image URL from ImgBB is saved in Redis and used in layout.tsx
+        // This matches how predictions work - only link, Farcaster fetches OG image from metadata
         await composeCast({
           text: shareText,
-          embeds: embeds
+          embeds: [pnlUrl]
         });
       } else {
         // Share to Twitter/X
