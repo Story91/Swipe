@@ -4,8 +4,8 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAccount } from "wagmi";
 import { useMiniKit } from "@coinbase/onchainkit/minikit";
-import { PNLTable } from "../../components/Portfolio/WinLossPNL/PNLTable";
-import type { PredictionWithStakes } from "../../components/Portfolio/WinLossPNL/PNLTable";
+import { PNLTable } from "../components/Portfolio/WinLossPNL/PNLTable";
+import type { PredictionWithStakes } from "../components/Portfolio/WinLossPNL/PNLTable";
 
 function PNLPageContent() {
   const searchParams = useSearchParams();
