@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redis, REDIS_KEYS } from "@/lib/redis";
 
 interface Props {
   children: React.ReactNode;
@@ -7,15 +8,17 @@ interface Props {
 // Generate dynamic metadata for PNL page
 // This allows custom OG images when sharing PNL links on Farcaster/social media
 // Note: searchParams not available in layout.tsx in Next.js 15
-// The OG image endpoint will extract user param from referer and check Redis for cached ImgBB URL
+// We use dynamic endpoint with user param in URL - endpoint will check Redis and redirect to ImgBB URL if cached
 export async function generateMetadata(): Promise<Metadata> {
   const URL = process.env.NEXT_PUBLIC_URL || 'https://theswipe.app';
   
   const title = "P&L Overview | Swipe Predictions";
   const description = "Check your trading performance and profit & loss on Swipe Predictions";
   
-  // Use dynamic OG image endpoint - it will extract user from referer and check Redis for cached ImgBB URL
-  // This matches how crypto predictions work - layout.tsx uses dynamic endpoint, which checks Redis internally
+  // Use dynamic OG image endpoint - it will check Redis for cached ImgBB URL and redirect if found
+  // When Farcaster crawls the page with ?user=0x... query param, it will be in the referer
+  // The endpoint extracts user from referer and checks Redis
+  // This matches how crypto predictions work - dynamic endpoint checks Redis internally
   const ogImageUrl = `${URL}/api/og/pnl`;
   const pnlUrl = `${URL}/pnl`;
 

@@ -12,16 +12,23 @@ export async function GET(request: NextRequest) {
     let userAddress = searchParams.get('user');
     
     // If user param not in query, try to extract from referer
+    // Farcaster crawler will include the page URL with ?user=0x... in the referer header
     if (!userAddress) {
-      const referer = request.headers.get('referer');
+      const referer = request.headers.get('referer') || request.headers.get('x-forwarded-url');
       if (referer) {
         try {
           const refererUrl = new URL(referer);
           userAddress = refererUrl.searchParams.get('user');
+          console.log(`📋 Extracted user from referer: ${userAddress}`);
         } catch (e) {
+          console.error('Error parsing referer URL:', e);
           // Ignore referer parsing errors
         }
+      } else {
+        console.log('⚠️ No referer header found');
       }
+    } else {
+      console.log(`✅ User from query param: ${userAddress}`);
     }
 
     // If we have user address, check Redis for cached ImgBB URL (like crypto predictions)
@@ -29,15 +36,22 @@ export async function GET(request: NextRequest) {
       try {
         const userAddressLower = userAddress.toLowerCase();
         const cacheKey = REDIS_KEYS.USER_PNL_OG_IMAGE(userAddressLower);
+        console.log(`🔍 Checking Redis for cached OG image: ${cacheKey}`);
         const cachedUrl = await redis.get(cacheKey);
+        console.log(`📦 Cached URL from Redis: ${cachedUrl ? 'Found' : 'Not found'}`);
         if (cachedUrl && typeof cachedUrl === 'string') {
+          console.log(`✅ Redirecting to cached ImgBB URL: ${cachedUrl}`);
           // Redirect to cached ImgBB URL (like crypto predictions do)
           return NextResponse.redirect(cachedUrl, 307);
+        } else {
+          console.log(`⚠️ No cached URL found in Redis, will generate dynamic image`);
         }
       } catch (error) {
-        console.error('Error checking Redis for cached PNL OG image:', error);
+        console.error('❌ Error checking Redis for cached PNL OG image:', error);
         // Continue to generate dynamic image
       }
+    } else {
+      console.log('⚠️ No user address available, will return default image');
     }
 
     if (!userAddress) {
