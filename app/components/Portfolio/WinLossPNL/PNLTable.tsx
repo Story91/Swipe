@@ -43,7 +43,7 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const { composeCast: minikitComposeCast } = useComposeCast();
-  const { openUrl } = useOpenUrl();
+  const openUrl = useOpenUrl();
 
   const weiToEth = (wei: number): number => {
     return wei / Math.pow(10, 18);
