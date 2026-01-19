@@ -14,10 +14,13 @@ export async function generateMetadata(): Promise<Metadata> {
   const title = "P&L Overview | Swipe Predictions";
   const description = "Check your trading performance and profit & loss on Swipe Predictions";
   
-  // Dynamic OG image URL - user param will be passed via page URL query string
-  // The OG endpoint can extract it from referer or accept it as query param
+  // Dynamic OG image URL - will extract user param from referer when page is accessed
+  // When Farcaster fetches OG image, it will include the page URL as referer
   const ogImageUrl = `${URL}/api/og/pnl`;
   const pnlUrl = `${URL}/pnl`;
+  
+  // Note: OG image endpoint will extract user param from referer header
+  // when Farcaster crawls the page URL with ?user=0x... query param
 
   return {
     title,

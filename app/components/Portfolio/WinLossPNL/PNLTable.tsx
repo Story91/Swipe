@@ -6,7 +6,6 @@ import html2canvas from 'html2canvas';
 import { useComposeCast, useOpenUrl } from '@coinbase/onchainkit/minikit';
 import { useAccount } from 'wagmi';
 import sdk from '@farcaster/miniapp-sdk';
-import { uploadToImgBB } from '@/lib/imgbb';
 import './WinLossPNL.css';
 
 export interface PredictionWithStakes {
@@ -233,44 +232,20 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
   }, [minikitComposeCast]);
 
   const handleShare = async (platform: 'farcaster' | 'twitter') => {
-    if (!cardRef.current) return;
+    if (!address) {
+      alert('Please connect your wallet to share PNL');
+      return;
+    }
 
     setIsSharing(true);
     setShowShareDropdown(false);
     
     try {
-      // Export to canvas with high quality
-      const canvas = await html2canvas(cardRef.current, {
-        backgroundColor: '#0a0a0a',
-        scale: 5, // High quality for sharing
-        logging: false,
-        useCORS: true,
-        width: cardRef.current.offsetWidth,
-        height: cardRef.current.offsetHeight,
-      });
-
-      // Convert canvas to blob (Promise wrapper)
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((blob) => {
-          if (blob) {
-            resolve(blob);
-          } else {
-            reject(new Error('Failed to convert canvas to blob'));
-          }
-        }, 'image/png');
-      });
-
-      // Convert blob to File
-      const file = new File([blob], `PNL_${selectedToken}_${Date.now()}.png`, { type: 'image/png' });
-
-      // Upload to ImgBB
-      const uploadResult = await uploadToImgBB(file);
-      const imageUrl = uploadResult.data.url;
-
       // Dynamic link to dedicated PNL page (like /prediction/[id] for predictions)
-      const pnlUrl = address 
-        ? `${window.location.origin}/pnl?user=${address.toLowerCase()}`
-        : `${window.location.origin}/pnl`;
+      const pnlUrl = `${window.location.origin}/pnl?user=${address.toLowerCase()}`;
+      
+      // Dynamic OG image URL with user param - this will be the main preview image
+      const ogImageUrl = `${window.location.origin}/api/og/pnl?user=${address.toLowerCase()}`;
 
       // Build motivational share text with PNL value if positive
       const motivationalTexts = [
@@ -292,10 +267,12 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
       }
 
       if (platform === 'farcaster') {
-        // Share to Farcaster/Base - image as first embed, PNL page link as second (like prediction links)
+        // Share to Farcaster/Base - OG image URL as first embed (main preview), PNL page link as second
+        // This ensures the correct dynamic OG image is displayed (with user data)
+        // The OG image URL includes user param directly, so it shows personalized data
         await composeCast({
           text: shareText,
-          embeds: [imageUrl, pnlUrl]
+          embeds: [ogImageUrl, pnlUrl]
         });
       } else {
         // Share to Twitter/X
@@ -304,8 +281,8 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
         await openUrl(twitterUrl);
       }
     } catch (error) {
-      console.error('Failed to share image:', error);
-      alert('Failed to share image. Please try again.');
+      console.error('Failed to share:', error);
+      alert('Failed to share. Please try again.');
     } finally {
       setIsSharing(false);
     }
