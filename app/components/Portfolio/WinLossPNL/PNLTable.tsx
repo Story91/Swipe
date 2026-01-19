@@ -9,7 +9,7 @@ import sdk from '@farcaster/miniapp-sdk';
 import { uploadToImgBB } from '@/lib/imgbb';
 import './WinLossPNL.css';
 
-interface PredictionWithStakes {
+export interface PredictionWithStakes {
   id: string;
   question: string;
   resolved: boolean;

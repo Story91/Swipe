@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAccount } from "wagmi";
 import { useMiniKit } from "@coinbase/onchainkit/minikit";
-import { PNLTable } from "@/components/Portfolio/WinLossPNL/PNLTable";
-import type { PredictionWithStakes } from "@/components/Portfolio/WinLossPNL/PNLTable";
+import { PNLTable } from "../../components/Portfolio/WinLossPNL/PNLTable";
+import type { PredictionWithStakes } from "../../components/Portfolio/WinLossPNL/PNLTable";
 
-export default function PNLPage() {
+function PNLPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { address: connectedAddress } = useAccount();
@@ -194,5 +194,21 @@ export default function PNLPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function PNLPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col min-h-screen bg-gradient-to-br from-black via-zinc-900 to-black">
+        <div className="w-full max-w-[424px] mx-auto px-4 py-6">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#d4ff00] border-t-transparent"></div>
+          </div>
+        </div>
+      </div>
+    }>
+      <PNLPageContent />
+    </Suspense>
   );
 }
