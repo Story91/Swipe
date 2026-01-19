@@ -4,6 +4,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { Download, Share2 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { useComposeCast, useOpenUrl } from '@coinbase/onchainkit/minikit';
+import { useAccount } from 'wagmi';
 import sdk from '@farcaster/miniapp-sdk';
 import { uploadToImgBB } from '@/lib/imgbb';
 import './WinLossPNL.css';
@@ -45,6 +46,7 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
   const [showShareDropdown, setShowShareDropdown] = useState(false);
   const { composeCast: minikitComposeCast } = useComposeCast();
   const openUrl = useOpenUrl();
+  const { address } = useAccount();
 
   const weiToEth = (wei: number): number => {
     return wei / Math.pow(10, 18);
@@ -265,8 +267,10 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
       const uploadResult = await uploadToImgBB(file);
       const imageUrl = uploadResult.data.url;
 
-      // Dynamic link to dashboard
-      const dashboardUrl = `${window.location.origin}/?dashboard=user&pnl=true`;
+      // Dynamic link to dedicated PNL page (like /prediction/[id] for predictions)
+      const pnlUrl = address 
+        ? `${window.location.origin}/pnl?user=${address.toLowerCase()}`
+        : `${window.location.origin}/pnl`;
 
       // Build motivational share text with PNL value if positive
       const motivationalTexts = [
@@ -288,14 +292,14 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
       }
 
       if (platform === 'farcaster') {
-        // Share to Farcaster/Base - image as first embed, link as second
+        // Share to Farcaster/Base - image as first embed, PNL page link as second (like prediction links)
         await composeCast({
           text: shareText,
-          embeds: [imageUrl, dashboardUrl]
+          embeds: [imageUrl, pnlUrl]
         });
       } else {
         // Share to Twitter/X
-        shareText += `\n\n${dashboardUrl}`;
+        shareText += `\n\n${pnlUrl}`;
         const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
         await openUrl(twitterUrl);
       }
