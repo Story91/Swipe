@@ -6,6 +6,7 @@ import html2canvas from 'html2canvas';
 import { useComposeCast, useOpenUrl } from '@coinbase/onchainkit/minikit';
 import { useAccount } from 'wagmi';
 import sdk from '@farcaster/miniapp-sdk';
+import { uploadToImgBB } from '@/lib/imgbb';
 import './WinLossPNL.css';
 
 export interface PredictionWithStakes {
@@ -244,19 +245,62 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
       // Dynamic link to dedicated PNL page (like /prediction/[id] for predictions)
       const pnlUrl = `${window.location.origin}/pnl?user=${address.toLowerCase()}`;
       
-      // For Farcaster, upload OG image to ImgBB first (like crypto predictions)
-      // This saves URL to Redis so layout.tsx can use it for metadata
-      if (platform === 'farcaster') {
+      let ogImageUrl: string | null = null;
+      
+      // For Farcaster, generate screenshot of PNL card (same as export/download) and upload to ImgBB
+      // This uses the actual PNL card from dashboard, not programmatically generated image
+      if (platform === 'farcaster' && cardRef.current) {
         try {
-          console.log('📸 Generating and uploading PNL OG image to ImgBB...');
-          await fetch(
-            `/api/og/upload/pnl?user=${encodeURIComponent(address.toLowerCase())}`,
-            { method: 'POST' }
-          );
-          console.log('✅ PNL OG image uploaded to ImgBB and saved to Redis');
+          console.log('📸 Generating PNL card screenshot and uploading to ImgBB...');
+          
+          // Generate screenshot of PNL card (same as export/download)
+          const canvas = await html2canvas(cardRef.current, {
+            backgroundColor: '#0a0a0a',
+            scale: 5, // High quality for sharing
+            logging: false,
+            useCORS: true,
+            width: cardRef.current.offsetWidth,
+            height: cardRef.current.offsetHeight,
+          });
+
+          // Convert canvas to blob
+          const blob = await new Promise<Blob>((resolve, reject) => {
+            canvas.toBlob((blob) => {
+              if (blob) {
+                resolve(blob);
+              } else {
+                reject(new Error('Failed to convert canvas to blob'));
+              }
+            }, 'image/png');
+          });
+
+          // Convert blob to File
+          const file = new File([blob], `PNL_${selectedToken}_${Date.now()}.png`, { type: 'image/png' });
+
+          // Upload to ImgBB
+          const uploadResult = await uploadToImgBB(file);
+          ogImageUrl = uploadResult.data.url;
+          
+          console.log('✅ PNL card screenshot uploaded to ImgBB:', ogImageUrl);
+          
+          // Also save URL to Redis for layout.tsx metadata (like crypto predictions)
+          const userAddressLower = address.toLowerCase();
+          try {
+            await fetch('/api/pnl/save-og-url', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                user: userAddressLower,
+                ogImageUrl: ogImageUrl
+              })
+            });
+            console.log('✅ Also saved to Redis for metadata');
+          } catch (redisError) {
+            console.error('Error saving to Redis (non-critical):', redisError);
+          }
         } catch (error) {
-          console.error('Error uploading to ImgBB:', error);
-          // Continue anyway - layout.tsx will use dynamic endpoint
+          console.error('Error generating/uploading PNL card screenshot:', error);
+          // Continue anyway - will use only link
         }
       }
 
@@ -280,12 +324,12 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
       }
 
       if (platform === 'farcaster') {
-        // Share to Farcaster/Base - only PNL page link as embed (like prediction links)
-        // Farcaster will automatically fetch OG image from page metadata (layout.tsx)
-        // The OG image URL from ImgBB is saved in Redis and used in layout.tsx
+        // Share to Farcaster/Base - OG image URL as first embed, PNL page link as second (like crypto predictions)
+        // This matches how crypto predictions work - image as first embed, link as second
+        const embeds = ogImageUrl ? [ogImageUrl, pnlUrl] : [pnlUrl];
         await composeCast({
           text: shareText,
-          embeds: [pnlUrl]
+          embeds: embeds
         });
       } else {
         // Share to Twitter/X
