@@ -68,46 +68,85 @@ export async function GET(request: NextRequest) {
     for (const prediction of allPredictions) {
       try {
         const stakes = await redisHelpers.getUserStakes(prediction.id);
-        const userStake = stakes.find(
-          (s: any) => s.user.toLowerCase() === userAddress.toLowerCase()
+        const userStakes = stakes.filter(
+          (s) => s.user.toLowerCase() === userAddress.toLowerCase()
         );
 
-        if (!userStake) continue;
+        if (userStakes.length === 0) continue;
 
-        const ethStake = userStake.ethStake;
-        const swipeStake = userStake.swipeStake;
+        // Process each stake (ETH and SWIPE are separate entries)
+        for (const userStake of userStakes) {
+          const yesAmount = Number(userStake.yesAmount) || 0;
+          const noAmount = Number(userStake.noAmount) || 0;
+          const staked = yesAmount + noAmount;
 
-        if (ethStake) {
-          const staked = (ethStake.yesAmount || 0) + (ethStake.noAmount || 0);
-          const payout = ethStake.potentialPayout || 0;
-          const profit = ethStake.potentialProfit || 0;
+          if (staked === 0) continue;
 
-          totalStaked += staked;
-          totalPayout += payout;
-          totalProfit += profit;
+          const tokenType = userStake.tokenType || 'ETH';
+          const isSwipeStake = tokenType === 'SWIPE';
+          
+          // Get the correct pools based on token type
+          const yesPool = isSwipeStake 
+            ? (prediction.swipeYesTotalAmount || 0) 
+            : (prediction.yesTotalAmount || 0);
+          const noPool = isSwipeStake 
+            ? (prediction.swipeNoTotalAmount || 0) 
+            : (prediction.noTotalAmount || 0);
 
-          if (prediction.resolved) {
-            if (ethStake.isWinner) {
-              wins++;
-            } else if (profit < 0) {
-              losses++;
+          let potentialPayout = 0;
+          let potentialProfit = 0;
+          let isWinner = false;
+
+          if (prediction.resolved && !prediction.cancelled) {
+            // Prediction is resolved - calculate actual payout
+            const userChoice = yesAmount > noAmount ? 'YES' : 'NO';
+            const userWinningStake = userChoice === 'YES' ? yesAmount : noAmount;
+            
+            if (prediction.outcome === (userChoice === 'YES')) {
+              // User won
+              isWinner = true;
+              const winnersPool = prediction.outcome ? yesPool : noPool;
+              const losersPool = prediction.outcome ? noPool : yesPool;
+
+              if (winnersPool > 0) {
+                // Platform fee is 1% (100 basis points)
+                const platformFee = (losersPool * 100) / 10000;
+                const netLosersPool = losersPool - platformFee;
+                const payoutRatio = netLosersPool / winnersPool;
+                potentialPayout = userWinningStake * (1 + payoutRatio);
+                potentialProfit = potentialPayout - staked;
+              }
+            } else {
+              // User lost
+              potentialPayout = 0;
+              potentialProfit = -staked;
             }
-          }
-        }
+          } else if (!prediction.resolved && prediction.deadline && prediction.deadline > Date.now() / 1000) {
+            // Prediction is active - calculate potential payout
+            const userChoice = yesAmount > noAmount ? 'YES' : 'NO';
+            const userWinningStake = userChoice === 'YES' ? yesAmount : noAmount;
+            const winningPool = userChoice === 'YES' ? yesPool : noPool;
+            const losingPool = userChoice === 'YES' ? noPool : yesPool;
 
-        if (swipeStake) {
-          const staked = (swipeStake.yesAmount || 0) + (swipeStake.noAmount || 0);
-          const payout = swipeStake.potentialPayout || 0;
-          const profit = swipeStake.potentialProfit || 0;
+            if (winningPool > 0) {
+              const payoutRatio = losingPool / winningPool;
+              potentialPayout = userWinningStake * (1 + payoutRatio);
+              potentialProfit = potentialPayout - staked;
+            }
+          } else {
+            // Expired or cancelled - no payout
+            potentialPayout = 0;
+            potentialProfit = -staked;
+          }
 
           totalStaked += staked;
-          totalPayout += payout;
-          totalProfit += profit;
+          totalPayout += potentialPayout;
+          totalProfit += potentialProfit;
 
           if (prediction.resolved) {
-            if (swipeStake.isWinner) {
+            if (isWinner) {
               wins++;
-            } else if (profit < 0) {
+            } else if (potentialProfit < 0) {
               losses++;
             }
           }
