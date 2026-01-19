@@ -921,6 +921,139 @@
   border: 1px solid rgba(128, 128, 128, 0.3);
 }
 
+/* Share Dropdown */
+.pnl-share-wrapper {
+  position: relative;
+}
+
+.pnl-share-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9;
+  background: transparent;
+}
+
+.pnl-share-dropdown {
+  position: absolute;
+  top: 42px;
+  right: 0;
+  background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
+  border: 1px solid #00ff41;
+  border-radius: 10px;
+  padding: 6px;
+  min-width: 140px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 255, 65, 0.1);
+  z-index: 10;
+}
+
+.pnl-share-option {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.pnl-share-option:hover:not(:disabled) {
+  background: rgba(0, 255, 65, 0.15);
+  color: #00ff41;
+}
+
+.pnl-share-option:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pnl-share-divider {
+  height: 1px;
+  margin: 6px 0;
+  background: linear-gradient(90deg, transparent, rgba(0, 255, 65, 0.5), transparent);
+}
+
+/* Farcaster/Base split button */
+.pnl-share-btn-farcaster-split {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  padding: 0 !important;
+}
+
+.pnl-share-btn-farcaster-split .pnl-share-btn-split-bg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+
+.pnl-share-btn-farcaster-split .pnl-share-btn-half-purple {
+  flex: 1;
+  background-color: #8A63D2;
+}
+
+.pnl-share-btn-farcaster-split .pnl-share-btn-half-white {
+  flex: 1;
+  background-color: #ffffff;
+}
+
+.pnl-share-btn-farcaster-split .pnl-share-btn-icons {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.pnl-share-btn-farcaster-split .pnl-share-btn-icon-left,
+.pnl-share-btn-farcaster-split .pnl-share-btn-icon-right {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.pnl-share-btn-farcaster-split:hover:not(:disabled) {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(138, 99, 210, 0.3);
+  background: transparent;
+}
+
+/* Twitter/X button */
+.pnl-share-btn-twitter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  background: #000;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #fff;
+}
+
+.pnl-share-btn-twitter:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.pnl-share-btn-x-icon {
+  width: 18px;
+  height: 18px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .win-loss-tables-wrapper {

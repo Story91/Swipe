@@ -42,6 +42,7 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [showShareDropdown, setShowShareDropdown] = useState(false);
   const { composeCast: minikitComposeCast } = useComposeCast();
   const openUrl = useOpenUrl();
 
@@ -229,10 +230,12 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
     }
   }, [minikitComposeCast]);
 
-  const handleShare = async () => {
+  const handleShare = async (platform: 'farcaster' | 'twitter') => {
     if (!cardRef.current) return;
 
     setIsSharing(true);
+    setShowShareDropdown(false);
+    
     try {
       // Export to canvas with high quality
       const canvas = await html2canvas(cardRef.current, {
@@ -262,19 +265,38 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
       const uploadResult = await uploadToImgBB(file);
       const imageUrl = uploadResult.data.url;
 
-      // Share text with image embed
-      const shareText = `My ${selectedToken} P&L Overview 📊\n\nCheck out my trading performance!`;
+      // Dynamic link to dashboard
+      const dashboardUrl = `${window.location.origin}/?dashboard=user&pnl=true`;
+
+      // Build motivational share text with PNL value if positive
+      const motivationalTexts = [
+        'Check your PNL and see how you\'re performing! 📊',
+        'Want to see your trading results? Check your PNL! 📈',
+        'Curious about your performance? Check your PNL now! 🎯',
+        'See how well you\'re doing - check your PNL! 💰',
+        'Ready to see your trading stats? Check your PNL! 🚀'
+      ];
+      const randomMotivationalText = motivationalTexts[Math.floor(Math.random() * motivationalTexts.length)];
       
-      // Try Farcaster first
-      try {
+      let shareText = randomMotivationalText;
+      
+      // Add PNL value if user is in profit
+      if (isProfit && totalProfit > 0) {
+        const profitFormatted = formatAmount(totalProfit);
+        shareText += `\n\n💰 Total P&L: +${profitFormatted} ${selectedToken}`;
+        shareText += `\n📈 ROI: +${Math.round(roi)}%`;
+      }
+
+      if (platform === 'farcaster') {
+        // Share to Farcaster/Base - image as first embed, link as second
         await composeCast({
           text: shareText,
-          embeds: [imageUrl]
+          embeds: [imageUrl, dashboardUrl]
         });
-      } catch (error) {
-        console.error('Failed to share via Farcaster, trying Twitter...', error);
-        // Fallback to Twitter/X
-        const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(imageUrl)}`;
+      } else {
+        // Share to Twitter/X
+        shareText += `\n\n${dashboardUrl}`;
+        const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
         await openUrl(twitterUrl);
       }
     } catch (error) {
@@ -332,14 +354,47 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
           >
             <Download size={16} />
           </button>
-          <button
-            className="pnl-export-btn pnl-share-btn pnl-share-icon-only"
-            onClick={handleShare}
-            disabled={isSharing}
-            title="Share PNL Card"
-          >
-            <Share2 size={16} />
-          </button>
+          <div className="pnl-share-wrapper" style={{ position: 'relative' }}>
+            <button
+              className="pnl-export-btn pnl-share-btn pnl-share-icon-only"
+              onClick={() => setShowShareDropdown(!showShareDropdown)}
+              disabled={isSharing}
+              title="Share PNL Card"
+            >
+              <Share2 size={16} />
+            </button>
+            {showShareDropdown && (
+              <>
+                <div className="pnl-share-overlay" onClick={() => setShowShareDropdown(false)} />
+                <div className="pnl-share-dropdown">
+                  <button 
+                    className="pnl-share-option pnl-share-btn-farcaster-split"
+                    onClick={() => handleShare('farcaster')}
+                    disabled={isSharing}
+                  >
+                    <div className="pnl-share-btn-split-bg">
+                      <div className="pnl-share-btn-half-purple"></div>
+                      <div className="pnl-share-btn-half-white"></div>
+                    </div>
+                    <div className="pnl-share-btn-icons">
+                      <img src="/farc.png" alt="Farcaster" className="pnl-share-btn-icon-left" />
+                      <img src="/Base_square_blue.png" alt="Base" className="pnl-share-btn-icon-right" />
+                    </div>
+                  </button>
+                  <div className="pnl-share-divider"></div>
+                  <button 
+                    className="pnl-share-option pnl-share-btn-twitter"
+                    onClick={() => handleShare('twitter')}
+                    disabled={isSharing}
+                  >
+                    <svg className="pnl-share-btn-x-icon" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                    </svg>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
