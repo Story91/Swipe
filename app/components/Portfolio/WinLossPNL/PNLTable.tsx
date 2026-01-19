@@ -244,8 +244,21 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
       // Dynamic link to dedicated PNL page (like /prediction/[id] for predictions)
       const pnlUrl = `${window.location.origin}/pnl?user=${address.toLowerCase()}`;
       
-      // Dynamic OG image URL with user param - this will be the main preview image
-      const ogImageUrl = `${window.location.origin}/api/og/pnl?user=${address.toLowerCase()}`;
+      // For Farcaster, upload OG image to ImgBB first (like crypto predictions)
+      // This saves URL to Redis so layout.tsx can use it for metadata
+      if (platform === 'farcaster') {
+        try {
+          console.log('📸 Generating and uploading PNL OG image to ImgBB...');
+          await fetch(
+            `/api/og/upload/pnl?user=${encodeURIComponent(address.toLowerCase())}`,
+            { method: 'POST' }
+          );
+          console.log('✅ PNL OG image uploaded to ImgBB and saved to Redis');
+        } catch (error) {
+          console.error('Error uploading to ImgBB:', error);
+          // Continue anyway - layout.tsx will use dynamic endpoint
+        }
+      }
 
       // Build motivational share text with PNL value if positive
       const motivationalTexts = [
@@ -267,12 +280,12 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
       }
 
       if (platform === 'farcaster') {
-        // Share to Farcaster/Base - OG image URL as first embed (main preview), PNL page link as second
-        // This ensures the correct dynamic OG image is displayed (with user data)
-        // The OG image URL includes user param directly, so it shows personalized data
+        // Share to Farcaster/Base - only PNL page link as embed (like prediction links)
+        // Farcaster will automatically fetch OG image from page metadata (layout.tsx)
+        // The OG image URL from ImgBB is saved in Redis and used in layout.tsx
         await composeCast({
           text: shareText,
-          embeds: [ogImageUrl, pnlUrl]
+          embeds: [pnlUrl]
         });
       } else {
         // Share to Twitter/X

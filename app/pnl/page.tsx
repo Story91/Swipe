@@ -50,11 +50,11 @@ function PNLPageContent() {
         const response = await fetch('/api/predictions');
         const predictionsData = await response.json();
 
-        if (!predictionsData.success || !predictionsData.predictions) {
-          throw new Error('Failed to fetch predictions');
+        if (!predictionsData.success || !predictionsData.data) {
+          throw new Error(predictionsData.error || 'Failed to fetch predictions');
         }
 
-        const allPredictions = predictionsData.predictions;
+        const allPredictions = predictionsData.data;
         const userPredictionsWithStakes: PredictionWithStakes[] = [];
 
         for (const prediction of allPredictions) {

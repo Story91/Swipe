@@ -40,6 +40,8 @@ export const REDIS_KEYS = {
   SWIPE_CLAIM_HISTORY: (userId: string) => `swipe_claim_history:${userId}`,
   // Farcaster profile cache (TTL: 7 days)
   FARCASTER_PROFILE: (address: string) => `farcaster_profile:${address.toLowerCase()}`,
+  // PNL OG image URL cache
+  USER_PNL_OG_IMAGE: (address: string) => `user:pnl:ogImageUrl:${address.toLowerCase()}`,
 } as const;
 
 // Farcaster profile cache type

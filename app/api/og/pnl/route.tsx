@@ -1,6 +1,6 @@
 import { ImageResponse } from 'next/og';
-import { NextRequest } from 'next/server';
-import { redisHelpers } from '@/lib/redis';
+import { NextRequest, NextResponse } from 'next/server';
+import { redisHelpers, redis, REDIS_KEYS } from '@/lib/redis';
 
 export const runtime = 'edge';
 
@@ -21,6 +21,22 @@ export async function GET(request: NextRequest) {
         } catch (e) {
           // Ignore referer parsing errors
         }
+      }
+    }
+
+    // If we have user address, check Redis for cached ImgBB URL (like crypto predictions)
+    if (userAddress) {
+      try {
+        const userAddressLower = userAddress.toLowerCase();
+        const cacheKey = REDIS_KEYS.USER_PNL_OG_IMAGE(userAddressLower);
+        const cachedUrl = await redis.get(cacheKey);
+        if (cachedUrl && typeof cachedUrl === 'string') {
+          // Redirect to cached ImgBB URL (like crypto predictions do)
+          return NextResponse.redirect(cachedUrl, 307);
+        }
+      } catch (error) {
+        console.error('Error checking Redis for cached PNL OG image:', error);
+        // Continue to generate dynamic image
       }
     }
 
@@ -55,7 +71,69 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch all predictions and calculate PNL for user
-    const allPredictions = await redisHelpers.getAllPredictions();
+    let allPredictions;
+    try {
+      allPredictions = await redisHelpers.getAllPredictions();
+      if (!allPredictions || allPredictions.length === 0) {
+        console.warn('No predictions found in Redis');
+        // Return default image if no predictions
+        return new ImageResponse(
+          (
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '100%',
+                height: '100%',
+                backgroundColor: '#000000',
+                color: '#d4ff00',
+                fontFamily: 'sans-serif',
+              }}
+            >
+              <div style={{ display: 'flex', fontSize: 60, fontWeight: 'bold' }}>SWIPE</div>
+              <div style={{ display: 'flex', fontSize: 24, color: '#888888', marginTop: 20 }}>
+                P&L Overview
+              </div>
+            </div>
+          ),
+          {
+            width: 1200,
+            height: 628,
+          }
+        );
+      }
+    } catch (error) {
+      console.error('Error fetching predictions for OG image:', error);
+      // Return default image on error
+      return new ImageResponse(
+        (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%',
+              height: '100%',
+              backgroundColor: '#000000',
+              color: '#d4ff00',
+              fontFamily: 'sans-serif',
+            }}
+          >
+            <div style={{ display: 'flex', fontSize: 60, fontWeight: 'bold' }}>SWIPE</div>
+            <div style={{ display: 'flex', fontSize: 24, color: '#888888', marginTop: 20 }}>
+              P&L Overview
+            </div>
+          </div>
+        ),
+        {
+          width: 1200,
+          height: 628,
+        }
+      );
+    }
     
     let totalStaked = 0;
     let totalPayout = 0;
@@ -182,170 +260,137 @@ export async function GET(request: NextRequest) {
     const totalProfitFormatted = totalProfit !== 0 ? formatEth(Math.abs(totalProfit)) : '0';
     const roiFormatted = Math.round(roi);
 
+    const BASE_URL = process.env.NEXT_PUBLIC_URL || 'https://theswipe.app';
+    const swiperImageUrl = `${BASE_URL}/swiper1.png`;
+
     return new ImageResponse(
       (
         <div
           style={{
             display: 'flex',
-            flexDirection: 'column',
+            flexDirection: 'row',
             width: '100%',
             height: '100%',
             backgroundColor: '#0a0a0a',
-            padding: '40px 60px',
+            padding: '30px 40px',
             fontFamily: 'sans-serif',
-            alignItems: 'center',
-            justifyContent: 'center',
+            border: '2px solid #00ff41',
+            borderRadius: '16px',
           }}
         >
-          {/* Header */}
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              marginBottom: 30,
-              width: '100%',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                backgroundColor: '#00ff41',
-                color: '#000000',
-                padding: '12px 32px',
-                borderRadius: 20,
-                fontSize: 24,
-                fontWeight: 'bold',
-              }}
-            >
-              P&L Overview
-            </div>
-          </div>
-
-          {/* Main Content */}
+          {/* Left Side - Stats */}
           <div
             style={{
               display: 'flex',
               flexDirection: 'column',
-              gap: 24,
-              width: '100%',
-              maxWidth: 800,
+              flex: 1,
+              paddingRight: 40,
             }}
           >
-            {/* Wins/Losses Row */}
+            {/* Header - WINS/LOSSES */}
             <div
               style={{
                 display: 'flex',
-                gap: 40,
-                justifyContent: 'center',
+                gap: 30,
+                marginBottom: 30,
                 alignItems: 'center',
               }}
             >
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <div style={{ display: 'flex', fontSize: 16, color: '#888888', marginBottom: 8 }}>
-                  WINS
-                </div>
-                <div
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 18, color: '#888888' }}>WINS:</span>
+                <span
                   style={{
-                    display: 'flex',
-                    fontSize: 48,
+                    fontSize: 20,
                     fontWeight: 'bold',
                     color: '#00ff41',
-                    textShadow: '0 0 20px #00ff41',
+                    textShadow: '0 0 10px #00ff41',
                   }}
                 >
                   {wins}
-                </div>
+                </span>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <div style={{ display: 'flex', fontSize: 16, color: '#888888', marginBottom: 8 }}>
-                  LOSSES
-                </div>
-                <div
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 18, color: '#888888' }}>LOSSES:</span>
+                <span
                   style={{
-                    display: 'flex',
-                    fontSize: 48,
+                    fontSize: 20,
                     fontWeight: 'bold',
                     color: '#ff0040',
-                    textShadow: '0 0 20px #ff0040',
+                    textShadow: '0 0 10px #ff0040',
                   }}
                 >
                   {losses}
-                </div>
+                </span>
               </div>
             </div>
 
-            {/* Stats Row */}
+            {/* Metrics */}
             <div
               style={{
                 display: 'flex',
-                gap: 32,
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginTop: 20,
+                flexDirection: 'column',
+                gap: 16,
               }}
             >
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <div style={{ display: 'flex', fontSize: 14, color: '#888888', marginBottom: 8 }}>
-                  Total Staked
-                </div>
-                <div style={{ display: 'flex', fontSize: 28, fontWeight: 'bold', color: '#ffffff' }}>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: 12, color: '#888888', marginBottom: 4 }}>
+                  Total Staked:
+                </span>
+                <span style={{ fontSize: 20, fontWeight: 'bold', color: '#ffffff' }}>
                   {totalStakedFormatted} ETH
-                </div>
+                </span>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <div style={{ display: 'flex', fontSize: 14, color: '#888888', marginBottom: 8 }}>
-                  Total P&L
-                </div>
-                <div
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: 12, color: '#888888', marginBottom: 4 }}>
+                  Total P&L:
+                </span>
+                <span
                   style={{
-                    display: 'flex',
-                    fontSize: 28,
+                    fontSize: 20,
                     fontWeight: 'bold',
                     color: isProfit ? '#00ff41' : '#ff0040',
                   }}
                 >
                   {isProfit ? '+' : '-'}{totalProfitFormatted} ETH
-                </div>
-              </div>
-            </div>
-
-            {/* ROI */}
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                marginTop: 20,
-              }}
-            >
-              <div style={{ display: 'flex', fontSize: 14, color: '#888888', marginBottom: 8 }}>
-                ROI
-              </div>
-              <div
-                style={{
-                  display: 'flex',
-                  fontSize: 72,
-                  fontWeight: 'bold',
-                  color: isProfit ? '#00ff41' : '#ff0040',
-                  textShadow: `0 0 30px ${isProfit ? '#00ff41' : '#ff0040'}`,
-                }}
-              >
-                {isProfit ? '+' : ''}{roiFormatted}%
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Footer */}
+          {/* Right Side - Swiper Image and ROI */}
           <div
             style={{
               display: 'flex',
-              marginTop: 40,
-              fontSize: 14,
-              color: '#666666',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'relative',
+              width: 400,
             }}
           >
-            theswipe.app
+            {/* Swiper Image */}
+            <img
+              src={swiperImageUrl}
+              alt="Swiper"
+              style={{
+                width: 200,
+                height: 200,
+                objectFit: 'contain',
+              }}
+            />
+            {/* ROI Percentage */}
+            <div
+              style={{
+                display: 'flex',
+                fontSize: 64,
+                fontWeight: 'bold',
+                color: isProfit ? '#00ff41' : '#ff0040',
+                textShadow: `0 0 20px ${isProfit ? '#00ff41' : '#ff0040'}`,
+                marginTop: -20,
+              }}
+            >
+              {isProfit ? '+' : ''}{roiFormatted}%
+            </div>
           </div>
         </div>
       ),

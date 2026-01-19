@@ -6,21 +6,18 @@ interface Props {
 
 // Generate dynamic metadata for PNL page
 // This allows custom OG images when sharing PNL links on Farcaster/social media
-// Note: searchParams not available in layout.tsx in Next.js 15, so we use a generic URL
-// The OG image endpoint will extract user param from the referer or use default
+// Note: searchParams not available in layout.tsx in Next.js 15
+// The OG image endpoint will extract user param from referer and check Redis for cached ImgBB URL
 export async function generateMetadata(): Promise<Metadata> {
   const URL = process.env.NEXT_PUBLIC_URL || 'https://theswipe.app';
   
   const title = "P&L Overview | Swipe Predictions";
   const description = "Check your trading performance and profit & loss on Swipe Predictions";
   
-  // Dynamic OG image URL - will extract user param from referer when page is accessed
-  // When Farcaster fetches OG image, it will include the page URL as referer
+  // Use dynamic OG image endpoint - it will extract user from referer and check Redis for cached ImgBB URL
+  // This matches how crypto predictions work - layout.tsx uses dynamic endpoint, which checks Redis internally
   const ogImageUrl = `${URL}/api/og/pnl`;
   const pnlUrl = `${URL}/pnl`;
-  
-  // Note: OG image endpoint will extract user param from referer header
-  // when Farcaster crawls the page URL with ?user=0x... query param
 
   return {
     title,
