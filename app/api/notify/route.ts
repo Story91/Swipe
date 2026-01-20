@@ -1,5 +1,5 @@
 import { sendFrameNotification } from "@/lib/notification-client";
-import { getAllUsersWithNotifications } from "@/lib/notification";
+import { getAllUsersWithNotifications, getAllAppFidsForUser } from "@/lib/notification";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
@@ -47,28 +47,45 @@ export async function POST(request: Request) {
       );
     }
     
-    console.log('Sending notification via Neynar API to FIDs:', targetFids);
+    // Strategy: Send to each user individually through all their clients
+    // This ensures notifications reach users on both Base App and Warpcast
+    console.log(`Sending notifications to ${targetFids.length} users via their registered clients`);
     
-    // Neynar API supports up to 100 FIDs per request
-    // If we have more, we need to batch them
-    const batchSize = 100;
-    const batches: number[][] = [];
-    
-    for (let i = 0; i < targetFids.length; i += batchSize) {
-      batches.push(targetFids.slice(i, i + batchSize));
-    }
-    
-    console.log(`Sending ${targetFids.length} notifications in ${batches.length} batch(es)`);
-    
+    // For each FID, get all their clients (appFids) and send notifications
     const results = await Promise.allSettled(
-      batches.map((batch) =>
-        sendFrameNotification({
-          fid: batch, // Array of FIDs
-          appFid: 0, // Not used by Neynar API
-          title,
-          body,
-        })
-      )
+      targetFids.map(async (targetFid) => {
+        // Get all clients where this user has notifications enabled
+        const userClients = await getAllAppFidsForUser(targetFid);
+        
+        if (userClients.length === 0) {
+          console.warn(`No notification clients found for FID ${targetFid}`);
+          return { state: "error", error: { message: `No clients found for FID ${targetFid}` } };
+        }
+        
+        // Send notification through each client for this user
+        // First try Neynar API (if configured) for all clients at once
+        // If that fails, try Base API for each client individually
+        const clientResults = await Promise.allSettled(
+          userClients.map(({ appFid, notificationDetails }) =>
+            sendFrameNotification({
+              fid: targetFid,
+              appFid,
+              title,
+              body,
+              notificationDetails,
+            })
+          )
+        );
+        
+        // Return success if at least one client succeeded
+        const hasSuccess = clientResults.some(
+          (r) => r.status === "fulfilled" && r.value.state === "success"
+        );
+        
+        return hasSuccess 
+          ? { state: "success" as const }
+          : { state: "error" as const, error: "All clients failed for this FID" };
+      })
     );
 
     const successCount = results.filter(
@@ -97,7 +114,6 @@ export async function POST(request: Request) {
           details: errors,
           stats: {
             total: targetFids.length,
-            batches: batches.length,
             success: 0,
             failed: failedCount,
           }
@@ -108,10 +124,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: `Notifications sent to ${targetFids.length} users via ${batches.length} batch(es)`,
+      message: `Notifications sent to ${successCount} out of ${targetFids.length} users`,
       stats: {
         total: targetFids.length,
-        batches: batches.length,
         success: successCount,
         failed: failedCount,
       },
