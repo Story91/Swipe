@@ -16,6 +16,7 @@ import sdk from '@farcaster/miniapp-sdk';
 import { Share2 } from 'lucide-react';
 import { PNLTable } from './WinLossPNL/PNLTable';
 import './EnhancedUserDashboard.css';
+import { buildClaimShareText, getRandomPortfolioIntro, getRandomPortfolioOutro } from '../../../lib/constants/share-texts';
 
 interface PredictionWithStakes {
   // Core data
@@ -369,7 +370,14 @@ export function EnhancedUserDashboard() {
     const profitFormatted = formatAmount(profit);
     const payoutFormatted = formatAmount(payout);
     
-    const text = `🎉 Just claimed ${payoutFormatted} ${tokenSymbol} (+${profitFormatted} profit) from Swipe!\n\n"${claimedPrediction.question}"\n\nPrediction was ${claimedPrediction.outcome ? 'YES ✅' : 'NO ❌'}\n\nPredict, Swipe and Earn:`;
+    // Build share text with random variants from share-texts.ts
+    const text = buildClaimShareText(
+      payoutFormatted,
+      profitFormatted,
+      tokenSymbol,
+      claimedPrediction.question,
+      claimedPrediction.outcome || false
+    );
     
     // Use composeCast SDK instead of window.open
     try {
@@ -1483,24 +1491,8 @@ export function EnhancedUserDashboard() {
     const swipeIsProfit = swipeTotalPotentialProfit >= 0;
     const overallProfit = ethIsProfit && swipeIsProfit;
     
-    // Use different tag based on platform: @swipeai for Farcaster, @swipe_ai_ for Twitter
-    const tag = platform === 'twitter' ? '@swipe_ai_' : '@swipeai';
-    
-    const profitIntros = [
-      `🏆 Crushing it on ${tag} !`,
-      `💎 Diamond hands paying off ! ${tag}`,
-      `📈 To the moon with ${tag} !`
-    ];
-    
-    const lossIntros = [
-      `📉 Learning the ropes on ${tag}...`,
-      `🎰 Some you win, some you learn ! ${tag}`,
-      `💪 NGMI? More like WAGMI soon ! ${tag}`
-    ];
-    
-    const intro = overallProfit 
-      ? profitIntros[Math.floor(Math.random() * profitIntros.length)]
-      : lossIntros[Math.floor(Math.random() * lossIntros.length)];
+    // Get random intro from share-texts.ts
+    const intro = getRandomPortfolioIntro(overallProfit, platform);
     
     let shareText = `${intro}\n\n📊 My SWIPE Stats:\n`;
     
@@ -1545,7 +1537,9 @@ export function EnhancedUserDashboard() {
     }
     
     const shareUrl = 'https://theswipe.app';
-    shareText += `\n\nSwipe to predict! 🎯`;
+    // Get random outro from share-texts.ts with platform tag
+    const outro = getRandomPortfolioOutro(platform);
+    shareText += `\n\n${outro}`;
     
     if (platform === 'farcaster') {
       // Use native composeCast for Farcaster - opens in-app compose dialog

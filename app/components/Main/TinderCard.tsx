@@ -24,6 +24,7 @@ import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
 import { useFarcasterProfiles } from '../../../lib/hooks/useFarcasterProfiles';
 import SharePredictionButton from '../Actions/SharePredictionButton';
+import { buildStakeShareText, buildCurrentPredictionShareText } from '../../../lib/constants/share-texts';
 import { notifyPredictionShared, notifyStakeSuccess } from '../../../lib/notification-helpers';
 import { generateTransactionId, generateBasescanUrl } from '../../../lib/utils/redis-utils';
 import { useTokenPrices } from '../../../lib/hooks/useTokenPrices';
@@ -1375,8 +1376,13 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       
     const formattedAmount = formatStakeAmountLocal(shareStakeData.amount, shareStakeData.token);
       
-    // Single unified share text with unique prediction link
-    const shareText = `🎯 I just bet on SWIPE!\n\n"${fullPredictionText}"\n\n💰 My bet: ${formattedAmount} ${shareStakeData.token}\n\nWDYT? 👀\n\nCheck it out:`;
+    // Build share text with random variants from share-texts.ts
+    const { text: shareText } = buildStakeShareText(
+      fullPredictionText,
+      formattedAmount,
+      shareStakeData.token,
+      predictionUrl
+    );
     
     // Close the share prompt and open preview modal
     setShowSharePrompt(false);
@@ -2029,36 +2035,13 @@ KEY USER-FACING CHANGES: V1 → V2
     const totalPoolETH = currentPred ? ((currentPred.yesTotalAmount || 0) + (currentPred.noTotalAmount || 0)) / 1e18 : 0;
     const totalSwipe = currentPred ? ((currentPred.swipeYesTotalAmount || 0) + (currentPred.swipeNoTotalAmount || 0)) / 1e18 : 0;
     
-    // Format SWIPE amount
-    const formatSwipe = (amount: number): string => {
-      if (amount >= 1000000) return (amount / 1000000).toFixed(1) + 'M';
-      if (amount >= 1000) return (amount / 1000).toFixed(0) + 'K';
-      return amount.toFixed(0);
-    };
-    
-    // Random crypto/prediction slang intros
-    const intros = [
-      `🔮 Ape in or fade? Here's my alpha:\n\n"${currentCard.prediction}"`,
-      `📈 NFA but this looks spicy:\n\n"${currentCard.prediction}"`,
-      `🎯 WAGMI or NGMI? You decide:\n\n"${currentCard.prediction}"`,
-    ];
-    let shareText = intros[Math.floor(Math.random() * intros.length)];
-    
-    if (totalPoolETH > 0 || totalSwipe > 0) {
-      shareText += '\n';
-      if (totalPoolETH > 0) {
-        shareText += `\n💰 ETH Pool: ${totalPoolETH.toFixed(4)} ETH`;
-      }
-      if (totalSwipe > 0) {
-        shareText += `\n🎯 SWIPE Pool: ${formatSwipe(totalSwipe)}`;
-      }
-    }
-    
-    if (currentCardParticipants.length > 0) {
-      shareText += `\n👥 ${currentCardParticipants.length} swipers`;
-    }
-    
-    shareText += `\n\nSwipe to predict! 🎯`;
+    // Build share text with random variants from share-texts.ts
+    const { text: shareText } = buildCurrentPredictionShareText(
+      currentCard.prediction,
+      totalPoolETH,
+      totalSwipe,
+      currentCardParticipants.length
+    );
     
     // Open preview modal instead of sharing directly
     setSharePreviewModal({
