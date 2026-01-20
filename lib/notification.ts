@@ -172,3 +172,109 @@ export async function getAllUsersWithNotifications(): Promise<number[]> {
     return [];
   }
 }
+
+/**
+ * Get Farcaster FID from Ethereum address using Neynar API
+ * @param address - Ethereum address to lookup
+ * @returns FID if found, null otherwise
+ */
+export async function getFidFromAddress(address: string): Promise<number | null> {
+  const neynarApiKey = process.env.NEYNAR_API_KEY;
+  
+  if (!neynarApiKey) {
+    console.log('⚠️ NEYNAR_API_KEY not set, cannot lookup FID');
+    return null;
+  }
+
+  try {
+    const response = await fetch(
+      `https://api.neynar.com/v2/farcaster/user/bulk-by-address?addresses=${address}`,
+      {
+        headers: {
+          'accept': 'application/json',
+          'x-api-key': neynarApiKey,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      console.log(`❌ Neynar API error for address ${address}: ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json();
+    
+    // Response format: { [address]: [users] }
+    const users = data[address.toLowerCase()] || data[address];
+    if (users && users.length > 0) {
+      const fid = users[0].fid;
+      console.log(`✅ Found FID ${fid} for address ${address}`);
+      return fid;
+    }
+    
+    console.log(`❌ No FID found for address ${address}`);
+    return null;
+
+  } catch (error) {
+    console.error(`Error getting FID from address ${address}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Get FIDs for multiple addresses (batched for efficiency)
+ * @param addresses - Array of Ethereum addresses
+ * @returns Map of address -> FID (only includes addresses with valid FIDs)
+ */
+export async function getFidsFromAddresses(addresses: string[]): Promise<Map<string, number>> {
+  const neynarApiKey = process.env.NEYNAR_API_KEY;
+  const result = new Map<string, number>();
+  
+  if (!neynarApiKey) {
+    console.log('⚠️ NEYNAR_API_KEY not set, cannot lookup FIDs');
+    return result;
+  }
+
+  if (addresses.length === 0) {
+    return result;
+  }
+
+  try {
+    // Neynar API supports bulk lookup
+    const uniqueAddresses = [...new Set(addresses.map(addr => addr.toLowerCase()))];
+    const addressesParam = uniqueAddresses.join(',');
+    
+    const response = await fetch(
+      `https://api.neynar.com/v2/farcaster/user/bulk-by-address?addresses=${addressesParam}`,
+      {
+        headers: {
+          'accept': 'application/json',
+          'x-api-key': neynarApiKey,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      console.log(`❌ Neynar API bulk lookup error: ${response.status}`);
+      return result;
+    }
+
+    const data = await response.json();
+    
+    // Response format: { [address]: [users] }
+    for (const address of uniqueAddresses) {
+      const users = data[address] || data[address.toLowerCase()];
+      if (users && users.length > 0) {
+        const fid = users[0].fid;
+        result.set(address, fid);
+      }
+    }
+    
+    console.log(`✅ Found ${result.size} FIDs from ${uniqueAddresses.length} addresses`);
+    return result;
+
+  } catch (error) {
+    console.error('Error getting FIDs from addresses:', error);
+    return result;
+  }
+}

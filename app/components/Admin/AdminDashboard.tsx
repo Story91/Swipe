@@ -467,6 +467,40 @@ export function AdminDashboard({
                 console.warn('⚠️ Claims sync failed after resolve');
               }
               
+              // Send broadcast notification to all users about resolved prediction
+              try {
+                console.log('📢 Sending broadcast notification about resolved prediction...');
+                // Get prediction title for notification
+                const currentPrediction = filteredPredictions.find(p => 
+                  (typeof predictionId === 'string' && p.id === predictionId) ||
+                  (typeof predictionId === 'number' && p.id === `pred_v${contractVersion === 'V1' ? '1' : '2'}_${predictionId}`)
+                );
+                
+                const predictionTitle = currentPrediction?.question || `Prediction #${numericId}`;
+                const outcomeText = outcome ? 'YES' : 'NO';
+                
+                const notifyResponse = await fetch('/api/notify', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    broadcast: true,
+                    title: "🎉 Prediction Resolved!",
+                    body: `"${predictionTitle}" resolved as ${outcomeText}! Check if you won and claim your winnings! Complete daily tasks for more free $SWIPE! 💰`,
+                    type: 'prediction_resolved'
+                  }),
+                });
+                
+                if (notifyResponse.ok) {
+                  const notifyResult = await notifyResponse.json();
+                  console.log('✅ Broadcast notification sent:', notifyResult);
+                } else {
+                  console.warn('⚠️ Broadcast notification failed:', await notifyResponse.text());
+                }
+              } catch (notifyError) {
+                console.error('❌ Failed to send broadcast notification:', notifyError);
+                // Don't fail the whole operation if notification fails
+              }
+              
               alert(`✅ Auto-sync complete!\nPrediction ${numericId} resolved as ${side}\nRedis and claims updated. Refreshing data...`);
               // Refresh data after successful sync
               setTimeout(() => {

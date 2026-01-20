@@ -3,8 +3,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useWalletClient } from "wagmi";
 import { formatEther, parseEther } from "viem";
-import { useNotification, useComposeCast, useOpenUrl } from "@coinbase/onchainkit/minikit";
+import { useNotification, useComposeCast, useOpenUrl, useMiniKit } from "@coinbase/onchainkit/minikit";
 import sdk from "@farcaster/miniapp-sdk";
+import { notifyDailyTaskCompleted } from "@/lib/notification-helpers";
 import Image from "next/image";
 import { Share2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
@@ -207,7 +208,27 @@ export function DailyTasks() {
   const publicClient = usePublicClient();
   const { composeCast: minikitComposeCast } = useComposeCast();
   const minikitOpenUrl = useOpenUrl();
+  const { context } = useMiniKit();
   const searchParams = useSearchParams();
+  
+  // Helper function to get user's FID
+  const getUserFid = async (): Promise<number | null> => {
+    try {
+      // Try user.fid first (newer MiniKit versions)
+      if (context?.user?.fid) {
+        return context.user.fid;
+      }
+      // Fallback to client.fid (older versions)
+      else if (context?.client && 'fid' in context.client) {
+        return (context.client as any).fid;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error getting user FID:', error);
+      return null;
+    }
+  };
   
   // Universal openUrl function - works on both MiniKit (Base app) and Farcaster SDK (Warpcast)
   const openUrl = useCallback(async (url: string) => {
@@ -572,6 +593,23 @@ export function DailyTasks() {
             });
             console.log(`✅ Task ${pendingConfirmTask} confirmed in Redis with tx ${hash}`);
             
+            // Send Farcaster notification about completed daily task (async, don't block)
+            getUserFid().then(async (userFid) => {
+              if (userFid && pendingConfirmTask !== 'REFERRAL') {
+                try {
+                  // Get reward amount from userStats (approximate)
+                  const rewardAmount = "10k"; // Default, you can make this dynamic based on task type
+                  await notifyDailyTaskCompleted(userFid, rewardAmount);
+                  console.log('✅ Farcaster notification sent for daily task completion');
+                } catch (notifyError) {
+                  console.error('Failed to send Farcaster notification for daily task:', notifyError);
+                  // Don't fail the whole operation if notification fails
+                }
+              }
+            }).catch((error) => {
+              console.error('Failed to get user FID for daily task notification:', error);
+            });
+            
             // Only refetch data AFTER confirmation in Redis is successful
             // This ensures achievement is marked as completed only after full confirmation
             refetchStats();
@@ -610,6 +648,23 @@ export function DailyTasks() {
         sendNotification({
           title: "🎉 Claim Successful!",
           body: `You received your SWIPE rewards!`,
+        });
+        
+        // Send Farcaster notification about daily claim (async, don't block UI)
+        getUserFid().then(async (userFid) => {
+          if (userFid) {
+            try {
+              // Get reward amount from userStats (approximate based on streak)
+              const rewardAmount = "50k+"; // Default, can be dynamic based on actual reward
+              await notifyDailyTaskCompleted(userFid, rewardAmount);
+              console.log('✅ Farcaster notification sent for daily claim');
+            } catch (notifyError) {
+              console.error('Failed to send Farcaster notification for daily claim:', notifyError);
+              // Don't fail the whole operation if notification fails
+            }
+          }
+        }).catch((error) => {
+          console.error('Failed to get user FID for daily claim notification:', error);
         });
         
         // Refetch data immediately for daily claim
