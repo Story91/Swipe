@@ -1,0 +1,38 @@
+const ROOT_URL = process.env.NEXT_PUBLIC_URL || "https://theswipe.app";
+const NEYNAR_WEBHOOK_URL = process.env.NEYNAR_WEBHOOK_URL;
+
+// Parse screenshot URLs from env (comma-separated)
+const screenshotUrls = process.env.NEXT_PUBLIC_APP_SCREENSHOT_URLS
+  ? process.env.NEXT_PUBLIC_APP_SCREENSHOT_URLS.split(',').map(url => url.trim())
+  : [];
+
+export const minikitConfig = {
+  accountAssociation: {
+    header: process.env.FARCASTER_HEADER,
+    payload: process.env.FARCASTER_PAYLOAD,
+    signature: process.env.FARCASTER_SIGNATURE,
+  },
+  miniapp: {
+    version: "1",
+    name: process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME,
+    subtitle: process.env.NEXT_PUBLIC_APP_SUBTITLE,
+    description: process.env.NEXT_PUBLIC_APP_DESCRIPTION,
+    screenshotUrls,
+    iconUrl: process.env.NEXT_PUBLIC_APP_ICON,
+    splashImageUrl: process.env.NEXT_PUBLIC_APP_SPLASH_IMAGE,
+    splashBackgroundColor: process.env.NEXT_PUBLIC_SPLASH_BACKGROUND_COLOR,
+    homeUrl: ROOT_URL,
+    webhookUrl: NEYNAR_WEBHOOK_URL || `${ROOT_URL}/api/webhook`,
+    primaryCategory: process.env.NEXT_PUBLIC_APP_PRIMARY_CATEGORY,
+    tags: ["prediction", "ai", "games", "finance"],
+    heroImageUrl: process.env.NEXT_PUBLIC_APP_HERO_IMAGE,
+    tagline: process.env.NEXT_PUBLIC_APP_TAGLINE,
+    ogTitle: process.env.NEXT_PUBLIC_APP_OG_TITLE,
+    ogDescription: process.env.NEXT_PUBLIC_APP_OG_DESCRIPTION,
+    ogImageUrl: process.env.NEXT_PUBLIC_APP_OG_IMAGE,
+  },
+  baseBuilder: {
+    allowedAddresses: ["0x5B9Db509BdA743DE9FF52C8049EFa92FEdD29126"]
+  },
+} as const;
+
