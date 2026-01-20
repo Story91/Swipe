@@ -52,6 +52,7 @@ import { SwipeTokenCard } from "./components/Market/SwipeTokenCard";
 import { SwipeClaim } from "./components/Portfolio/SwipeClaim";
 import { DailyTasks } from "./components/Tasks/DailyTasks";
 import { SidePanels } from "./components/SidePanels/SidePanels";
+import { useIsDesktop } from "@/lib/hooks/useMediaQuery";
 
 type DashboardType = 'tinder' | 'user' | 'admin' | 'approver' | 'market-stats' | 'analytics' | 'settings' | 'audit-logs' | 'my-portfolio' | 'active-bets' | 'bet-history' | 'help-faq' | 'leaderboard' | 'recent-activity' | 'swipe-token' | 'claim' | 'daily-tasks';
 
@@ -103,6 +104,7 @@ export default function App() {
   const [badgePosition, setBadgePosition] = useState({ top: 0, right: 0 });
   const [initialPredictionId, setInitialPredictionId] = useState<string | null>(null);
   const viewProfile = useViewProfile();
+  const isDesktop = useIsDesktop();
 
   useEffect(() => {
     if (!isFrameReady) {
@@ -358,8 +360,8 @@ export default function App() {
         <SearchParamsHandler onPredictionId={handlePredictionId} />
       </Suspense>
       
-      {/* Side Panels - Desktop Only */}
-      <SidePanels />
+      {/* Side Panels - Desktop Only (conditionally rendered) */}
+      {isDesktop && <SidePanels />}
       
       <div className="w-full max-w-[424px] mx-auto px-2 sm:px-4 py-3 overflow-x-hidden main-content-wrapper">
         {/* Wallet Connection and Admin/Help - Top */}
