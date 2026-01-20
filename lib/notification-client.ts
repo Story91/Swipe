@@ -212,17 +212,41 @@ export async function sendFrameNotification({
   }
 
   // Strategy selection:
+  // IMPORTANT: Base App (appFid: 309857) REQUIRES Base API, Neynar API doesn't send to Base App
+  // - For Base App (appFid: 309857): ALWAYS use Base API with tokens from Redis
+  // - For other clients (Warpcast, etc.): Use Neynar API if configured, otherwise Base API
   // If using Neynar webhook (isNeynarWebhookConfigured):
   //   - Neynar manages tokens automatically
-  //   - ALWAYS use Neynar API for all notifications (single or multiple FIDs)
+  //   - Use Neynar API for non-Base clients (Warpcast, etc.)
+  //   - Use Base API for Base App (appFid: 309857) with tokens from Redis
   // If using own webhook:
   //   - You manage tokens in Redis
-  //   - Use Base API with tokens from Redis
-  //   - For multiple FIDs, can try Neynar API if available (but tokens still in Redis)
+  //   - Use Base API with tokens from Redis for all clients
   
-  // IMPORTANT: If webhook is set to Neynar URL, Neynar manages tokens
-  // and we MUST use Neynar API. Base API won't work because we don't have tokens.
+  // Base App FID constant
+  const BASE_APP_FID = 309857;
   
+  // If this is Base App, always use Base API (Neynar API doesn't support Base App)
+  if (appFid === BASE_APP_FID) {
+    console.log('📱 Base App detected (appFid: 309857), using Base API (Neynar API doesn\'t support Base App)');
+    const tokenData = notificationDetails || await getUserNotificationDetails(targetFids[0], BASE_APP_FID);
+    if (tokenData) {
+      return await sendViaBaseAPI({
+        fid: targetFids[0],
+        appFid: BASE_APP_FID,
+        title,
+        body,
+        notificationDetails: tokenData,
+      });
+    } else {
+      console.warn('No notification token found for Base App. User needs to enable notifications in Base App.');
+      return { 
+        state: "no_token"
+      };
+    }
+  }
+  
+  // For other clients, try Neynar API if configured
   const shouldUseNeynar = USE_NEYNAR_API && neynarApiKey && isNeynarWebhookConfigured;
   
   if (isNeynarWebhookConfigured && (!neynarApiKey || !USE_NEYNAR_API)) {
@@ -234,7 +258,7 @@ export async function sendFrameNotification({
   }
 
   if (shouldUseNeynar) {
-    console.log('Using Neynar API for notification (webhook configured for Neynar)');
+    console.log('Using Neynar API for notification (for non-Base clients)');
     try {
       const result = await sendViaNeynarAPI({ fid, title, body });
       
@@ -249,7 +273,7 @@ export async function sendFrameNotification({
       
       // For single FID, try Base API if we have token in Redis
       if (!isMultipleFids && appFid) {
-        const tokenData = await getUserNotificationDetails(targetFids[0], appFid);
+        const tokenData = notificationDetails || await getUserNotificationDetails(targetFids[0], appFid);
         if (tokenData) {
           console.log('✅ Found token in Redis, using Base API as fallback');
           return await sendViaBaseAPI({
@@ -269,7 +293,7 @@ export async function sendFrameNotification({
       
       // Try Base API as fallback if we have tokens in Redis
       if (!isMultipleFids && appFid) {
-        const tokenData = await getUserNotificationDetails(targetFids[0], appFid);
+        const tokenData = notificationDetails || await getUserNotificationDetails(targetFids[0], appFid);
         if (tokenData) {
           console.log('✅ Found token in Redis, using Base API as fallback after Neynar exception');
           try {
