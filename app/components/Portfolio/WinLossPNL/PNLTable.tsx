@@ -295,24 +295,71 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
       // Following Base Mini Apps documentation for dynamic embed images
       const pnlPageUrl = `${window.location.origin}/pnl/${userAddressLower}`;
 
-      // Build motivational share text with PNL value if positive
-      const motivationalTexts = [
-        'Check your PNL and see how you\'re performing! 📊',
-        'Want to see your trading results? Check your PNL! 📈',
-        'Curious about your performance? Check your PNL now! 🎯',
-        'See how well you\'re doing - check your PNL! 💰',
-        'Ready to see your trading stats? Check your PNL! 🚀'
+      // Build share text with platform-specific tag
+      // @swipeai for Farcaster/Base, @swipe_ai_ for Twitter/X
+      const tag = platform === 'farcaster' ? '@swipeai' : '@swipe_ai_';
+      
+      // Motivational call-to-action texts in various styles
+      // Includes Base references, crypto slang (mfer, gm, wagmi, etc.)
+      const ctaTexts = [
+        // Casual/Fun style
+        'gm mfers! Check your PNL and see if you can beat mine 🎯',
+        'Built different on Base. Show me your stats anon 👀',
+        'wagmi but first - share your predictions! LFG 🚀',
+        'ngmi if you\'re not tracking your PNL tbh 📊',
+        'ser, are you even predicting on Base? 🤔',
+        
+        // Competitive style
+        'Think you can outpredict me? Prove it mfer 💪',
+        'My PNL speaks for itself. What about yours? 👀',
+        'Stacking wins on Base. Your move anon 🎰',
+        'Less talking, more predicting. Show your stats! 📈',
+        'I\'m cooking on Base rn. Wbu? 🔥',
+        
+        // Motivational style
+        'Every prediction is a chance to win. Start earning on Base! 💰',
+        'The best time to start predicting was yesterday. The second best time is now 🚀',
+        'Fortune favors the bold. Make your predictions count! ⚡',
+        'Don\'t just watch the market - predict it and earn! 🎯',
+        'Your portfolio, your predictions, your profits. Let\'s go! 💎',
+        
+        // Community style
+        'Based predictions only. Join the movement on Base! 🔵',
+        'The Base prediction community is thriving. Are you in? 🤝',
+        'Onchain predictions, real profits. This is the way 🛡️',
+        'Predict with the best on Base. lfg frens! 💙',
+        'Base is home. Predictions are life. wagmi together! 🏠',
+        
+        // Challenge style
+        'I bet you can\'t beat my ROI. Prove me wrong mfer 😤',
+        'My predictions are printing. What\'s your excuse? 💸',
+        'Less scrolling, more predicting. Get in here anon! 📲',
+        'Touch grass? Nah, touch predictions on Base 🌱',
+        'Imagine not tracking your PNL in 2026. couldn\'t be me 😂'
       ];
-      const randomMotivationalText = motivationalTexts[Math.floor(Math.random() * motivationalTexts.length)];
+      const randomCta = ctaTexts[Math.floor(Math.random() * ctaTexts.length)];
       
-      let shareText = randomMotivationalText;
+      // Build share text
+      let shareText = '';
       
-      // Add PNL value if user is in profit
+      // Add PNL stats with intro
       if (isProfit && totalProfit > 0) {
         const profitFormatted = formatAmount(totalProfit);
-        shareText += `\n\n💰 Total P&L: +${profitFormatted} ${selectedToken}`;
-        shareText += `\n📈 ROI: +${Math.round(roi)}%`;
+        shareText = `📊 My ${selectedToken} P&L on ${tag}:\n\n`;
+        shareText += `💰 Total P&L: +${profitFormatted} ${selectedToken}\n`;
+        shareText += `📈 ROI: +${Math.round(roi)}%\n`;
+      } else {
+        const pnlFormatted = formatAmount(totalProfit);
+        shareText = `📊 My ${selectedToken} P&L on ${tag}:\n\n`;
+        shareText += `📉 Total P&L: ${pnlFormatted} ${selectedToken}\n`;
+        shareText += `📊 ROI: ${Math.round(roi)}%\n`;
       }
+      
+      // Add wins/losses count
+      shareText += `🏆 Wins: ${wins} | Losses: ${losses}\n\n`;
+      
+      // Add motivational CTA
+      shareText += randomCta;
 
       if (platform === 'farcaster') {
         // Share to Farcaster/Base - use PNL page URL as embed
