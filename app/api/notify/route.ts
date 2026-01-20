@@ -49,16 +49,20 @@ export async function POST(request: Request) {
     
     // Strategy: Send to each user individually through all their clients
     // This ensures notifications reach users on both Base App and Warpcast
-    console.log(`Sending notifications to ${targetFids.length} users via their registered clients`);
+    console.log(`📤 Sending notifications to ${targetFids.length} users via their registered clients`);
+    console.log(`📤 Title: "${title}", Body: "${body}", Type: ${type || 'none'}`);
     
     // For each FID, get all their clients (appFids) and send notifications
     const results = await Promise.allSettled(
       targetFids.map(async (targetFid) => {
+        console.log(`🔍 Processing FID ${targetFid}...`);
+        
         // Get all clients where this user has notifications enabled
         const userClients = await getAllAppFidsForUser(targetFid);
+        console.log(`🔍 Found ${userClients.length} clients for FID ${targetFid}:`, userClients.map(c => `appFid=${c.appFid}`));
         
         if (userClients.length === 0) {
-          console.warn(`No notification clients found for FID ${targetFid}`);
+          console.warn(`⚠️ No notification clients found for FID ${targetFid}`);
           return { state: "error", error: { message: `No clients found for FID ${targetFid}` } };
         }
         
@@ -81,6 +85,19 @@ export async function POST(request: Request) {
         const hasSuccess = clientResults.some(
           (r) => r.status === "fulfilled" && r.value.state === "success"
         );
+        
+        if (hasSuccess) {
+          console.log(`✅ Successfully sent notification to FID ${targetFid} via at least one client`);
+        } else {
+          console.error(`❌ Failed to send notification to FID ${targetFid} - all clients failed`);
+          clientResults.forEach((result, index) => {
+            if (result.status === "rejected") {
+              console.error(`  Client ${userClients[index].appFid} rejected:`, result.reason);
+            } else if (result.status === "fulfilled" && result.value.state !== "success") {
+              console.error(`  Client ${userClients[index].appFid} error:`, result.value);
+            }
+          });
+        }
         
         return hasSuccess 
           ? { state: "success" as const }

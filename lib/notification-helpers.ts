@@ -10,7 +10,7 @@ export interface NotificationData {
 // Helper function to send notification via API
 export async function sendNotificationToUser(data: NotificationData): Promise<boolean> {
   try {
-    console.log('Sending notification to user:', data);
+    console.log('📨 Sending notification to user:', data);
     
     const response = await fetch('/api/notify', {
       method: 'POST',
@@ -21,11 +21,30 @@ export async function sendNotificationToUser(data: NotificationData): Promise<bo
     });
 
     const responseData = await response.json();
-    console.log('Notification API response:', response.status, responseData);
+    console.log('📨 Notification API response:', response.status, responseData);
 
+    // Check if response is OK AND actually succeeded
+    if (!response.ok) {
+      console.error('❌ Notification API returned error:', responseData);
+      return false;
+    }
+
+    // Check if notifications were actually sent successfully
+    if (responseData.success !== false && responseData.stats) {
+      const { success, total, failed } = responseData.stats;
+      if (success > 0) {
+        console.log(`✅ Notification sent successfully: ${success}/${total} succeeded`);
+        return true;
+      } else {
+        console.error(`❌ Notification failed: ${failed}/${total} failed`, responseData.errors || responseData.details);
+        return false;
+      }
+    }
+
+    // Fallback: if response is OK, assume success
     return response.ok;
   } catch (error) {
-    console.error('Failed to send notification:', error);
+    console.error('❌ Failed to send notification:', error);
     return false;
   }
 }
