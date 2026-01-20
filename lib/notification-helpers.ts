@@ -7,6 +7,39 @@ export interface NotificationData {
   type?: 'bet_success' | 'bet_failed' | 'winnings_claimed' | 'prediction_shared' | 'prediction_resolved' | 'new_prediction' | 'achievement' | 'daily_task';
 }
 
+/**
+ * Format large numbers to K/M format for better readability
+ * Examples: 1000 -> "1K", 1500000 -> "1.5M", 500 -> "500"
+ */
+function formatNumberCompact(amount: number | string): string {
+  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+  
+  if (!Number.isFinite(num)) {
+    return String(amount);
+  }
+  
+  if (num >= 1000000) {
+    const millions = num / 1000000;
+    return millions.toFixed(1).replace(/\.0$/, '') + 'M';
+  }
+  if (num >= 1000) {
+    const thousands = num / 1000;
+    return thousands.toFixed(0) + 'K';
+  }
+  return num.toLocaleString();
+}
+
+/**
+ * Format token amount for notifications - use compact format for SWIPE, normal for ETH
+ */
+function formatTokenAmountForNotification(amount: string | number, token: string): string {
+  if (token === 'SWIPE' || token.toUpperCase() === 'SWIPE') {
+    return formatNumberCompact(amount);
+  }
+  // For ETH, return as is (already formatted)
+  return String(amount);
+}
+
 // Helper function to send notification via API
 export async function sendNotificationToUser(data: NotificationData): Promise<boolean> {
   try {
@@ -51,12 +84,15 @@ export async function sendNotificationToUser(data: NotificationData): Promise<bo
 
 // Predefined notification templates
 export const notificationTemplates = {
-  betSuccess: (fid: number, predictionTitle: string, betAmount: string, outcome: string, token: string = 'ETH') => ({
-    fid,
-    title: "✅ Bet Placed!",
-    body: `Your ${betAmount} ${token} bet on "${predictionTitle}" is live! Prediction: ${outcome}. Complete daily tasks to earn free $SWIPE! 🎁`,
-    type: 'bet_success' as const
-  }),
+  betSuccess: (fid: number, predictionTitle: string, betAmount: string, outcome: string, token: string = 'ETH') => {
+    const formattedAmount = formatTokenAmountForNotification(betAmount, token);
+    return {
+      fid,
+      title: "✅ Bet Placed!",
+      body: `Your ${formattedAmount} ${token} bet on "${predictionTitle}" is live! Prediction: ${outcome}. Complete daily tasks to earn free $SWIPE! 🎁`,
+      type: 'bet_success' as const
+    };
+  },
 
   betFailed: (fid: number, predictionTitle: string, reason: string) => ({
     fid,
@@ -65,12 +101,15 @@ export const notificationTemplates = {
     type: 'bet_failed' as const
   }),
 
-  winningsClaimed: (fid: number, predictionTitle: string, amount: string, token: string = 'ETH') => ({
-    fid,
-    title: "💰 Winnings Claimed!",
-    body: `You claimed ${amount} ${token} from "${predictionTitle}"! Keep betting and complete daily tasks for more $SWIPE rewards! 🎁`,
-    type: 'winnings_claimed' as const
-  }),
+  winningsClaimed: (fid: number, predictionTitle: string, amount: string, token: string = 'ETH') => {
+    const formattedAmount = formatTokenAmountForNotification(amount, token);
+    return {
+      fid,
+      title: "💰 Winnings Claimed!",
+      body: `You claimed ${formattedAmount} ${token} from "${predictionTitle}"! Keep betting and complete daily tasks for more $SWIPE rewards! 🎁`,
+      type: 'winnings_claimed' as const
+    };
+  },
 
   predictionShared: (fid: number, predictionTitle: string, shareType: string) => ({
     fid,
