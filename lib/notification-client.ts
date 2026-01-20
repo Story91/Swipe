@@ -78,16 +78,15 @@ async function sendViaBaseAPI({
 
       // Check for invalid tokens (expired or revoked)
       if (responseBody.data.result.invalidTokens.length > 0) {
-        console.warn(`⚠️ Invalid token detected for FID ${fid}, appFid ${appFid}. Token was expired or revoked.`);
+        console.warn(`⚠️ Invalid token detected for FID ${fid}, appFid ${appFid}. Token was expired or revoked. User needs to re-enable notifications.`);
         // Delete invalid token from Redis
         const { deleteUserNotificationDetails } = await import("@/lib/notification");
         await deleteUserNotificationDetails(fid, appFid).catch(() => {});
         
         // If all tokens are invalid, notification was NOT sent
-        // Return error state so caller knows notification failed
+        // Return no_token state so caller knows notification failed
         return { 
-          state: "no_token", 
-          error: { message: "Token expired or revoked. User needs to re-enable notifications." }
+          state: "no_token"
         };
       }
 
