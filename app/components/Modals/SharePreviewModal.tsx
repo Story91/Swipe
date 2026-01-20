@@ -123,7 +123,10 @@ export function SharePreviewModal({
       }
     }
     
-    const encodedText = encodeURIComponent(`${shareText}`);
+    // Replace Farcaster tag with Twitter tag
+    const twitterShareText = shareText.replace(/@swipeai/g, '@swipe_ai_');
+    
+    const encodedText = encodeURIComponent(`${twitterShareText}`);
     const encodedUrl = encodeURIComponent(shareUrl);
     const twitterUrl = `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`;
     
