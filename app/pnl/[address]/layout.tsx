@@ -35,6 +35,9 @@ export async function generateMetadata({ params }: { params: Promise<{ address: 
   }
   
   const pnlUrl = `${URL}/pnl/${address}`;
+  
+  // After clicking the button, user is redirected to dashboard with PNL tab open
+  const dashboardPnlUrl = `${URL}/?dashboard=user&pnl=true`;
 
   return {
     title,
@@ -71,7 +74,7 @@ export async function generateMetadata({ params }: { params: Promise<{ address: 
           action: {
             type: "launch_frame",
             name: "Swipe Predictions",
-            url: URL,
+            url: dashboardPnlUrl,
             splashImageUrl: process.env.NEXT_PUBLIC_APP_SPLASH_IMAGE,
             splashBackgroundColor: "#d4ff00",
           },
@@ -86,7 +89,7 @@ export async function generateMetadata({ params }: { params: Promise<{ address: 
           action: {
             type: "launch_frame",
             name: "Swipe Predictions",
-            url: URL,
+            url: dashboardPnlUrl,
             splashImageUrl: process.env.NEXT_PUBLIC_APP_SPLASH_IMAGE,
             splashBackgroundColor: "#d4ff00",
           },
