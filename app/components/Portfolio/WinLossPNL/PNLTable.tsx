@@ -267,9 +267,6 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
       const uploadResult = await uploadToImgBB(file);
       const imageUrl = uploadResult.data.url;
 
-      // Dynamic link to dashboard
-      const dashboardUrl = `${window.location.origin}/?dashboard=user&pnl=true`;
-
       // Build motivational share text with PNL value if positive
       const motivationalTexts = [
         'Check your PNL and see how you\'re performing! 📊',
@@ -290,15 +287,15 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
       }
 
       if (platform === 'farcaster') {
-        // Share to Farcaster/Base - image as first embed, link as second
+        // Share to Farcaster/Base - ONLY image as embed
+        // If we add a link as second embed, Farcaster ignores the image and shows OG from link
         await composeCast({
           text: shareText,
-          embeds: [imageUrl, dashboardUrl]
+          embeds: [imageUrl]
         });
       } else {
-        // Share to Twitter/X
-        shareText += `\n\n${dashboardUrl}`;
-        const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
+        // Share to Twitter/X - add image URL to tweet
+        const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(imageUrl)}`;
         await openUrl(twitterUrl);
       }
     } catch (error) {
