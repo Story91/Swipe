@@ -233,79 +233,42 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
   }, [minikitComposeCast]);
 
   const handleShare = async (platform: 'farcaster' | 'twitter') => {
-    if (!address) {
-      alert('Please connect your wallet to share PNL');
-      return;
-    }
+    if (!cardRef.current) return;
 
     setIsSharing(true);
     setShowShareDropdown(false);
     
     try {
-      // Dynamic link to dedicated PNL page (like /prediction/[id] for predictions)
-      const pnlUrl = `${window.location.origin}/pnl?user=${address.toLowerCase()}`;
-      
-      let ogImageUrl: string | null = null;
-      
-      // For Farcaster, generate screenshot of PNL card (same as export/download) and upload to ImgBB
-      // This uses the actual PNL card from dashboard, not programmatically generated image
-      if (platform === 'farcaster' && cardRef.current) {
-        try {
-          console.log('📸 Generating PNL card screenshot and uploading to ImgBB...');
-          
-          // Generate screenshot of PNL card (same as export/download)
-          const canvas = await html2canvas(cardRef.current, {
-            backgroundColor: '#0a0a0a',
-            scale: 5, // High quality for sharing
-            logging: false,
-            useCORS: true,
-            width: cardRef.current.offsetWidth,
-            height: cardRef.current.offsetHeight,
-          });
+      // Export to canvas with high quality
+      const canvas = await html2canvas(cardRef.current, {
+        backgroundColor: '#0a0a0a',
+        scale: 5, // High quality for sharing
+        logging: false,
+        useCORS: true,
+        width: cardRef.current.offsetWidth,
+        height: cardRef.current.offsetHeight,
+      });
 
-          // Convert canvas to blob
-          const blob = await new Promise<Blob>((resolve, reject) => {
-            canvas.toBlob((blob) => {
-              if (blob) {
-                resolve(blob);
-              } else {
-                reject(new Error('Failed to convert canvas to blob'));
-              }
-            }, 'image/png');
-          });
-
-          // Convert blob to File
-          const file = new File([blob], `PNL_${selectedToken}_${Date.now()}.png`, { type: 'image/png' });
-
-          // Upload to ImgBB
-          const uploadResult = await uploadToImgBB(file);
-          // Use direct image URL from ImgBB - this will be rendered as image embed in Farcaster
-          // data.url is the direct image URL that ends with .png/.jpg/.gif
-          ogImageUrl = uploadResult.data.url;
-          
-          console.log('✅ PNL card screenshot uploaded to ImgBB:', ogImageUrl);
-          console.log('📸 Image URL ends with:', ogImageUrl.split('.').pop());
-          
-          // Also save URL to Redis for layout.tsx metadata (like crypto predictions)
-          const userAddressLower = address.toLowerCase();
-          try {
-            await fetch('/api/pnl/save-og-url', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                user: userAddressLower,
-                ogImageUrl: ogImageUrl
-              })
-            });
-            console.log('✅ Also saved to Redis for metadata');
-          } catch (redisError) {
-            console.error('Error saving to Redis (non-critical):', redisError);
+      // Convert canvas to blob
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error('Failed to convert canvas to blob'));
           }
-        } catch (error) {
-          console.error('Error generating/uploading PNL card screenshot:', error);
-          // Continue anyway - will use only link
-        }
-      }
+        }, 'image/png');
+      });
+
+      // Convert blob to File
+      const file = new File([blob], `PNL_${selectedToken}_${Date.now()}.png`, { type: 'image/png' });
+
+      // Upload to ImgBB
+      const uploadResult = await uploadToImgBB(file);
+      const imageUrl = uploadResult.data.url;
+
+      // Dynamic link to dashboard
+      const dashboardUrl = `${window.location.origin}/?dashboard=user&pnl=true`;
 
       // Build motivational share text with PNL value if positive
       const motivationalTexts = [
@@ -327,17 +290,14 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
       }
 
       if (platform === 'farcaster') {
-        // Share to Farcaster/Base - only PNL page link as embed (like prediction links)
-        // Farcaster will automatically fetch OG image from page metadata (layout.tsx)
-        // The OG image URL from ImgBB is saved in Redis and used in layout.tsx
-        // This matches how predictions work - only link, Farcaster fetches OG image from metadata
+        // Share to Farcaster/Base - image as first embed, link as second
         await composeCast({
           text: shareText,
-          embeds: [pnlUrl]
+          embeds: [imageUrl, dashboardUrl]
         });
       } else {
         // Share to Twitter/X
-        shareText += `\n\n${pnlUrl}`;
+        shareText += `\n\n${dashboardUrl}`;
         const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
         await openUrl(twitterUrl);
       }
