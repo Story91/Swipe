@@ -233,7 +233,12 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
   }, [minikitComposeCast]);
 
   const handleShare = async (platform: 'farcaster' | 'twitter') => {
-    if (!cardRef.current) return;
+    if (!cardRef.current || !address) {
+      if (!address) {
+        alert('Please connect your wallet to share PNL');
+      }
+      return;
+    }
 
     setIsSharing(true);
     setShowShareDropdown(false);
@@ -266,6 +271,29 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
       // Upload to ImgBB
       const uploadResult = await uploadToImgBB(file);
       const imageUrl = uploadResult.data.url;
+      
+      console.log('📸 PNL card uploaded to ImgBB:', imageUrl);
+
+      // Save image URL to Redis for the /pnl/[address] page metadata
+      // This follows Base Mini Apps documentation - the page will serve fc:miniapp metadata with this imageUrl
+      const userAddressLower = address.toLowerCase();
+      try {
+        await fetch('/api/pnl/save-og-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user: userAddressLower,
+            ogImageUrl: imageUrl
+          })
+        });
+        console.log('💾 Saved ogImageUrl to Redis for metadata');
+      } catch (redisError) {
+        console.error('Error saving to Redis (non-critical):', redisError);
+      }
+
+      // PNL share page URL - this page has fc:miniapp metadata with the uploaded image
+      // Following Base Mini Apps documentation for dynamic embed images
+      const pnlPageUrl = `${window.location.origin}/pnl/${userAddressLower}`;
 
       // Build motivational share text with PNL value if positive
       const motivationalTexts = [
@@ -287,15 +315,16 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
       }
 
       if (platform === 'farcaster') {
-        // Share to Farcaster/Base - ONLY image as embed
-        // If we add a link as second embed, Farcaster ignores the image and shows OG from link
+        // Share to Farcaster/Base - use PNL page URL as embed
+        // The page has fc:miniapp metadata with imageUrl pointing to the ImgBB image
+        // This follows Base Mini Apps documentation for dynamic embed images
         await composeCast({
           text: shareText,
-          embeds: [imageUrl]
+          embeds: [pnlPageUrl]
         });
       } else {
-        // Share to Twitter/X - add image URL to tweet
-        const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(imageUrl)}`;
+        // Share to Twitter/X - add PNL page URL to tweet
+        const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(pnlPageUrl)}`;
         await openUrl(twitterUrl);
       }
     } catch (error) {
