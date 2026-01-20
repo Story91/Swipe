@@ -73,7 +73,12 @@ interface PredictionWithStakes {
   status: 'active' | 'resolved' | 'expired' | 'cancelled';
 }
 
-export function EnhancedUserDashboard() {
+interface EnhancedUserDashboardProps {
+  showPnlOnLoad?: boolean;
+  onPnlShown?: () => void;
+}
+
+export function EnhancedUserDashboard({ showPnlOnLoad, onPnlShown }: EnhancedUserDashboardProps) {
   const { address } = useAccount();
   const { writeContract } = useWriteContract();
   const { composeCast: minikitComposeCast } = useComposeCast();
@@ -146,6 +151,15 @@ export function EnhancedUserDashboard() {
   
   // Dashboard view state (main, pnl)
   const [activeView, setActiveView] = useState<'main' | 'pnl'>('main');
+  
+  // Handle showPnlOnLoad prop - open PNL tab when coming from shared link
+  useEffect(() => {
+    if (showPnlOnLoad) {
+      console.log('📊 Opening PNL tab from shared link');
+      setActiveView('pnl');
+      onPnlShown?.();
+    }
+  }, [showPnlOnLoad, onPnlShown]);
   
   // Modal states
   const [showModal, setShowModal] = useState(false);

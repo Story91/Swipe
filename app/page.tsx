@@ -66,15 +66,22 @@ interface UserProfile {
 
 // Component to handle URL search params (needs Suspense wrapper)
 function SearchParamsHandler({ 
-  onPredictionId 
+  onPredictionId,
+  onDashboardChange,
+  onPnlOpen
 }: { 
-  onPredictionId: (id: string) => void 
+  onPredictionId: (id: string) => void;
+  onDashboardChange: (dashboard: DashboardType) => void;
+  onPnlOpen: () => void;
 }) {
   const searchParams = useSearchParams();
   const router = useRouter();
 
   useEffect(() => {
     const predictionId = searchParams.get('prediction');
+    const dashboard = searchParams.get('dashboard');
+    const pnl = searchParams.get('pnl');
+    
     if (predictionId) {
       console.log('🎯 Found prediction parameter in URL:', predictionId);
       onPredictionId(predictionId);
@@ -82,7 +89,22 @@ function SearchParamsHandler({
       // Clear the URL parameter without full page reload
       router.replace('/', { scroll: false });
     }
-  }, [searchParams, router, onPredictionId]);
+    
+    // Handle dashboard=user&pnl=true from PNL share links
+    if (dashboard === 'user') {
+      console.log('📊 Found dashboard=user parameter in URL');
+      onDashboardChange('user');
+      
+      // If pnl=true, trigger PNL tab open
+      if (pnl === 'true') {
+        console.log('📈 Found pnl=true parameter, opening PNL tab');
+        onPnlOpen();
+      }
+      
+      // Clear the URL parameters without full page reload
+      router.replace('/', { scroll: false });
+    }
+  }, [searchParams, router, onPredictionId, onDashboardChange, onPnlOpen]);
 
   return null;
 }
@@ -103,6 +125,7 @@ export default function App() {
   const [readyToClaimCount, setReadyToClaimCount] = useState(0);
   const [badgePosition, setBadgePosition] = useState({ top: 0, right: 0 });
   const [initialPredictionId, setInitialPredictionId] = useState<string | null>(null);
+  const [showPnlOnLoad, setShowPnlOnLoad] = useState(false);
   const viewProfile = useViewProfile();
   const isDesktop = useIsDesktop();
 
@@ -357,7 +380,11 @@ export default function App() {
     <div className="flex flex-col min-h-screen font-sans text-[var(--app-foreground)] mini-app-theme from-[var(--app-background)] to-[var(--app-gray)]">
       {/* Suspense wrapper for useSearchParams */}
       <Suspense fallback={null}>
-        <SearchParamsHandler onPredictionId={handlePredictionId} />
+        <SearchParamsHandler 
+          onPredictionId={handlePredictionId}
+          onDashboardChange={setActiveDashboard}
+          onPnlOpen={() => setShowPnlOnLoad(true)}
+        />
       </Suspense>
       
       {/* Side Panels - Desktop Only (conditionally rendered) */}
@@ -569,7 +596,10 @@ export default function App() {
           {/* Dashboard - moved from 'user' to replace CLAIM */}
           {activeDashboard === 'user' && (
             <div>
-              <EnhancedUserDashboard />
+              <EnhancedUserDashboard 
+                showPnlOnLoad={showPnlOnLoad}
+                onPnlShown={() => setShowPnlOnLoad(false)}
+              />
             </div>
           )}
 
