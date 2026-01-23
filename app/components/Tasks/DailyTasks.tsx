@@ -314,7 +314,7 @@ export function DailyTasks() {
   const [isMigrating, setIsMigrating] = useState(false);
   
   // Contract reads
-  const { data: userStats, refetch: refetchStats } = useReadContract({
+  const { data: userStats, refetch: refetchStats, isLoading: isLoadingStats, error: statsError } = useReadContract({
     address: DAILY_REWARDS_CONTRACT,
     abi: DAILY_REWARDS_ABI,
     functionName: "getUserStats",
@@ -323,6 +323,20 @@ export function DailyTasks() {
       enabled: !!address && DAILY_REWARDS_CONTRACT !== "0x0000000000000000000000000000000000000000",
     }
   });
+
+  // Debug: Log contract read status
+  useEffect(() => {
+    if (address) {
+      console.log('📊 Daily Tasks Debug:', {
+        contract: DAILY_REWARDS_CONTRACT,
+        v1Contract: DAILY_REWARDS_V1_CONTRACT,
+        address,
+        userStats,
+        isLoadingStats,
+        statsError: statsError?.message,
+      });
+    }
+  }, [address, userStats, isLoadingStats, statsError]);
 
   const { data: dailyTasks, refetch: refetchTasks } = useReadContract({
     address: DAILY_REWARDS_CONTRACT,
@@ -1225,16 +1239,38 @@ export function DailyTasks() {
         </div>
 
         {/* SWIPE Balance Display - Thin line like jackpot */}
-        {address && swipeBalance !== undefined && (
+        {address && (
           <div className="daily-tasks-balance">
             <span className="daily-tasks-balance-label">Your Balance:</span>
             <span className="daily-tasks-balance-value">
-              {Math.floor(parseFloat(formatEther(swipeBalance as bigint))).toLocaleString()} SWIPE
+              {swipeBalance !== undefined 
+                ? `${Math.floor(parseFloat(formatEther(swipeBalance as bigint))).toLocaleString()} SWIPE`
+                : 'Loading...'
+              }
             </span>
-            {!hasMinimumBalance && (
+            {swipeBalance !== undefined && !hasMinimumBalance && (
               <span className="daily-tasks-balance-requirement">
                 1M min. required
               </span>
+            )}
+          </div>
+        )}
+
+        {/* Debug: Show loading/error state */}
+        {(isLoadingStats || statsError || !userStats) && (
+          <div style={{
+            backgroundColor: statsError ? 'rgba(255,0,0,0.1)' : 'rgba(255,255,0,0.1)',
+            border: `1px solid ${statsError ? 'rgba(255,0,0,0.3)' : 'rgba(255,255,0,0.3)'}`,
+            borderRadius: '8px',
+            padding: '8px 12px',
+            marginBottom: '12px',
+            fontSize: '11px',
+            color: statsError ? '#ff6b6b' : '#ffcc00'
+          }}>
+            {isLoadingStats && '⏳ Loading...'}
+            {statsError && `❌ ${statsError.message?.slice(0, 80)}`}
+            {!isLoadingStats && !statsError && !userStats && (
+              <span>⚠️ Contract: {DAILY_REWARDS_CONTRACT?.slice(0, 10)}... (no data)</span>
             )}
           </div>
         )}
