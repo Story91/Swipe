@@ -13,12 +13,14 @@ import "./DailyTasks.css";
 import { HackScreen } from "../HackScreen/HackScreen";
 
 // Contract addresses - UPDATE THESE AFTER DEPLOYMENT
-// Use V3 if available, fallback to V2 (UI will still show "V1 to V2" for users)
+// Use V3 if available, fallback to V2
 const DAILY_REWARDS_CONTRACT = (
   (process.env.NEXT_PUBLIC_DAILY_REWARDS_V3_CONTRACT as `0x${string}`) ||
   (process.env.NEXT_PUBLIC_DAILY_REWARDS_V2_CONTRACT as `0x${string}`) ||
   "0x0000000000000000000000000000000000000000"
 );
+// V1 contract for migration check
+const DAILY_REWARDS_V1_CONTRACT = process.env.NEXT_PUBLIC_DAILY_REWARDS_CONTRACT as `0x${string}` || "0x0000000000000000000000000000000000000000";
 const SWIPE_TOKEN = "0xd0187D77Af0ED6a44F0A631B406c78b30E160aA9";
 
 // Minimum SWIPE balance required (1M SWIPE)
@@ -351,6 +353,39 @@ export function DailyTasks() {
     }
   });
 
+  // Check if user has data in V1 contract (for migration prompt)
+  // Only needed if user is not migrated in V3
+  const { data: v1UserStats } = useReadContract({
+    address: DAILY_REWARDS_V1_CONTRACT,
+    abi: [
+      {
+        "inputs": [{"name": "user", "type": "address"}],
+        "name": "getUserStats",
+        "outputs": [
+          {"name": "lastClaimTimestamp", "type": "uint256"},
+          {"name": "currentStreak", "type": "uint256"},
+          {"name": "longestStreak", "type": "uint256"},
+          {"name": "totalClaimed", "type": "uint256"},
+          {"name": "jackpotsWon", "type": "uint256"},
+          {"name": "canClaimToday", "type": "bool"},
+          {"name": "nextClaimTime", "type": "uint256"},
+          {"name": "potentialReward", "type": "uint256"}
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      }
+    ],
+    functionName: "getUserStats",
+    args: address ? [address] : undefined,
+    query: {
+      // Only check V1 if: user connected, V1 contract exists, and user is NOT migrated in V3
+      enabled: !!address && 
+               DAILY_REWARDS_V1_CONTRACT !== "0x0000000000000000000000000000000000000000" &&
+               userStats !== undefined && 
+               !(userStats as any)?.[8], // [8] is isMigrated in V3
+    }
+  });
+
   // Read baseDailyReward from contract (try both names - V2/V3 has public var, V1 has constant)
   const { data: baseDailyReward } = useReadContract({
     address: DAILY_REWARDS_CONTRACT,
@@ -635,7 +670,7 @@ export function DailyTasks() {
         // Migration successful
         sendNotification({
           title: "✅ Migration Successful!",
-          body: "Your data has been migrated from V1 to V2!",
+          body: "Your V1 streak and achievements have been migrated!",
         });
         
         setIsMigrating(false);
@@ -709,7 +744,7 @@ export function DailyTasks() {
     return () => clearInterval(interval);
   }, [userStats, refetchStats]);
 
-  // Migrate from V1 to V2
+  // Migrate from V1 to V3 (preserves streak and achievements)
   const handleMigrate = async () => {
     if (!address) return;
     
@@ -1022,6 +1057,7 @@ export function DailyTasks() {
 
   // Parse user stats
   const stats = userStats ? {
+    lastClaimTimestamp: Number((userStats as any)[0]),
     currentStreak: Number((userStats as any)[1]),
     longestStreak: Number((userStats as any)[2]),
     totalClaimed: (userStats as any)[3] as bigint,
@@ -1030,6 +1066,15 @@ export function DailyTasks() {
     potentialReward: (userStats as any)[7] as bigint,
     isMigrated: (userStats as any)[8] as boolean,
   } : null;
+
+  // Check if user has V1 data to migrate (streak > 0 or has claimed before)
+  const hasV1DataToMigrate = v1UserStats ? (
+    Number((v1UserStats as any)[0]) > 0 || // lastClaimTimestamp > 0
+    Number((v1UserStats as any)[1]) > 0    // currentStreak > 0
+  ) : false;
+  
+  // V1 streak info for migration prompt
+  const v1Streak = v1UserStats ? Number((v1UserStats as any)[1]) : 0;
 
   // Parse daily tasks
   const tasks = dailyTasks ? {
@@ -1194,23 +1239,25 @@ export function DailyTasks() {
           </div>
         )}
 
-        {/* Migration Banner - Show if user has not migrated from V1 */}
-        {stats && !stats.isMigrated && (
-          <div className="migration-banner" style={{
-            backgroundColor: '#FFE5B4',
-            border: '2px solid #FFA500',
-            borderRadius: '12px',
-            padding: '16px',
-            marginBottom: '20px',
-            textAlign: 'center'
+        {/* Optional Migration Notice - Show only if user has V1 data to migrate */}
+        {stats && !stats.isMigrated && hasV1DataToMigrate && (
+          <div className="migration-notice" style={{
+            backgroundColor: 'rgba(255, 165, 0, 0.1)',
+            border: '1px solid rgba(255, 165, 0, 0.3)',
+            borderRadius: '8px',
+            padding: '10px 14px',
+            marginBottom: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px'
           }}>
-            <div style={{ fontSize: '24px', marginBottom: '8px' }}>🔄</div>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', color: '#8B4513' }}>
-              Migrate Your Data from V1
-            </h3>
-            <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: '#654321' }}>
-              Transfer your streaks and achievements to the new V2 contract
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+              <span style={{ fontSize: '18px' }}>🔄</span>
+              <span style={{ fontSize: '13px', color: '#FFA500', fontWeight: '500' }}>
+                {v1Streak > 0 ? `Keep your ${v1Streak}-day streak from V1!` : 'Transfer V1 progress'}
+              </span>
+            </div>
             <button
               onClick={handleMigrate}
               disabled={isPending || isConfirming || isMigrating}
@@ -1218,28 +1265,17 @@ export function DailyTasks() {
                 backgroundColor: '#FFA500',
                 color: 'white',
                 border: 'none',
-                borderRadius: '8px',
-                padding: '12px 24px',
-                fontSize: '16px',
-                fontWeight: 'bold',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                fontSize: '12px',
+                fontWeight: '600',
                 cursor: isPending || isConfirming || isMigrating ? 'not-allowed' : 'pointer',
-                opacity: isPending || isConfirming || isMigrating ? 0.6 : 1
+                opacity: isPending || isConfirming || isMigrating ? 0.6 : 1,
+                whiteSpace: 'nowrap'
               }}
             >
-              {isMigrating || isPending || isConfirming ? (
-                <>
-                  <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⏳</span>
-                  {' Migrating...'}
-                </>
-              ) : (
-                'Migrate Now'
-              )}
+              {isMigrating || isPending || isConfirming ? '...' : 'Migrate'}
             </button>
-            {taskError && (
-              <p style={{ marginTop: '12px', color: '#d32f2f', fontSize: '13px' }}>
-                {taskError}
-              </p>
-            )}
           </div>
         )}
 
