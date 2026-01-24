@@ -97,9 +97,6 @@ async function syncPredictionUSDC(predictionId: number): Promise<{
       usdcParticipantCount: Number(usdcData[8])
     };
 
-    // Save updated prediction back to Redis (with merged participants)
-    await redis.set(REDIS_KEYS.PREDICTION(redisId), JSON.stringify(updated));
-
     // Also sync USDC participants list and positions
     try {
       const participantCount = Number(usdcData[8]);
@@ -167,6 +164,9 @@ async function syncPredictionUSDC(predictionId: number): Promise<{
       console.warn(`Failed to sync USDC positions for prediction ${predictionId}:`, posSyncError);
       // Don't fail the whole sync if position sync fails
     }
+
+    // Save updated prediction back to Redis (with USDC participants and all data)
+    await redis.set(REDIS_KEYS.PREDICTION(redisId), JSON.stringify(updated));
 
     return {
       success: true,

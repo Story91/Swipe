@@ -195,6 +195,19 @@ export async function GET(request: NextRequest) {
               }
             }
           }
+        } else {
+          // No stake data in Redis - might need to sync USDC positions first
+          // Try to check if user is in usdcParticipants list
+          const predAny = prediction as any;
+          if (predAny.usdcParticipants && Array.isArray(predAny.usdcParticipants)) {
+            const isParticipant = predAny.usdcParticipants.some((p: string) => 
+              p.toLowerCase() === normalizedUserId
+            );
+            if (isParticipant) {
+              // User is participant but stake not synced - this shouldn't happen but log it
+              console.warn(`⚠️ User ${normalizedUserId} is in usdcParticipants for ${prediction.id} but stake not found in Redis`);
+            }
+          }
         }
       }
     }
