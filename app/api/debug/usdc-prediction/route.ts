@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
           args: [BigInt(predictionId), userParam as `0x${string}`]
         });
         
-        const [yesAmount, noAmount, yesEntryPrice, noEntryPrice, claimed] = positionData as any[];
+        const [yesAmount, noAmount, yesEntryPrice, noEntryPrice, claimed] = positionData as unknown as [bigint, bigint, bigint, bigint, boolean];
         
         userPosition = {
           yesAmount: Number(yesAmount),
