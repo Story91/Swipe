@@ -84,6 +84,7 @@ interface MarketCardProps {
   id: number;
   predictionId: string;
   title: string;
+  description?: string;
   category: string;
   image?: string;
   yesPool: number;
@@ -103,7 +104,8 @@ interface MarketCardProps {
 function MarketCard({ 
   id,
   predictionId,
-  title, 
+  title,
+  description,
   category, 
   image, 
   yesPool, 
@@ -274,6 +276,9 @@ function MarketCard({
               )}
               <div className="market-info">
                 <h3 className="market-title">{title}</h3>
+                {description && (
+                  <p className="market-description">{description}</p>
+                )}
               </div>
             </div>
 
@@ -311,14 +316,13 @@ function MarketCard({
                 </Badge>
               )}
               <div className="market-stats">
-                <span className="stat">
-                  <DollarSign className="w-3 h-3" />
+                <Badge variant="outline" className="pool-badge">
                   {formatPool(totalPool)}
-                </span>
-                <span className="stat">
+                </Badge>
+                <Badge variant="outline" className="time-badge">
                   <Clock className="w-3 h-3" />
                   {formatDeadline(deadline)}
-                </span>
+                </Badge>
               </div>
               <button className="expand-btn" onClick={() => setIsExpanded(true)}>
                 <ChevronRight className="w-4 h-4" />
@@ -913,6 +917,7 @@ export default function KalshiMarkets() {
           : pred.id,
         predictionId: pred.id,
         title: pred.question,
+        description: pred.description,
         category: pred.category || 'General',
         image: pred.imageUrl || '/hero.png',
         yesPool: pred.yesTotalAmount || 0,
@@ -962,21 +967,6 @@ export default function KalshiMarkets() {
             </div>
             <div className="usdc-title-group">
               <h1 className="usdc-main-title">USDC Markets</h1>
-              <div className="usdc-subtitle-row">
-                <Badge variant="outline" className="usdc-badge-live">
-                  <span className="live-dot"></span>
-                  Live
-                </Badge>
-                <a 
-                  href="https://basescan.org/address/0xf5Fa6206c2a7d5473ae7468082c9D260DFF83205"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="contract-link"
-                >
-                  <img src="/Base_square_blue.png" alt="Base" className="contract-icon" />
-                  <span>Contract</span>
-                </a>
-              </div>
             </div>
           </div>
           
@@ -989,6 +979,15 @@ export default function KalshiMarkets() {
               </div>
             )}
             <div className="usdc-action-buttons">
+              <a 
+                href="https://basescan.org/address/0xf5Fa6206c2a7d5473ae7468082c9D260DFF83205"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="contract-icon-link"
+                aria-label="USDC DualPool contract on Basescan"
+              >
+                <img src="/Base_square_blue.png" alt="Base" className="contract-icon" />
+              </a>
               <Button
                 variant="ghost"
                 size="icon"
@@ -1015,7 +1014,6 @@ export default function KalshiMarkets() {
             </div>
           </div>
         </div>
-        <Separator className="usdc-separator" />
       </Card>
 
       {/* Markets Grid */}
