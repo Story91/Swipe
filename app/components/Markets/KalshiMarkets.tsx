@@ -602,23 +602,24 @@ export default function KalshiMarkets() {
   
   // Universal composeCast function - works on both MiniKit (Base app) and Farcaster SDK (Warpcast)
   const composeCast = useCallback(async (params: { text: string; embeds?: string[] }) => {
+    // Try MiniKit first (Base app)
     try {
-      // Try MiniKit first (Base app)
       if (minikitComposeCast) {
         console.log('📱 Using MiniKit composeCast for USDC market share...');
-        await minikitComposeCast(params);
+        const embedsParam = params.embeds?.slice(0, 2) as [] | [string] | [string, string] | undefined;
+        await minikitComposeCast({ text: params.text, embeds: embedsParam });
         return;
       }
     } catch (error) {
       console.log('MiniKit composeCast failed, trying Farcaster SDK...', error);
     }
     
+    // Fallback to Farcaster SDK (Warpcast and other clients)
     try {
-      // Fallback to Farcaster SDK (Warpcast)
       console.log('📱 Using Farcaster SDK composeCast for USDC market share...');
       await sdk.actions.composeCast({
         text: params.text,
-        embeds: params.embeds || []
+        embeds: params.embeds?.map(url => ({ url })) as any
       });
     } catch (error) {
       console.error('Both composeCast methods failed:', error);
