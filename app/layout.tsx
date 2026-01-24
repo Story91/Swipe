@@ -18,6 +18,11 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title,
     description,
+    icons: {
+      icon: "/micro.png",
+      shortcut: "/micro.png",
+      apple: "/micro.png",
+    },
     openGraph: {
       title,
       description,
