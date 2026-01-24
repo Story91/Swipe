@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useReadContract, usePublicClient, useWriteContract } from 'wagmi';
-import { CONTRACTS, getV2Contract } from '../../../lib/contract';
+import { CONTRACTS, getV2Contract, USDC_DUALPOOL_CONTRACT_ADDRESS, USDC_DUALPOOL_ABI } from '../../../lib/contract';
 import { useAdminPredictions } from '../../../lib/hooks/useAdminPredictions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 
@@ -304,6 +304,123 @@ export function AdminDashboard({
     }
   };
 
+  // Resolve USDC contract only (for already V2-resolved predictions)
+  const handleResolveUsdcOnly = async (predictionId: string | number, outcome: boolean) => {
+    const side = outcome ? 'YES' : 'NO';
+    
+    // Extract numeric ID
+    let numericId: number | null = null;
+    if (typeof predictionId === 'string' && predictionId.startsWith('pred_v2_')) {
+      numericId = parseInt(predictionId.replace('pred_v2_', ''));
+    } else if (typeof predictionId === 'number') {
+      numericId = predictionId;
+    }
+    
+    if (!numericId || isNaN(numericId)) {
+      alert('❌ Invalid prediction ID for USDC contract');
+      return;
+    }
+    
+    if (!confirm(`Resolve USDC DualPool prediction ${numericId} as ${side}?`)) {
+      return;
+    }
+    
+    try {
+      writeContract({
+        address: USDC_DUALPOOL_CONTRACT_ADDRESS as `0x${string}`,
+        abi: USDC_DUALPOOL_ABI,
+        functionName: 'resolvePrediction',
+        args: [BigInt(numericId), outcome],
+      }, {
+        onSuccess: async (tx) => {
+          console.log(`✅ USDC DualPool prediction ${numericId} resolved as ${side}:`, tx);
+          alert(`✅ USDC prediction resolved as ${side}!\nTransaction: ${tx}`);
+          
+          // Sync USDC data to Redis
+          try {
+            await fetch('/api/sync/usdc', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ predictionId: numericId })
+            });
+            console.log('✅ USDC data synced to Redis');
+          } catch (syncErr) {
+            console.warn('⚠️ USDC sync failed:', syncErr);
+          }
+          
+          handleRefresh();
+        },
+        onError: (error) => {
+          console.error('❌ USDC resolve failed:', error);
+          alert(`❌ USDC resolve failed: ${error.message}`);
+        }
+      });
+    } catch (error) {
+      console.error('Failed to resolve USDC prediction:', error);
+      alert(`❌ Failed: ${error}`);
+    }
+  };
+
+  // Register prediction on USDC DualPool contract
+  const handleRegisterUsdc = async (predictionId: string | number) => {
+    // Extract numeric ID
+    let numericId: number | null = null;
+    if (typeof predictionId === 'string' && predictionId.startsWith('pred_v2_')) {
+      numericId = parseInt(predictionId.replace('pred_v2_', ''));
+    } else if (typeof predictionId === 'number') {
+      numericId = predictionId;
+    }
+    
+    if (!numericId || isNaN(numericId)) {
+      alert('❌ Invalid prediction ID for USDC registration');
+      return;
+    }
+    
+    // Find prediction data
+    const pred = redisPredictions.find(p => p.id === predictionId || p.id === `pred_v2_${predictionId}`);
+    if (!pred) {
+      alert('❌ Prediction not found in Redis');
+      return;
+    }
+    
+    if (!confirm(`Register prediction ${numericId} on USDC DualPool contract?\n\nQuestion: ${pred.question?.substring(0, 50)}...`)) {
+      return;
+    }
+    
+    try {
+      writeContract({
+        address: USDC_DUALPOOL_CONTRACT_ADDRESS as `0x${string}`,
+        abi: USDC_DUALPOOL_ABI,
+        functionName: 'registerPrediction',
+        args: [BigInt(numericId), pred.creator as `0x${string}`, BigInt(pred.deadline)],
+      }, {
+        onSuccess: async (tx) => {
+          console.log(`✅ Prediction ${numericId} registered on USDC DualPool:`, tx);
+          alert(`✅ Prediction registered on USDC!\nTransaction: ${tx}\n\nUsers can now bet with USDC.`);
+          
+          // Sync USDC data to Redis
+          try {
+            await fetch('/api/sync/usdc', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ predictionIds: [numericId] })
+            });
+            handleRefresh();
+          } catch (e) {
+            console.warn('USDC sync after registration failed:', e);
+          }
+        },
+        onError: (error) => {
+          console.error('❌ USDC registration failed:', error);
+          alert(`❌ Failed: ${error.message}`);
+        }
+      });
+    } catch (error) {
+      console.error('Failed to register USDC prediction:', error);
+      alert(`❌ Failed: ${error}`);
+    }
+  };
+
   const handleCancel = async (predictionId: string | number) => {
     const reason = prompt('Reason for emergency cancellation:');
     if (reason) {
@@ -430,6 +547,11 @@ export function AdminDashboard({
     }
 
     const contract = contractVersion === 'V1' ? CONTRACTS.V1 : CONTRACTS.V2;
+    
+    // Check if this prediction has USDC pool enabled
+    const predictionStringId = `pred_${contractVersion.toLowerCase()}_${numericId}`;
+    const currentPred = redisPredictions.find(p => p.id === predictionStringId);
+    const hasUsdcPool = (currentPred as any)?.usdcPoolEnabled === true;
 
     try {
       writeContract({
@@ -440,7 +562,32 @@ export function AdminDashboard({
       }, {
         onSuccess: async (tx) => {
           console.log(`✅ Prediction ${numericId} resolved successfully on ${contractVersion}:`, tx);
-          alert(`✅ Prediction resolved as ${side}!\nTransaction: ${tx}\n\nAuto-syncing with Redis...`);
+          
+          // If USDC pool is enabled, also resolve on USDC DualPool contract
+          if (hasUsdcPool) {
+            console.log(`🔵 USDC pool detected - also resolving on USDC DualPool contract...`);
+            try {
+              writeContract({
+                address: USDC_DUALPOOL_CONTRACT_ADDRESS as `0x${string}`,
+                abi: USDC_DUALPOOL_ABI,
+                functionName: 'resolvePrediction',
+                args: [BigInt(numericId), outcome],
+              }, {
+                onSuccess: (usdcTx) => {
+                  console.log(`✅ USDC DualPool prediction ${numericId} also resolved:`, usdcTx);
+                  alert(`✅ Prediction resolved as ${side} on BOTH contracts!\n\nV2: ${tx}\nUSDC: ${usdcTx}`);
+                },
+                onError: (usdcError) => {
+                  console.error('❌ USDC DualPool resolve failed:', usdcError);
+                  alert(`⚠️ V2 resolved but USDC failed!\n\nV2: ${tx}\nUSDC Error: ${usdcError.message}`);
+                }
+              });
+            } catch (usdcErr) {
+              console.error('❌ Failed to call USDC resolve:', usdcErr);
+            }
+          } else {
+            alert(`✅ Prediction resolved as ${side}!\nTransaction: ${tx}\n\nAuto-syncing with Redis...`);
+          }
           
           // Auto-sync single prediction (like TinderCard stake)
           try {
@@ -1003,6 +1150,175 @@ export function AdminDashboard({
           
           <button 
             onClick={async () => {
+              const idsInput = prompt('💵 USDC SYNC\n\nSync USDC contract data to Redis.\n\nEnter prediction IDs (comma separated) or leave empty for all registered:\n\nExample: 224,225,226');
+              
+              try {
+                alert('💵 Starting USDC sync...');
+                const url = idsInput 
+                  ? `/api/sync/usdc?ids=${idsInput.replace(/\s/g, '')}` 
+                  : '/api/sync/usdc';
+                  
+                const response = await fetch(url);
+                if (response.ok) {
+                  const result = await response.json();
+                  alert(`✅ USDC SYNC COMPLETE!\n\nSynced: ${result.synced} predictions\nTotal checked: ${result.total}\n\nResults:\n${Object.entries(result.results || {}).map(([id, r]: [string, any]) => 
+                    `#${id}: ${r.registered ? `✓ Pool: YES=$${r.yesPool?.toFixed(2)} NO=$${r.noPool?.toFixed(2)}` : '✗ Not registered'}`
+                  ).join('\n')}\n\nRefreshing data...`);
+                  handleRefresh();
+                } else {
+                  alert('❌ USDC sync failed. Check console for details.');
+                }
+              } catch (error) {
+                console.error('USDC sync error:', error);
+                alert('❌ USDC sync failed. Check console for details.');
+              }
+            }}
+            className="sync-btn ultra-compact-btn"
+            style={{
+              background: '#10b981',
+              color: 'white',
+              border: 'none',
+              padding: '6px 8px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '9px',
+              fontWeight: '500',
+              whiteSpace: 'nowrap',
+              minHeight: '28px',
+              touchAction: 'manipulation',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px'
+            }}
+          >
+            💵 USDC Sync
+          </button>
+          
+          <button 
+            onClick={async () => {
+              // Show USDC status for all predictions
+              const v2Predictions = redisPredictions.filter(p => p.id.startsWith('pred_v2_') && !p.resolved && !p.cancelled);
+              const usdcEnabled = v2Predictions.filter(p => (p as any).usdcPoolEnabled);
+              const notRegistered = v2Predictions.filter(p => !(p as any).usdcPoolEnabled);
+              
+              let message = `💵 USDC MARKETS STATUS\n\n`;
+              message += `📊 Total Active V2 Predictions: ${v2Predictions.length}\n`;
+              message += `✅ USDC Enabled: ${usdcEnabled.length}\n`;
+              message += `❌ Not Registered: ${notRegistered.length}\n\n`;
+              
+              if (usdcEnabled.length > 0) {
+                message += `✅ USDC ENABLED:\n`;
+                usdcEnabled.slice(0, 5).forEach((p: any) => {
+                  const id = p.id.replace('pred_v2_', '');
+                  const yesPool = ((p.usdcYesTotalAmount || 0) / 1e6).toFixed(2);
+                  const noPool = ((p.usdcNoTotalAmount || 0) / 1e6).toFixed(2);
+                  message += `• #${id}: $${yesPool} YES / $${noPool} NO\n`;
+                });
+                if (usdcEnabled.length > 5) message += `... +${usdcEnabled.length - 5} more\n`;
+                message += `\n`;
+              }
+              
+              if (notRegistered.length > 0) {
+                message += `❌ NOT REGISTERED (need to register):\n`;
+                notRegistered.slice(0, 5).forEach((p: any) => {
+                  const id = p.id.replace('pred_v2_', '');
+                  message += `• #${id}: ${p.question?.substring(0, 40)}...\n`;
+                });
+                if (notRegistered.length > 5) message += `... +${notRegistered.length - 5} more\n`;
+              }
+              
+              alert(message);
+            }}
+            className="sync-btn ultra-compact-btn"
+            style={{
+              background: '#3b82f6',
+              color: 'white',
+              border: 'none',
+              padding: '6px 8px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '9px',
+              fontWeight: '500',
+              whiteSpace: 'nowrap',
+              minHeight: '28px',
+              touchAction: 'manipulation',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px'
+            }}
+          >
+            💵 USDC Status
+          </button>
+          
+          <button 
+            onClick={async () => {
+              // Register all unregistered V2 predictions on USDC
+              const v2Predictions = redisPredictions.filter(p => 
+                p.id.startsWith('pred_v2_') && 
+                !p.resolved && 
+                !p.cancelled &&
+                !(p as any).usdcPoolEnabled
+              );
+              
+              if (v2Predictions.length === 0) {
+                alert('✅ All active V2 predictions are already registered on USDC!');
+                return;
+              }
+              
+              const predList = v2Predictions.map(p => `• ${p.id.replace('pred_v2_', '')}: ${p.question?.substring(0, 40)}...`).join('\n');
+              
+              if (!confirm(`💵 REGISTER ALL ON USDC\n\nThis will register ${v2Predictions.length} predictions on USDC DualPool contract.\n\nPredictions to register:\n${predList}\n\n⚠️ This requires ${v2Predictions.length} separate transactions!\n\nContinue?`)) {
+                return;
+              }
+              
+              alert(`Starting registration of ${v2Predictions.length} predictions...\nPlease confirm each transaction in your wallet.`);
+              
+              for (const pred of v2Predictions) {
+                const numericId = parseInt(pred.id.replace('pred_v2_', ''));
+                try {
+                  writeContract({
+                    address: USDC_DUALPOOL_CONTRACT_ADDRESS as `0x${string}`,
+                    abi: USDC_DUALPOOL_ABI,
+                    functionName: 'registerPrediction',
+                    args: [BigInt(numericId), pred.creator as `0x${string}`, BigInt(pred.deadline)],
+                  });
+                } catch (e) {
+                  console.error(`Failed to register ${numericId}:`, e);
+                }
+              }
+            }}
+            className="sync-btn ultra-compact-btn"
+            style={{
+              background: 'linear-gradient(135deg, #3b82f6, #10b981)',
+              color: 'white',
+              border: 'none',
+              padding: '6px 8px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '9px',
+              fontWeight: '500',
+              whiteSpace: 'nowrap',
+              minHeight: '28px',
+              touchAction: 'manipulation',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px'
+            }}
+          >
+            💵 Register All
+          </button>
+          
+          <button 
+            onClick={async () => {
               const userId = prompt('👤 USER BLOCKCHAIN SYNC\n\nEnter user wallet address to sync their complete transaction history from blockchain to Redis.\n\nThis will find ALL missing stakes and transactions!\n\nWallet address (0x...):');
               if (userId && userId.startsWith('0x')) {
                 try {
@@ -1498,8 +1814,41 @@ export function AdminDashboard({
 
               <div className="action-buttons" style={{
                 display: 'flex',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                gap: '8px',
+                flexWrap: 'wrap'
               }}>
+                {/* Register USDC button - only for V2 predictions not yet registered */}
+                {typeof prediction.id === 'string' && prediction.id.startsWith('pred_v2_') && !(prediction as any).usdcPoolEnabled && (
+                  <button
+                    onClick={() => handleRegisterUsdc(prediction.id)}
+                    style={{
+                      background: 'linear-gradient(135deg, #3b82f6, #10b981)',
+                      color: 'white',
+                      border: 'none',
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    💵 Register USDC
+                  </button>
+                )}
+                {(prediction as any).usdcPoolEnabled && (
+                  <span style={{
+                    background: 'rgba(16, 185, 129, 0.1)',
+                    color: '#10b981',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    fontSize: '11px',
+                    fontWeight: '600'
+                  }}>
+                    💵 USDC Active
+                  </span>
+                )}
                 <button
                   className="btn btn-cancel"
                   onClick={() => handleCancel(prediction.id)}
@@ -1641,7 +1990,9 @@ export function AdminDashboard({
 
               <div className="action-buttons" style={{
                 display: 'flex',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                gap: '8px',
+                flexWrap: 'wrap'
               }}>
                 <button className="btn" style={{ 
                   background: '#e0e0e0', 
@@ -1653,8 +2004,44 @@ export function AdminDashboard({
                   fontSize: '11px',
                   fontWeight: '600'
                 }}>
-                  Resolved ✅
+                  V2 Resolved ✅
                 </button>
+                
+                {/* USDC Resolve Button - show for V2 predictions that are not USDC resolved */}
+                {typeof prediction.id === 'string' && prediction.id.startsWith('pred_v2_') && !(prediction as any).usdcResolved && (
+                  <button 
+                    className="btn"
+                    onClick={() => handleResolveUsdcOnly(prediction.id, prediction.outcome || false)}
+                    style={{ 
+                      background: 'linear-gradient(135deg, #2775ca, #1e5aa8)',
+                      color: 'white',
+                      cursor: 'pointer',
+                      border: 'none',
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      fontSize: '11px',
+                      fontWeight: '600'
+                    }}
+                  >
+                    💵 Resolve USDC ({prediction.outcome ? 'YES' : 'NO'})
+                  </button>
+                )}
+                
+                {/* USDC Already Resolved */}
+                {(prediction as any).usdcResolved && (
+                  <button className="btn" style={{ 
+                    background: '#c8e6c9', 
+                    color: '#2e7d32',
+                    cursor: 'not-allowed',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontSize: '11px',
+                    fontWeight: '600'
+                  }}>
+                    💵 USDC Resolved ✅
+                  </button>
+                )}
               </div>
             </div>
           );

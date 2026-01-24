@@ -42,6 +42,8 @@ export const REDIS_KEYS = {
   FARCASTER_PROFILE: (address: string) => `farcaster_profile:${address.toLowerCase()}`,
   // PNL OG image URL cache
   USER_PNL_OG_IMAGE: (address: string) => `user:pnl:ogImageUrl:${address.toLowerCase()}`,
+  // USDC Price history for charts
+  USDC_PRICE_HISTORY: (predictionId: string) => `usdc:price_history:${predictionId}`,
 } as const;
 
 // Farcaster profile cache type

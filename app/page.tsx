@@ -27,11 +27,10 @@ import {
   MenubarTrigger,
 } from "@/components/ui/menubar";
 import { Button } from "@/components/ui/button";
-import { Trophy, HelpCircle, Settings } from "lucide-react";
+import { Menu, Plus, BarChart3, PlayCircle, Trophy, HelpCircle, Settings } from "lucide-react";
 import { useAccount, useConnect } from "wagmi";
 import { useState, useEffect, useRef, Suspense, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
 import TinderCardComponent from "./components/Main/TinderCard";
 import { AdminPanel } from "./components/Admin/AdminPanel";
 import { CompactStats } from "./components/Market/CompactStats";
@@ -52,9 +51,10 @@ import { SwipeTokenCard } from "./components/Market/SwipeTokenCard";
 import { SwipeClaim } from "./components/Portfolio/SwipeClaim";
 import { DailyTasks } from "./components/Tasks/DailyTasks";
 import { SidePanels } from "./components/SidePanels/SidePanels";
+import KalshiMarkets from "./components/Markets/KalshiMarkets";
 import { useIsDesktop } from "@/lib/hooks/useMediaQuery";
 
-type DashboardType = 'tinder' | 'user' | 'admin' | 'approver' | 'market-stats' | 'analytics' | 'settings' | 'audit-logs' | 'my-portfolio' | 'active-bets' | 'bet-history' | 'help-faq' | 'leaderboard' | 'recent-activity' | 'swipe-token' | 'claim' | 'daily-tasks';
+type DashboardType = 'tinder' | 'user' | 'admin' | 'approver' | 'market-stats' | 'analytics' | 'settings' | 'audit-logs' | 'my-portfolio' | 'active-bets' | 'bet-history' | 'help-faq' | 'leaderboard' | 'recent-activity' | 'swipe-token' | 'claim' | 'daily-tasks' | 'usdc-markets';
 
 // User profile type
 interface UserProfile {
@@ -66,22 +66,15 @@ interface UserProfile {
 
 // Component to handle URL search params (needs Suspense wrapper)
 function SearchParamsHandler({ 
-  onPredictionId,
-  onDashboardChange,
-  onPnlOpen
+  onPredictionId 
 }: { 
-  onPredictionId: (id: string) => void;
-  onDashboardChange: (dashboard: DashboardType) => void;
-  onPnlOpen: () => void;
+  onPredictionId: (id: string) => void 
 }) {
   const searchParams = useSearchParams();
   const router = useRouter();
 
   useEffect(() => {
     const predictionId = searchParams.get('prediction');
-    const dashboard = searchParams.get('dashboard');
-    const pnl = searchParams.get('pnl');
-    
     if (predictionId) {
       console.log('🎯 Found prediction parameter in URL:', predictionId);
       onPredictionId(predictionId);
@@ -89,22 +82,7 @@ function SearchParamsHandler({
       // Clear the URL parameter without full page reload
       router.replace('/', { scroll: false });
     }
-    
-    // Handle dashboard=user&pnl=true from PNL share links
-    if (dashboard === 'user') {
-      console.log('📊 Found dashboard=user parameter in URL');
-      onDashboardChange('user');
-      
-      // If pnl=true, trigger PNL tab open
-      if (pnl === 'true') {
-        console.log('📈 Found pnl=true parameter, opening PNL tab');
-        onPnlOpen();
-      }
-      
-      // Clear the URL parameters without full page reload
-      router.replace('/', { scroll: false });
-    }
-  }, [searchParams, router, onPredictionId, onDashboardChange, onPnlOpen]);
+  }, [searchParams, router, onPredictionId]);
 
   return null;
 }
@@ -125,7 +103,6 @@ export default function App() {
   const [readyToClaimCount, setReadyToClaimCount] = useState(0);
   const [badgePosition, setBadgePosition] = useState({ top: 0, right: 0 });
   const [initialPredictionId, setInitialPredictionId] = useState<string | null>(null);
-  const [showPnlOnLoad, setShowPnlOnLoad] = useState(false);
   const viewProfile = useViewProfile();
   const isDesktop = useIsDesktop();
 
@@ -380,11 +357,7 @@ export default function App() {
     <div className="flex flex-col min-h-screen font-sans text-[var(--app-foreground)] mini-app-theme from-[var(--app-background)] to-[var(--app-gray)]">
       {/* Suspense wrapper for useSearchParams */}
       <Suspense fallback={null}>
-        <SearchParamsHandler 
-          onPredictionId={handlePredictionId}
-          onDashboardChange={setActiveDashboard}
-          onPnlOpen={() => setShowPnlOnLoad(true)}
-        />
+        <SearchParamsHandler onPredictionId={handlePredictionId} />
       </Suspense>
       
       {/* Side Panels - Desktop Only (conditionally rendered) */}
@@ -452,50 +425,76 @@ export default function App() {
             </WalletDropdown>
           </Wallet>
           
-          {/* Admin, Leaderboard, Help icons + How to Play button - Top Right */}
-          <div className="flex gap-2 items-center">
-            {/* Icon buttons grouped together */}
-            <div className="flex gap-1">
-              {isAdmin && (
-                <Button
-                  variant="swipeGlow"
-                  size="icon"
-                  onClick={() => setActiveDashboard('admin')}
-                  title="Admin Dashboard"
-                  className="swipe-glow-purple"
+          {/* Menu Dropdown - Top Right */}
+          <Menubar className="!bg-transparent !border-0 !p-0 !h-auto">
+            <MenubarMenu>
+              <MenubarTrigger 
+                className="swipe-glow-button swipe-glow-green !px-3 !py-2 !text-sm !font-semibold !rounded-full hover:!scale-105 !transition-all !duration-200 !cursor-pointer flex items-center gap-2"
+                style={{ fontFamily: '"Spicy Rice", cursive' }}
+              >
+                <Menu className="h-4 w-4 text-[#d4ff00]" />
+                <span className="text-[#d4ff00]">Menu</span>
+              </MenubarTrigger>
+              <MenubarContent className="!bg-black/95 !border-[#d4ff00]/30 !rounded-xl !p-2 !min-w-[180px]">
+                {/* Create - First */}
+                <MenubarItem 
+                  className="!text-white hover:!bg-[#d4ff00]/20 !rounded-lg !py-2.5 !px-3 !cursor-pointer flex items-center gap-3"
+                  onSelect={() => setIsCreateModalOpen(true)}
                 >
-                  <Settings className="h-4 w-4" />
-                </Button>
-              )}
-              <Button
-                variant="swipeGlow"
-                size="icon"
-                onClick={() => setActiveDashboard('leaderboard')}
-                title="Leaderboard"
-                className="swipe-glow-gold"
-              >
-                <Trophy className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="swipeGlow"
-                size="icon"
-                onClick={() => setActiveDashboard('help-faq')}
-                title="Help & FAQ"
-                className="swipe-glow-cyan"
-              >
-                <HelpCircle className="h-4 w-4" />
-              </Button>
-            </div>
-            {/* How to Play button on the right */}
-            <Button
-              variant="swipeGlow"
-              onClick={() => setIsHowToPlayOpen(true)}
-              className="!px-3 !py-2 !text-xs !font-semibold swipe-glow-green"
-              style={{ fontFamily: '"Spicy Rice", cursive' }}
-            >
-              How to Play
-            </Button>
-          </div>
+                  <Plus className="h-4 w-4 text-red-500" />
+                  <span className="font-semibold">Create</span>
+                  <span className="ml-auto text-[10px] bg-red-500 text-white px-1.5 py-0.5 rounded animate-pulse">LIVE</span>
+                </MenubarItem>
+                
+                {/* Stats */}
+                <MenubarItem 
+                  className="!text-white hover:!bg-[#d4ff00]/20 !rounded-lg !py-2.5 !px-3 !cursor-pointer flex items-center gap-3"
+                  onSelect={() => setActiveDashboard('market-stats')}
+                >
+                  <BarChart3 className="h-4 w-4 text-blue-400" />
+                  <span>Stats</span>
+                </MenubarItem>
+                
+                {/* How to Play */}
+                <MenubarItem 
+                  className="!text-white hover:!bg-[#d4ff00]/20 !rounded-lg !py-2.5 !px-3 !cursor-pointer flex items-center gap-3"
+                  onSelect={() => setIsHowToPlayOpen(true)}
+                >
+                  <PlayCircle className="h-4 w-4 text-green-400" />
+                  <span>How to Play</span>
+                </MenubarItem>
+                
+                {/* Leaderboard */}
+                <MenubarItem 
+                  className="!text-white hover:!bg-[#d4ff00]/20 !rounded-lg !py-2.5 !px-3 !cursor-pointer flex items-center gap-3"
+                  onSelect={() => setActiveDashboard('leaderboard')}
+                >
+                  <Trophy className="h-4 w-4 text-yellow-400" />
+                  <span>Leaderboard</span>
+                </MenubarItem>
+                
+                {/* Help & FAQ */}
+                <MenubarItem 
+                  className="!text-white hover:!bg-[#d4ff00]/20 !rounded-lg !py-2.5 !px-3 !cursor-pointer flex items-center gap-3"
+                  onSelect={() => setActiveDashboard('help-faq')}
+                >
+                  <HelpCircle className="h-4 w-4 text-cyan-400" />
+                  <span>Help & FAQ</span>
+                </MenubarItem>
+                
+                {/* Admin - only if admin */}
+                {isAdmin && (
+                  <MenubarItem 
+                    className="!text-white hover:!bg-purple-500/20 !rounded-lg !py-2.5 !px-3 !cursor-pointer flex items-center gap-3 !border-t !border-[#d4ff00]/10 !mt-1 !pt-3"
+                    onSelect={() => setActiveDashboard('admin')}
+                  >
+                    <Settings className="h-4 w-4 text-purple-400" />
+                    <span>Admin Panel</span>
+                  </MenubarItem>
+                )}
+              </MenubarContent>
+            </MenubarMenu>
+          </Menubar>
         </div>
 
         {/* Menu Bar - Right after Wallet */}
@@ -504,6 +503,14 @@ export default function App() {
             <MenubarMenu>
               <MenubarTrigger className="menubar-trigger" onClick={() => setActiveDashboard('tinder')}>
                 Bets
+              </MenubarTrigger>
+            </MenubarMenu>
+            <MenubarMenu>
+              <MenubarTrigger 
+                className="menubar-trigger !bg-gradient-to-r !from-blue-500 !to-green-500 !text-white !font-bold hover:!from-blue-400 hover:!to-green-400" 
+                onClick={() => setActiveDashboard('usdc-markets')}
+              >
+                💵 USDC
               </MenubarTrigger>
             </MenubarMenu>
             <MenubarMenu>
@@ -532,27 +539,6 @@ export default function App() {
               >
                 🎁 Tasks
               </MenubarTrigger>
-            </MenubarMenu>
-            <MenubarMenu>
-              <MenubarTrigger className="menubar-trigger" onClick={() => setActiveDashboard('market-stats')}>
-                Stats
-              </MenubarTrigger>
-            </MenubarMenu>
-            <MenubarMenu>
-              <MenubarTrigger className="menubar-trigger relative">
-                Create
-                <Badge 
-                  variant="default" 
-                  className="absolute -top-2 -right-3 px-1 py-0 text-[9px] font-bold bg-red-500 text-white border-0 animate-pulse shadow-lg shadow-red-500/30"
-                >
-                  LIVE
-                </Badge>
-              </MenubarTrigger>
-              <MenubarContent>
-                <MenubarItem onSelect={() => setIsCreateModalOpen(true)}>
-                  Create Prediction
-                </MenubarItem>
-              </MenubarContent>
             </MenubarMenu>
           </Menubar>
           {/* Animated notification badge positioned absolutely outside Menubar */}
@@ -593,13 +579,13 @@ export default function App() {
           {/* Daily Tasks */}
           {activeDashboard === 'daily-tasks' && <DailyTasks />}
 
+          {/* USDC Markets */}
+          {activeDashboard === 'usdc-markets' && <KalshiMarkets />}
+
           {/* Dashboard - moved from 'user' to replace CLAIM */}
           {activeDashboard === 'user' && (
             <div>
-              <EnhancedUserDashboard 
-                showPnlOnLoad={showPnlOnLoad}
-                onPnlShown={() => setShowPnlOnLoad(false)}
-              />
+              <EnhancedUserDashboard />
             </div>
           )}
 

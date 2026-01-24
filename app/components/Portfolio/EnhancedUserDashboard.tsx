@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { CONTRACTS, getV1Contract, getV2Contract, getContractForPrediction } from '../../../lib/contract';
+import { CONTRACTS, getV1Contract, getV2Contract, getContractForPrediction, USDC_DUALPOOL_CONTRACT_ADDRESS, USDC_DUALPOOL_ABI } from '../../../lib/contract';
 import { ethers } from 'ethers';
 import { useHybridPredictions } from '../../../lib/hooks/useHybridPredictions';
 import { RedisPrediction, RedisUserStake, UserTransaction } from '../../../lib/types/redis';
@@ -69,16 +69,28 @@ interface PredictionWithStakes {
       canClaim: boolean;
       isWinner: boolean;
     };
+    USDC?: {
+      predictionId: string;
+      yesAmount: number;      // raw 6 decimals
+      noAmount: number;       // raw 6 decimals
+      claimed: boolean;
+      potentialPayout: number;
+      potentialProfit: number;
+      canClaim: boolean;
+      isWinner: boolean;
+    };
   };
+  // USDC pool data
+  usdcPoolEnabled?: boolean;
+  usdcYesTotalAmount?: number;
+  usdcNoTotalAmount?: number;
+  usdcResolved?: boolean;
+  usdcCancelled?: boolean;
+  usdcOutcome?: boolean;
   status: 'active' | 'resolved' | 'expired' | 'cancelled';
 }
 
-interface EnhancedUserDashboardProps {
-  showPnlOnLoad?: boolean;
-  onPnlShown?: () => void;
-}
-
-export function EnhancedUserDashboard({ showPnlOnLoad, onPnlShown }: EnhancedUserDashboardProps) {
+export function EnhancedUserDashboard() {
   const { address } = useAccount();
   const { writeContract } = useWriteContract();
   const { composeCast: minikitComposeCast } = useComposeCast();
@@ -152,15 +164,6 @@ export function EnhancedUserDashboard({ showPnlOnLoad, onPnlShown }: EnhancedUse
   // Dashboard view state (main, pnl)
   const [activeView, setActiveView] = useState<'main' | 'pnl'>('main');
   
-  // Handle showPnlOnLoad prop - open PNL tab when coming from shared link
-  useEffect(() => {
-    if (showPnlOnLoad) {
-      console.log('📊 Opening PNL tab from shared link');
-      setActiveView('pnl');
-      onPnlShown?.();
-    }
-  }, [showPnlOnLoad, onPnlShown]);
-  
   // Modal states
   const [showModal, setShowModal] = useState(false);
   const [showShareDropdown, setShowShareDropdown] = useState(false);
@@ -186,7 +189,7 @@ export function EnhancedUserDashboard({ showPnlOnLoad, onPnlShown }: EnhancedUse
   };
 
   // Mark stake as claimed locally - only for specific token type
-  const markStakeAsClaimed = (predictionId: string, tokenType: 'ETH' | 'SWIPE') => {
+  const markStakeAsClaimed = (predictionId: string, tokenType: 'ETH' | 'SWIPE' | 'USDC') => {
     const stakeKey = `${predictionId}-${tokenType}`;
     setClaimedStakes(prev => new Set([...prev, stakeKey]));
     
@@ -209,7 +212,7 @@ export function EnhancedUserDashboard({ showPnlOnLoad, onPnlShown }: EnhancedUse
       }
       
       // Also handle single stake format (V1) - check if it's a direct stake
-      if (updatedPred.userStakes && !updatedPred.userStakes.ETH && !updatedPred.userStakes.SWIPE) {
+      if (updatedPred.userStakes && !updatedPred.userStakes.ETH && !updatedPred.userStakes.SWIPE && !updatedPred.userStakes.USDC) {
         // This is a V1 single stake - convert to ETH format
         if (tokenType === 'ETH') {
           const originalStake = updatedPred.userStakes as any;
@@ -263,6 +266,25 @@ export function EnhancedUserDashboard({ showPnlOnLoad, onPnlShown }: EnhancedUse
     } else {
       // Small numbers
       return `${sign}${absSwipe.toFixed(4)}`;
+    }
+  };
+
+  // Format USDC for display (6 decimals)
+  const formatUsdc = (raw: number): string => {
+    const usdc = raw / 1e6;
+    if (usdc === 0) return '$0.00';
+    
+    const absUsdc = Math.abs(usdc);
+    const sign = usdc < 0 ? '-' : '';
+    
+    if (absUsdc >= 1000000) {
+      return `${sign}$${(absUsdc / 1000000).toFixed(2)}M`;
+    } else if (absUsdc >= 1000) {
+      return `${sign}$${(absUsdc / 1000).toFixed(2)}K`;
+    } else if (absUsdc >= 1) {
+      return `${sign}$${absUsdc.toFixed(2)}`;
+    } else {
+      return `${sign}$${absUsdc.toFixed(4)}`;
     }
   };
 
@@ -513,8 +535,10 @@ export function EnhancedUserDashboard({ showPnlOnLoad, onPnlShown }: EnhancedUse
           // Get stakes for this prediction (if any)
           const predictionStakes = stakesByPrediction[prediction.id] || [];
           
-          if (predictionStakes.length === 0) {
-            continue; // Skip predictions without user stakes
+          // Skip if no ETH/SWIPE stakes AND not a V2 prediction AND no USDC pool enabled
+          const isV2Pred = prediction.id.startsWith('pred_v2_');
+          if (predictionStakes.length === 0 && !prediction.usdcPoolEnabled && !isV2Pred) {
+            continue;
           }
             
             // Group stakes by token type
@@ -615,6 +639,103 @@ export function EnhancedUserDashboard({ showPnlOnLoad, onPnlShown }: EnhancedUse
             }
             
             
+            // Check for USDC position for all V2 predictions (USDC contract may have positions even without usdcPoolEnabled flag)
+            const isV2Prediction = prediction.id.startsWith('pred_v2_');
+            if (isV2Prediction || prediction.usdcPoolEnabled) {
+              try {
+                // Get numeric ID for contract call
+                const numericId = parseInt(prediction.id.replace('pred_v2_', '').replace('pred_v1_', ''), 10);
+                
+                if (!isNaN(numericId)) {
+                  const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_BASE_RPC_URL);
+                  const usdcContract = new ethers.Contract(USDC_DUALPOOL_CONTRACT_ADDRESS, USDC_DUALPOOL_ABI, provider);
+                  
+                  const position = await usdcContract.getPosition(numericId, address);
+                  const usdcYesAmount = Number(position[0]) || 0;  // yesAmount (6 decimals)
+                  const usdcNoAmount = Number(position[1]) || 0;   // noAmount (6 decimals)
+                  const usdcClaimed = position[4] || false;        // claimed
+                  
+                  if (usdcYesAmount > 0 || usdcNoAmount > 0) {
+                    const usdcStakeAmount = usdcYesAmount + usdcNoAmount;
+                    let usdcPotentialPayout = 0;
+                    let usdcPotentialProfit = 0;
+                    let usdcCanClaim = false;
+                    let usdcIsWinner = false;
+                    
+                    // Get USDC pools
+                    const usdcYesPool = prediction.usdcYesTotalAmount || 0;
+                    const usdcNoPool = prediction.usdcNoTotalAmount || 0;
+                    
+                    // Check if USDC prediction is resolved (cast to any for USDC-specific fields)
+                    const predAny = prediction as any;
+                    const usdcResolved = predAny.usdcResolved || prediction.resolved;
+                    const usdcCancelled = predAny.usdcCancelled || prediction.cancelled;
+                    const usdcOutcome = predAny.usdcOutcome ?? prediction.outcome;
+                    
+                    if (usdcResolved) {
+                      const winnersPool = usdcOutcome ? usdcYesPool : usdcNoPool;
+                      const losersPool = usdcOutcome ? usdcNoPool : usdcYesPool;
+                      const platformFee = losersPool * 0.015; // 1.5% total fee (1% platform + 0.5% creator)
+                      const netLosersPool = losersPool - platformFee;
+                      
+                      // User's winning stake (only the side that won)
+                      const winningStake = usdcOutcome ? usdcYesAmount : usdcNoAmount;
+                      // User's losing stake (the side that lost)
+                      const losingStake = usdcOutcome ? usdcNoAmount : usdcYesAmount;
+                      
+                      if (winningStake > 0) {
+                        usdcIsWinner = true;
+                        // Payout = winning stake + share of losers pool
+                        usdcPotentialPayout = winningStake + (winningStake / winnersPool) * netLosersPool;
+                        // Profit = what we get - TOTAL we staked (including lost side)
+                        usdcPotentialProfit = usdcPotentialPayout - usdcStakeAmount;
+                        usdcCanClaim = !usdcClaimed;
+                      } else {
+                        // User only bet on losing side
+                        usdcIsWinner = false;
+                        usdcPotentialPayout = 0;
+                        usdcPotentialProfit = -usdcStakeAmount;
+                        usdcCanClaim = false;
+                      }
+                    } else if (usdcCancelled) {
+                      usdcPotentialPayout = usdcStakeAmount;
+                      usdcPotentialProfit = 0;
+                      usdcCanClaim = !usdcClaimed;
+                      usdcIsWinner = false;
+                    } else {
+                      // Active - calculate potential payout
+                      if (usdcYesAmount > 0 && usdcYesPool > 0) {
+                        const fee = usdcNoPool * 0.015;
+                        const netNoPool = usdcNoPool - fee;
+                        usdcPotentialPayout = usdcStakeAmount + (usdcYesAmount / usdcYesPool) * netNoPool;
+                        usdcPotentialProfit = usdcPotentialPayout - usdcStakeAmount;
+                      } else if (usdcNoAmount > 0 && usdcNoPool > 0) {
+                        const fee = usdcYesPool * 0.015;
+                        const netYesPool = usdcYesPool - fee;
+                        usdcPotentialPayout = usdcStakeAmount + (usdcNoAmount / usdcNoPool) * netYesPool;
+                        usdcPotentialProfit = usdcPotentialPayout - usdcStakeAmount;
+                      }
+                      usdcCanClaim = false;
+                      usdcIsWinner = false;
+                    }
+                    
+                    stakesByToken['USDC'] = {
+                      predictionId: prediction.id,
+                      yesAmount: usdcYesAmount,
+                      noAmount: usdcNoAmount,
+                      claimed: usdcClaimed,
+                      potentialPayout: usdcPotentialPayout,
+                      potentialProfit: usdcPotentialProfit,
+                      canClaim: usdcCanClaim,
+                      isWinner: usdcIsWinner
+                    };
+                  }
+                }
+              } catch (usdcError) {
+                console.warn(`Failed to fetch USDC position for prediction ${prediction.id}:`, usdcError);
+              }
+            }
+            
             // Only add prediction if there are stakes
             if (Object.keys(stakesByToken).length > 0) {
               const predictionWithStakes: PredictionWithStakes = {
@@ -672,20 +793,24 @@ export function EnhancedUserDashboard({ showPnlOnLoad, onPnlShown }: EnhancedUse
         filteredPredictions = allUserPredictions.filter(p => {
           const ethStake = p.userStakes?.ETH;
           const swipeStake = p.userStakes?.SWIPE;
+          const usdcStake = p.userStakes?.USDC;
 
           // Check local claimed state first
           const ethClaimed = claimedStakes.has(`${p.id}-ETH`) || ethStake?.claimed;
           const swipeClaimed = claimedStakes.has(`${p.id}-SWIPE`) || swipeStake?.claimed;
+          const usdcClaimed = claimedStakes.has(`${p.id}-USDC`) || usdcStake?.claimed;
 
           // Must be resolved and user must have won, and not already claimed
           const ethCanClaim = ethStake && ethStake.isWinner && ethStake.canClaim && !ethClaimed;
           const swipeCanClaim = swipeStake && swipeStake.isWinner && swipeStake.canClaim && !swipeClaimed;
+          const usdcCanClaim = usdcStake && usdcStake.isWinner && usdcStake.canClaim && !usdcClaimed;
 
           // Also include cancelled predictions where user can claim refund
           const ethCanClaimRefund = p.cancelled && ethStake && !ethClaimed && (ethStake.yesAmount > 0 || ethStake.noAmount > 0);
           const swipeCanClaimRefund = p.cancelled && swipeStake && !swipeClaimed && (swipeStake.yesAmount > 0 || swipeStake.noAmount > 0);
+          const usdcCanClaimRefund = (p.cancelled || p.usdcCancelled) && usdcStake && !usdcClaimed && (usdcStake.yesAmount > 0 || usdcStake.noAmount > 0);
 
-          return ethCanClaim || swipeCanClaim || ethCanClaimRefund || swipeCanClaimRefund;
+          return ethCanClaim || swipeCanClaim || usdcCanClaim || ethCanClaimRefund || swipeCanClaimRefund || usdcCanClaimRefund;
         });
         break;
         
@@ -699,7 +824,8 @@ export function EnhancedUserDashboard({ showPnlOnLoad, onPnlShown }: EnhancedUse
         filteredPredictions = allUserPredictions.filter(p => {
           const ethStake = p.userStakes?.ETH;
           const swipeStake = p.userStakes?.SWIPE;
-          return (ethStake?.isWinner) || (swipeStake?.isWinner);
+          const usdcStake = p.userStakes?.USDC;
+          return (ethStake?.isWinner) || (swipeStake?.isWinner) || (usdcStake?.isWinner);
         });
         break;
         
@@ -708,8 +834,10 @@ export function EnhancedUserDashboard({ showPnlOnLoad, onPnlShown }: EnhancedUse
         filteredPredictions = allUserPredictions.filter(p => {
           const ethStake = p.userStakes?.ETH;
           const swipeStake = p.userStakes?.SWIPE;
+          const usdcStake = p.userStakes?.USDC;
           return (ethStake && !ethStake.isWinner && p.status === 'resolved') || 
-                 (swipeStake && !swipeStake.isWinner && p.status === 'resolved');
+                 (swipeStake && !swipeStake.isWinner && p.status === 'resolved') ||
+                 (usdcStake && !usdcStake.isWinner && (p.status === 'resolved' || p.usdcResolved));
         });
         break;
         
@@ -720,7 +848,7 @@ export function EnhancedUserDashboard({ showPnlOnLoad, onPnlShown }: EnhancedUse
         
       case 'cancelled':
         // Show only cancelled predictions where user participated
-        filteredPredictions = allUserPredictions.filter(p => p.cancelled);
+        filteredPredictions = allUserPredictions.filter(p => p.cancelled || p.usdcCancelled);
         break;
         
       case 'claimed':
@@ -728,12 +856,14 @@ export function EnhancedUserDashboard({ showPnlOnLoad, onPnlShown }: EnhancedUse
         filteredPredictions = allUserPredictions.filter(p => {
           const ethStake = p.userStakes?.ETH;
           const swipeStake = p.userStakes?.SWIPE;
+          const usdcStake = p.userStakes?.USDC;
           
           // Check local claimed state first
           const ethClaimed = claimedStakes.has(`${p.id}-ETH`) || ethStake?.claimed;
           const swipeClaimed = claimedStakes.has(`${p.id}-SWIPE`) || swipeStake?.claimed;
+          const usdcClaimed = claimedStakes.has(`${p.id}-USDC`) || usdcStake?.claimed;
           
-          return ethClaimed || swipeClaimed;
+          return ethClaimed || swipeClaimed || usdcClaimed;
         });
         break;
         
@@ -747,15 +877,18 @@ export function EnhancedUserDashboard({ showPnlOnLoad, onPnlShown }: EnhancedUse
         filteredPredictions = allUserPredictions.filter(p => {
           const ethStake = p.userStakes?.ETH;
           const swipeStake = p.userStakes?.SWIPE;
+          const usdcStake = p.userStakes?.USDC;
           
           // Check local claimed state first
           const ethClaimed = claimedStakes.has(`${p.id}-ETH`) || ethStake?.claimed;
           const swipeClaimed = claimedStakes.has(`${p.id}-SWIPE`) || swipeStake?.claimed;
+          const usdcClaimed = claimedStakes.has(`${p.id}-USDC`) || usdcStake?.claimed;
           
           const ethCanClaim = ethStake && ethStake.isWinner && ethStake.canClaim && !ethClaimed;
           const swipeCanClaim = swipeStake && swipeStake.isWinner && swipeStake.canClaim && !swipeClaimed;
+          const usdcCanClaim = usdcStake && usdcStake.isWinner && usdcStake.canClaim && !usdcClaimed;
           
-          return ethCanClaim || swipeCanClaim;
+          return ethCanClaim || swipeCanClaim || usdcCanClaim;
         });
     }
     
@@ -980,7 +1113,7 @@ export function EnhancedUserDashboard({ showPnlOnLoad, onPnlShown }: EnhancedUse
   }, [selectedFilter, allUserPredictions.length, fetchAllUserPredictions, fetchUserStakes]);
 
   // Handle claim reward
-  const handleClaimReward = async (predictionId: string, tokenType?: 'ETH' | 'SWIPE') => {
+  const handleClaimReward = async (predictionId: string, tokenType?: 'ETH' | 'SWIPE' | 'USDC') => {
     if (!address) {
       alert('❌ Please connect your wallet first');
       return;
@@ -1044,6 +1177,73 @@ export function EnhancedUserDashboard({ showPnlOnLoad, onPnlShown }: EnhancedUse
         }
 
         console.log(`🎯 Attempting to claim reward for prediction ${numericId}...`);
+
+        // Handle USDC claims separately - use USDC DualPool contract
+        if (tokenType === 'USDC') {
+          console.log(`🎯 Using USDC DualPool contract for claim`);
+          
+          // Determine function: claimWinnings for resolved, claimRefund for cancelled
+          const functionName = prediction.cancelled || prediction.usdcCancelled ? 'claimRefund' : 'claimWinnings';
+          console.log(`🎯 Claiming USDC reward using function: ${functionName}`);
+          
+          writeContract({
+            address: USDC_DUALPOOL_CONTRACT_ADDRESS as `0x${string}`,
+            abi: USDC_DUALPOOL_ABI,
+            functionName: functionName,
+            args: [BigInt(numericId)],
+          }, {
+            onSuccess: async (txHash: string) => {
+              console.log('🎯 USDC Claim transaction sent:', txHash);
+              markStakeAsClaimed(predictionId, 'USDC');
+              clearCache();
+              
+              // Create transaction record for USDC claim
+              const usdcStake = stake as { potentialPayout?: number };
+              const transaction: UserTransaction = {
+                id: `tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                type: 'claim' as const,
+                predictionId: predictionId,
+                predictionQuestion: prediction.question,
+                txHash: txHash,
+                basescanUrl: generateBasescanUrl(txHash),
+                timestamp: Date.now(),
+                status: 'pending' as const,
+                tokenType: 'USDC' as const,
+                amount: usdcStake?.potentialPayout || 0
+              };
+              
+              try {
+                await fetch('/api/user-transactions', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    userId: address.toLowerCase(),
+                    transaction
+                  }),
+                });
+                
+                // Add to local state
+                addNewTransaction(transaction);
+              } catch (e) {
+                console.error('Failed to save USDC transaction:', e);
+              }
+              
+              showClaimModal(txHash, generateBasescanUrl(txHash));
+              
+              try {
+                await fetch('/api/sync', { method: 'POST' });
+              } catch (e) {
+                console.error('Sync failed:', e);
+              }
+            },
+            onError: (error: any) => {
+              console.error('❌ USDC Claim transaction failed:', error);
+              showErrorModal(error?.message || 'USDC claim transaction failed');
+              setIsTransactionLoading(false);
+            },
+          });
+          return;
+        }
 
         // All predictions use V2 contract (pred_v1_ are synced V1 predictions on V2)
         const contract = CONTRACTS.V2;
@@ -1313,20 +1513,24 @@ export function EnhancedUserDashboard({ showPnlOnLoad, onPnlShown }: EnhancedUse
         return allUserPredictions.filter(p => {
           const ethStake = p.userStakes?.ETH;
           const swipeStake = p.userStakes?.SWIPE;
+          const usdcStake = p.userStakes?.USDC;
 
           // Check local claimed state first
           const ethClaimed = claimedStakes.has(`${p.id}-ETH`) || ethStake?.claimed;
           const swipeClaimed = claimedStakes.has(`${p.id}-SWIPE`) || swipeStake?.claimed;
+          const usdcClaimed = claimedStakes.has(`${p.id}-USDC`) || usdcStake?.claimed;
 
           // Must be resolved and user must have won, and not already claimed
           const ethCanClaim = ethStake && ethStake.isWinner && ethStake.canClaim && !ethClaimed;
           const swipeCanClaim = swipeStake && swipeStake.isWinner && swipeStake.canClaim && !swipeClaimed;
+          const usdcCanClaim = usdcStake && usdcStake.isWinner && usdcStake.canClaim && !usdcClaimed;
 
           // Also include cancelled predictions where user can claim refund
           const ethCanClaimRefund = p.cancelled && ethStake && !ethClaimed && (ethStake.yesAmount > 0 || ethStake.noAmount > 0);
           const swipeCanClaimRefund = p.cancelled && swipeStake && !swipeClaimed && (swipeStake.yesAmount > 0 || swipeStake.noAmount > 0);
+          const usdcCanClaimRefund = (p.cancelled || p.usdcCancelled) && usdcStake && !usdcClaimed && (usdcStake.yesAmount > 0 || usdcStake.noAmount > 0);
 
-          return ethCanClaim || swipeCanClaim || ethCanClaimRefund || swipeCanClaimRefund;
+          return ethCanClaim || swipeCanClaim || usdcCanClaim || ethCanClaimRefund || swipeCanClaimRefund || usdcCanClaimRefund;
         });
       case 'active':
         // Show only active predictions where user participated
@@ -1336,33 +1540,38 @@ export function EnhancedUserDashboard({ showPnlOnLoad, onPnlShown }: EnhancedUse
         return allUserPredictions.filter(p => {
           const ethStake = p.userStakes?.ETH;
           const swipeStake = p.userStakes?.SWIPE;
-          return (ethStake?.isWinner) || (swipeStake?.isWinner);
+          const usdcStake = p.userStakes?.USDC;
+          return (ethStake?.isWinner) || (swipeStake?.isWinner) || (usdcStake?.isWinner);
         });
       case 'lost':
         // Show only predictions where user lost
         return allUserPredictions.filter(p => {
           const ethStake = p.userStakes?.ETH;
           const swipeStake = p.userStakes?.SWIPE;
+          const usdcStake = p.userStakes?.USDC;
           return (ethStake && !ethStake.isWinner && p.status === 'resolved') || 
-                 (swipeStake && !swipeStake.isWinner && p.status === 'resolved');
+                 (swipeStake && !swipeStake.isWinner && p.status === 'resolved') ||
+                 (usdcStake && !usdcStake.isWinner && (p.status === 'resolved' || p.usdcResolved));
         });
       case 'expired':
         // Show only expired predictions where user participated (deadline passed but not resolved)
         return allUserPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline <= Date.now() / 1000);
       case 'cancelled':
         // Show only cancelled predictions where user participated
-        return allUserPredictions.filter(p => p.cancelled);
+        return allUserPredictions.filter(p => p.cancelled || p.usdcCancelled);
       case 'claimed':
         // Show only predictions that have been claimed
         return allUserPredictions.filter(p => {
           const ethStake = p.userStakes?.ETH;
           const swipeStake = p.userStakes?.SWIPE;
+          const usdcStake = p.userStakes?.USDC;
           
           // Check local claimed state first
           const ethClaimed = claimedStakes.has(`${p.id}-ETH`) || ethStake?.claimed;
           const swipeClaimed = claimedStakes.has(`${p.id}-SWIPE`) || swipeStake?.claimed;
+          const usdcClaimed = claimedStakes.has(`${p.id}-USDC`) || usdcStake?.claimed;
           
-          return ethClaimed || swipeClaimed;
+          return ethClaimed || swipeClaimed || usdcClaimed;
         });
       case 'all':
         // Show all predictions where user participated
@@ -1405,6 +1614,13 @@ export function EnhancedUserDashboard({ showPnlOnLoad, onPnlShown }: EnhancedUse
     return sum + swipeAmount;
   }, 0);
   
+  // USDC totals (6 decimals)
+  const usdcTotalStaked = allUserPredictions.reduce((sum, p) => {
+    const usdcStake = p.userStakes?.USDC;
+    const usdcAmount = (usdcStake?.yesAmount || 0) + (usdcStake?.noAmount || 0);
+    return sum + usdcAmount;
+  }, 0);
+  
   const ethTotalPotentialPayout = allUserPredictions.reduce((sum, p) => {
     const ethStake = p.userStakes?.ETH;
     return sum + (ethStake?.potentialPayout || 0);
@@ -1415,9 +1631,19 @@ export function EnhancedUserDashboard({ showPnlOnLoad, onPnlShown }: EnhancedUse
     return sum + (swipeStake?.potentialPayout || 0);
   }, 0);
   
+  const usdcTotalPotentialPayout = allUserPredictions.reduce((sum, p) => {
+    const usdcStake = p.userStakes?.USDC;
+    return sum + (usdcStake?.potentialPayout || 0);
+  }, 0);
+  
   const ethTotalPotentialProfit = allUserPredictions.reduce((sum, p) => {
     const ethStake = p.userStakes?.ETH;
     return sum + (ethStake?.potentialProfit || 0);
+  }, 0);
+  
+  const usdcTotalPotentialProfit = allUserPredictions.reduce((sum, p) => {
+    const usdcStake = p.userStakes?.USDC;
+    return sum + (usdcStake?.potentialProfit || 0);
   }, 0);
   
   const swipeTotalPotentialProfit = allUserPredictions.reduce((sum, p) => {
@@ -1428,20 +1654,24 @@ export function EnhancedUserDashboard({ showPnlOnLoad, onPnlShown }: EnhancedUse
   const canClaimCount = allUserPredictions.filter(p => {
     const ethStake = p.userStakes?.ETH;
     const swipeStake = p.userStakes?.SWIPE;
+    const usdcStake = p.userStakes?.USDC;
 
     // Check local claimed state first
     const ethClaimed = claimedStakes.has(`${p.id}-ETH`) || ethStake?.claimed;
     const swipeClaimed = claimedStakes.has(`${p.id}-SWIPE`) || swipeStake?.claimed;
+    const usdcClaimed = claimedStakes.has(`${p.id}-USDC`) || usdcStake?.claimed;
 
     // Must be resolved, user must have won, and not already claimed
     const ethCanClaim = ethStake && ethStake.isWinner && ethStake.canClaim && !ethClaimed;
     const swipeCanClaim = swipeStake && swipeStake.isWinner && swipeStake.canClaim && !swipeClaimed;
+    const usdcCanClaim = usdcStake && usdcStake.isWinner && usdcStake.canClaim && !usdcClaimed;
 
     // Also include cancelled predictions where user can claim refund
     const ethCanClaimRefund = p.cancelled && ethStake && !ethClaimed && (ethStake.yesAmount > 0 || ethStake.noAmount > 0);
     const swipeCanClaimRefund = p.cancelled && swipeStake && !swipeClaimed && (swipeStake.yesAmount > 0 || swipeStake.noAmount > 0);
+    const usdcCanClaimRefund = (p.cancelled || p.usdcCancelled) && usdcStake && !usdcClaimed && (usdcStake.yesAmount > 0 || usdcStake.noAmount > 0);
 
-    return ethCanClaim || swipeCanClaim || ethCanClaimRefund || swipeCanClaimRefund;
+    return ethCanClaim || swipeCanClaim || usdcCanClaim || ethCanClaimRefund || swipeCanClaimRefund || usdcCanClaimRefund;
   }).length;
 
   if (!address) {
@@ -1691,6 +1921,25 @@ export function EnhancedUserDashboard({ showPnlOnLoad, onPnlShown }: EnhancedUse
                 </span>
               </td>
             </tr>
+            {/* USDC Row - only show if user has USDC stakes */}
+            {usdcTotalStaked > 0 && (
+              <tr className="usdc-row">
+                <td className="token-cell">
+                  <span className="usdc-icon-stats">$</span>
+                </td>
+                <td className="value-cell">
+                  <span className="stat-value-total">{formatUsdc(usdcTotalStaked)}</span>
+                </td>
+                <td className="value-cell">
+                  <span className="stat-value-payout">{formatUsdc(usdcTotalPotentialPayout)}</span>
+                </td>
+                <td className="value-cell">
+                  <span className={`stat-value-profit ${usdcTotalPotentialProfit >= 0 ? 'profit' : 'loss'}`}>
+                    {usdcTotalPotentialProfit >= 0 ? '+' : ''}{formatUsdc(usdcTotalPotentialProfit)}
+                  </span>
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
         
@@ -1968,6 +2217,7 @@ export function EnhancedUserDashboard({ showPnlOnLoad, onPnlShown }: EnhancedUse
                   }
                   
                   const isSwipe = tokenType === 'SWIPE';
+                  const isUsdc = tokenType === 'USDC';
                   
                   return (
                     <div key={uniqueKey} className="transaction-card-compact">
@@ -1981,7 +2231,9 @@ export function EnhancedUserDashboard({ showPnlOnLoad, onPnlShown }: EnhancedUse
                             {transaction.type.toUpperCase()}
                           </span>
                           <span className={`token-type-badge-compact ${tokenType.toLowerCase()}`}>
-                            {isSwipe ? (
+                            {isUsdc ? (
+                              <span className="usdc-icon-tx">$</span>
+                            ) : isSwipe ? (
                               <img src="/splash.png" alt="SWIPE" className="token-badge-icon-compact" />
                             ) : (
                               <img src="/Ethereum-icon-purple.svg" alt="ETH" className="token-badge-icon-compact eth-icon-no-bg" />
@@ -2034,13 +2286,18 @@ export function EnhancedUserDashboard({ showPnlOnLoad, onPnlShown }: EnhancedUse
                             <span className="label">Amount:</span>
                             <span className={`amount-value-compact ${tokenType.toLowerCase()}`}>
                               {(() => {
+                                if (isUsdc) {
+                                  // USDC is stored with 6 decimals
+                                  const usdcAmount = transaction.amount / 1e6;
+                                  return `$${usdcAmount.toFixed(2)}`;
+                                }
                                 const isWei = transaction.amount > 1000000;
                                 if (isSwipe) {
                                   return isWei ? formatSwipe(transaction.amount) : `${transaction.amount.toLocaleString()}`;
                                 } else {
                                   return isWei ? formatEth(transaction.amount) : transaction.amount.toFixed(6);
                                 }
-                              })()} {tokenType}
+                              })()} {!isUsdc && tokenType}
                             </span>
                           </p>
                         )}

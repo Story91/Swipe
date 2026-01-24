@@ -1328,6 +1328,13 @@ export const CONTRACTS = {
     version: 'v2',
     active: true, // dla nowych predictions
     supportedTokens: ['ETH', 'SWIPE']
+  },
+  USDC: {
+    address: process.env.NEXT_PUBLIC_USDC_DUALPOOL_CONTRACT || '0xf5Fa6206c2a7d5473ae7468082c9D260DFF83205',
+    abi: [], // Will be populated after import
+    version: 'usdc',
+    active: true,
+    supportedTokens: ['USDC']
   }
 };
 
@@ -1401,6 +1408,289 @@ export const SWIPE_CLAIM_CONFIG = {
   address: SWIPE_CLAIM_CONTRACT_ADDRESS,
   abi: SWIPE_CLAIM_ABI,
 };
+
+// ============ USDC DualPool Contract Configuration ============
+
+// USDC Token Address on Base
+export const USDC_TOKEN = {
+  address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+  symbol: 'USDC',
+  decimals: 6,
+  name: 'USD Coin'
+};
+
+// USDC DualPool Contract Address (update after deployment)
+export const USDC_DUALPOOL_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_USDC_DUALPOOL_CONTRACT || '0xf5Fa6206c2a7d5473ae7468082c9D260DFF83205';
+
+// USDC DualPool Contract ABI
+export const USDC_DUALPOOL_ABI = [
+  // Register prediction
+  {
+    inputs: [
+      { name: 'predictionId', type: 'uint256' },
+      { name: 'creator', type: 'address' },
+      { name: 'deadline', type: 'uint256' }
+    ],
+    name: 'registerPrediction',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  // Place bet
+  {
+    inputs: [
+      { name: 'predictionId', type: 'uint256' },
+      { name: 'isYes', type: 'bool' },
+      { name: 'amount', type: 'uint256' }
+    ],
+    name: 'placeBet',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  // Exit early
+  {
+    inputs: [
+      { name: 'predictionId', type: 'uint256' },
+      { name: 'isYes', type: 'bool' },
+      { name: 'amount', type: 'uint256' }
+    ],
+    name: 'exitEarly',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  // Resolve prediction
+  {
+    inputs: [
+      { name: 'predictionId', type: 'uint256' },
+      { name: 'outcome', type: 'bool' }
+    ],
+    name: 'resolvePrediction',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  // Claim winnings
+  {
+    inputs: [{ name: 'predictionId', type: 'uint256' }],
+    name: 'claimWinnings',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  // Claim refund
+  {
+    inputs: [{ name: 'predictionId', type: 'uint256' }],
+    name: 'claimRefund',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  // Cancel prediction
+  {
+    inputs: [
+      { name: 'predictionId', type: 'uint256' },
+      { name: 'reason', type: 'string' }
+    ],
+    name: 'cancelPrediction',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  // View: Get prices
+  {
+    inputs: [{ name: 'predictionId', type: 'uint256' }],
+    name: 'getPrices',
+    outputs: [
+      { name: 'yesPrice', type: 'uint256' },
+      { name: 'noPrice', type: 'uint256' }
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  // View: Get prediction
+  {
+    inputs: [{ name: 'predictionId', type: 'uint256' }],
+    name: 'getPrediction',
+    outputs: [
+      { name: 'registered', type: 'bool' },
+      { name: 'creator', type: 'address' },
+      { name: 'deadline', type: 'uint256' },
+      { name: 'yesPool', type: 'uint256' },
+      { name: 'noPool', type: 'uint256' },
+      { name: 'resolved', type: 'bool' },
+      { name: 'cancelled', type: 'bool' },
+      { name: 'outcome', type: 'bool' },
+      { name: 'participantCount', type: 'uint256' }
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  // View: Get position
+  {
+    inputs: [
+      { name: 'predictionId', type: 'uint256' },
+      { name: 'user', type: 'address' }
+    ],
+    name: 'getPosition',
+    outputs: [
+      { name: 'yesAmount', type: 'uint256' },
+      { name: 'noAmount', type: 'uint256' },
+      { name: 'yesEntryPrice', type: 'uint256' },
+      { name: 'noEntryPrice', type: 'uint256' },
+      { name: 'claimed', type: 'bool' }
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  // View: Calculate exit value
+  {
+    inputs: [
+      { name: 'predictionId', type: 'uint256' },
+      { name: 'isYes', type: 'bool' },
+      { name: 'amount', type: 'uint256' }
+    ],
+    name: 'calculateExitValue',
+    outputs: [
+      { name: 'grossValue', type: 'uint256' },
+      { name: 'fee', type: 'uint256' },
+      { name: 'netValue', type: 'uint256' }
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  // View: Calculate potential winnings
+  {
+    inputs: [
+      { name: 'predictionId', type: 'uint256' },
+      { name: 'isYes', type: 'bool' },
+      { name: 'amount', type: 'uint256' }
+    ],
+    name: 'calculatePotentialWinnings',
+    outputs: [
+      { name: 'potentialPayout', type: 'uint256' },
+      { name: 'potentialProfit', type: 'uint256' }
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  // View: Is prediction active
+  {
+    inputs: [{ name: 'predictionId', type: 'uint256' }],
+    name: 'isPredictionActive',
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  // View: Get participant count
+  {
+    inputs: [{ name: 'predictionId', type: 'uint256' }],
+    name: 'getParticipantCount',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  // Events
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: 'predictionId', type: 'uint256' },
+      { indexed: true, name: 'creator', type: 'address' },
+      { indexed: false, name: 'deadline', type: 'uint256' }
+    ],
+    name: 'PredictionRegistered',
+    type: 'event'
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: 'predictionId', type: 'uint256' },
+      { indexed: true, name: 'user', type: 'address' },
+      { indexed: false, name: 'isYes', type: 'bool' },
+      { indexed: false, name: 'amount', type: 'uint256' },
+      { indexed: false, name: 'priceAtEntry', type: 'uint256' },
+      { indexed: false, name: 'newYesPool', type: 'uint256' },
+      { indexed: false, name: 'newNoPool', type: 'uint256' }
+    ],
+    name: 'BetPlaced',
+    type: 'event'
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: 'predictionId', type: 'uint256' },
+      { indexed: true, name: 'user', type: 'address' },
+      { indexed: false, name: 'isYes', type: 'bool' },
+      { indexed: false, name: 'amount', type: 'uint256' },
+      { indexed: false, name: 'received', type: 'uint256' },
+      { indexed: false, name: 'fee', type: 'uint256' }
+    ],
+    name: 'EarlyExit',
+    type: 'event'
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: 'predictionId', type: 'uint256' },
+      { indexed: false, name: 'outcome', type: 'bool' },
+      { indexed: false, name: 'platformFee', type: 'uint256' },
+      { indexed: false, name: 'creatorReward', type: 'uint256' },
+      { indexed: false, name: 'winnersPool', type: 'uint256' },
+      { indexed: false, name: 'losersPool', type: 'uint256' }
+    ],
+    name: 'PredictionResolved',
+    type: 'event'
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: 'predictionId', type: 'uint256' },
+      { indexed: true, name: 'user', type: 'address' },
+      { indexed: false, name: 'amount', type: 'uint256' },
+      { indexed: false, name: 'profit', type: 'uint256' }
+    ],
+    name: 'WinningsClaimed',
+    type: 'event'
+  }
+] as const;
+
+// USDC DualPool Contract Config
+export const USDC_DUALPOOL_CONFIG = {
+  address: USDC_DUALPOOL_CONTRACT_ADDRESS,
+  abi: USDC_DUALPOOL_ABI,
+  token: USDC_TOKEN,
+  fees: {
+    platform: 100, // 1% (basis points)
+    creator: 50,   // 0.5% (basis points)
+    earlyExit: 500 // 5% (basis points)
+  },
+  minBet: 1_000_000 // 1 USDC (6 decimals)
+};
+
+// Helper function to get USDC DualPool contract
+export function getUSDCDualPoolContract(signer?: ethers.Signer) {
+  if (!signer) {
+    return new ethers.Contract(USDC_DUALPOOL_CONTRACT_ADDRESS, USDC_DUALPOOL_ABI);
+  }
+  return new ethers.Contract(USDC_DUALPOOL_CONTRACT_ADDRESS, USDC_DUALPOOL_ABI, signer);
+}
+
+// Helper function to get USDC token contract
+export function getUSDCContract(signer?: ethers.Signer) {
+  const ERC20_ABI = [
+    'function approve(address spender, uint256 amount) returns (bool)',
+    'function allowance(address owner, address spender) view returns (uint256)',
+    'function balanceOf(address account) view returns (uint256)',
+    'function transfer(address to, uint256 amount) returns (bool)',
+    'function decimals() view returns (uint8)'
+  ];
+  
+  if (!signer) {
+    return new ethers.Contract(USDC_TOKEN.address, ERC20_ABI);
+  }
+  return new ethers.Contract(USDC_TOKEN.address, ERC20_ABI, signer);
+}
 
 // Type definitions for TypeScript
 export interface PredictionView {

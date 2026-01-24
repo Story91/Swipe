@@ -59,12 +59,29 @@ interface LegacyCardProps {
         canClaim: boolean;
         isWinner: boolean;
       };
+      USDC?: {
+        predictionId: string;
+        yesAmount: number;      // raw 6 decimals
+        noAmount: number;       // raw 6 decimals
+        claimed: boolean;
+        potentialPayout: number;
+        potentialProfit: number;
+        canClaim: boolean;
+        isWinner: boolean;
+      };
     };
+    // USDC pool data
+    usdcPoolEnabled?: boolean;
+    usdcYesTotalAmount?: number;
+    usdcNoTotalAmount?: number;
+    usdcResolved?: boolean;
+    usdcCancelled?: boolean;
+    usdcOutcome?: boolean;
     status: 'active' | 'resolved' | 'expired' | 'cancelled';
   };
-  onClaimReward: (predictionId: string, tokenType?: 'ETH' | 'SWIPE') => void;
+  onClaimReward: (predictionId: string, tokenType?: 'ETH' | 'SWIPE' | 'USDC') => void;
   isTransactionLoading: boolean;
-  onShareResult?: (prediction: LegacyCardProps['prediction'], isWinner: boolean, profit: number, tokenType: 'ETH' | 'SWIPE') => void;
+  onShareResult?: (prediction: LegacyCardProps['prediction'], isWinner: boolean, profit: number, tokenType: 'ETH' | 'SWIPE' | 'USDC') => void;
 }
 
 export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, onShareResult }: LegacyCardProps) {
@@ -530,12 +547,23 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, on
   // Calculate total staked for user
   const ethStake = prediction.userStakes?.ETH;
   const swipeStake = prediction.userStakes?.SWIPE;
+  const usdcStake = prediction.userStakes?.USDC;
   const ethTotalStaked = ethStake ? (ethStake.yesAmount + ethStake.noAmount) : 0;
   const swipeTotalStaked = swipeStake ? (swipeStake.yesAmount + swipeStake.noAmount) : 0;
+  const usdcTotalStaked = usdcStake ? (usdcStake.yesAmount + usdcStake.noAmount) : 0;
 
   // Determine if user has any stakes
   const hasEthStake = ethTotalStaked > 0;
   const hasSwipeStake = swipeTotalStaked > 0;
+  const hasUsdcStake = usdcTotalStaked > 0;
+
+  // Format USDC (6 decimals)
+  const formatUsdc = (amount: number) => {
+    const val = amount / 1e6;
+    if (val >= 1000) return `${(val / 1000).toFixed(1)}k`;
+    if (val >= 1) return val.toFixed(2);
+    return val.toFixed(4);
+  };
 
   return (
     <div className="legacy-card">
@@ -695,6 +723,19 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, on
                   </td>
                 </tr>
               )}
+              {/* USDC Row */}
+              {hasUsdcStake && (
+                <tr className="usdc-row">
+                  <td className="token-cell">
+                    <span className="usdc-icon">$</span>
+                  </td>
+                  <td className="value-cell staked">${formatUsdc(usdcTotalStaked)}</td>
+                  <td className="value-cell payout">${formatUsdc(usdcStake?.potentialPayout || 0)}</td>
+                  <td className={`value-cell profit ${(usdcStake?.potentialProfit || 0) >= 0 ? 'positive' : 'negative'}`}>
+                    {(usdcStake?.potentialProfit || 0) >= 0 ? '+' : '-'}${formatUsdc(Math.abs(usdcStake?.potentialProfit || 0))}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -750,6 +791,33 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, on
             {isTransactionLoading ? '...' :
              swipeStake?.claimed ? '✅ SWIPE Claimed' :
              swipeStake?.canClaim ? '💰 Claim SWIPE' :
+             prediction.status === 'active' ? '⏳ Wait' :
+             prediction.status === 'expired' ? '⏰ In Waiting' :
+             '❌ Lost'}
+          </button>
+        )}
+        
+        {/* USDC Claim Button */}
+        {hasUsdcStake && (
+          <button
+            onClick={() => onClaimReward(prediction.id, 'USDC')}
+            disabled={isTransactionLoading || usdcStake?.claimed || !usdcStake?.canClaim}
+            className={`legacy-claim-btn usdc-claim-btn ${usdcStake?.claimed || !usdcStake?.canClaim ? 'disabled' : ''}`}
+            title={
+              usdcStake?.claimed
+                ? 'Already claimed'
+                : !usdcStake?.canClaim
+                  ? prediction.status === 'active'
+                    ? 'Wait for prediction to be resolved'
+                    : prediction.status === 'expired'
+                      ? 'Waiting for prediction to be resolved'
+                      : 'Cannot claim - you lost this prediction'
+                  : 'Claim USDC reward'
+            }
+          >
+            {isTransactionLoading ? '...' :
+             usdcStake?.claimed ? '✅ USDC Claimed' :
+             usdcStake?.canClaim ? '💵 Claim USDC' :
              prediction.status === 'active' ? '⏳ Wait' :
              prediction.status === 'expired' ? '⏰ In Waiting' :
              '❌ Lost'}

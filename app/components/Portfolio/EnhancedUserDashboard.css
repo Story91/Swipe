@@ -163,6 +163,23 @@
   height: 40px;
 }
 
+.usdc-row {
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.usdc-icon-stats {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+}
+
 .value-cell {
   text-align: center;
 }
@@ -1125,6 +1142,12 @@
     height: 30px;
   }
   
+  .usdc-icon-stats {
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+  }
+  
   .value-cell span {
     font-size: 11px;
   }
@@ -1535,6 +1558,30 @@
 .token-type-badge-compact.swipe .token-badge-icon-compact {
   width: 16px;
   height: 16px;
+}
+
+/* USDC icon in transaction history */
+.usdc-icon-tx {
+  font-size: 12px;
+  font-weight: 700;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.2);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.token-type-badge-compact.usdc {
+  background: rgba(16, 185, 129, 0.2) !important;
+  border: 1px solid rgba(16, 185, 129, 0.3) !important;
+  color: #10b981 !important;
+}
+
+.amount-value-compact.usdc {
+  color: #10b981 !important;
 }
 
 .status-badge-compact {

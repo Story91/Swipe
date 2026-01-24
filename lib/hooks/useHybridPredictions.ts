@@ -23,6 +23,17 @@ export interface HybridPrediction {
   swipeNoTotalAmount: number;
   totalStakes: number;
   
+  // USDC Dual Pool fields
+  usdcPoolEnabled?: boolean;
+  usdcYesTotalAmount?: number;
+  usdcNoTotalAmount?: number;
+  usdcMarketStats?: {
+    yesPercentage: number;
+    noPercentage: number;
+    totalPool: number;
+    participantCount: number;
+  };
+  
   // Enhanced data from Redis
   includeChart?: boolean;
   selectedCrypto?: string;
@@ -88,6 +99,12 @@ export function useHybridPredictions() {
         swipeYesTotalAmount: pred.swipeYesTotalAmount || 0,
         swipeNoTotalAmount: pred.swipeNoTotalAmount || 0,
         totalStakes: pred.totalStakes,
+        
+        // USDC Dual Pool data
+        usdcPoolEnabled: pred.usdcPoolEnabled || false,
+        usdcYesTotalAmount: pred.usdcYesTotalAmount || 0,
+        usdcNoTotalAmount: pred.usdcNoTotalAmount || 0,
+        usdcMarketStats: pred.usdcMarketStats,
         
         // Enhanced data
         includeChart: pred.includeChart,
