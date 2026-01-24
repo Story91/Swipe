@@ -209,6 +209,14 @@ function MarketCard({
     return `${Math.floor(diff / 86400)}d`;
   };
 
+  // First sentence for card teaser
+  const getFirstSentence = (text: string) => {
+    const m = text.match(/^[^.!?]*[.!?]/);
+    if (m) return m[0].trim();
+    return text.length > 120 ? text.slice(0, 120).trim() + '…' : text;
+  };
+  const hasMoreDescription = description && description.trim().length > 0 && description !== getFirstSentence(description);
+
   // Fetch price history when expanded
   useEffect(() => {
     if (!isExpanded) return;
@@ -277,7 +285,14 @@ function MarketCard({
               <div className="market-info">
                 <h3 className="market-title">{title}</h3>
                 {description && (
-                  <p className="market-description">{description}</p>
+                  <div className="market-description-wrap">
+                    <p className="market-description">{getFirstSentence(description)}</p>
+                    {hasMoreDescription && (
+                      <button type="button" className="read-more-link" onClick={() => setIsExpanded(true)}>
+                        Read more
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -486,6 +501,13 @@ function MarketCard({
                     <span>No exit liquidity</span>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Full description */}
+            {description && (
+              <div className="expanded-description">
+                <p>{description}</p>
               </div>
             )}
           </motion.div>
