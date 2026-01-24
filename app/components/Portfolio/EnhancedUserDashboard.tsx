@@ -723,17 +723,20 @@ export function EnhancedUserDashboard() {
           usdcProvider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_BASE_RPC_URL);
           usdcContract = new ethers.Contract(USDC_DUALPOOL_CONTRACT_ADDRESS, USDC_DUALPOOL_ABI, usdcProvider);
           
-          // Fetch all positions in parallel
+          // Fetch all positions and prediction data in parallel
           const positionPromises = v2PredictionsToCheck.map(({ numericId }) => 
-            usdcContract!.getPosition(numericId, address).catch(() => null)
+            Promise.all([
+              usdcContract!.getPosition(numericId, address).catch(() => null),
+              usdcContract!.getPrediction(numericId).catch(() => null)
+            ])
           );
           
-          const positions = await Promise.all(positionPromises);
+          const results = await Promise.all(positionPromises);
           
           // Process results
           for (let i = 0; i < v2PredictionsToCheck.length; i++) {
             const { prediction, numericId, stakesByToken } = v2PredictionsToCheck[i];
-            const position = positions[i];
+            const [position, usdcPredictionData] = results[i];
             
             if (!position) continue;
             
@@ -752,17 +755,34 @@ export function EnhancedUserDashboard() {
               const usdcNoPool = prediction.usdcNoTotalAmount || 0;
               
               const predAny = prediction as any;
-              // For USDC predictions, always use usdcResolved/usdcOutcome if usdcPoolEnabled
-              // Use ?? to handle undefined, but check usdcPoolEnabled first
-              const usdcResolved = predAny.usdcPoolEnabled 
-                ? (predAny.usdcResolved !== undefined ? predAny.usdcResolved : false)
-                : prediction.resolved;
-              const usdcCancelled = predAny.usdcPoolEnabled
-                ? (predAny.usdcCancelled !== undefined ? predAny.usdcCancelled : false)
-                : prediction.cancelled;
-              const usdcOutcome = predAny.usdcPoolEnabled
-                ? (predAny.usdcOutcome !== undefined ? predAny.usdcOutcome : null)
-                : prediction.outcome;
+              
+              // Get USDC prediction data from contract if available (more reliable than Redis)
+              let usdcResolved = false;
+              let usdcCancelled = false;
+              let usdcOutcome: boolean | null = null;
+              
+              if (usdcPredictionData) {
+                // Use contract data (most reliable)
+                usdcResolved = usdcPredictionData[5] || false; // resolved
+                usdcCancelled = usdcPredictionData[6] || false; // cancelled
+                usdcOutcome = usdcResolved ? (usdcPredictionData[7] ?? null) : null; // outcome (only if resolved)
+              } else {
+                // Fallback to Redis data
+                usdcResolved = predAny.usdcPoolEnabled 
+                  ? (predAny.usdcResolved !== undefined ? predAny.usdcResolved : false)
+                  : prediction.resolved;
+                usdcCancelled = predAny.usdcPoolEnabled
+                  ? (predAny.usdcCancelled !== undefined ? predAny.usdcCancelled : false)
+                  : prediction.cancelled;
+                usdcOutcome = predAny.usdcPoolEnabled
+                  ? (predAny.usdcOutcome !== undefined ? predAny.usdcOutcome : null)
+                  : prediction.outcome;
+              }
+              
+              // If still no outcome but resolved, try prediction.outcome as last fallback
+              if (usdcResolved && usdcOutcome === null) {
+                usdcOutcome = prediction.outcome ?? null;
+              }
               
               if (usdcResolved) {
                 const winnersPool = usdcOutcome ? usdcYesPool : usdcNoPool;
@@ -2081,7 +2101,9 @@ export function EnhancedUserDashboard() {
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
                 <SelectContent>
-                <SelectItem value="ready-to-claim">🎉 Ready to Claim</SelectItem>
+                <SelectItem value="ready-to-claim">
+                  🎉 Ready to Claim {canClaimCount > 0 && <span className="filter-badge">{canClaimCount}</span>}
+                </SelectItem>
                 <SelectItem value="active">⏳ Active</SelectItem>
                 <SelectItem value="won">🏆 Won</SelectItem>
                 <SelectItem value="lost">💔 Lost</SelectItem>
@@ -2093,7 +2115,10 @@ export function EnhancedUserDashboard() {
                 <SelectItem value="all">📊 All</SelectItem>
               </SelectContent>
             </Select>
-            {inWaitingCount > 0 && selectedFilter !== 'expired' && (
+            {canClaimCount > 0 && selectedFilter !== 'ready-to-claim' && (
+              <span className="filter-badge-overlay claim-badge-overlay">{canClaimCount}</span>
+            )}
+            {inWaitingCount > 0 && selectedFilter !== 'expired' && selectedFilter !== 'ready-to-claim' && (
               <span className="filter-badge-overlay">{inWaitingCount}</span>
             )}
             </div>

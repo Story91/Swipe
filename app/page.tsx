@@ -101,7 +101,6 @@ export default function App() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [readyToClaimCount, setReadyToClaimCount] = useState(0);
-  const [badgePosition, setBadgePosition] = useState({ top: 0, right: 0 });
   const [initialPredictionId, setInitialPredictionId] = useState<string | null>(null);
   const viewProfile = useViewProfile();
   const isDesktop = useIsDesktop();
@@ -320,25 +319,6 @@ export default function App() {
     return () => clearInterval(interval);
   }, [address]);
 
-  // Update badge position relative to Dashboard trigger
-  useEffect(() => {
-    const updateBadgePosition = () => {
-      if (dashboardTriggerRef.current) {
-        const rect = dashboardTriggerRef.current.getBoundingClientRect();
-        const containerRect = dashboardTriggerRef.current.closest('.mb-4')?.getBoundingClientRect();
-        if (containerRect) {
-          setBadgePosition({
-            top: rect.top - containerRect.top - 8,
-            right: containerRect.right - rect.right - 6,
-          });
-        }
-      }
-    };
-
-    updateBadgePosition();
-    window.addEventListener('resize', updateBadgePosition);
-    return () => window.removeEventListener('resize', updateBadgePosition);
-  }, [readyToClaimCount]);
 
   // Function to refresh predictions data
   const refreshPredictions = () => {
@@ -522,6 +502,11 @@ export default function App() {
                 style={{ overflow: 'visible' }}
               >
                 <span>Dashboard</span>
+                {readyToClaimCount > 0 && (
+                  <span className="dashboard-badge">
+                    {readyToClaimCount > 9 ? '9+' : readyToClaimCount}
+                  </span>
+                )}
               </MenubarTrigger>
             </MenubarMenu>
             <MenubarMenu>
@@ -541,20 +526,6 @@ export default function App() {
               </MenubarTrigger>
             </MenubarMenu>
           </Menubar>
-          {/* Animated notification badge positioned absolutely outside Menubar */}
-          {readyToClaimCount > 0 && (
-            <div
-              className="notification-badge"
-              style={{ 
-                position: 'absolute',
-                top: `${badgePosition.top}px`, 
-                right: `${badgePosition.right}px`,
-                zIndex: 99999 
-              }}
-            >
-              {readyToClaimCount > 9 ? '9+' : readyToClaimCount}
-            </div>
-          )}
         </div>
 
         {/* Main Content with Tinder Cards */}

@@ -430,6 +430,32 @@ button.swipe-glow-button[class*="ock"] *:not(img) {
   pointer-events: none;
 }
 
+/* Dashboard badge - red circle on Dashboard button */
+.dashboard-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #b91c1c 100%);
+  border-radius: 50%;
+  box-shadow: 
+    0 0 8px rgba(239, 68, 68, 0.5),
+    0 0 15px rgba(239, 68, 68, 0.3),
+    0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  border: 2px solid #0a0a0a;
+  z-index: 10;
+  pointer-events: none;
+  font-family: "Orbitron", sans-serif;
+}
+
 .notification-badge::before {
   content: '';
   position: absolute;

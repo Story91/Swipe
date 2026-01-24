@@ -33,6 +33,7 @@ export interface RedisPrediction {
   approved: boolean;
   needsApproval: boolean;
   participants: string[];
+  usdcParticipants?: string[]; // USDC participants (separate from ETH/SWIPE participants)
   totalStakes: number;
   marketStats?: {
     yesPercentage: number;

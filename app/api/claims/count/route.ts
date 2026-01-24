@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { redis, redisHelpers } from '../../../../lib/redis';
+import { redis, redisHelpers, REDIS_KEYS } from '../../../../lib/redis';
 
 /**
  * GET /api/claims/count?userId=0x...
@@ -148,6 +148,55 @@ export async function GET(request: NextRequest) {
 
       const results = await Promise.all(stakePromises);
       readyToClaimCount += results.filter(Boolean).length;
+    }
+
+    // Also check USDC positions from Redis (they should be synced by sync/usdc endpoint)
+    // Check all predictions with usdcPoolEnabled that we haven't processed yet
+    const usdcPredictions = allPredictions.filter(p => {
+      const predAny = p as any;
+      return predAny.usdcPoolEnabled && 
+             ((predAny.usdcResolved && !predAny.usdcCancelled) || predAny.usdcCancelled) &&
+             !processedPredictions.has(p.id);
+    });
+
+    if (usdcPredictions.length > 0) {
+      // Check USDC stakes from Redis
+      for (const prediction of usdcPredictions) {
+        const stakeKey = REDIS_KEYS.USER_STAKES(normalizedUserId, prediction.id);
+        const stakeData = await redis.get(stakeKey);
+        
+        if (stakeData) {
+          const stake = typeof stakeData === 'string' ? JSON.parse(stakeData) : stakeData;
+          const predAny = prediction as any;
+          
+          // Check if user has USDC stake
+          if (stake.USDC && !stake.USDC.claimed) {
+            const usdcYesAmount = Number(stake.USDC.yesAmount) || 0;
+            const usdcNoAmount = Number(stake.USDC.noAmount) || 0;
+            const hasStake = usdcYesAmount > 0 || usdcNoAmount > 0;
+
+            if (hasStake) {
+              const usdcResolved = predAny.usdcResolved || false;
+              const usdcCancelled = predAny.usdcCancelled || false;
+              const usdcOutcome = predAny.usdcOutcome ?? null;
+
+              if (usdcCancelled) {
+                // Can claim refund if cancelled
+                processedPredictions.add(prediction.id);
+                readyToClaimCount++;
+              } else if (usdcResolved && usdcOutcome !== null) {
+                // Check if user won
+                const userWon = (usdcYesAmount > 0 && usdcOutcome === true) ||
+                              (usdcNoAmount > 0 && usdcOutcome === false);
+                if (userWon) {
+                  processedPredictions.add(prediction.id);
+                  readyToClaimCount++;
+                }
+              }
+            }
+          }
+        }
+      }
     }
 
     return NextResponse.json({

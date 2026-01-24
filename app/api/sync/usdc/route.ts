@@ -22,6 +22,29 @@ const USDC_DUALPOOL_ABI = [
     ],
     stateMutability: 'view',
     type: 'function'
+  },
+  {
+    inputs: [
+      { name: 'predictionId', type: 'uint256' },
+      { name: 'user', type: 'address' }
+    ],
+    name: 'getPosition',
+    outputs: [
+      { name: 'yesAmount', type: 'uint256' },
+      { name: 'noAmount', type: 'uint256' },
+      { name: 'entryPrice', type: 'uint256' },
+      { name: 'exitedEarly', type: 'bool' },
+      { name: 'claimed', type: 'bool' }
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: 'predictionId', type: 'uint256' }],
+    name: 'getParticipants',
+    outputs: [{ name: '', type: 'address[]' }],
+    stateMutability: 'view',
+    type: 'function'
   }
 ] as const;
 
@@ -74,8 +97,76 @@ async function syncPredictionUSDC(predictionId: number): Promise<{
       usdcParticipantCount: Number(usdcData[8])
     };
 
-    // Save back to Redis
+    // Save updated prediction back to Redis (with merged participants)
     await redis.set(REDIS_KEYS.PREDICTION(redisId), JSON.stringify(updated));
+
+    // Also sync USDC participants list and positions
+    try {
+      const participantCount = Number(usdcData[8]);
+      if (participantCount > 0) {
+        // Get USDC participants from contract
+        const usdcParticipants = await client.readContract({
+          address: USDC_DUALPOOL_ADDRESS as `0x${string}`,
+          abi: USDC_DUALPOOL_ABI,
+          functionName: 'getParticipants',
+          args: [BigInt(predictionId)]
+        }).catch(() => null) as string[] | null;
+
+        // Save USDC participants separately
+        if (usdcParticipants && usdcParticipants.length > 0) {
+          updated.usdcParticipants = usdcParticipants.map((p: string) => p.toLowerCase());
+        }
+        
+        // Sync positions for each USDC participant
+        const participantsToSync = usdcParticipants || [];
+        for (const participant of participantsToSync.slice(0, 100)) { // Limit to 100 to avoid timeout
+          try {
+            const position = await client.readContract({
+              address: USDC_DUALPOOL_ADDRESS as `0x${string}`,
+              abi: USDC_DUALPOOL_ABI,
+              functionName: 'getPosition',
+              args: [BigInt(predictionId), participant.toLowerCase() as `0x${string}`]
+            }).catch(() => null);
+
+            if (position) {
+              const usdcYesAmount = Number(position[0]) || 0;
+              const usdcNoAmount = Number(position[1]) || 0;
+              const usdcClaimed = position[4] || false;
+
+              if (usdcYesAmount > 0 || usdcNoAmount > 0) {
+                // Get or create user stake
+                const stakeKey = REDIS_KEYS.USER_STAKES(participant.toLowerCase(), redisId);
+                const existingStake = await redis.get(stakeKey);
+                let userStake: any = existingStake ? (typeof existingStake === 'string' ? JSON.parse(existingStake) : existingStake) : {
+                  user: participant.toLowerCase(),
+                  predictionId: redisId,
+                  stakedAt: Math.floor(Date.now() / 1000),
+                  contractVersion: 'V2' as const
+                };
+
+                // Add/update USDC stake
+                userStake.USDC = {
+                  yesAmount: usdcYesAmount,
+                  noAmount: usdcNoAmount,
+                  claimed: usdcClaimed,
+                  tokenType: 'USDC' as const,
+                  entryPrice: Number(position[2]) || 0,
+                  exitedEarly: position[3] || false
+                };
+
+                await redis.set(stakeKey, JSON.stringify(userStake));
+              }
+            }
+          } catch (posError) {
+            // Skip individual position errors
+            console.warn(`Failed to sync USDC position for ${participant} in ${redisId}:`, posError);
+          }
+        }
+      }
+    } catch (posSyncError) {
+      console.warn(`Failed to sync USDC positions for prediction ${predictionId}:`, posSyncError);
+      // Don't fail the whole sync if position sync fails
+    }
 
     return {
       success: true,
