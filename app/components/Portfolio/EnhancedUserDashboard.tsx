@@ -151,6 +151,7 @@ export function EnhancedUserDashboard() {
   const [isTransactionLoading, setIsTransactionLoading] = useState(false);
   const [userTransactions, setUserTransactions] = useState<UserTransaction[]>([]);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
+  const [syncingBlockchain, setSyncingBlockchain] = useState(false);
   
   // Local state for tracking claimed stakes
   const [claimedStakes, setClaimedStakes] = useState<Set<string>>(new Set());
@@ -455,6 +456,38 @@ export function EnhancedUserDashboard() {
     }
   }, [address]);
 
+  // Sync transactions from blockchain (recover historical data)
+  const syncFromBlockchain = useCallback(async () => {
+    if (!address) return;
+    
+    setSyncingBlockchain(true);
+    try {
+      console.log('🔄 Syncing transactions from blockchain...');
+      const response = await fetch('/api/user-transactions/sync-blockchain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: address.toLowerCase() })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log(`✅ Synced ${result.newTransactions} transactions from blockchain`);
+        alert(`✅ Synced ${result.newTransactions} new transactions from blockchain!\n\nBets: ${result.totalEvents?.bets || 0}\nClaims: ${result.totalEvents?.claims || 0}`);
+        // Refresh transactions list
+        await fetchUserTransactions(true);
+      } else {
+        console.error('Failed to sync:', result.error);
+        alert(`❌ Failed to sync: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Failed to sync from blockchain:', error);
+      alert('❌ Failed to sync from blockchain');
+    } finally {
+      setSyncingBlockchain(false);
+    }
+  }, [address, fetchUserTransactions]);
+
          // No more cache - always fetch fresh from Redis
 
          // Incremental update function - add new transaction to existing data instead of refetching all
@@ -530,14 +563,21 @@ export function EnhancedUserDashboard() {
       
       const allUserPredictionsWithStakes: PredictionWithStakes[] = [];
       
+      // Create provider once for all USDC checks (optimization)
+      let usdcProvider: ethers.JsonRpcProvider | null = null;
+      let usdcContract: ethers.Contract | null = null;
+      
+      // Batch USDC position checks for V2 predictions
+      const v2PredictionsToCheck: { prediction: any; numericId: number; stakesByToken: any }[] = [];
+      
       for (const prediction of predictions) {
         try {
           // Get stakes for this prediction (if any)
           const predictionStakes = stakesByPrediction[prediction.id] || [];
           
-          // Skip if no ETH/SWIPE stakes AND not a V2 prediction AND no USDC pool enabled
-          const isV2Pred = prediction.id.startsWith('pred_v2_');
-          if (predictionStakes.length === 0 && !prediction.usdcPoolEnabled && !isV2Pred) {
+          // Skip if no ETH/SWIPE stakes AND no USDC pool enabled
+          // We only check USDC for predictions that have usdcPoolEnabled flag set
+          if (predictionStakes.length === 0 && !prediction.usdcPoolEnabled) {
             continue;
           }
             
@@ -639,104 +679,23 @@ export function EnhancedUserDashboard() {
             }
             
             
-            // Check for USDC position for all V2 predictions (USDC contract may have positions even without usdcPoolEnabled flag)
-            const isV2Prediction = prediction.id.startsWith('pred_v2_');
-            if (isV2Prediction || prediction.usdcPoolEnabled) {
-              try {
-                // Get numeric ID for contract call
-                const numericId = parseInt(prediction.id.replace('pred_v2_', '').replace('pred_v1_', ''), 10);
-                
-                if (!isNaN(numericId)) {
-                  const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_BASE_RPC_URL);
-                  const usdcContract = new ethers.Contract(USDC_DUALPOOL_CONTRACT_ADDRESS, USDC_DUALPOOL_ABI, provider);
-                  
-                  const position = await usdcContract.getPosition(numericId, address);
-                  const usdcYesAmount = Number(position[0]) || 0;  // yesAmount (6 decimals)
-                  const usdcNoAmount = Number(position[1]) || 0;   // noAmount (6 decimals)
-                  const usdcClaimed = position[4] || false;        // claimed
-                  
-                  if (usdcYesAmount > 0 || usdcNoAmount > 0) {
-                    const usdcStakeAmount = usdcYesAmount + usdcNoAmount;
-                    let usdcPotentialPayout = 0;
-                    let usdcPotentialProfit = 0;
-                    let usdcCanClaim = false;
-                    let usdcIsWinner = false;
-                    
-                    // Get USDC pools
-                    const usdcYesPool = prediction.usdcYesTotalAmount || 0;
-                    const usdcNoPool = prediction.usdcNoTotalAmount || 0;
-                    
-                    // Check if USDC prediction is resolved (cast to any for USDC-specific fields)
-                    const predAny = prediction as any;
-                    const usdcResolved = predAny.usdcResolved || prediction.resolved;
-                    const usdcCancelled = predAny.usdcCancelled || prediction.cancelled;
-                    const usdcOutcome = predAny.usdcOutcome ?? prediction.outcome;
-                    
-                    if (usdcResolved) {
-                      const winnersPool = usdcOutcome ? usdcYesPool : usdcNoPool;
-                      const losersPool = usdcOutcome ? usdcNoPool : usdcYesPool;
-                      const platformFee = losersPool * 0.015; // 1.5% total fee (1% platform + 0.5% creator)
-                      const netLosersPool = losersPool - platformFee;
-                      
-                      // User's winning stake (only the side that won)
-                      const winningStake = usdcOutcome ? usdcYesAmount : usdcNoAmount;
-                      // User's losing stake (the side that lost)
-                      const losingStake = usdcOutcome ? usdcNoAmount : usdcYesAmount;
-                      
-                      if (winningStake > 0) {
-                        usdcIsWinner = true;
-                        // Payout = winning stake + share of losers pool
-                        usdcPotentialPayout = winningStake + (winningStake / winnersPool) * netLosersPool;
-                        // Profit = what we get - TOTAL we staked (including lost side)
-                        usdcPotentialProfit = usdcPotentialPayout - usdcStakeAmount;
-                        usdcCanClaim = !usdcClaimed;
-                      } else {
-                        // User only bet on losing side
-                        usdcIsWinner = false;
-                        usdcPotentialPayout = 0;
-                        usdcPotentialProfit = -usdcStakeAmount;
-                        usdcCanClaim = false;
-                      }
-                    } else if (usdcCancelled) {
-                      usdcPotentialPayout = usdcStakeAmount;
-                      usdcPotentialProfit = 0;
-                      usdcCanClaim = !usdcClaimed;
-                      usdcIsWinner = false;
-                    } else {
-                      // Active - calculate potential payout
-                      if (usdcYesAmount > 0 && usdcYesPool > 0) {
-                        const fee = usdcNoPool * 0.015;
-                        const netNoPool = usdcNoPool - fee;
-                        usdcPotentialPayout = usdcStakeAmount + (usdcYesAmount / usdcYesPool) * netNoPool;
-                        usdcPotentialProfit = usdcPotentialPayout - usdcStakeAmount;
-                      } else if (usdcNoAmount > 0 && usdcNoPool > 0) {
-                        const fee = usdcYesPool * 0.015;
-                        const netYesPool = usdcYesPool - fee;
-                        usdcPotentialPayout = usdcStakeAmount + (usdcNoAmount / usdcNoPool) * netYesPool;
-                        usdcPotentialProfit = usdcPotentialPayout - usdcStakeAmount;
-                      }
-                      usdcCanClaim = false;
-                      usdcIsWinner = false;
-                    }
-                    
-                    stakesByToken['USDC'] = {
-                      predictionId: prediction.id,
-                      yesAmount: usdcYesAmount,
-                      noAmount: usdcNoAmount,
-                      claimed: usdcClaimed,
-                      potentialPayout: usdcPotentialPayout,
-                      potentialProfit: usdcPotentialProfit,
-                      canClaim: usdcCanClaim,
-                      isWinner: usdcIsWinner
-                    };
-                  }
-                }
-              } catch (usdcError) {
-                console.warn(`Failed to fetch USDC position for prediction ${prediction.id}:`, usdcError);
+            // Check for USDC position - ONLY if:
+            // 1. User has ETH/SWIPE stake (interested in this prediction) OR
+            // 2. Prediction has usdcPoolEnabled AND has actual USDC pool (yesPool + noPool > 0)
+            // This avoids checking old predictions with stale usdcPoolEnabled flag
+            const hasUserStake = Object.keys(stakesByToken).length > 0;
+            const hasActiveUsdcPool = prediction.usdcPoolEnabled && 
+              ((prediction.usdcYesTotalAmount || 0) + (prediction.usdcNoTotalAmount || 0)) > 0;
+            
+            if (hasUserStake || hasActiveUsdcPool) {
+              const numericId = parseInt(prediction.id.replace('pred_v2_', '').replace('pred_v1_', ''), 10);
+              if (!isNaN(numericId)) {
+                // Add to batch check list
+                v2PredictionsToCheck.push({ prediction, numericId, stakesByToken });
               }
             }
             
-            // Only add prediction if there are stakes
+            // Only add prediction if there are ETH/SWIPE stakes (USDC will be added after batch check)
             if (Object.keys(stakesByToken).length > 0) {
               const predictionWithStakes: PredictionWithStakes = {
                 ...prediction,
@@ -754,8 +713,136 @@ export function EnhancedUserDashboard() {
         }
       }
       
-      console.log(`📊 Found ${allUserPredictionsWithStakes.length} ALL user predictions with stakes for user ${address}`);
-      console.log(`📊 All user predictions data:`, allUserPredictionsWithStakes);
+      // BATCH CHECK: Fetch all USDC positions in parallel (much faster than sequential)
+      console.log(`📊 V2 predictions to check for USDC: ${v2PredictionsToCheck.length}`);
+      if (v2PredictionsToCheck.length > 0) {
+        try {
+          console.log(`🔄 Batch checking ${v2PredictionsToCheck.length} V2 predictions for USDC positions...`);
+          
+          // Create provider once for all checks
+          usdcProvider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_BASE_RPC_URL);
+          usdcContract = new ethers.Contract(USDC_DUALPOOL_CONTRACT_ADDRESS, USDC_DUALPOOL_ABI, usdcProvider);
+          
+          // Fetch all positions in parallel
+          const positionPromises = v2PredictionsToCheck.map(({ numericId }) => 
+            usdcContract!.getPosition(numericId, address).catch(() => null)
+          );
+          
+          const positions = await Promise.all(positionPromises);
+          
+          // Process results
+          for (let i = 0; i < v2PredictionsToCheck.length; i++) {
+            const { prediction, numericId, stakesByToken } = v2PredictionsToCheck[i];
+            const position = positions[i];
+            
+            if (!position) continue;
+            
+            const usdcYesAmount = Number(position[0]) || 0;
+            const usdcNoAmount = Number(position[1]) || 0;
+            const usdcClaimed = position[4] || false;
+            
+            if (usdcYesAmount > 0 || usdcNoAmount > 0) {
+              const usdcStakeAmount = usdcYesAmount + usdcNoAmount;
+              let usdcPotentialPayout = 0;
+              let usdcPotentialProfit = 0;
+              let usdcCanClaim = false;
+              let usdcIsWinner = false;
+              
+              const usdcYesPool = prediction.usdcYesTotalAmount || 0;
+              const usdcNoPool = prediction.usdcNoTotalAmount || 0;
+              
+              const predAny = prediction as any;
+              const usdcResolved = predAny.usdcResolved || prediction.resolved;
+              const usdcCancelled = predAny.usdcCancelled || prediction.cancelled;
+              const usdcOutcome = predAny.usdcOutcome ?? prediction.outcome;
+              
+              if (usdcResolved) {
+                const winnersPool = usdcOutcome ? usdcYesPool : usdcNoPool;
+                const losersPool = usdcOutcome ? usdcNoPool : usdcYesPool;
+                const platformFee = losersPool * 0.015;
+                const netLosersPool = losersPool - platformFee;
+                
+                const winningStake = usdcOutcome ? usdcYesAmount : usdcNoAmount;
+                
+                if (winningStake > 0 && winnersPool > 0) {
+                  usdcIsWinner = true;
+                  usdcPotentialPayout = winningStake + (winningStake / winnersPool) * netLosersPool;
+                  usdcPotentialProfit = usdcPotentialPayout - usdcStakeAmount;
+                  usdcCanClaim = !usdcClaimed;
+                } else {
+                  usdcIsWinner = false;
+                  usdcPotentialPayout = 0;
+                  usdcPotentialProfit = -usdcStakeAmount;
+                  usdcCanClaim = false;
+                }
+              } else if (usdcCancelled) {
+                usdcPotentialPayout = usdcStakeAmount;
+                usdcPotentialProfit = 0;
+                usdcCanClaim = !usdcClaimed;
+                usdcIsWinner = false;
+              } else {
+                if (usdcYesAmount > 0 && usdcYesPool > 0) {
+                  const fee = usdcNoPool * 0.015;
+                  const netNoPool = usdcNoPool - fee;
+                  usdcPotentialPayout = usdcStakeAmount + (usdcYesAmount / usdcYesPool) * netNoPool;
+                  usdcPotentialProfit = usdcPotentialPayout - usdcStakeAmount;
+                } else if (usdcNoAmount > 0 && usdcNoPool > 0) {
+                  const fee = usdcYesPool * 0.015;
+                  const netYesPool = usdcYesPool - fee;
+                  usdcPotentialPayout = usdcStakeAmount + (usdcNoAmount / usdcNoPool) * netYesPool;
+                  usdcPotentialProfit = usdcPotentialPayout - usdcStakeAmount;
+                }
+                usdcCanClaim = false;
+                usdcIsWinner = false;
+              }
+              
+              // Add USDC stake to stakesByToken
+              stakesByToken['USDC'] = {
+                predictionId: prediction.id,
+                yesAmount: usdcYesAmount,
+                noAmount: usdcNoAmount,
+                claimed: usdcClaimed,
+                potentialPayout: usdcPotentialPayout,
+                potentialProfit: usdcPotentialProfit,
+                canClaim: usdcCanClaim,
+                isWinner: usdcIsWinner
+              };
+              
+              // Check if this prediction is already in the list
+              const existingIdx = allUserPredictionsWithStakes.findIndex(p => p.id === prediction.id);
+              if (existingIdx >= 0) {
+                // Update existing prediction with USDC stake
+                allUserPredictionsWithStakes[existingIdx].userStakes = {
+                  ...allUserPredictionsWithStakes[existingIdx].userStakes,
+                  USDC: stakesByToken['USDC']
+                };
+              } else if (Object.keys(stakesByToken).length > 0) {
+                // Add new prediction with USDC stake only
+                allUserPredictionsWithStakes.push({
+                  ...prediction,
+                  userStakes: stakesByToken,
+                  status: prediction.resolved ? 'resolved' : 
+                         prediction.cancelled ? 'cancelled' :
+                         prediction.deadline <= Date.now() / 1000 ? 'expired' : 'active'
+                });
+              }
+            }
+          }
+          
+          // Count how many USDC positions were found
+          const usdcPositionsFound = allUserPredictionsWithStakes.filter(p => p.userStakes?.USDC).length;
+          console.log(`✅ USDC batch check complete. Found ${usdcPositionsFound} USDC positions`);
+        } catch (usdcBatchError) {
+          console.warn('Failed to batch fetch USDC positions:', usdcBatchError);
+        }
+      }
+      
+      // Debug: Log USDC totals
+      const totalUsdcStaked = allUserPredictionsWithStakes.reduce((sum, p) => {
+        const usdc = p.userStakes?.USDC;
+        return sum + ((usdc?.yesAmount || 0) + (usdc?.noAmount || 0));
+      }, 0);
+      console.log(`📊 Found ${allUserPredictionsWithStakes.length} predictions, USDC total staked: ${totalUsdcStaked}`);
       
       
       setAllUserPredictions(allUserPredictionsWithStakes);
@@ -1060,15 +1147,7 @@ export function EnhancedUserDashboard() {
       console.log('🔄 User dashboard: fetching ALL predictions...');
       fetchAllPredictionsComplete(); // Fetch all predictions for user dashboard
     }
-  }, [address, fetchAllPredictionsComplete]); // Add fetchAllPredictionsComplete back to dependencies
-
-  // Fetch all predictions first, then user predictions
-  useEffect(() => {
-    if (address && allPredictions.length === 0 && !predictionsLoading) {
-      console.log('🔄 No predictions loaded, fetching all predictions first...');
-      fetchAllPredictionsComplete(); // Fetch ALL predictions (not just active)
-    }
-  }, [address, allPredictions.length, predictionsLoading, fetchAllPredictionsComplete]);
+  }, [address, fetchAllPredictionsComplete]);
 
   // Fetch all user predictions when ALL predictions are loaded (not just active)
   // Wait for allPredictionsLoaded flag AND a reasonable number of predictions to ensure we have resolved ones too
@@ -1581,15 +1660,18 @@ export function EnhancedUserDashboard() {
         return allUserPredictions.filter(p => {
           const ethStake = p.userStakes?.ETH;
           const swipeStake = p.userStakes?.SWIPE;
+          const usdcStake = p.userStakes?.USDC;
           
           // Check local claimed state first
           const ethClaimed = claimedStakes.has(`${p.id}-ETH`) || ethStake?.claimed;
           const swipeClaimed = claimedStakes.has(`${p.id}-SWIPE`) || swipeStake?.claimed;
+          const usdcClaimed = claimedStakes.has(`${p.id}-USDC`) || usdcStake?.claimed;
           
           const ethCanClaim = ethStake && ethStake.isWinner && ethStake.canClaim && !ethClaimed;
           const swipeCanClaim = swipeStake && swipeStake.isWinner && swipeStake.canClaim && !swipeClaimed;
+          const usdcCanClaim = usdcStake && usdcStake.isWinner && usdcStake.canClaim && !usdcClaimed;
           
-          return ethCanClaim || swipeCanClaim;
+          return ethCanClaim || swipeCanClaim || usdcCanClaim;
         });
     }
   };
@@ -1921,25 +2003,23 @@ export function EnhancedUserDashboard() {
                 </span>
               </td>
             </tr>
-            {/* USDC Row - only show if user has USDC stakes */}
-            {usdcTotalStaked > 0 && (
-              <tr className="usdc-row">
-                <td className="token-cell">
-                  <span className="usdc-icon-stats">$</span>
-                </td>
-                <td className="value-cell">
-                  <span className="stat-value-total">{formatUsdc(usdcTotalStaked)}</span>
-                </td>
-                <td className="value-cell">
-                  <span className="stat-value-payout">{formatUsdc(usdcTotalPotentialPayout)}</span>
-                </td>
-                <td className="value-cell">
-                  <span className={`stat-value-profit ${usdcTotalPotentialProfit >= 0 ? 'profit' : 'loss'}`}>
-                    {usdcTotalPotentialProfit >= 0 ? '+' : ''}{formatUsdc(usdcTotalPotentialProfit)}
-                  </span>
-                </td>
-              </tr>
-            )}
+            {/* USDC Row - always visible */}
+            <tr className="usdc-row">
+              <td className="token-cell">
+                <span className="usdc-icon-stats">$</span>
+              </td>
+              <td className="value-cell">
+                <span className="stat-value-total">{formatUsdc(usdcTotalStaked)}</span>
+              </td>
+              <td className="value-cell">
+                <span className="stat-value-payout">{formatUsdc(usdcTotalPotentialPayout)}</span>
+              </td>
+              <td className="value-cell">
+                <span className={`stat-value-profit ${usdcTotalPotentialProfit >= 0 ? 'profit' : 'loss'}`}>
+                  {usdcTotalPotentialProfit >= 0 ? '+' : ''}{formatUsdc(usdcTotalPotentialProfit)}
+                </span>
+              </td>
+            </tr>
           </tbody>
         </table>
         
@@ -2171,7 +2251,17 @@ export function EnhancedUserDashboard() {
 
       {/* Transaction History */}
       <div className="section">
-        <h3>🔄 Transaction History</h3>
+        <div className="section-header-with-action">
+          <h3>🔄 Transaction History</h3>
+          <button
+            onClick={syncFromBlockchain}
+            disabled={syncingBlockchain}
+            className="sync-blockchain-btn"
+            title="Recover historical transactions from blockchain"
+          >
+            {syncingBlockchain ? '⏳ Syncing...' : '⛓️ Sync from Chain'}
+          </button>
+        </div>
         {loadingTransactions ? (
           <div className="loading-container">
             <div className="loading-spinner"></div>
@@ -2228,7 +2318,8 @@ export function EnhancedUserDashboard() {
                             {transaction.type === 'stake' && '🎯'}
                             {transaction.type === 'resolve' && '✅'}
                             {transaction.type === 'cancel' && '🚫'}
-                            {transaction.type.toUpperCase()}
+                            {transaction.type === 'exit_early' && '🚪'}
+                            {transaction.type === 'exit_early' ? 'EXIT' : transaction.type.toUpperCase()}
                           </span>
                           <span className={`token-type-badge-compact ${tokenType.toLowerCase()}`}>
                             {isUsdc ? (

@@ -1513,6 +1513,12 @@
   border: 1px solid rgba(156, 39, 176, 0.4);
 }
 
+.type-badge-compact.exit_early {
+  background: rgba(255, 152, 0, 0.25);
+  color: #ff9800;
+  border: 1px solid rgba(255, 152, 0, 0.4);
+}
+
 .type-badge-compact.cancel {
   background: rgba(244, 67, 54, 0.25);
   color: #f44336;
@@ -1636,7 +1642,7 @@
 }
 
 .transaction-details-compact .label {
-  color: #60a5fa;
+  color: #60a5fa !important;
   font-weight: 600;
   font-family: "Orbitron", sans-serif;
   font-size: 10px;
@@ -1645,8 +1651,19 @@
 }
 
 .transaction-details-compact .value {
-  color: rgba(255, 255, 255, 0.95);
+  color: rgba(255, 255, 255, 0.95) !important;
   font-family: "Exo 2", sans-serif;
+}
+
+/* Force transaction text visibility on dark background */
+.transaction-card-compact .label,
+.transaction-card-compact span.label {
+  color: #60a5fa !important;
+}
+
+.transaction-card-compact .value,
+.transaction-card-compact span.value {
+  color: rgba(255, 255, 255, 0.95) !important;
 }
 
 .transaction-prediction .value {

@@ -249,11 +249,28 @@
   color: #ff6b6b;
 }
 
+.legacy-pool-values {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
 .legacy-pool-value {
   font-size: 8px;
   color: #fff;
   font-weight: 700;
   font-family: "Exo 2", sans-serif;
+}
+
+.legacy-pool-value.swipe {
+  color: #00ff88;
+  font-size: 7px;
+}
+
+.legacy-pool-value.usdc {
+  color: #10b981;
+  font-size: 7px;
 }
 
 /* Stats Table */
@@ -349,6 +366,7 @@
 /* Card Actions */
 .legacy-card-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   align-items: center;
   gap: 6px;
@@ -552,8 +570,15 @@
   }
 
   .legacy-claim-btn {
-    padding: 8px 12px;
-    font-size: 11px;
+    padding: 8px 10px;
+    font-size: 10px;
+    gap: 3px;
+    flex: 1 1 auto;
+    min-width: 80px;
+    max-width: 120px;
+  }
+
+  .legacy-card-actions {
     gap: 4px;
   }
 

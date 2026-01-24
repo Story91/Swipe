@@ -676,16 +676,28 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, on
       <div className="legacy-pool-info">
         <div className="legacy-pool-item yes">
           <span className="legacy-pool-label">YES Pool:</span>
-          <span className="legacy-pool-value">{formatEth(prediction.yesTotalAmount)} ETH</span>
+          <div className="legacy-pool-values">
+            <span className="legacy-pool-value">{formatEth(prediction.yesTotalAmount)} ETH</span>
+            <span className="legacy-pool-value swipe">{formatSwipe(prediction.swipeYesTotalAmount || 0)} SWIPE</span>
+            {prediction.usdcPoolEnabled && (
+              <span className="legacy-pool-value usdc">${formatUsdc(prediction.usdcYesTotalAmount || 0)}</span>
+            )}
+          </div>
         </div>
         <div className="legacy-pool-item no">
           <span className="legacy-pool-label">NO Pool:</span>
-          <span className="legacy-pool-value">{formatEth(prediction.noTotalAmount)} ETH</span>
+          <div className="legacy-pool-values">
+            <span className="legacy-pool-value">{formatEth(prediction.noTotalAmount)} ETH</span>
+            <span className="legacy-pool-value swipe">{formatSwipe(prediction.swipeNoTotalAmount || 0)} SWIPE</span>
+            {prediction.usdcPoolEnabled && (
+              <span className="legacy-pool-value usdc">${formatUsdc(prediction.usdcNoTotalAmount || 0)}</span>
+            )}
+          </div>
         </div>
       </div>
 
       {/* User Stakes Stats Table - like the screenshot */}
-      {(hasEthStake || hasSwipeStake) && (
+      {(hasEthStake || hasSwipeStake || hasUsdcStake) && (
         <div className="legacy-stats-table">
           <table>
             <thead>

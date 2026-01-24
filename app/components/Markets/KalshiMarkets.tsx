@@ -95,7 +95,7 @@ interface MarketCardProps {
   usdcNoPool?: number;
   refreshKey?: number; // Used to trigger refetch of price history
   onBet: (predictionId: string, id: number, side: 'yes' | 'no') => void;
-  onEarlyExit?: (predictionId: string, numericId: number, isYes: boolean, amount: bigint, netValue: bigint, fee: bigint) => void;
+  onEarlyExit?: (predictionId: string, numericId: number, isYes: boolean, amount: bigint, netValue: bigint, fee: bigint, title: string) => void;
 }
 
 function MarketCard({ 
@@ -468,7 +468,7 @@ function MarketCard({
                 {exitNetValue > BigInt(0) ? (
                   <button
                     className="early-exit-btn"
-                    onClick={() => onEarlyExit?.(predictionId, numericId, positionSide === 'yes', positionAmount, exitNetValue, exitFee)}
+                    onClick={() => onEarlyExit?.(predictionId, numericId, positionSide === 'yes', positionAmount, exitNetValue, exitFee, title)}
                     title={`Exit and receive $${(Number(exitNetValue) / 1e6).toFixed(2)}`}
                   >
                     <ArrowRightLeft className="w-4 h-4" />
@@ -552,6 +552,7 @@ export default function KalshiMarkets() {
     amount: bigint;
     netValue: bigint;
     fee: bigint;
+    title: string;
   }>({
     isOpen: false,
     predictionId: '',
@@ -559,7 +560,8 @@ export default function KalshiMarkets() {
     isYes: true,
     amount: BigInt(0),
     netValue: BigInt(0),
-    fee: BigInt(0)
+    fee: BigInt(0),
+    title: ''
   });
 
   // Wait for transactions
@@ -600,7 +602,7 @@ export default function KalshiMarkets() {
             id: `tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             type: 'stake',
             predictionId: betModal.predictionId,
-            predictionQuestion: betModal.market?.question || `Prediction #${betModal.marketId}`,
+            predictionQuestion: betModal.market?.title || `Prediction #${betModal.marketId}`,
             txHash: betHash,
             basescanUrl: `https://basescan.org/tx/${betHash}`,
             timestamp: Date.now(),
@@ -757,7 +759,7 @@ export default function KalshiMarkets() {
             id: `tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             type: 'exit_early',
             predictionId: exitModal.predictionId,
-            predictionQuestion: `Early exit from prediction #${exitModal.numericId}`,
+            predictionQuestion: exitModal.title || `Prediction #${exitModal.numericId}`,
             txHash: exitHash,
             basescanUrl: `https://basescan.org/tx/${exitHash}`,
             timestamp: Date.now(),
@@ -857,7 +859,7 @@ export default function KalshiMarkets() {
   }, [isExiting, isExitConfirming, isExitSuccess, exitHash, address, refresh, exitModal]);
 
   // Handle early exit
-  const handleEarlyExit = useCallback((predictionId: string, numericId: number, isYes: boolean, amount: bigint, netValue: bigint, fee: bigint) => {
+  const handleEarlyExit = useCallback((predictionId: string, numericId: number, isYes: boolean, amount: bigint, netValue: bigint, fee: bigint, title: string) => {
     setExitModal({
       isOpen: true,
       predictionId,
@@ -865,7 +867,8 @@ export default function KalshiMarkets() {
       isYes,
       amount,
       netValue,
-      fee
+      fee,
+      title
     });
   }, []);
 
