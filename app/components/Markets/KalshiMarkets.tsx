@@ -920,7 +920,7 @@ export default function KalshiMarkets() {
         usdcNoPool: pred.usdcNoTotalAmount || 0,
         deadline: pred.deadline || 0,
         participants: pred.participants?.length || 0,
-        isLive: Boolean(pred.deadline && pred.deadline > Date.now() / 1000 && pred.deadline < Date.now() / 1000 + 86400),
+        isLive: Boolean(pred.deadline && pred.deadline > Date.now() / 1000 && !pred.resolved && !pred.cancelled),
         creator: pred.creator
       }))
       // Sort by volume (highest first)
