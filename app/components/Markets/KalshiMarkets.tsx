@@ -18,7 +18,8 @@ import {
   Users,
   RefreshCw,
   HelpCircle,
-  X
+  X,
+  Share2
 } from 'lucide-react';
 import { XAxis, YAxis, ResponsiveContainer, Tooltip, Area, AreaChart, CartesianGrid } from 'recharts';
 import { Button } from '@/components/ui/button';
@@ -35,6 +36,9 @@ import {
   USDC_TOKEN 
 } from '../../../lib/contract';
 import { ConnectWallet, Wallet as WalletContainer } from '@coinbase/onchainkit/wallet';
+import { useComposeCast, useOpenUrl } from '@coinbase/onchainkit/minikit';
+import { getRandomCurrentPredictionIntro, getRandomCurrentPredictionOutro } from '../../../lib/constants/share-texts';
+import sdk from '@farcaster/miniapp-sdk';
 import './KalshiMarkets.css';
 
 // ERC20 ABI for USDC approval
@@ -318,6 +322,7 @@ function MarketCard({
       whileHover={!isExpanded ? { y: -4 } : {}}
       transition={{ duration: 0.2 }}
       layout
+      style={{ position: 'relative' }}
     >
       <AnimatePresence mode="wait">
         {!isExpanded ? (
@@ -584,6 +589,65 @@ export default function KalshiMarkets() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
+  
+  // Share dropdown state (like in EnhancedUserDashboard)
+  const [showShareDropdown, setShowShareDropdown] = useState(false);
+  const [shareStep, setShareStep] = useState<'type' | 'platform'>('type');
+  const [selectedShareType, setSelectedShareType] = useState<'profit-only' | 'full'>('profit-only');
+  const [selectedMarket, setSelectedMarket] = useState<{ id: string; title: string; totalPool: number; participants: number } | null>(null);
+  
+  // ComposeCast and OpenUrl hooks for sharing
+  const { composeCast: minikitComposeCast } = useComposeCast();
+  const minikitOpenUrl = useOpenUrl();
+  
+  // Universal composeCast function - works on both MiniKit (Base app) and Farcaster SDK (Warpcast)
+  const composeCast = useCallback(async (params: { text: string; embeds?: string[] }) => {
+    try {
+      // Try MiniKit first (Base app)
+      if (minikitComposeCast) {
+        console.log('📱 Using MiniKit composeCast for USDC market share...');
+        await minikitComposeCast(params);
+        return;
+      }
+    } catch (error) {
+      console.log('MiniKit composeCast failed, trying Farcaster SDK...', error);
+    }
+    
+    try {
+      // Fallback to Farcaster SDK (Warpcast)
+      console.log('📱 Using Farcaster SDK composeCast for USDC market share...');
+      await sdk.actions.composeCast({
+        text: params.text,
+        embeds: params.embeds || []
+      });
+    } catch (error) {
+      console.error('Both composeCast methods failed:', error);
+      throw error;
+    }
+  }, [minikitComposeCast]);
+
+  // Universal openUrl function - works on both MiniKit (Base app) and Farcaster SDK (Warpcast)
+  const openUrl = useCallback(async (url: string) => {
+    try {
+      // Try MiniKit first (Base app)
+      if (minikitOpenUrl) {
+        console.log('📱 Using MiniKit openUrl...');
+        await minikitOpenUrl(url);
+        return;
+      }
+    } catch (error) {
+      console.log('MiniKit openUrl failed, trying Farcaster SDK...', error);
+    }
+    
+    try {
+      // Fallback to Farcaster SDK (Warpcast)
+      console.log('📱 Using Farcaster SDK openUrl...');
+      await sdk.actions.openUrl(url);
+    } catch (error) {
+      console.error('Both openUrl methods failed, using window.open:', error);
+      window.open(url, '_blank');
+    }
+  }, [minikitOpenUrl]);
   
   // Show sample data only if not loading AND no predictions
   const useSampleData = !loading && (!predictions || predictions.length === 0);
@@ -1028,6 +1092,109 @@ export default function KalshiMarkets() {
     setErrorMessage(null);
   }, [markets]);
 
+  // Handle share type selection (step 1)
+  const handleSelectShareType = (type: 'profit-only' | 'full') => {
+    setSelectedShareType(type);
+    setShareStep('platform');
+  };
+  
+  // Go back to type selection
+  const handleBackToType = () => {
+    setShareStep('type');
+  };
+
+  // Perform share based on selected option and platform (like in EnhancedUserDashboard)
+  const performShareStats = useCallback(async (shareType: 'full' | 'profit-only', platform: 'farcaster' | 'twitter') => {
+    if (!selectedMarket) return;
+    
+    const { id: predictionId, title, totalPool, participants } = selectedMarket;
+    
+    try {
+      // Generate OG image first (for crypto predictions or if needed)
+      const prediction = predictions?.find(p => p.id === predictionId);
+      const isCryptoPrediction = prediction?.includeChart || prediction?.imageUrl?.includes('geckoterminal.com');
+      
+      if (isCryptoPrediction) {
+        try {
+          console.log('📸 Generating OG image for USDC prediction:', predictionId);
+          const response = await fetch(`/api/og/upload/usdc/${predictionId}`, {
+            method: 'POST',
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('✅ OG image generated:', data.url);
+          }
+        } catch (error) {
+          console.error('Failed to generate OG image:', error);
+          // Continue with share even if image generation fails
+        }
+      }
+      
+      // Build share text - different based on shareType
+      const totalPoolUSDC = totalPool / 1e6; // Convert from 6 decimals
+      
+      let shareText: string;
+      const intro = platform === 'twitter' 
+        ? getRandomCurrentPredictionIntro('twitter')
+        : getRandomCurrentPredictionIntro('farcaster');
+      const outro = platform === 'twitter'
+        ? getRandomCurrentPredictionOutro('twitter')
+        : getRandomCurrentPredictionOutro('farcaster');
+      
+      if (shareType === 'full') {
+        // Share with Stats - includes pool size and participants
+        shareText = `${intro}\n\n"${title}"`;
+        if (totalPoolUSDC > 0) {
+          shareText += `\n\n💰 USDC Pool: $${totalPoolUSDC.toFixed(2)}`;
+        }
+        if (participants > 0) {
+          shareText += `\n👥 ${participants} bettors`;
+        }
+        shareText += `\n\n${outro}`;
+      } else {
+        // Share Market - just the question and basic info (no stats)
+        shareText = `${intro}\n\n"${title}"\n\n${outro}`;
+      }
+      
+      // Create prediction URL for USDC markets
+      const predictionUrl = `${window.location.origin}/usdc-markets/prediction/${predictionId}`;
+      
+      if (platform === 'farcaster') {
+        // Use native composeCast for Farcaster - opens in-app compose dialog
+        try {
+          await composeCast({
+            text: shareText,
+            embeds: [predictionUrl]
+          });
+          console.log('✅ USDC market shared via native composeCast');
+        } catch (error) {
+          console.error('Failed to share USDC market via composeCast, falling back to URL:', error);
+          // Fallback to URL only if composeCast completely fails
+          const warpcastUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(shareText)}&embeds[]=${encodeURIComponent(predictionUrl)}`;
+          window.open(warpcastUrl, '_blank');
+        }
+      } else {
+        // Twitter - use universal openUrl (MiniKit or Farcaster SDK)
+        const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(predictionUrl)}`;
+        await openUrl(twitterUrl);
+      }
+      
+      setShowShareDropdown(false);
+      setShareStep('type'); // Reset for next time
+      setSelectedMarket(null);
+    } catch (error) {
+      console.error('Error sharing USDC market:', error);
+    }
+  }, [composeCast, openUrl, predictions, selectedMarket]);
+
+  // Handle share prediction from MarketCard - opens dropdown
+  const handleShare = useCallback((predictionId: string, title: string, totalPool: number, participants: number) => {
+    setSelectedMarket({ id: predictionId, title, totalPool, participants });
+    setShowShareDropdown(true);
+    setShareStep('type');
+  }, []);
+
   // Format USDC balance for display
   const formattedBalance = useMemo(() => {
     if (!usdcBalance) return '0.00';
@@ -1111,13 +1278,83 @@ export default function KalshiMarkets() {
           </div>
         ) : (
           markets.map(market => (
-            <MarketCard
-              key={market.id}
-              {...market}
-              refreshKey={refreshKey}
-              onBet={handleBet}
-              onEarlyExit={handleEarlyExit}
-            />
+            <div key={market.id} style={{ position: 'relative' }}>
+              {/* Share button in top-right corner - positioned above card */}
+              <div className="share-stats-wrapper" style={{ position: 'absolute', top: '-10px', right: '-10px', zIndex: 100 }}>
+                <button 
+                  className="share-stats-badge"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleShare(market.predictionId, market.title, market.usdcYesPool + market.usdcNoPool, market.participants);
+                  }}
+                  title="Share prediction"
+                >
+                  <Share2 size={14} />
+                </button>
+                
+                {/* Dropdown positioned relative to share button */}
+                {showShareDropdown && selectedMarket && selectedMarket.id === market.predictionId && (
+                  <>
+                    <div className="share-dropdown-overlay" onClick={() => { setShowShareDropdown(false); setShareStep('type'); setSelectedMarket(null); }} />
+                    <div className="share-stats-dropdown">
+                      {shareStep === 'type' ? (
+                        <>
+                          <button 
+                            className="share-dropdown-item"
+                            onClick={() => handleSelectShareType('profit-only')}
+                          >
+                            Share Market
+                          </button>
+                          <button 
+                            className="share-dropdown-item"
+                            onClick={() => handleSelectShareType('full')}
+                          >
+                            Share with Stats
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button 
+                            className="share-dropdown-back"
+                            onClick={handleBackToType}
+                          >
+                            ← Back
+                          </button>
+                          <button 
+                            className="share-dropdown-item share-btn-farcaster-split"
+                            onClick={() => performShareStats(selectedShareType, 'farcaster')}
+                          >
+                            <div className="share-btn-split-bg">
+                              <div className="share-btn-half-purple"></div>
+                              <div className="share-btn-half-white"></div>
+                            </div>
+                            <div className="share-btn-icons">
+                              <img src="/farc.png" alt="Farcaster" className="share-btn-icon-left" />
+                              <img src="/Base_square_blue.png" alt="Base" className="share-btn-icon-right" />
+                            </div>
+                          </button>
+                          <div className="share-stats-divider"></div>
+                          <button 
+                            className="share-dropdown-item share-btn-twitter"
+                            onClick={() => performShareStats(selectedShareType, 'twitter')}
+                          >
+                            <svg className="share-btn-x-icon" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                            </svg>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+              <MarketCard
+                {...market}
+                refreshKey={refreshKey}
+                onBet={handleBet}
+                onEarlyExit={handleEarlyExit}
+              />
+            </div>
           ))
         )}
       </div>
