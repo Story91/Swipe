@@ -35,11 +35,187 @@
   color: #000;
 }
 
-.markets-subtitle {
-  font-size: 12px;
-  color: #10b981;
-  font-weight: 500;
+/* Premium USDC Header */
+.usdc-header-card {
+  background: linear-gradient(135deg, #0a1628 0%, #1a2744 50%, #0d1929 100%) !important;
+  border: 1px solid rgba(39, 117, 202, 0.3) !important;
+  border-radius: 16px !important;
+  padding: 12px 16px !important;
+  margin-bottom: 12px;
+  box-shadow: 
+    0 4px 20px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.usdc-header-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(39, 117, 202, 0.5), transparent);
+}
+
+.usdc-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.usdc-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.usdc-logo-container {
+  position: relative;
+  width: 40px;
+  height: 40px;
+}
+
+.usdc-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  position: relative;
+  z-index: 1;
+}
+
+.usdc-logo-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 50px;
+  height: 50px;
+  background: radial-gradient(circle, rgba(39, 117, 202, 0.4) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 0.8; transform: translate(-50%, -50%) scale(1.1); }
+}
+
+.usdc-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.usdc-main-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
   margin: 0;
+  font-family: "Exo 2", sans-serif;
+  text-shadow: 0 2px 10px rgba(39, 117, 202, 0.3);
+}
+
+.usdc-subtitle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.usdc-badge-live {
+  background: rgba(16, 185, 129, 0.15) !important;
+  border-color: rgba(16, 185, 129, 0.4) !important;
+  color: #10b981 !important;
+  font-size: 10px !important;
+  padding: 2px 8px !important;
+  gap: 4px !important;
+}
+
+.live-dot {
+  width: 6px;
+  height: 6px;
+  background: #10b981;
+  border-radius: 50%;
+  animation: blink 1.5s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.contract-link {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: #64748b;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.contract-link:hover {
+  color: #0052ff;
+  background: rgba(0, 82, 255, 0.1);
+}
+
+.contract-icon {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.usdc-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.usdc-balance-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05));
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 20px;
+  padding: 6px 12px;
+  color: #10b981;
+}
+
+.balance-amount {
+  font-weight: 600;
+  font-size: 14px;
+  font-family: "Exo 2", sans-serif;
+}
+
+.usdc-action-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.action-btn {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 8px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: #94a3b8 !important;
+  transition: all 0.2s ease !important;
+}
+
+.action-btn:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.usdc-separator {
+  margin-top: 12px !important;
+  background: linear-gradient(90deg, transparent, rgba(39, 117, 202, 0.3), transparent) !important;
 }
 
 .wallet-balance-compact {
@@ -632,9 +808,7 @@
     color: #fff;
   }
   
-  .markets-subtitle {
-    color: #10b981;
-  }
+  /* USDC Header already dark themed */
   
   .refresh-btn-mini {
     background: #1a1a1a;
@@ -753,8 +927,40 @@
     font-size: 16px;
   }
   
-  .markets-subtitle {
-    font-size: 11px;
+  .usdc-header-card {
+    padding: 10px 12px !important;
+  }
+  
+  .usdc-logo-container {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .usdc-logo {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .usdc-logo-glow {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .usdc-main-title {
+    font-size: 15px;
+  }
+  
+  .usdc-balance-pill {
+    padding: 4px 10px;
+  }
+  
+  .balance-amount {
+    font-size: 12px;
+  }
+  
+  .action-btn {
+    width: 28px !important;
+    height: 28px !important;
   }
   
   .market-image {
@@ -1240,12 +1446,12 @@
   color: #f59e0b;
 }
 
-/* Help Modal Overlay */
+/* Help Modal Overlay - Premium Dark Theme */
 .help-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1254,40 +1460,57 @@
 }
 
 .help-modal-content {
-  background: #fff;
-  border-radius: 16px;
-  max-width: 400px;
+  background: linear-gradient(135deg, #0a1628 0%, #1a2744 50%, #0d1929 100%);
+  border: 1px solid rgba(212, 255, 0, 0.2);
+  border-radius: 20px;
+  max-width: 420px;
   width: 100%;
   max-height: 85vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  box-shadow: 
+    0 25px 50px -12px rgba(0, 0, 0, 0.5),
+    0 0 40px rgba(212, 255, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .help-modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid #e5e5e5;
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  padding: 18px 24px;
+  border-bottom: 1px solid rgba(212, 255, 0, 0.15);
+  background: linear-gradient(135deg, rgba(212, 255, 0, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%);
+  position: relative;
+}
+
+.help-modal-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(212, 255, 0, 0.5), transparent);
 }
 
 .help-modal-header h2 {
   font-size: 18px;
   font-weight: 700;
-  color: #fff;
+  color: #d4ff00;
   margin: 0;
+  font-family: "Exo 2", sans-serif;
+  text-shadow: 0 0 20px rgba(212, 255, 0, 0.3);
 }
 
 .help-close-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  border: none;
-  background: rgba(255, 255, 255, 0.2);
-  color: #fff;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #94a3b8;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1296,17 +1519,19 @@
 }
 
 .help-close-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .help-modal-body {
-  padding: 16px 20px;
+  padding: 20px 24px;
   overflow-y: auto;
   flex: 1;
 }
 
 .help-section {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .help-section:last-child {
@@ -1316,15 +1541,16 @@
 .help-section h3 {
   font-size: 14px;
   font-weight: 700;
-  color: #000;
-  margin: 0 0 8px 0;
+  color: #d4ff00;
+  margin: 0 0 10px 0;
+  font-family: "Exo 2", sans-serif;
 }
 
 .help-section p {
   font-size: 13px;
-  color: #666;
-  margin: 0 0 10px 0;
-  line-height: 1.5;
+  color: #94a3b8;
+  margin: 0 0 12px 0;
+  line-height: 1.6;
 }
 
 .help-comparison {
@@ -1336,50 +1562,62 @@
 .comparison-item {
   display: flex;
   justify-content: space-between;
-  padding: 8px 12px;
-  background: #f5f5f5;
-  border-radius: 8px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
   font-size: 12px;
 }
 
 .comparison-item.highlight {
-  background: rgba(16, 185, 129, 0.15);
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  background: rgba(212, 255, 0, 0.08);
+  border: 1px solid rgba(212, 255, 0, 0.25);
 }
 
 .comparison-item .label {
   font-weight: 600;
-  color: #333;
+  color: #e2e8f0;
+  font-family: "Exo 2", sans-serif;
 }
 
 .comparison-item .value {
-  color: #666;
+  color: #94a3b8;
+}
+
+.comparison-item .value.positive {
+  color: #10b981;
+}
+
+.comparison-item .value.negative {
+  color: #ef4444;
 }
 
 .help-formula {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin: 10px 0;
+  gap: 6px;
+  margin: 12px 0;
 }
 
 .help-formula code {
-  background: #1a1a1a;
-  color: #10b981;
-  padding: 8px 12px;
-  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(212, 255, 0, 0.15);
+  color: #d4ff00;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
   font-family: monospace;
 }
 
 .help-example {
-  background: #f8fafc;
-  border-left: 3px solid #10b981;
-  padding: 10px 12px;
-  border-radius: 0 8px 8px 0;
+  background: rgba(212, 255, 0, 0.05);
+  border-left: 3px solid #d4ff00;
+  padding: 12px 14px;
+  border-radius: 0 10px 10px 0;
   font-size: 12px;
-  color: #333;
-  line-height: 1.6;
+  color: #e2e8f0;
+  line-height: 1.7;
 }
 
 .help-fees {
@@ -1393,33 +1631,35 @@
   grid-template-columns: 1fr auto auto;
   gap: 8px;
   align-items: center;
-  padding: 8px 12px;
-  background: #f5f5f5;
-  border-radius: 8px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
   font-size: 12px;
 }
 
 .fee-item.exit {
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
 }
 
 .fee-name {
   font-weight: 600;
-  color: #333;
+  color: #e2e8f0;
+  font-family: "Exo 2", sans-serif;
 }
 
 .fee-value {
   font-weight: 700;
-  color: #10b981;
+  color: #d4ff00;
 }
 
 .fee-item.exit .fee-value {
-  color: #ef4444;
+  color: #f87171;
 }
 
 .fee-note {
-  color: #888;
+  color: #64748b;
   font-size: 10px;
 }
 
@@ -1430,46 +1670,49 @@
 }
 
 .payout-scenario {
-  background: #f5f5f5;
-  padding: 10px 12px;
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 12px 14px;
+  border-radius: 10px;
   font-size: 12px;
-  color: #333;
-  line-height: 1.6;
+  color: #e2e8f0;
+  line-height: 1.7;
 }
 
 .payout-result {
-  padding: 10px 12px;
-  border-radius: 8px;
+  padding: 12px 14px;
+  border-radius: 10px;
   font-size: 12px;
-  line-height: 1.6;
+  line-height: 1.7;
+  color: #e2e8f0;
 }
 
 .payout-result.win {
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  background: rgba(212, 255, 0, 0.08);
+  border: 1px solid rgba(212, 255, 0, 0.25);
 }
 
 .payout-result.lose {
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
 }
 
 .payout-result .amount {
   font-weight: 700;
+  font-family: "Exo 2", sans-serif;
 }
 
 .payout-result.win .amount {
-  color: #10b981;
+  color: #d4ff00;
 }
 
 .payout-result.lose .amount {
-  color: #ef4444;
+  color: #f87171;
 }
 
 .payout-result .profit {
   font-weight: 700;
-  color: #10b981;
+  color: #d4ff00;
 }
 
 .help-section.tips ul {
@@ -1480,65 +1723,20 @@
 
 .help-section.tips li {
   font-size: 12px;
-  color: #333;
-  padding: 6px 0;
-  border-bottom: 1px solid #eee;
+  color: #e2e8f0;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 .help-section.tips li:last-child {
   border-bottom: none;
 }
 
-/* Dark mode for help modal */
-@media (prefers-color-scheme: dark) {
-  .help-modal-content {
-    background: #1a1a1a;
-  }
-  
-  .help-modal-header {
-    border-color: #333;
-  }
-  
-  .help-section h3 {
-    color: #fff;
-  }
-  
-  .help-section p {
-    color: #aaa;
-  }
-  
-  .comparison-item {
-    background: #2a2a2a;
-  }
-  
-  .comparison-item .label {
-    color: #eee;
-  }
-  
-  .comparison-item .value {
-    color: #aaa;
-  }
-  
-  .help-example {
-    background: #2a2a2a;
-    color: #eee;
-  }
-  
-  .fee-item {
-    background: #2a2a2a;
-  }
-  
-  .fee-name {
-    color: #eee;
-  }
-  
-  .payout-scenario {
-    background: #2a2a2a;
-    color: #eee;
-  }
-  
-  .help-section.tips li {
-    color: #eee;
-    border-color: #333;
-  }
+.help-section.tips li::before {
+  content: '→';
+  color: #d4ff00;
+  font-weight: bold;
 }

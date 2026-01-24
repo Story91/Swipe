@@ -24,6 +24,8 @@ import { XAxis, YAxis, ResponsiveContainer, Tooltip, Area, AreaChart, CartesianG
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 import { useHybridPredictions } from '../../../lib/hooks/useHybridPredictions';
 import { useAccount, useWriteContract, useReadContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseUnits, formatUnits } from 'viem';
@@ -949,44 +951,72 @@ export default function KalshiMarkets() {
 
   return (
     <div className="kalshi-markets">
-      {/* Compact Header for MiniApp */}
-      <div className="markets-header-compact">
-        {/* Title Row */}
-        <div className="header-title-row">
-          <div className="title-section">
-            <DollarSign className="w-5 h-5 text-green-500" />
-            <span className="markets-title-text">USDC Markets</span>
-            <button 
-              className="help-btn-mini"
-              onClick={() => setShowHelpModal(true)}
-              title="How USDC Markets Work"
-            >
-              <HelpCircle className="w-3.5 h-3.5" />
-            </button>
-            <button 
-              className="refresh-btn-mini"
-              onClick={async () => {
-                setIsRefreshing(true);
-                await refresh();
-                setRefreshKey(prev => prev + 1);
-                setTimeout(() => setIsRefreshing(false), 500);
-              }}
-              disabled={isRefreshing}
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-          {isConnected && (
-            <div className="wallet-balance-compact">
-              <Wallet className="w-3.5 h-3.5" />
-              <span>{parseFloat(formattedBalance).toFixed(2)}</span>
+      {/* Premium Header with shadcn */}
+      <Card className="usdc-header-card">
+        <div className="usdc-header-content">
+          {/* Left: Logo & Title */}
+          <div className="usdc-header-left">
+            <div className="usdc-logo-container">
+              <img src="/usdc.png" alt="USDC" className="usdc-logo" />
+              <div className="usdc-logo-glow"></div>
             </div>
-          )}
+            <div className="usdc-title-group">
+              <h1 className="usdc-main-title">USDC Markets</h1>
+              <div className="usdc-subtitle-row">
+                <Badge variant="outline" className="usdc-badge-live">
+                  <span className="live-dot"></span>
+                  Live
+                </Badge>
+                <a 
+                  href="https://basescan.org/address/0xf5Fa6206c2a7d5473ae7468082c9D260DFF83205"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="contract-link"
+                >
+                  <img src="/Base_square_blue.png" alt="Base" className="contract-icon" />
+                  <span>Contract</span>
+                </a>
+              </div>
+            </div>
+          </div>
+          
+          {/* Right: Balance & Actions */}
+          <div className="usdc-header-right">
+            {isConnected && (
+              <div className="usdc-balance-pill">
+                <Wallet className="w-4 h-4" />
+                <span className="balance-amount">${parseFloat(formattedBalance).toFixed(2)}</span>
+              </div>
+            )}
+            <div className="usdc-action-buttons">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="action-btn"
+                onClick={() => setShowHelpModal(true)}
+                title="How it works"
+              >
+                <HelpCircle className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="action-btn"
+                onClick={async () => {
+                  setIsRefreshing(true);
+                  await refresh();
+                  setRefreshKey(prev => prev + 1);
+                  setTimeout(() => setIsRefreshing(false), 500);
+                }}
+                disabled={isRefreshing}
+              >
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
+          </div>
         </div>
-        
-        {/* Subtitle */}
-        <p className="markets-subtitle">Tradeable • Exit Anytime • 5% Fee</p>
-      </div>
+        <Separator className="usdc-separator" />
+      </Card>
 
       {/* Markets Grid */}
       <div className="markets-grid">

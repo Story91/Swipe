@@ -2006,7 +2006,7 @@ export function EnhancedUserDashboard() {
             {/* USDC Row - always visible */}
             <tr className="usdc-row">
               <td className="token-cell">
-                <span className="usdc-icon-stats">$</span>
+                <img src="/usdc.png" alt="USDC" className="token-logo" />
               </td>
               <td className="value-cell">
                 <span className="stat-value-total">{formatUsdc(usdcTotalStaked)}</span>
@@ -2319,7 +2319,7 @@ export function EnhancedUserDashboard() {
                             {transaction.type === 'resolve' && '✅'}
                             {transaction.type === 'cancel' && '🚫'}
                             {transaction.type === 'exit_early' && '🚪'}
-                            {transaction.type === 'exit_early' ? 'EXIT' : transaction.type.toUpperCase()}
+                            {transaction.type === 'stake' ? 'BET' : (transaction.type === 'exit_early' ? 'EXIT' : transaction.type.toUpperCase())}
                           </span>
                           <span className={`token-type-badge-compact ${tokenType.toLowerCase()}`}>
                             {isUsdc ? (
