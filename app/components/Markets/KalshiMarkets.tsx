@@ -87,6 +87,8 @@ interface MarketCardProps {
   description?: string;
   category: string;
   image?: string;
+  selectedCrypto?: string;
+  includeChart?: boolean;
   yesPool: number;
   noPool: number;
   deadline: number;
@@ -107,7 +109,9 @@ function MarketCard({
   title,
   description,
   category, 
-  image, 
+  image,
+  selectedCrypto,
+  includeChart,
   yesPool, 
   noPool, 
   deadline, 
@@ -217,6 +221,56 @@ function MarketCard({
   };
   const hasMoreDescription = description && description.trim().length > 0 && description !== getFirstSentence(description);
 
+  // Get crypto icon fallback
+  const getCryptoImage = (): string | null => {
+    if (selectedCrypto) {
+      const symbol = selectedCrypto.toUpperCase();
+      const cryptoIcons: Record<string, string> = {
+        'BTC': '/btc.png',
+        'ETH': '/eth.png',
+        'SOL': '/sol.png',
+        'SWIPE': '/logo.png'
+        // XRP and BNB don't have icons, will fallback to hero.png
+      };
+      return cryptoIcons[symbol] || null;
+    }
+    if (includeChart) {
+      // Try to detect from title/question
+      const upperTitle = title.toUpperCase();
+      if (upperTitle.includes('BITCOIN') || upperTitle.includes('BTC')) return '/btc.png';
+      if (upperTitle.includes('ETHEREUM') || upperTitle.includes('ETH')) return '/eth.png';
+      if (upperTitle.includes('SOLANA') || upperTitle.includes('SOL')) return '/sol.png';
+    }
+    return null;
+  };
+
+  // Image with fallback
+  const cryptoFallback = useMemo(() => getCryptoImage(), [selectedCrypto, includeChart, title]);
+  
+  const initialImage = useMemo((): string => {
+    // If no image or empty, use crypto fallback or hero
+    if (!image || image.trim() === '' || image.includes('geckoterminal')) {
+      return cryptoFallback || '/hero.png';
+    }
+    return image;
+  }, [image, cryptoFallback]);
+  
+  const [imageSrc, setImageSrc] = useState<string>(initialImage);
+  
+  // Update image when props change
+  useEffect(() => {
+    setImageSrc(initialImage);
+  }, [initialImage]);
+  
+  const handleImageError = () => {
+    // Try crypto icon first, then hero.png
+    if (cryptoFallback && imageSrc !== cryptoFallback) {
+      setImageSrc(cryptoFallback);
+    } else if (imageSrc !== '/hero.png') {
+      setImageSrc('/hero.png');
+    }
+  };
+
   // Fetch price history when expanded
   useEffect(() => {
     if (!isExpanded) return;
@@ -277,11 +331,13 @@ function MarketCard({
           >
             {/* Header */}
             <div className="market-card-header">
-              {image && (
-                <div className="market-image">
-                  <img src={image} alt={title} />
-                </div>
-              )}
+              <div className="market-image">
+                <img 
+                  src={imageSrc} 
+                  alt={title}
+                  onError={handleImageError}
+                />
+              </div>
               <div className="market-info">
                 <h3 className="market-title">{title}</h3>
                 {description && (
@@ -942,6 +998,8 @@ export default function KalshiMarkets() {
         description: pred.description,
         category: pred.category || 'General',
         image: pred.imageUrl || '/hero.png',
+        selectedCrypto: pred.selectedCrypto,
+        includeChart: pred.includeChart,
         yesPool: pred.yesTotalAmount || 0,
         noPool: pred.noTotalAmount || 0,
         usdcEnabled: pred.usdcPoolEnabled || false,
