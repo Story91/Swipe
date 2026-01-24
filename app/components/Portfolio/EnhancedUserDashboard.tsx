@@ -752,9 +752,17 @@ export function EnhancedUserDashboard() {
               const usdcNoPool = prediction.usdcNoTotalAmount || 0;
               
               const predAny = prediction as any;
-              const usdcResolved = predAny.usdcResolved || prediction.resolved;
-              const usdcCancelled = predAny.usdcCancelled || prediction.cancelled;
-              const usdcOutcome = predAny.usdcOutcome ?? prediction.outcome;
+              // For USDC predictions, always use usdcResolved/usdcOutcome if usdcPoolEnabled
+              // Use ?? to handle undefined, but check usdcPoolEnabled first
+              const usdcResolved = predAny.usdcPoolEnabled 
+                ? (predAny.usdcResolved !== undefined ? predAny.usdcResolved : false)
+                : prediction.resolved;
+              const usdcCancelled = predAny.usdcPoolEnabled
+                ? (predAny.usdcCancelled !== undefined ? predAny.usdcCancelled : false)
+                : prediction.cancelled;
+              const usdcOutcome = predAny.usdcPoolEnabled
+                ? (predAny.usdcOutcome !== undefined ? predAny.usdcOutcome : null)
+                : prediction.outcome;
               
               if (usdcResolved) {
                 const winnersPool = usdcOutcome ? usdcYesPool : usdcNoPool;
@@ -918,14 +926,16 @@ export function EnhancedUserDashboard() {
         
       case 'lost':
         // Show only predictions where user lost
-        filteredPredictions = allUserPredictions.filter(p => {
-          const ethStake = p.userStakes?.ETH;
-          const swipeStake = p.userStakes?.SWIPE;
-          const usdcStake = p.userStakes?.USDC;
-          return (ethStake && !ethStake.isWinner && p.status === 'resolved') || 
-                 (swipeStake && !swipeStake.isWinner && p.status === 'resolved') ||
-                 (usdcStake && !usdcStake.isWinner && (p.status === 'resolved' || p.usdcResolved));
-        });
+        filteredPredictions = allUserPredictions
+          .filter(p => {
+            const ethStake = p.userStakes?.ETH;
+            const swipeStake = p.userStakes?.SWIPE;
+            const usdcStake = p.userStakes?.USDC;
+            return (ethStake && !ethStake.isWinner && p.status === 'resolved') || 
+                   (swipeStake && !swipeStake.isWinner && p.status === 'resolved') ||
+                   (usdcStake && !usdcStake.isWinner && (p.status === 'resolved' || p.usdcResolved));
+          })
+          .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); // Newest first (highest createdAt on top)
         break;
         
       case 'expired':
@@ -1624,14 +1634,16 @@ export function EnhancedUserDashboard() {
         });
       case 'lost':
         // Show only predictions where user lost
-        return allUserPredictions.filter(p => {
-          const ethStake = p.userStakes?.ETH;
-          const swipeStake = p.userStakes?.SWIPE;
-          const usdcStake = p.userStakes?.USDC;
-          return (ethStake && !ethStake.isWinner && p.status === 'resolved') || 
-                 (swipeStake && !swipeStake.isWinner && p.status === 'resolved') ||
-                 (usdcStake && !usdcStake.isWinner && (p.status === 'resolved' || p.usdcResolved));
-        });
+        return allUserPredictions
+          .filter(p => {
+            const ethStake = p.userStakes?.ETH;
+            const swipeStake = p.userStakes?.SWIPE;
+            const usdcStake = p.userStakes?.USDC;
+            return (ethStake && !ethStake.isWinner && p.status === 'resolved') || 
+                   (swipeStake && !swipeStake.isWinner && p.status === 'resolved') ||
+                   (usdcStake && !usdcStake.isWinner && (p.status === 'resolved' || p.usdcResolved));
+          })
+          .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); // Newest first (highest createdAt on top)
       case 'expired':
         // Show only expired predictions where user participated (deadline passed but not resolved)
         return allUserPredictions.filter(p => !p.resolved && !p.cancelled && p.deadline <= Date.now() / 1000);

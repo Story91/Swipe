@@ -978,6 +978,78 @@ export function AdminDashboard({
           
           <button 
             onClick={async () => {
+              if (confirm('💵 SYNC USDC RESOLVED STATUS\n\nThis will sync resolved/cancelled/outcome status from USDC DualPool contract to Redis for ALL predictions with USDC pools.\n\nThis is useful when:\n• Prediction was resolved on USDC contract but Redis is outdated\n• Users can\'t see claim buttons in dashboard\n• Need to update lost/won status\n\nContinue?')) {
+                try {
+                  alert('💵 Starting USDC resolved status sync...');
+                  
+                  // Get all predictions with USDC pools
+                  const predictionsWithUSDC = redisPredictions.filter(p => p.usdcPoolEnabled);
+                  
+                  if (predictionsWithUSDC.length === 0) {
+                    alert('ℹ️ No predictions with USDC pools found');
+                    return;
+                  }
+                  
+                  // Extract numeric IDs
+                  const predictionIds = predictionsWithUSDC.map(p => {
+                    const numericId = parseInt(p.id.replace('pred_v2_', '').replace('pred_v1_', ''), 10);
+                    return numericId;
+                  }).filter(id => !isNaN(id));
+                  
+                  if (predictionIds.length === 0) {
+                    alert('❌ No valid prediction IDs found');
+                    return;
+                  }
+                  
+                  console.log(`💵 Syncing USDC resolved status for ${predictionIds.length} predictions...`);
+                  
+                  const response = await fetch('/api/sync/usdc', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ predictionIds })
+                  });
+                  
+                  const result = await response.json();
+                  
+                  if (result.success) {
+                    const syncedCount = result.synced || 0;
+                    alert(`✅ USDC RESOLVED STATUS SYNC COMPLETE!\n\nSynced: ${syncedCount} predictions\nTotal checked: ${predictionIds.length}\n\nRefreshing data...`);
+                    handleRefresh();
+                  } else {
+                    alert(`❌ USDC sync failed: ${result.error || 'Unknown error'}`);
+                  }
+                } catch (error) {
+                  console.error('USDC resolved sync error:', error);
+                  alert('❌ USDC resolved sync failed. Check console for details.');
+                }
+              }
+            }}
+            className="sync-btn ultra-compact-btn"
+            style={{
+              background: '#2563eb',
+              color: 'white',
+              border: 'none',
+              padding: '6px 8px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '9px',
+              fontWeight: '500',
+              whiteSpace: 'nowrap',
+              minHeight: '28px',
+              touchAction: 'manipulation',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px'
+            }}
+          >
+            💵 Sync USDC Resolved
+          </button>
+          
+          <button 
+            onClick={async () => {
               if (confirm('⚡ V2 INCREMENTAL SYNC\n\nThis will sync only NEW V2 predictions (newer than last in Redis).\nMuch faster than full sync!\n\nContinue?')) {
                 try {
                   alert('⚡ Starting V2 incremental sync...');
