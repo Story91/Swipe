@@ -2,7 +2,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createPublicClient, http } from 'viem';
 import { base } from 'viem/chains';
 import { CONTRACTS } from '../../../../../lib/contract';
-import { redisHelpers } from '../../../../../lib/redis';
+import { redisHelpers, redis, REDIS_KEYS } from '../../../../../lib/redis';
+
+// USDC DualPool Contract for syncing USDC data
+const USDC_DUALPOOL_ADDRESS = '0xf5Fa6206c2a7d5473ae7468082c9D260DFF83205';
+const USDC_DUALPOOL_ABI = [
+  {
+    inputs: [{ name: 'predictionId', type: 'uint256' }],
+    name: 'getPrediction',
+    outputs: [
+      { name: 'registered', type: 'bool' },
+      { name: 'creator', type: 'address' },
+      { name: 'deadline', type: 'uint256' },
+      { name: 'yesPool', type: 'uint256' },
+      { name: 'noPool', type: 'uint256' },
+      { name: 'resolved', type: 'bool' },
+      { name: 'cancelled', type: 'bool' },
+      { name: 'outcome', type: 'bool' },
+      { name: 'participantCount', type: 'uint256' }
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  }
+] as const;
 
 // Initialize public client for Base network
 const publicClient = createPublicClient({
@@ -245,7 +267,52 @@ export async function GET(request: NextRequest) {
     // Update market stats
     await redisHelpers.updateMarketStats();
 
-    console.log(`🎉 V2 recent sync completed! Synced: ${syncedPredictions} predictions, ${syncedStakes} stakes, Errors: ${errorsCount}`);
+    // === USDC SYNC: Sync USDC data for all synced predictions ===
+    console.log(`💵 Starting USDC sync for ${count} predictions...`);
+    let usdcSyncedCount = 0;
+    let usdcErrorsCount = 0;
+
+    for (let i = startId; i < totalCountNumber; i++) {
+      try {
+        const usdcData = await publicClient.readContract({
+          address: USDC_DUALPOOL_ADDRESS as `0x${string}`,
+          abi: USDC_DUALPOOL_ABI,
+          functionName: 'getPrediction',
+          args: [BigInt(i)]
+        });
+
+        // Check if registered on USDC contract
+        if (usdcData[0]) { // registered = true
+          const redisId = `pred_v2_${i}`;
+          const predData = await redis.get(REDIS_KEYS.PREDICTION(redisId));
+          
+          if (predData) {
+            const pred = typeof predData === 'string' ? JSON.parse(predData) : predData;
+            
+            // Update with USDC data
+            const updated = {
+              ...pred,
+              usdcPoolEnabled: true,
+              usdcYesTotalAmount: Number(usdcData[3]), // yesPool (raw 6 decimals)
+              usdcNoTotalAmount: Number(usdcData[4]),  // noPool (raw 6 decimals)
+              usdcResolved: usdcData[5],
+              usdcCancelled: usdcData[6],
+              usdcOutcome: usdcData[7],
+              usdcParticipantCount: Number(usdcData[8])
+            };
+
+            await redis.set(REDIS_KEYS.PREDICTION(redisId), JSON.stringify(updated));
+            usdcSyncedCount++;
+            console.log(`💵 USDC synced for prediction ${i}: YES=$${(Number(usdcData[3]) / 1e6).toFixed(2)} NO=$${(Number(usdcData[4]) / 1e6).toFixed(2)}`);
+          }
+        }
+      } catch (usdcError) {
+        // Not registered or error - skip silently (most predictions won't have USDC)
+        usdcErrorsCount++;
+      }
+    }
+
+    console.log(`🎉 V2 recent sync completed! V2: ${syncedPredictions} predictions, ${syncedStakes} stakes | USDC: ${usdcSyncedCount} synced | Errors: V2=${errorsCount}, USDC=${usdcErrorsCount}`);
 
     return NextResponse.json({
       success: true,
@@ -256,7 +323,9 @@ export async function GET(request: NextRequest) {
         syncedRange: { from: startId, to: totalCountNumber - 1 },
         syncedPredictions,
         syncedStakes,
-        errorsCount
+        errorsCount,
+        usdcSynced: usdcSyncedCount,
+        usdcErrors: usdcErrorsCount
       },
       timestamp: new Date().toISOString()
     });

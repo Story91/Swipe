@@ -935,13 +935,13 @@ export function AdminDashboard({
           
           <button 
             onClick={async () => {
-              if (confirm('🔄 V2 RECENT SYNC (Last 15)\n\nThis will sync only the last 15 predictions and their stakes.\nPerfect for keeping live predictions up to date!\n\nContinue?')) {
+              if (confirm('🔄 V2 + USDC SYNC (Last 15)\n\nThis will sync the last 15 predictions:\n• ETH/SWIPE pools and stakes (V2)\n• USDC pools (DualPool contract)\n\nPerfect for keeping live predictions up to date!\n\nContinue?')) {
                 try {
-                  alert('🔄 Starting V2 recent sync (last 15 predictions)...');
+                  alert('🔄 Starting V2 + USDC sync (last 15 predictions)...');
                   const response = await fetch('/api/sync/v2/recent?count=15');
                   if (response.ok) {
                     const result = await response.json();
-                    alert(`✅ V2 RECENT SYNC COMPLETE!\n\nSynced: ${result.data.syncedPredictions} predictions\nStakes: ${result.data.syncedStakes}\nRange: #${result.data.syncedRange.from} - #${result.data.syncedRange.to}\nErrors: ${result.data.errorsCount}\n\nRefreshing data...`);
+                    alert(`✅ V2 + USDC SYNC COMPLETE!\n\nV2 Synced: ${result.data.syncedPredictions} predictions\nStakes: ${result.data.syncedStakes}\nRange: #${result.data.syncedRange.from} - #${result.data.syncedRange.to}\n\n💵 USDC Synced: ${result.data.usdcSynced || 0} predictions\n\nErrors: V2=${result.data.errorsCount}, USDC=${result.data.usdcErrors || 0}\n\nRefreshing data...`);
                     handleRefresh();
                   } else {
                     alert('❌ V2 recent sync failed. Check console for details.');
@@ -973,7 +973,7 @@ export function AdminDashboard({
               gap: '3px'
             }}
           >
-            🔄 Last 15
+            🔄 Last 15 + 💵
           </button>
           
           <button 
