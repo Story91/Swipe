@@ -1111,25 +1111,23 @@ export default function KalshiMarkets() {
     const { id: predictionId, title, totalPool, participants } = selectedMarket;
     
     try {
-      // Generate OG image first (for crypto predictions or if needed)
-      const prediction = predictions?.find(p => p.id === predictionId);
-      const isCryptoPrediction = prediction?.includeChart || prediction?.imageUrl?.includes('geckoterminal.com');
-      
-      if (isCryptoPrediction) {
-        try {
-          console.log('📸 Generating OG image for USDC prediction:', predictionId);
-          const response = await fetch(`/api/og/upload/usdc/${predictionId}`, {
-            method: 'POST',
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            console.log('✅ OG image generated:', data.url);
-          }
-        } catch (error) {
-          console.error('Failed to generate OG image:', error);
-          // Continue with share even if image generation fails
+      // Always generate OG image for USDC predictions (like in SharePreviewModal)
+      // This ensures the embed shows our custom MarketCard-style image
+      try {
+        console.log('📸 Generating OG image for USDC prediction:', predictionId);
+        const response = await fetch(`/api/og/upload/usdc/${predictionId}`, {
+          method: 'POST',
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('✅ OG image generated:', data.url);
+        } else {
+          console.warn('Failed to generate OG image:', response.status);
         }
+      } catch (error) {
+        console.error('Failed to generate OG image:', error);
+        // Continue with share even if image generation fails
       }
       
       // Build share text - different based on shareType
