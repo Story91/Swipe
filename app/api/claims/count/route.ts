@@ -152,11 +152,16 @@ export async function GET(request: NextRequest) {
 
     // Also check USDC positions from Redis (they should be synced by sync/usdc endpoint)
     // Check all predictions with usdcPoolEnabled that we haven't processed yet
+    // USDC can be resolved independently of the main prediction, so check separately
     const usdcPredictions = allPredictions.filter(p => {
       const predAny = p as any;
-      return predAny.usdcPoolEnabled && 
-             ((predAny.usdcResolved && !predAny.usdcCancelled) || predAny.usdcCancelled) &&
-             !processedPredictions.has(p.id);
+      // Check if USDC pool is enabled and resolved/cancelled
+      const hasUsdcPool = predAny.usdcPoolEnabled || false;
+      const usdcResolved = predAny.usdcResolved || false;
+      const usdcCancelled = predAny.usdcCancelled || false;
+      const isUsdcResolvedOrCancelled = (usdcResolved && !usdcCancelled) || usdcCancelled;
+      
+      return hasUsdcPool && isUsdcResolvedOrCancelled && !processedPredictions.has(p.id);
     });
 
     if (usdcPredictions.length > 0) {
@@ -164,10 +169,10 @@ export async function GET(request: NextRequest) {
       for (const prediction of usdcPredictions) {
         const stakeKey = REDIS_KEYS.USER_STAKES(normalizedUserId, prediction.id);
         const stakeData = await redis.get(stakeKey);
+        const predAny = prediction as any;
         
         if (stakeData) {
           const stake = typeof stakeData === 'string' ? JSON.parse(stakeData) : stakeData;
-          const predAny = prediction as any;
           
           // Check if user has USDC stake
           if (stake.USDC && !stake.USDC.claimed) {
@@ -198,7 +203,6 @@ export async function GET(request: NextRequest) {
         } else {
           // No stake data in Redis - might need to sync USDC positions first
           // Try to check if user is in usdcParticipants list
-          const predAny = prediction as any;
           if (predAny.usdcParticipants && Array.isArray(predAny.usdcParticipants)) {
             const isParticipant = predAny.usdcParticipants.some((p: string) => 
               p.toLowerCase() === normalizedUserId

@@ -1271,6 +1271,57 @@ export function AdminDashboard({
           
           <button 
             onClick={async () => {
+              const idInput = prompt('🔍 CHECK USDC PREDICTION\n\nCheck USDC prediction data and participants.\n\nEnter prediction ID:\n\nExample: 227');
+              
+              if (!idInput) return;
+              
+              try {
+                const response = await fetch(`/api/admin/check-usdc-prediction?predictionId=${idInput.trim()}`);
+                if (response.ok) {
+                  const result = await response.json();
+                  if (result.success) {
+                    const info = `🔍 USDC PREDICTION CHECK\n\nPrediction ID: ${result.predictionId}\nRedis ID: ${result.redisId}\n\n📊 Status:\n• USDC Pool Enabled: ${result.prediction.usdcPoolEnabled}\n• USDC Resolved: ${result.prediction.usdcResolved}\n• USDC Cancelled: ${result.prediction.usdcCancelled}\n• USDC Outcome: ${result.prediction.usdcOutcome ?? 'null'}\n• Participant Count: ${result.prediction.usdcParticipantCount}\n• YES Pool: $${(result.prediction.usdcYesTotalAmount / 1e6).toFixed(2)}\n• NO Pool: $${(result.prediction.usdcNoTotalAmount / 1e6).toFixed(2)}\n\n👥 Participants in List: ${result.usdcParticipants.length}\n💰 USDC Stakes in Redis: ${result.usdcStakesCount}\n\n📋 Participants:\n${result.usdcParticipants.slice(0, 10).join('\n')}${result.usdcParticipants.length > 10 ? '\n...' : ''}\n\n💰 USDC Stakes:\n${result.usdcStakes.slice(0, 5).map((s: any) => 
+                      `${s.user}: YES=$${(s.yesAmount / 1e6).toFixed(2)} NO=$${(s.noAmount / 1e6).toFixed(2)} Claimed=${s.claimed}`
+                    ).join('\n')}${result.usdcStakes.length > 5 ? '\n...' : ''}\n\n⚠️ Missing Stakes:\n${result.diagnostic.missingStakes.length > 0 ? result.diagnostic.missingStakes.slice(0, 5).join('\n') : 'None'}`;
+                    alert(info);
+                    console.log('Full USDC prediction data:', result);
+                  } else {
+                    alert(`❌ Check failed: ${result.error}`);
+                  }
+                } else {
+                  alert('❌ Check failed. Check console for details.');
+                }
+              } catch (error) {
+                console.error('USDC check error:', error);
+                alert('❌ Check failed. Check console for details.');
+              }
+            }}
+            className="sync-btn ultra-compact-btn"
+            style={{
+              background: '#6366f1',
+              color: 'white',
+              border: 'none',
+              padding: '6px 8px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '9px',
+              fontWeight: '500',
+              whiteSpace: 'nowrap',
+              minHeight: '28px',
+              touchAction: 'manipulation',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px'
+            }}
+          >
+            🔍 Check USDC
+          </button>
+          
+          <button 
+            onClick={async () => {
               // Show USDC status for all predictions
               const v2Predictions = redisPredictions.filter(p => p.id.startsWith('pred_v2_') && !p.resolved && !p.cancelled);
               const usdcEnabled = v2Predictions.filter(p => (p as any).usdcPoolEnabled);
