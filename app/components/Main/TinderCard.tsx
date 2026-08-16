@@ -5,6 +5,7 @@ import { ethers } from 'ethers';
 import { CONTRACTS, SWIPE_TOKEN, getV2Contract, getContractForAction } from '../../../lib/contract';
 import { calculateApprovalAmount } from '../../../lib/constants/approval';
 import { useAdminRequest } from '../../../lib/auth/useAdminRequest';
+import { isReadOnlyChain } from '@/lib/chains';
 import { useViewProfile, useComposeCast, useMiniKit, useViewCast, useOpenUrl } from '@coinbase/onchainkit/minikit';
 import sdk from '@farcaster/miniapp-sdk';
 import './TinderCard.css';
@@ -1051,6 +1052,18 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   // Dashboard handlers
 
   const handleStakeBet = (predictionId: number, isYes: boolean, amount: number, token: 'ETH' | 'SWIPE') => {
+    // These markets live on a chain whose contracts are owned by a compromised,
+    // unrecoverable key. A stake here could never be resolved or claimed, so the
+    // transaction is refused rather than taking the user's money.
+    if (isReadOnlyChain()) {
+      alert(
+        '❌ These markets are archived.\n\n' +
+        'This network is read-only: its contracts can no longer resolve markets or ' +
+        'pay out, so new stakes are disabled. Existing positions stay visible.'
+      );
+      return;
+    }
+
     // Validate based on token type
     if (token === 'ETH') {
       if (amount < 0.00001) {

@@ -29,6 +29,7 @@ import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useHybridPredictions } from '../../../lib/hooks/useHybridPredictions';
 import { useAccount, useWriteContract, useReadContract, useWaitForTransactionReceipt } from 'wagmi';
+import { isReadOnlyChain } from '@/lib/chains';
 import { parseUnits, formatUnits } from 'viem';
 import { 
   USDC_DUALPOOL_ABI, 
@@ -868,7 +869,17 @@ export default function KalshiMarkets() {
   // Handle place bet
   const handlePlaceBet = useCallback(async () => {
     if (!address || !betModal.side || !betModal.marketId) return;
-    
+
+    // The USDC pool's owner key is compromised and unrecoverable, so a bet
+    // placed here could never be resolved or claimed.
+    if (isReadOnlyChain()) {
+      setErrorMessage(
+        'These markets are archived. This network is read-only: its contracts can no ' +
+        'longer resolve markets or pay out, so new bets are disabled.'
+      );
+      return;
+    }
+
     setErrorMessage(null);
     try {
       const amountInUSDC = parseUnits(betModal.amount.toString(), 6);

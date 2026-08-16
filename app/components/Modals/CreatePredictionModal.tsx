@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useWriteContract, useAccount, useReadContract, useWaitForTransactionReceipt, useChainId, useBalance } from 'wagmi';
 import { formatEther } from 'viem';
-import { getChainConfig } from '@/lib/chains';
+import { getChainConfig, isReadOnlyChain } from '@/lib/chains';
 import { CONTRACTS, SWIPE_TOKEN } from '../../../lib/contract';
 import { calculateApprovalAmount } from '../../../lib/constants/approval';
 import { uploadToImgBB } from '../../../lib/imgbb';
@@ -517,7 +517,17 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    // The contracts on a read-only chain are owned by a compromised key, so a
+    // market created there could never be resolved.
+    if (isReadOnlyChain()) {
+      alert(
+        '❌ This network is archived.\n\n' +
+        'Its contracts can no longer resolve markets, so new ones cannot be created here.'
+      );
+      return;
+    }
+
     if (!validateForm() || !canCreate) return;
 
     try {
