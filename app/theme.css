@@ -640,50 +640,50 @@ button.swipe-glow-button[class*="ock"] *:not(img) {
   color: #000000 !important;
 }
 
-/* ---------- desktop view switch (Grid | Swipe) ---------- */
+/* ---------- desktop layout switch, inside the main nav ---------- */
 
-.view-switch {
+.nav-view-switch {
   display: flex;
-  width: fit-content;
+  align-items: center;
   gap: 2px;
-  padding: 3px;
-  margin: 0 auto 16px;
-  background: #000;
+  margin-left: 4px;
+  padding: 2px;
+  background: rgba(212, 255, 0, 0.12);
+  border: 1px solid rgba(212, 255, 0, 0.35);
   border-radius: 999px;
-  border: 2px solid #000;
+  flex: 0 0 auto;
 }
 
-.view-switch__option {
-  font-family: "Orbitron", sans-serif;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.nav-view-switch__option {
+  font-family: "Spicy Rice", cursive;
+  font-size: 0.8rem;
+  line-height: 1;
   color: #d4ff00;
   background: transparent;
   border: none;
   border-radius: 999px;
-  padding: 7px 20px;
+  padding: 5px 12px;
   cursor: pointer;
+  white-space: nowrap;
   transition: background 140ms ease, color 140ms ease;
 }
 
-.view-switch__option:hover {
-  background: rgba(212, 255, 0, 0.14);
+.nav-view-switch__option:hover {
+  background: rgba(212, 255, 0, 0.2);
 }
 
-.view-switch__option--active {
+.nav-view-switch__option--active {
   background: #d4ff00;
   color: #000;
 }
 
-.view-switch__option:focus-visible {
-  outline: 3px solid #000;
-  outline-offset: 3px;
+.nav-view-switch__option:focus-visible {
+  outline: 2px solid #d4ff00;
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .view-switch__option {
+  .nav-view-switch__option {
     transition: none;
   }
 }

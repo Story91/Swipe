@@ -31,13 +31,10 @@
     display: block;
   }
   
-  /* Keep main content centered as before, panels are fixed on sides */
-  .main-content-wrapper {
-    max-width: 424px !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-    width: 100% !important;
-  }
+  /* The main wrapper's width is set per view mode in page.tsx (424px for
+     swipe, 1400px for grid). This file used to pin it to 424px !important at
+     exactly this breakpoint, which silently overrode the grid width and
+     collapsed the market grid into a single column. */
 }
 
 /* Panel Content */

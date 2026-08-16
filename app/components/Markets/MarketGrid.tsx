@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useHybridPredictions } from "@/lib/hooks/useHybridPredictions";
 import type { HybridPrediction } from "@/lib/hooks/useHybridPredictions";
@@ -37,6 +37,18 @@ function formatTimeLeft(deadline: number): { label: string; urgent: boolean } {
   return { label: `${minutes}m left`, urgent: true };
 }
 
+type StatusFilter = "open" | "resolved" | "all";
+
+const FILTERS: { key: StatusFilter; label: string }[] = [
+  { key: "open", label: "Open" },
+  { key: "resolved", label: "Resolved" },
+  { key: "all", label: "All" },
+];
+
+function isOpen(p: HybridPrediction, now: number): boolean {
+  return !p.resolved && !p.cancelled && p.deadline > now;
+}
+
 function MarketCard({
   prediction,
   onOpen,
@@ -48,6 +60,7 @@ function MarketCard({
   const no = Math.max(0, 100 - yes);
   const time = formatTimeLeft(prediction.deadline);
   const pool = formatPool(prediction.totalPool ?? 0);
+  const settled = prediction.resolved || prediction.cancelled;
 
   return (
     <article
@@ -71,11 +84,21 @@ function MarketCard({
           <div className="market-card__media-fallback" aria-hidden="true" />
         )}
         <span className="market-card__category">{prediction.category}</span>
-        <span
-          className={`market-card__time${time.urgent ? " market-card__time--urgent" : ""}`}
-        >
-          {time.label}
-        </span>
+        {prediction.cancelled ? (
+          <span className="market-card__time">Cancelled</span>
+        ) : prediction.resolved ? (
+          <span
+            className={`market-card__outcome market-card__outcome--${prediction.outcome ? "yes" : "no"}`}
+          >
+            {prediction.outcome ? "YES won" : "NO won"}
+          </span>
+        ) : (
+          <span
+            className={`market-card__time${time.urgent ? " market-card__time--urgent" : ""}`}
+          >
+            {time.label}
+          </span>
+        )}
       </div>
 
       <div className="market-card__body">
@@ -108,16 +131,58 @@ function MarketCard({
 
 export function MarketGrid() {
   const router = useRouter();
-  const { predictions, loading, error } = useHybridPredictions();
+  const { predictions, loading, error, allPredictionsLoaded, fetchAllPredictions } =
+    useHybridPredictions();
+  const [filter, setFilter] = useState<StatusFilter>("open");
 
-  const openMarkets = useMemo(() => {
+  // The hook loads only open markets by default, so the settled filters would
+  // show nothing until the full set is requested.
+  useEffect(() => {
+    if (filter !== "open" && !allPredictionsLoaded) {
+      fetchAllPredictions();
+    }
+  }, [filter, allPredictionsLoaded, fetchAllPredictions]);
+
+  const { visible, openCount } = useMemo(() => {
     const now = Math.floor(Date.now() / 1000);
-    return (predictions ?? [])
-      .filter((p) => !p.resolved && !p.cancelled && p.deadline > now)
-      .sort((a, b) => a.deadline - b.deadline);
-  }, [predictions]);
+    const all = predictions ?? [];
+    const open = all.filter((p) => isOpen(p, now));
+
+    const list =
+      filter === "open"
+        ? open
+        : filter === "resolved"
+          ? all.filter((p) => p.resolved || p.cancelled)
+          : all;
+
+    // Open markets read best soonest-first; settled ones most-recent-first.
+    const sorted = [...list].sort((a, b) =>
+      filter === "open" ? a.deadline - b.deadline : b.deadline - a.deadline
+    );
+
+    return { visible: sorted, openCount: open.length };
+  }, [predictions, filter]);
 
   const openMarket = (id: string) => router.push(`/prediction/${id}`);
+
+  const filterBar = (
+    <div className="market-filter" role="group" aria-label="Filter markets">
+      {FILTERS.map(({ key, label }) => (
+        <button
+          key={key}
+          type="button"
+          className={`market-filter__chip${filter === key ? " market-filter__chip--active" : ""}`}
+          aria-pressed={filter === key}
+          onClick={() => setFilter(key)}
+        >
+          {label}
+          {key === "open" && openCount > 0 && (
+            <span className="market-filter__count">{openCount}</span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
 
   if (loading) {
     return (
@@ -138,28 +203,44 @@ export function MarketGrid() {
     );
   }
 
-  if (openMarkets.length === 0) {
-    return (
-      <div className="market-grid__notice">
-        <h2>No open markets right now</h2>
-        <p>
-          Every market has passed its deadline. New ones appear here as soon as
-          they are created.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="market-grid">
-      {openMarkets.map((prediction) => (
-        <MarketCard
-          key={prediction.id}
-          prediction={prediction}
-          onOpen={openMarket}
-        />
-      ))}
-    </div>
+    <>
+      {filterBar}
+
+      {visible.length === 0 ? (
+        <div className="market-grid__notice">
+          <h2>
+            {filter === "open"
+              ? "No open markets right now"
+              : "Nothing here yet"}
+          </h2>
+          <p>
+            {filter === "open"
+              ? "Every market has passed its deadline. New ones appear here as soon as they are created."
+              : "No markets match this filter."}
+          </p>
+          {filter === "open" && (
+            <button
+              type="button"
+              className="market-grid__notice-action"
+              onClick={() => setFilter("resolved")}
+            >
+              Browse settled markets
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="market-grid">
+          {visible.map((prediction) => (
+            <MarketCard
+              key={prediction.id}
+              prediction={prediction}
+              onOpen={openMarket}
+            />
+          ))}
+        </div>
+      )}
+    </>
   );
 }
 

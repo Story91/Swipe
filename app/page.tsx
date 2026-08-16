@@ -364,7 +364,13 @@ export default function App() {
 
       <div
         className={`w-full mx-auto px-2 sm:px-4 py-3 overflow-x-hidden main-content-wrapper ${
-          showGrid ? 'max-w-[1400px]' : 'max-w-[424px]'
+          showGrid
+            // Header stays readable; MarketGrid breaks out to the full viewport itself.
+            ? 'max-w-[1100px]'
+            : isDesktop
+              // Desktop swipe mode: one large card rather than a phone-width column.
+              ? 'max-w-[560px]'
+              : 'max-w-[424px]'
         }`}
       >
         {/* Wallet Connection and Admin/Help - Top */}
@@ -508,6 +514,27 @@ export default function App() {
                 Bets
               </MenubarTrigger>
             </MenubarMenu>
+            {/* Layout switch lives in the main nav on desktop; mobile is always swipe */}
+            {isDesktop && activeDashboard === 'tinder' && (
+              <div className="nav-view-switch" role="group" aria-label="Markets layout">
+                <button
+                  type="button"
+                  className={`nav-view-switch__option${desktopView === 'grid' ? ' nav-view-switch__option--active' : ''}`}
+                  aria-pressed={desktopView === 'grid'}
+                  onClick={() => setDesktopView('grid')}
+                >
+                  Grid
+                </button>
+                <button
+                  type="button"
+                  className={`nav-view-switch__option${desktopView === 'swipe' ? ' nav-view-switch__option--active' : ''}`}
+                  aria-pressed={desktopView === 'swipe'}
+                  onClick={() => setDesktopView('swipe')}
+                >
+                  Swipe
+                </button>
+              </div>
+            )}
             <MenubarMenu>
               <MenubarTrigger 
                 className="menubar-trigger !bg-gradient-to-r !from-blue-500 !to-green-500 !text-white !font-bold hover:!from-blue-400 hover:!to-green-400" 
@@ -550,28 +577,6 @@ export default function App() {
             </MenubarMenu>
           </Menubar>
         </div>
-
-        {/* View switch - desktop only, and only over the markets view */}
-        {isDesktop && activeDashboard === 'tinder' && (
-          <div className="view-switch" role="group" aria-label="Markets layout">
-            <button
-              type="button"
-              className={`view-switch__option${desktopView === 'grid' ? ' view-switch__option--active' : ''}`}
-              aria-pressed={desktopView === 'grid'}
-              onClick={() => setDesktopView('grid')}
-            >
-              Grid
-            </button>
-            <button
-              type="button"
-              className={`view-switch__option${desktopView === 'swipe' ? ' view-switch__option--active' : ''}`}
-              aria-pressed={desktopView === 'swipe'}
-              onClick={() => setDesktopView('swipe')}
-            >
-              Swipe
-            </button>
-          </div>
-        )}
 
         {/* Main Content with Tinder Cards */}
         <main className="flex-1">
