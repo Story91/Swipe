@@ -31,31 +31,50 @@ import { Menu, Plus, BarChart3, PlayCircle, Trophy, HelpCircle, Settings } from 
 import { useAccount, useConnect } from "wagmi";
 import { useState, useEffect, useRef, Suspense, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import TinderCardComponent from "./components/Main/TinderCard";
-import { AdminPanel } from "./components/Admin/AdminPanel";
+import dynamic from "next/dynamic";
 import { CompactStats } from "./components/Market/CompactStats";
-import { UserDashboard } from "./components/Portfolio/UserDashboard";
-import { EnhancedUserDashboard } from "./components/Portfolio/EnhancedUserDashboard";
-import { MyPortfolio } from "./components/Portfolio/MyPortfolio";
-import { ActiveBets } from "./components/Portfolio/ActiveBets";
-import { BetHistory } from "./components/Portfolio/BetHistory";
-import { PlatformAnalytics } from "./components/Admin/PlatformAnalytics";
-import { SystemSettings } from "./components/Admin/SystemSettings";
-import { AuditLogs } from "./components/Admin/AuditLogs";
-import { HelpAndFaq } from "./components/Support/HelpAndFaq";
-import { Leaderboard } from "./components/Market/Leaderboard";
-import { RecentActivity } from "./components/Support/RecentActivity";
-import { CreatePredictionModal } from "./components/Modals/CreatePredictionModal";
-import { HowToPlayModal } from "./components/Modals/HowToPlayModal";
-import { SwipeTokenCard } from "./components/Market/SwipeTokenCard";
-import { SwipeClaim } from "./components/Portfolio/SwipeClaim";
-import { DailyTasks } from "./components/Tasks/DailyTasks";
 import { SidePanels } from "./components/SidePanels/SidePanels";
-import KalshiMarkets from "./components/Markets/KalshiMarkets";
 import { useIsDesktop } from "@/lib/hooks/useMediaQuery";
 import { useDesktopViewMode } from "@/lib/hooks/desktopViewMode";
 import { MarketGrid } from "./components/Markets/MarketGrid";
 import { ProductPanels } from "./components/Panels/ProductPanels";
+
+/**
+ * Everything below renders behind a dashboard switch or a modal, so at most one
+ * of them is on screen at a time — yet importing them eagerly put all of them
+ * in the first-load bundle (846 kB for this route). next/dynamic defers each
+ * until it is actually chosen.
+ *
+ * ssr: false because they are wallet- and browser-dependent and were never
+ * server-rendered in any useful form; this avoids paying for their markup twice.
+ */
+const loading = () => <div className="dashboard-loading">Loading…</div>;
+
+// The swipe card is the heaviest single component in the app and is not
+// rendered at all in desktop grid mode. Deferring it costs mobile one extra
+// round trip and saves every desktop visitor from downloading it.
+const TinderCardComponent = dynamic(() => import("./components/Main/TinderCard"), { ssr: false, loading });
+
+const AdminPanel = dynamic(() => import("./components/Admin/AdminPanel").then(m => m.AdminPanel), { ssr: false, loading });
+const UserDashboard = dynamic(() => import("./components/Portfolio/UserDashboard").then(m => m.UserDashboard), { ssr: false, loading });
+const EnhancedUserDashboard = dynamic(() => import("./components/Portfolio/EnhancedUserDashboard").then(m => m.EnhancedUserDashboard), { ssr: false, loading });
+const MyPortfolio = dynamic(() => import("./components/Portfolio/MyPortfolio").then(m => m.MyPortfolio), { ssr: false, loading });
+const ActiveBets = dynamic(() => import("./components/Portfolio/ActiveBets").then(m => m.ActiveBets), { ssr: false, loading });
+const BetHistory = dynamic(() => import("./components/Portfolio/BetHistory").then(m => m.BetHistory), { ssr: false, loading });
+const PlatformAnalytics = dynamic(() => import("./components/Admin/PlatformAnalytics").then(m => m.PlatformAnalytics), { ssr: false, loading });
+const SystemSettings = dynamic(() => import("./components/Admin/SystemSettings").then(m => m.SystemSettings), { ssr: false, loading });
+const AuditLogs = dynamic(() => import("./components/Admin/AuditLogs").then(m => m.AuditLogs), { ssr: false, loading });
+const HelpAndFaq = dynamic(() => import("./components/Support/HelpAndFaq").then(m => m.HelpAndFaq), { ssr: false, loading });
+const Leaderboard = dynamic(() => import("./components/Market/Leaderboard").then(m => m.Leaderboard), { ssr: false, loading });
+const RecentActivity = dynamic(() => import("./components/Support/RecentActivity").then(m => m.RecentActivity), { ssr: false, loading });
+const SwipeTokenCard = dynamic(() => import("./components/Market/SwipeTokenCard").then(m => m.SwipeTokenCard), { ssr: false, loading });
+const SwipeClaim = dynamic(() => import("./components/Portfolio/SwipeClaim").then(m => m.SwipeClaim), { ssr: false, loading });
+const DailyTasks = dynamic(() => import("./components/Tasks/DailyTasks").then(m => m.DailyTasks), { ssr: false, loading });
+const KalshiMarkets = dynamic(() => import("./components/Markets/KalshiMarkets"), { ssr: false, loading });
+
+// Modals: mounted but closed most of the time, so they cost nothing until opened.
+const CreatePredictionModal = dynamic(() => import("./components/Modals/CreatePredictionModal").then(m => m.CreatePredictionModal), { ssr: false });
+const HowToPlayModal = dynamic(() => import("./components/Modals/HowToPlayModal").then(m => m.HowToPlayModal), { ssr: false });
 
 type DashboardType = 'tinder' | 'user' | 'admin' | 'approver' | 'market-stats' | 'analytics' | 'settings' | 'audit-logs' | 'my-portfolio' | 'active-bets' | 'bet-history' | 'help-faq' | 'leaderboard' | 'recent-activity' | 'swipe-token' | 'claim' | 'daily-tasks' | 'usdc-markets';
 

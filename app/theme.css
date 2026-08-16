@@ -687,3 +687,20 @@ button.swipe-glow-button[class*="ock"] *:not(img) {
     transition: none;
   }
 }
+
+/* Placeholder shown while a lazily-loaded dashboard arrives. Deliberately
+   quiet: these chunks land in well under a second on a warm connection, and a
+   spinner that flashes for 200ms reads as a glitch. */
+.dashboard-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  font-family: "Orbitron", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #1a1a1a;
+  opacity: 0.45;
+}
