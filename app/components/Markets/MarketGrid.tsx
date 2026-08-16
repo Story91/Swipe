@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useHybridPredictions } from "@/lib/hooks/useHybridPredictions";
 import type { HybridPrediction } from "@/lib/hooks/useHybridPredictions";
 import { pageWindow } from "./pageWindow";
+import { thumbKindFor, hueFromSeed, initialsFor } from "./marketThumb";
 import "./MarketGrid.css";
 
 /**
@@ -53,6 +54,57 @@ function isOpen(p: HybridPrediction, now: number): boolean {
   return !p.resolved && !p.cancelled && p.deadline > now;
 }
 
+/**
+ * Card thumbnail. Crypto markets store a GeckoTerminal embed URL rather than an
+ * image, so those get a chart-styled tile; anything that fails to load falls
+ * back to a colour derived from the market id, keeping the grid gap-free.
+ */
+function MarketThumb({ prediction }: { prediction: HybridPrediction }) {
+  const [failed, setFailed] = useState(false);
+  const kind = thumbKindFor(prediction.imageUrl);
+
+  if (kind === "image" && !failed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        className="market-card__thumb"
+        src={prediction.imageUrl}
+        alt=""
+        loading="lazy"
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+
+  if (kind === "chart") {
+    return (
+      <div className="market-card__thumb market-card__thumb--chart" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="20" height="20" role="presentation">
+          <polyline
+            points="2,24 9,16 15,20 22,8 30,12"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
+    );
+  }
+
+  const hue = hueFromSeed(prediction.id);
+  return (
+    <div
+      className="market-card__thumb market-card__thumb--generated"
+      style={{ background: `hsl(${hue} 55% 28%)`, color: `hsl(${hue} 85% 78%)` }}
+      aria-hidden="true"
+    >
+      {initialsFor(prediction.question || prediction.category || "?")}
+    </div>
+  );
+}
+
 function MarketCard({
   prediction,
   onOpen,
@@ -80,54 +132,43 @@ function MarketCard({
       }}
       aria-label={prediction.question}
     >
-      <div className="market-card__media">
-        {prediction.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={prediction.imageUrl} alt="" loading="lazy" />
-        ) : (
-          <div className="market-card__media-fallback" aria-hidden="true" />
-        )}
-        <span className="market-card__category">{prediction.category}</span>
+      <div className="market-card__head">
+        <MarketThumb prediction={prediction} />
+        <h3 className="market-card__question">{prediction.question}</h3>
+      </div>
+
+      <div className="market-card__odds">
+        <div className="market-card__odds-labels">
+          <span className="market-card__yes">YES {yes}%</span>
+          <span className="market-card__no">NO {no}%</span>
+        </div>
+        <div className="market-card__bar" aria-hidden="true">
+          <span className="market-card__bar-yes" style={{ width: `${yes}%` }} />
+        </div>
+      </div>
+
+      <div className="market-card__foot">
+        <span className="market-card__stat">{pool} ETH</span>
+        <span className="market-card__dot" aria-hidden="true">·</span>
+        <span className="market-card__stat">
+          {prediction.participants?.length ?? 0} players
+        </span>
+        <span className="market-card__spacer" />
         {prediction.cancelled ? (
-          <span className="market-card__time">Cancelled</span>
-        ) : prediction.resolved ? (
+          <span className="market-card__badge">Cancelled</span>
+        ) : settled ? (
           <span
-            className={`market-card__outcome market-card__outcome--${prediction.outcome ? "yes" : "no"}`}
+            className={`market-card__badge market-card__badge--${prediction.outcome ? "yes" : "no"}`}
           >
             {prediction.outcome ? "YES won" : "NO won"}
           </span>
         ) : (
           <span
-            className={`market-card__time${time.urgent ? " market-card__time--urgent" : ""}`}
+            className={`market-card__badge${time.urgent ? " market-card__badge--urgent" : ""}`}
           >
             {time.label}
           </span>
         )}
-      </div>
-
-      <div className="market-card__body">
-        <h3 className="market-card__question">{prediction.question}</h3>
-
-        <div className="market-card__odds" aria-hidden="true">
-          <div className="market-card__bar">
-            <span className="market-card__bar-yes" style={{ width: `${yes}%` }} />
-          </div>
-          <div className="market-card__odds-labels">
-            <span className="market-card__yes">YES {yes}%</span>
-            <span className="market-card__no">NO {no}%</span>
-          </div>
-        </div>
-
-        <dl className="market-card__stats">
-          <div>
-            <dt>Pool</dt>
-            <dd>{pool} ETH</dd>
-          </div>
-          <div>
-            <dt>Players</dt>
-            <dd>{prediction.participants?.length ?? 0}</dd>
-          </div>
-        </dl>
       </div>
     </article>
   );
