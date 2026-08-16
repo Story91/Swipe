@@ -1,5 +1,5 @@
 import { base } from 'viem/chains';
-import { createPublicClient, http, type PublicClient } from 'viem';
+import { createPublicClient, http, type Chain, type PublicClient } from 'viem';
 import { robinhoodChain, robinhoodTestnetChain } from './definitions';
 import type { ChainConfig, ChainKey } from './types';
 
@@ -90,6 +90,29 @@ export function getChainConfig(key: ChainKey = DEFAULT_CHAIN_KEY): ChainConfig {
 export function createChainPublicClient(key: ChainKey = DEFAULT_CHAIN_KEY): PublicClient {
   const { viemChain, rpcUrl } = getChainConfig(key);
   return createPublicClient({ chain: viemChain, transport: http(rpcUrl) }) as PublicClient;
+}
+
+/**
+ * Every chain config the app can use, default first.
+ *
+ * Testnets are included only behind NEXT_PUBLIC_SHOW_TESTNETS, matching what
+ * the network switcher offers — registering a chain the user can never select
+ * would just add a transport nobody uses.
+ */
+export function chainList(): ChainConfig[] {
+  const showTestnets = process.env.NEXT_PUBLIC_SHOW_TESTNETS === 'true';
+  const keys = (Object.keys(CHAINS) as ChainKey[]).filter(
+    (key) => showTestnets || !CHAINS[key].viemChain.testnet
+  );
+  // Default first: wagmi connects on chains[0].
+  keys.sort((a, b) => (a === DEFAULT_CHAIN_KEY ? -1 : b === DEFAULT_CHAIN_KEY ? 1 : 0));
+  return keys.map((key) => CHAINS[key]);
+}
+
+/** viem Chain objects for createConfig, in the same order as chainList(). */
+export function supportedChains(): [Chain, ...Chain[]] {
+  const chains = chainList().map((c) => c.viemChain);
+  return chains as [Chain, ...Chain[]];
 }
 
 /** True when a chain's markets are history only and accept no new writes. */

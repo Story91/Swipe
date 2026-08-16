@@ -5,6 +5,8 @@ import {
   DEFAULT_CHAIN_KEY,
   isReadOnlyChain,
   getWritableMarket,
+  chainList,
+  supportedChains,
 } from './index';
 
 describe('chain registry', () => {
@@ -51,6 +53,32 @@ describe('chain registry', () => {
   it('throws on an unknown chain key', () => {
     // @ts-expect-error deliberately invalid key
     expect(() => getChainConfig('ethereum')).toThrow(/unknown chain/i);
+  });
+});
+
+describe('chain registration for wagmi', () => {
+  it('lists the default chain first, because wagmi connects on chains[0]', () => {
+    expect(chainList()[0].key).toBe(DEFAULT_CHAIN_KEY);
+  });
+
+  it('registers more than one chain, or the switcher cannot work', () => {
+    // wagmi refuses to read or sign on a chain it was never given.
+    expect(supportedChains().length).toBeGreaterThan(1);
+  });
+
+  it('hides testnets unless explicitly enabled', () => {
+    expect(chainList().some((c) => c.viemChain.testnet)).toBe(false);
+  });
+
+  it('gives every registered chain a usable rpc url', () => {
+    for (const chain of chainList()) {
+      expect(chain.rpcUrl).toMatch(/^https?:\/\//);
+    }
+  });
+
+  it('has no duplicate chain ids, which would collide in transports', () => {
+    const ids = supportedChains().map((c) => c.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });
 
