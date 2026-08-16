@@ -14,6 +14,9 @@ import './ProductPanels.css';
  */
 
 type Layout = 'bar' | 'rail';
+export type PanelSection = 'claim' | 'stats' | 'activity';
+
+const ALL_SECTIONS: PanelSection[] = ['claim', 'stats', 'activity'];
 
 function formatEth(wei: number): string {
   const eth = wei / 1e18;
@@ -68,7 +71,15 @@ function ActivityRow({ item }: { item: ActivityItem }) {
   );
 }
 
-export function ProductPanels({ layout }: { layout: Layout }) {
+export function ProductPanels({
+  layout,
+  sections = ALL_SECTIONS,
+}: {
+  layout: Layout;
+  /** Which blocks to render. Lets the two side rails show different content
+      while still going through one implementation. */
+  sections?: PanelSection[];
+}) {
   const { address } = useAccount();
   const { stats, activity, claimCount, loading } = useProductPanelData(address);
 
@@ -76,11 +87,12 @@ export function ProductPanels({ layout }: { layout: Layout }) {
     return <div className={`pp pp--${layout} pp--loading`} aria-busy="true" />;
   }
 
+  const show = (s: PanelSection) => sections.includes(s);
   const activityLimit = layout === 'bar' ? 3 : 6;
 
   return (
     <div className={`pp pp--${layout}`}>
-      {claimCount !== null && claimCount > 0 && (
+      {show('claim') && claimCount !== null && claimCount > 0 && (
         <section className="pp-card pp-card--claim">
           <h3 className="pp-card__title">Ready to claim</h3>
           <p className="pp-claim__count">{claimCount}</p>
@@ -90,7 +102,7 @@ export function ProductPanels({ layout }: { layout: Layout }) {
         </section>
       )}
 
-      {stats && (
+      {show('stats') && stats && (
         <section className="pp-card">
           <h3 className="pp-card__title">Market</h3>
           <dl className="pp-stats">
@@ -114,7 +126,7 @@ export function ProductPanels({ layout }: { layout: Layout }) {
         </section>
       )}
 
-      {activity.length > 0 && (
+      {show('activity') && activity.length > 0 && (
         <section className="pp-card pp-card--activity">
           <h3 className="pp-card__title">Recent activity</h3>
           <ul className="pp-activity">

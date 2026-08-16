@@ -55,6 +55,7 @@ import KalshiMarkets from "./components/Markets/KalshiMarkets";
 import { useIsDesktop } from "@/lib/hooks/useMediaQuery";
 import { useDesktopViewMode } from "@/lib/hooks/desktopViewMode";
 import { MarketGrid } from "./components/Markets/MarketGrid";
+import { ProductPanels } from "./components/Panels/ProductPanels";
 
 type DashboardType = 'tinder' | 'user' | 'admin' | 'approver' | 'market-stats' | 'analytics' | 'settings' | 'audit-logs' | 'my-portfolio' | 'active-bets' | 'bet-history' | 'help-faq' | 'leaderboard' | 'recent-activity' | 'swipe-token' | 'claim' | 'daily-tasks' | 'usdc-markets';
 
@@ -588,7 +589,12 @@ export default function App() {
 
         {/* Main Content with Tinder Cards */}
         <main className="flex-1">
-          {showGrid && <MarketGrid />}
+          {showGrid && (
+            <>
+              <ProductPanels layout="bar" />
+              <MarketGrid />
+            </>
+          )}
 
           {activeDashboard === 'tinder' && !showGrid && (
             <TinderCardComponent
