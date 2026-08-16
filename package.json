@@ -11,6 +11,7 @@
     "deploy:v2": "hardhat run scripts/deploy_V2.js --network base",
     "deploy:usdc": "hardhat run scripts/deploy_USDC_DualPool_mainnet.js --network base",
     "deploy:v2:sepolia": "hardhat run scripts/deploy_V2.js --network baseSepolia",
+    "deploy:robinhood:testnet": "hardhat run scripts/deploy_robinhood_testnet.js --network robinhoodTestnet",
     "test": "hardhat test",
     "compile": "hardhat compile",
     "compile:via-ir": "hardhat compile --config hardhat.config.js"

@@ -1,5 +1,10 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("@nomicfoundation/hardhat-ethers");
+
+// This project keeps its secrets in .env.local (the Next.js convention, and what
+// `vercel env pull` writes). Load it first: dotenv does not overwrite variables
+// that are already set, so .env.local wins and .env stays a fallback.
+require("dotenv").config({ path: ".env.local" });
 require("dotenv").config();
 
 /** @type import('hardhat/config').HardhatUserConfig */
@@ -27,11 +32,6 @@ module.exports = {
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 8453,
     },
-    baseGoerli: {
-      url: process.env.BASE_GOERLI_RPC_URL || "https://goerli.base.org",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-      chainId: 84531,
-    },
     baseSepolia: {
       url: process.env.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
@@ -42,10 +42,29 @@ module.exports = {
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 11155111,
     },
+    // Robinhood Chain — Arbitrum Orbit (Nitro, ArbOS 61), native gas token is ETH
+    robinhoodTestnet: {
+      url: process.env.ROBINHOOD_TESTNET_RPC_URL || "https://rpc.testnet.chain.robinhood.com",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      chainId: 46630,
+    },
+    robinhood: {
+      url: process.env.ROBINHOOD_RPC_URL || "https://rpc.mainnet.chain.robinhood.com",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      chainId: 4663,
+    },
   },
   etherscan: {
-    // Use single Etherscan API V2 key for all chains (required for V2 migration)
-    apiKey: process.env.ETHERSCAN_API_V2_KEY || process.env.BASESCAN_API_KEY || process.env.ETHERSCAN_API_KEY,
+    // Per-network keys. A bare string here makes hardhat-verify treat every chain
+    // as Etherscan V2 and ignore customChains, which breaks Blockscout networks.
+    apiKey: {
+      base: process.env.ETHERSCAN_API_V2_KEY || process.env.BASESCAN_API_KEY || process.env.ETHERSCAN_API_KEY,
+      baseSepolia: process.env.ETHERSCAN_API_V2_KEY || process.env.BASESCAN_API_KEY || process.env.ETHERSCAN_API_KEY,
+      sepolia: process.env.ETHERSCAN_API_V2_KEY || process.env.ETHERSCAN_API_KEY,
+      // Blockscout ignores the value but requires a non-empty string
+      robinhoodTestnet: "blockscout",
+      robinhood: "blockscout",
+    },
     customChains: [
       {
         network: "base",
@@ -53,6 +72,24 @@ module.exports = {
         urls: {
           apiURL: "https://api.etherscan.io/v2/api", // Use V2 API endpoint
           browserURL: "https://basescan.org"
+        }
+      },
+      // Robinhood Chain uses Blockscout, not Etherscan. Blockscout accepts any
+      // non-empty API key, so the shared apiKey above is fine.
+      {
+        network: "robinhoodTestnet",
+        chainId: 46630,
+        urls: {
+          apiURL: "https://explorer.testnet.chain.robinhood.com/api",
+          browserURL: "https://explorer.testnet.chain.robinhood.com"
+        }
+      },
+      {
+        network: "robinhood",
+        chainId: 4663,
+        urls: {
+          apiURL: "https://robinhoodchain.blockscout.com/api",
+          browserURL: "https://robinhoodchain.blockscout.com"
         }
       }
     ]
