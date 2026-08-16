@@ -39,6 +39,7 @@ import { useDesktopViewMode } from "@/lib/hooks/desktopViewMode";
 import { MarketGrid } from "./components/Markets/MarketGrid";
 import { ProductPanels } from "./components/Panels/ProductPanels";
 import { ReadOnlyNotice } from "./components/Panels/ReadOnlyNotice";
+import { ChainSwitcher } from "./components/Wallet/ChainSwitcher";
 
 /**
  * Everything below renders behind a dashboard switch or a modal, so at most one
@@ -543,6 +544,9 @@ export default function App() {
                 Bets
               </MenubarTrigger>
             </MenubarMenu>
+            {/* Network switch sits with the other nav controls so the active
+                chain is visible without opening a menu. */}
+            <ChainSwitcher />
             {/* Layout switch lives in the main nav on desktop; mobile is always swipe */}
             {isDesktop && activeDashboard === 'tinder' && (
               <div className="nav-view-switch" role="group" aria-label="Markets layout">

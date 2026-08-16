@@ -1,0 +1,113 @@
+/* Network switcher, styled to sit inside the black nav bar alongside the
+   Grid/Swipe switch rather than competing with it. */
+
+.chain-switcher {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.chain-switcher__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: "Spicy Rice", cursive;
+  font-size: 0.85rem;
+  line-height: 1;
+  color: #d4ff00;
+  background: rgba(212, 255, 0, 0.12);
+  border: 1px solid rgba(212, 255, 0, 0.35);
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 140ms ease;
+}
+
+.chain-switcher__trigger:hover {
+  background: rgba(212, 255, 0, 0.22);
+}
+
+.chain-switcher__trigger:focus-visible,
+.chain-switcher__option:focus-visible {
+  outline: 2px solid #d4ff00;
+  outline-offset: 2px;
+}
+
+/* Green for a live chain, amber for one that is read-only. Not red: archived
+   is a state to understand, not an error. */
+.chain-switcher__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4ade80;
+  flex: 0 0 auto;
+}
+
+.chain-switcher__dot--archived {
+  background: #ffb020;
+}
+
+.chain-switcher__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 100;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: #0d0d0d;
+  border: 2px solid #d4ff00;
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+
+.chain-switcher__option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  font-family: "Orbitron", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  color: #f0f0f0;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 12px;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.chain-switcher__option:hover {
+  background: rgba(212, 255, 0, 0.14);
+}
+
+.chain-switcher__option--active {
+  background: rgba(212, 255, 0, 0.2);
+}
+
+.chain-switcher__name {
+  flex: 1 1 auto;
+}
+
+.chain-switcher__tag {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #000;
+  background: #ffb020;
+  border-radius: 999px;
+  padding: 2px 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chain-switcher__trigger,
+  .chain-switcher__option {
+    transition: none;
+  }
+}

@@ -1,0 +1,112 @@
+/* Wallet chooser. Sits in the header next to the nav, so it matches the black
+   pill styling used there rather than introducing a third visual language. */
+
+.wallet-picker {
+  position: relative;
+  display: inline-block;
+}
+
+.wallet-picker__trigger,
+.wallet-picker__connected {
+  font-family: "Spicy Rice", cursive;
+  font-size: 0.9rem;
+  color: #d4ff00;
+  background: #000;
+  border: 2px solid #000;
+  border-radius: 999px;
+  padding: 8px 18px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: filter 140ms ease;
+}
+
+.wallet-picker__trigger:hover:not(:disabled),
+.wallet-picker__connected:hover {
+  filter: brightness(1.25);
+}
+
+.wallet-picker__trigger:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.wallet-picker__trigger:focus-visible,
+.wallet-picker__connected:focus-visible,
+.wallet-picker__option:focus-visible {
+  outline: 3px solid #000;
+  outline-offset: 3px;
+}
+
+.wallet-picker__connected {
+  font-family: "Source Code Pro", monospace;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.wallet-picker__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 100;
+  min-width: 210px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: #0d0d0d;
+  border: 2px solid #d4ff00;
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+
+.wallet-picker__option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  font-family: "Orbitron", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  color: #f0f0f0;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.wallet-picker__option:hover {
+  background: rgba(212, 255, 0, 0.14);
+}
+
+.wallet-picker__empty,
+.wallet-picker__error {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #9a9a9a;
+}
+
+.wallet-picker__error {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 210px;
+  max-width: 280px;
+  background: #0d0d0d;
+  border: 1px solid #ffb020;
+  border-radius: 10px;
+  color: #ffb020;
+  z-index: 100;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wallet-picker__trigger,
+  .wallet-picker__connected,
+  .wallet-picker__option {
+    transition: none;
+  }
+}
