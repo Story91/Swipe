@@ -5,17 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ExternalLink, Clock, TrendingUp, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
+import type { NewsItem } from "@/lib/types/news";
 import "./SidePanels.css";
-
-interface NewsItem {
-  title: string;
-  description: string;
-  url: string;
-  source: string;
-  publishedAt: string;
-  imageUrl?: string;
-  categories?: string;
-}
 
 interface PredictionIdea {
   title: string;
@@ -43,34 +34,19 @@ export function SidePanels() {
       try {
         setLoading(true);
         
-        // Using CryptoCompare free API for crypto news
-        const cryptoResponse = await fetch(
-          "https://min-api.cryptocompare.com/data/v2/news/?lang=EN&limit=10"
-        );
-        
-        if (cryptoResponse.ok) {
-          const cryptoData = await cryptoResponse.json();
-          const newsItems: NewsItem[] = (cryptoData.Data || []).map((item: any) => {
-            // CryptoCompare API returns imageurl field
-            const imageUrl = item.imageurl || item.imageurl || null;
-            console.log('News item:', { title: item.title, imageUrl });
-            return {
-              title: item.title || "No title",
-              description: item.body?.substring(0, 150) || "No description",
-              url: item.url || "#",
-              source: item.source || "CryptoCompare",
-              publishedAt: new Date(item.published_on * 1000).toISOString(),
-              imageUrl: imageUrl,
-              categories: item.categories || item.category || "General",
-            };
-          });
-          
+        // Served by our own route: the upstream news API sends no CORS headers,
+        // so it cannot be called from the browser.
+        const newsResponse = await fetch("/api/news");
+        const payload = await newsResponse.json().catch(() => null);
+        const newsItems: NewsItem[] = payload?.items ?? [];
+
+        if (newsResponse.ok && newsItems.length > 0) {
           // Split news between left and right panels
           const midPoint = Math.ceil(newsItems.length / 2);
           setLeftNews(newsItems.slice(0, midPoint));
           setRightNews(newsItems.slice(midPoint));
         } else {
-          // Fallback: Generate sample prediction ideas if API fails
+          // Fallback: Generate sample prediction ideas if the news feed is empty
           generateFallbackContent();
         }
       } catch (error) {

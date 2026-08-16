@@ -230,6 +230,16 @@ export default function App() {
 
     const promptAddMiniApp = async () => {
       try {
+        // There is no Mini App host to answer outside Warpcast / the Base app,
+        // so the SDK call resolves undefined and then throws on `.result`.
+        // isInMiniApp() returns false when the page is not framed by a host.
+        const inMiniApp = await sdk.isInMiniApp();
+        if (!inMiniApp) {
+          console.log('ℹ️ Not running inside a Mini App host, skipping addMiniApp prompt');
+          setHasTriedAddMiniApp(true);
+          return;
+        }
+
         // Check if user already added the mini app - don't prompt again!
         const alreadyAdded = context?.client?.added;
         if (alreadyAdded) {
@@ -240,7 +250,7 @@ export default function App() {
 
         console.log('📱 Prompting user to add Mini App (not added yet)...');
         setHasTriedAddMiniApp(true);
-        
+
         try {
           const result = await sdk.actions.addMiniApp();
           console.log('✅ Add Mini App result:', result);
