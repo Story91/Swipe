@@ -65,19 +65,19 @@
   text-align: center;
 }
 
+/* Saturated red on saturated lime is the worst pairing available here: the two
+   sit at similar luminance, so the edges shimmer. A red glow on top made it
+   worse, and the infinite animation kept it moving. Near-black carries real
+   contrast against the brand lime and stays legible. */
 .side-panel-subtitle {
   font-family: "Orbitron", sans-serif;
   font-size: 0.75rem;
-  color: #ff0000;
+  color: #1a1a1a;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   text-align: center;
-  text-shadow: 
-    0 0 5px rgba(255, 0, 0, 0.8),
-    0 0 10px rgba(255, 0, 0, 0.6),
-    0 0 15px rgba(255, 0, 0, 0.4),
-    0 0 20px rgba(255, 0, 0, 0.3);
-  animation: neonGlow 2s ease-in-out infinite alternate;
+  opacity: 0.7;
 }
 
 @keyframes neonGlow {

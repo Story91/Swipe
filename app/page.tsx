@@ -53,6 +53,8 @@ import { DailyTasks } from "./components/Tasks/DailyTasks";
 import { SidePanels } from "./components/SidePanels/SidePanels";
 import KalshiMarkets from "./components/Markets/KalshiMarkets";
 import { useIsDesktop } from "@/lib/hooks/useMediaQuery";
+import { useDesktopViewMode } from "@/lib/hooks/desktopViewMode";
+import { MarketGrid } from "./components/Markets/MarketGrid";
 
 type DashboardType = 'tinder' | 'user' | 'admin' | 'approver' | 'market-stats' | 'analytics' | 'settings' | 'audit-logs' | 'my-portfolio' | 'active-bets' | 'bet-history' | 'help-faq' | 'leaderboard' | 'recent-activity' | 'swipe-token' | 'claim' | 'daily-tasks' | 'usdc-markets';
 
@@ -104,6 +106,13 @@ export default function App() {
   const [initialPredictionId, setInitialPredictionId] = useState<string | null>(null);
   const viewProfile = useViewProfile();
   const isDesktop = useIsDesktop();
+  const { mode: desktopView, setMode: setDesktopView } = useDesktopViewMode();
+
+  // Grid is a desktop-only browse layout; mobile always stays on the swipe card.
+  const showGrid = isDesktop && desktopView === 'grid' && activeDashboard === 'tinder';
+  // Side rails only make sense around the narrow swipe card — in grid mode the
+  // markets themselves fill the width.
+  const showSidePanels = isDesktop && desktopView === 'swipe';
 
   useEffect(() => {
     if (!isFrameReady) {
@@ -350,10 +359,14 @@ export default function App() {
         <SearchParamsHandler onPredictionId={handlePredictionId} />
       </Suspense>
       
-      {/* Side Panels - Desktop Only (conditionally rendered) */}
-      {isDesktop && <SidePanels />}
-      
-      <div className="w-full max-w-[424px] mx-auto px-2 sm:px-4 py-3 overflow-x-hidden main-content-wrapper">
+      {/* Side rails - desktop swipe mode only */}
+      {showSidePanels && <SidePanels />}
+
+      <div
+        className={`w-full mx-auto px-2 sm:px-4 py-3 overflow-x-hidden main-content-wrapper ${
+          showGrid ? 'max-w-[1400px]' : 'max-w-[424px]'
+        }`}
+      >
         {/* Wallet Connection and Admin/Help - Top */}
         <div className="flex justify-between items-center mb-3">
           <Wallet className="z-10">
@@ -538,9 +551,33 @@ export default function App() {
           </Menubar>
         </div>
 
+        {/* View switch - desktop only, and only over the markets view */}
+        {isDesktop && activeDashboard === 'tinder' && (
+          <div className="view-switch" role="group" aria-label="Markets layout">
+            <button
+              type="button"
+              className={`view-switch__option${desktopView === 'grid' ? ' view-switch__option--active' : ''}`}
+              aria-pressed={desktopView === 'grid'}
+              onClick={() => setDesktopView('grid')}
+            >
+              Grid
+            </button>
+            <button
+              type="button"
+              className={`view-switch__option${desktopView === 'swipe' ? ' view-switch__option--active' : ''}`}
+              aria-pressed={desktopView === 'swipe'}
+              onClick={() => setDesktopView('swipe')}
+            >
+              Swipe
+            </button>
+          </div>
+        )}
+
         {/* Main Content with Tinder Cards */}
         <main className="flex-1">
-          {activeDashboard === 'tinder' && (
+          {showGrid && <MarketGrid />}
+
+          {activeDashboard === 'tinder' && !showGrid && (
             <TinderCardComponent
               ref={tinderCardRef}
               activeDashboard={activeDashboard}

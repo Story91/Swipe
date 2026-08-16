@@ -115,7 +115,9 @@ body::before {
   right: 0;
   bottom: 0;
   background: var(--app-background);
-  opacity: 0.85;
+  /* 0.85 left hero.png legible enough to read as a photo behind the content,
+     which fought with it on wide screens. At 0.95 it survives as texture. */
+  opacity: 0.95;
   z-index: -1;
   pointer-events: none;
 }
@@ -636,4 +638,52 @@ button.swipe-glow-button[class*="ock"] *:not(img) {
 [data-testid="ockConnectWallet_Container"] button span,
 .ock-connect-wallet-button span {
   color: #000000 !important;
+}
+
+/* ---------- desktop view switch (Grid | Swipe) ---------- */
+
+.view-switch {
+  display: flex;
+  width: fit-content;
+  gap: 2px;
+  padding: 3px;
+  margin: 0 auto 16px;
+  background: #000;
+  border-radius: 999px;
+  border: 2px solid #000;
+}
+
+.view-switch__option {
+  font-family: "Orbitron", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #d4ff00;
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  padding: 7px 20px;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.view-switch__option:hover {
+  background: rgba(212, 255, 0, 0.14);
+}
+
+.view-switch__option--active {
+  background: #d4ff00;
+  color: #000;
+}
+
+.view-switch__option:focus-visible {
+  outline: 3px solid #000;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .view-switch__option {
+    transition: none;
+  }
 }
