@@ -39,6 +39,7 @@ import { useDesktopViewMode } from "@/lib/hooks/desktopViewMode";
 import { MarketGrid } from "./components/Markets/MarketGrid";
 import { ProductPanels } from "./components/Panels/ProductPanels";
 import { ReadOnlyNotice } from "./components/Panels/ReadOnlyNotice";
+import { ComingSoonOverlay } from "./components/Panels/ComingSoonOverlay";
 import { ChainSwitcher } from "./components/Wallet/ChainSwitcher";
 
 /**
@@ -648,11 +649,26 @@ export default function App() {
 
           {activeDashboard === 'approver' && <AdminPanel />}
 
-          {/* SWIPE Token Card */}
-          {activeDashboard === 'swipe-token' && <SwipeTokenCard />}
+          {/* SWIPE Token Card — the Base token's fee stream is captured by the
+              compromised key, so this is being rebuilt on the new token. */}
+          {activeDashboard === 'swipe-token' && (
+            <ComingSoonOverlay
+              title="New $SWIPE incoming"
+              message="The token page is moving to the new $SWIPE on Robinhood Chain. Balances, price and DEX links will return once it launches."
+            >
+              <SwipeTokenCard />
+            </ComingSoonOverlay>
+          )}
 
-          {/* Daily Tasks */}
-          {activeDashboard === 'daily-tasks' && <DailyTasks />}
+          {/* Daily Tasks — rewards were paid in the old token. */}
+          {activeDashboard === 'daily-tasks' && (
+            <ComingSoonOverlay
+              title="Daily tasks are being rebuilt"
+              message="Tasks and streak rewards are moving to the new $SWIPE on Robinhood Chain. Nothing is claimable here in the meantime."
+            >
+              <DailyTasks />
+            </ComingSoonOverlay>
+          )}
 
           {/* USDC Markets */}
           {activeDashboard === 'usdc-markets' && <KalshiMarkets />}
@@ -667,12 +683,24 @@ export default function App() {
           {/* Claim Page - kept for future use but not accessible from nav */}
           {activeDashboard === 'claim' && (
             <div style={{ padding: '20px' }}>
-              <SwipeClaim />
+              <ComingSoonOverlay
+                title="Claims are paused"
+                message="$SWIPE claims are moving to the new token on Robinhood Chain. Claims against the old contract cannot be processed."
+              >
+                <SwipeClaim />
+              </ComingSoonOverlay>
             </div>
           )}
 
-          {/* Market Stats - separate from main dashboard flow */}
-          {activeDashboard === 'market-stats' && <CompactStats />}
+          {/* Market Stats — the SWIPE figures here come from the old token. */}
+          {activeDashboard === 'market-stats' && (
+            <ComingSoonOverlay
+              title="Stats are being rebuilt"
+              message="Market stats still count volume in the old $SWIPE. They return once the new token is live on Robinhood Chain."
+            >
+              <CompactStats />
+            </ComingSoonOverlay>
+          )}
 
           {/* Portfolio Components */}
           {activeDashboard === 'my-portfolio' && <MyPortfolio />}

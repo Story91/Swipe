@@ -1,0 +1,78 @@
+/*
+ * Blurred preview of a feature that is being rebuilt on the new token.
+ * The old screen stays visible so people can see what is returning, but it is
+ * unmistakably inactive: blurred, dimmed, and not clickable.
+ */
+
+.coming-soon {
+  position: relative;
+  min-height: 320px;
+}
+
+.coming-soon__content {
+  filter: blur(5px) saturate(0.7);
+  opacity: 0.5;
+  pointer-events: none;
+  user-select: none;
+  /* Keeps the blur from bleeding past the section's edges. */
+  overflow: hidden;
+}
+
+.coming-soon__panel {
+  position: absolute;
+  top: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  width: min(420px, calc(100% - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+  background: #0d0d0d;
+  border: 2px solid #d4ff00;
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+}
+
+.coming-soon__title {
+  margin: 0;
+  font-family: "Spicy Rice", cursive;
+  font-size: 1.35rem;
+  line-height: 1.1;
+  color: #d4ff00;
+}
+
+.coming-soon__message {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #d8d8d8;
+}
+
+.coming-soon__note {
+  margin: 4px 0 0;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #7a7a7a;
+}
+
+@media (max-width: 600px) {
+  .coming-soon__panel {
+    top: 24px;
+    padding: 18px;
+  }
+  .coming-soon__title {
+    font-size: 1.15rem;
+  }
+}
+
+/* Blur is decorative; the panel already carries the message. */
+@media (prefers-reduced-motion: reduce) {
+  .coming-soon__content {
+    filter: none;
+    opacity: 0.35;
+  }
+}
