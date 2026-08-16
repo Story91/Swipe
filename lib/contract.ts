@@ -1,10 +1,15 @@
 import { ethers } from 'ethers';
+import { getChainConfig } from './chains';
 
-// V1 Contract Configuration (Legacy)
-export const V1_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_V1_CONTRACT_ADDRESS || '0xdc21A340835C41a14Eb1C856Ce902464D04774E3';
+// V1 Contract Configuration (Legacy).
+// Base-only and not part of the chain registry. The env var name here was
+// NEXT_PUBLIC_V1_CONTRACT_ADDRESS, which this project never sets - the actual
+// name is NEXT_PUBLIC_CONTRACT_ADDRESS, so the hardcoded fallback was doing all
+// the work.
+export const V1_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0xdc21A340835C41a14Eb1C856Ce902464D04774E3';
 
 // V2 Contract Configuration (New)
-export const V2_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_V2_CONTRACT_ADDRESS || '0x2bA339Df34B98099a9047d9442075F7B3a792f74';
+export const V2_CONTRACT_ADDRESS = getChainConfig().contracts.v2 ?? '';
 
 // SWIPE Token Configuration
 export const SWIPE_TOKEN = {
@@ -1330,7 +1335,7 @@ export const CONTRACTS = {
     supportedTokens: ['ETH', 'SWIPE']
   },
   USDC: {
-    address: process.env.NEXT_PUBLIC_USDC_DUALPOOL_CONTRACT || '0xf5Fa6206c2a7d5473ae7468082c9D260DFF83205',
+    address: getChainConfig().contracts.dualPool ?? '',
     abi: [], // Will be populated after import
     version: 'usdc',
     active: true,
@@ -1359,7 +1364,7 @@ export function getContract(signer?: ethers.Signer) {
 }
 
 // SwipeClaim Contract Configuration
-export const SWIPE_CLAIM_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_SWIPE_CLAIM_CONTRACT || '0x0000000000000000000000000000000000000000';
+export const SWIPE_CLAIM_CONTRACT_ADDRESS = getChainConfig().contracts.swipeClaim ?? '';
 
 // SwipeClaim Contract ABI (simplified - only functions we need)
 export const SWIPE_CLAIM_ABI = [
@@ -1420,7 +1425,7 @@ export const USDC_TOKEN = {
 };
 
 // USDC DualPool Contract Address (update after deployment)
-export const USDC_DUALPOOL_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_USDC_DUALPOOL_CONTRACT || '0xf5Fa6206c2a7d5473ae7468082c9D260DFF83205';
+export const USDC_DUALPOOL_CONTRACT_ADDRESS = getChainConfig().contracts.dualPool ?? '';
 
 // USDC DualPool Contract ABI
 export const USDC_DUALPOOL_ABI = [
