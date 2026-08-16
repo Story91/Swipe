@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createPublicClient, http } from 'viem';
-import { base } from 'viem/chains';
+import { createChainPublicClient } from '@/lib/chains';
 import { redis, REDIS_KEYS } from '@/lib/redis';
 
 // USDC DualPool Contract
@@ -49,10 +48,7 @@ const USDC_DUALPOOL_ABI = [
 ] as const;
 
 // Create viem client
-const client = createPublicClient({
-  chain: base,
-  transport: http(process.env.NEXT_PUBLIC_BASE_RPC_URL)
-});
+const client = createChainPublicClient();
 
 // Sync single prediction USDC data to Redis
 async function syncPredictionUSDC(predictionId: number): Promise<{

@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createPublicClient, http, parseAbiItem } from 'viem';
-import { base } from 'viem/chains';
+import { createChainPublicClient } from '@/lib/chains';
+import { parseAbiItem } from 'viem';
 import { SWIPE_CLAIM_CONFIG } from '../../../../lib/contract';
 import { redis, REDIS_KEYS } from '../../../../lib/redis';
 
-const publicClient = createPublicClient({
-  chain: base,
-  transport: http(process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org'),
-});
+const publicClient = createChainPublicClient();
 
 /**
  * GET /api/swipe-claim/claim-history?address=0x...

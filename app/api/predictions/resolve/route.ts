@@ -1,19 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { redisHelpers } from '../../../../lib/redis';
+import { requireAdmin } from '../../../../lib/auth/requireAdmin';
+
+// This endpoint is the sole resolution authority for predictions that live only in
+// Redis and were never registered on-chain. Predictions backed by a contract
+// (pred_v1_* / pred_v2_*) must be resolved through the contract instead — writing
+// their Redis mirror directly would desynchronise it from the chain until the next
+// sync, so those ids are rejected outright.
+function isPureRedisPrediction(predictionId: string): boolean {
+  return (
+    typeof predictionId === 'string' &&
+    predictionId.startsWith('pred_') &&
+    !predictionId.startsWith('pred_v1_') &&
+    !predictionId.startsWith('pred_v2_')
+  );
+}
 
 // POST /api/predictions/resolve - Resolve a Redis-based prediction
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAdmin(request, 'resolve');
+    if (!auth.ok) return auth.response;
+
     const body = await request.json();
     const { predictionId, outcome, reason } = body;
-    
+
     if (!predictionId) {
       return NextResponse.json(
         { success: false, error: 'Prediction ID is required' },
         { status: 400 }
       );
     }
-    
+
+    if (!isPureRedisPrediction(predictionId)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'On-chain predictions must be resolved via the contract, not this endpoint'
+        },
+        { status: 400 }
+      );
+    }
+
     if (typeof outcome !== 'boolean') {
       return NextResponse.json(
         { success: false, error: 'Outcome must be true (YES) or false (NO)' },
@@ -60,7 +88,7 @@ export async function POST(request: NextRequest) {
       resolved: true,
       outcome: outcome,
       resolvedAt: now,
-      resolvedBy: 'admin', // TODO: Get actual admin address
+      resolvedBy: auth.address, // verified by signature, not self-reported
       resolutionReason: reason || 'Admin resolution'
     };
     
@@ -189,6 +217,9 @@ export async function POST(request: NextRequest) {
 // POST /api/predictions/resolve/cancel - Cancel a Redis-based prediction
 export async function PUT(request: NextRequest) {
   try {
+    const auth = await requireAdmin(request, 'cancel');
+    if (!auth.ok) return auth.response;
+
     const body = await request.json();
     const { predictionId, reason } = body;
     
@@ -198,7 +229,17 @@ export async function PUT(request: NextRequest) {
         { status: 400 }
       );
     }
-    
+
+    if (!isPureRedisPrediction(predictionId)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'On-chain predictions must be cancelled via the contract, not this endpoint'
+        },
+        { status: 400 }
+      );
+    }
+
     if (!reason || reason.trim().length === 0) {
       return NextResponse.json(
         { success: false, error: 'Cancellation reason is required' },
@@ -235,7 +276,7 @@ export async function PUT(request: NextRequest) {
       ...existingPrediction,
       cancelled: true,
       cancelledAt: Math.floor(Date.now() / 1000),
-      cancelledBy: 'admin', // TODO: Get actual admin address
+      cancelledBy: auth.address, // verified by signature, not self-reported
       cancellationReason: reason.trim()
     };
     

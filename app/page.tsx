@@ -31,28 +31,50 @@ import { Menu, Plus, BarChart3, PlayCircle, Trophy, HelpCircle, Settings } from 
 import { useAccount, useConnect } from "wagmi";
 import { useState, useEffect, useRef, Suspense, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import TinderCardComponent from "./components/Main/TinderCard";
-import { AdminPanel } from "./components/Admin/AdminPanel";
+import dynamic from "next/dynamic";
 import { CompactStats } from "./components/Market/CompactStats";
-import { UserDashboard } from "./components/Portfolio/UserDashboard";
-import { EnhancedUserDashboard } from "./components/Portfolio/EnhancedUserDashboard";
-import { MyPortfolio } from "./components/Portfolio/MyPortfolio";
-import { ActiveBets } from "./components/Portfolio/ActiveBets";
-import { BetHistory } from "./components/Portfolio/BetHistory";
-import { PlatformAnalytics } from "./components/Admin/PlatformAnalytics";
-import { SystemSettings } from "./components/Admin/SystemSettings";
-import { AuditLogs } from "./components/Admin/AuditLogs";
-import { HelpAndFaq } from "./components/Support/HelpAndFaq";
-import { Leaderboard } from "./components/Market/Leaderboard";
-import { RecentActivity } from "./components/Support/RecentActivity";
-import { CreatePredictionModal } from "./components/Modals/CreatePredictionModal";
-import { HowToPlayModal } from "./components/Modals/HowToPlayModal";
-import { SwipeTokenCard } from "./components/Market/SwipeTokenCard";
-import { SwipeClaim } from "./components/Portfolio/SwipeClaim";
-import { DailyTasks } from "./components/Tasks/DailyTasks";
 import { SidePanels } from "./components/SidePanels/SidePanels";
-import KalshiMarkets from "./components/Markets/KalshiMarkets";
 import { useIsDesktop } from "@/lib/hooks/useMediaQuery";
+import { useDesktopViewMode } from "@/lib/hooks/desktopViewMode";
+import { MarketGrid } from "./components/Markets/MarketGrid";
+import { ProductPanels } from "./components/Panels/ProductPanels";
+
+/**
+ * Everything below renders behind a dashboard switch or a modal, so at most one
+ * of them is on screen at a time — yet importing them eagerly put all of them
+ * in the first-load bundle (846 kB for this route). next/dynamic defers each
+ * until it is actually chosen.
+ *
+ * ssr: false because they are wallet- and browser-dependent and were never
+ * server-rendered in any useful form; this avoids paying for their markup twice.
+ */
+const loading = () => <div className="dashboard-loading">Loading…</div>;
+
+// The swipe card is the heaviest single component in the app and is not
+// rendered at all in desktop grid mode. Deferring it costs mobile one extra
+// round trip and saves every desktop visitor from downloading it.
+const TinderCardComponent = dynamic(() => import("./components/Main/TinderCard"), { ssr: false, loading });
+
+const AdminPanel = dynamic(() => import("./components/Admin/AdminPanel").then(m => m.AdminPanel), { ssr: false, loading });
+const UserDashboard = dynamic(() => import("./components/Portfolio/UserDashboard").then(m => m.UserDashboard), { ssr: false, loading });
+const EnhancedUserDashboard = dynamic(() => import("./components/Portfolio/EnhancedUserDashboard").then(m => m.EnhancedUserDashboard), { ssr: false, loading });
+const MyPortfolio = dynamic(() => import("./components/Portfolio/MyPortfolio").then(m => m.MyPortfolio), { ssr: false, loading });
+const ActiveBets = dynamic(() => import("./components/Portfolio/ActiveBets").then(m => m.ActiveBets), { ssr: false, loading });
+const BetHistory = dynamic(() => import("./components/Portfolio/BetHistory").then(m => m.BetHistory), { ssr: false, loading });
+const PlatformAnalytics = dynamic(() => import("./components/Admin/PlatformAnalytics").then(m => m.PlatformAnalytics), { ssr: false, loading });
+const SystemSettings = dynamic(() => import("./components/Admin/SystemSettings").then(m => m.SystemSettings), { ssr: false, loading });
+const AuditLogs = dynamic(() => import("./components/Admin/AuditLogs").then(m => m.AuditLogs), { ssr: false, loading });
+const HelpAndFaq = dynamic(() => import("./components/Support/HelpAndFaq").then(m => m.HelpAndFaq), { ssr: false, loading });
+const Leaderboard = dynamic(() => import("./components/Market/Leaderboard").then(m => m.Leaderboard), { ssr: false, loading });
+const RecentActivity = dynamic(() => import("./components/Support/RecentActivity").then(m => m.RecentActivity), { ssr: false, loading });
+const SwipeTokenCard = dynamic(() => import("./components/Market/SwipeTokenCard").then(m => m.SwipeTokenCard), { ssr: false, loading });
+const SwipeClaim = dynamic(() => import("./components/Portfolio/SwipeClaim").then(m => m.SwipeClaim), { ssr: false, loading });
+const DailyTasks = dynamic(() => import("./components/Tasks/DailyTasks").then(m => m.DailyTasks), { ssr: false, loading });
+const KalshiMarkets = dynamic(() => import("./components/Markets/KalshiMarkets"), { ssr: false, loading });
+
+// Modals: mounted but closed most of the time, so they cost nothing until opened.
+const CreatePredictionModal = dynamic(() => import("./components/Modals/CreatePredictionModal").then(m => m.CreatePredictionModal), { ssr: false });
+const HowToPlayModal = dynamic(() => import("./components/Modals/HowToPlayModal").then(m => m.HowToPlayModal), { ssr: false });
 
 type DashboardType = 'tinder' | 'user' | 'admin' | 'approver' | 'market-stats' | 'analytics' | 'settings' | 'audit-logs' | 'my-portfolio' | 'active-bets' | 'bet-history' | 'help-faq' | 'leaderboard' | 'recent-activity' | 'swipe-token' | 'claim' | 'daily-tasks' | 'usdc-markets';
 
@@ -104,6 +126,13 @@ export default function App() {
   const [initialPredictionId, setInitialPredictionId] = useState<string | null>(null);
   const viewProfile = useViewProfile();
   const isDesktop = useIsDesktop();
+  const { mode: desktopView, setMode: setDesktopView } = useDesktopViewMode();
+
+  // Grid is a desktop-only browse layout; mobile always stays on the swipe card.
+  const showGrid = isDesktop && desktopView === 'grid' && activeDashboard === 'tinder';
+  // Side rails only make sense around the narrow swipe card — in grid mode the
+  // markets themselves fill the width.
+  const showSidePanels = isDesktop && desktopView === 'swipe';
 
   useEffect(() => {
     if (!isFrameReady) {
@@ -230,6 +259,16 @@ export default function App() {
 
     const promptAddMiniApp = async () => {
       try {
+        // There is no Mini App host to answer outside Warpcast / the Base app,
+        // so the SDK call resolves undefined and then throws on `.result`.
+        // isInMiniApp() returns false when the page is not framed by a host.
+        const inMiniApp = await sdk.isInMiniApp();
+        if (!inMiniApp) {
+          console.log('ℹ️ Not running inside a Mini App host, skipping addMiniApp prompt');
+          setHasTriedAddMiniApp(true);
+          return;
+        }
+
         // Check if user already added the mini app - don't prompt again!
         const alreadyAdded = context?.client?.added;
         if (alreadyAdded) {
@@ -240,7 +279,7 @@ export default function App() {
 
         console.log('📱 Prompting user to add Mini App (not added yet)...');
         setHasTriedAddMiniApp(true);
-        
+
         try {
           const result = await sdk.actions.addMiniApp();
           console.log('✅ Add Mini App result:', result);
@@ -340,12 +379,27 @@ export default function App() {
         <SearchParamsHandler onPredictionId={handlePredictionId} />
       </Suspense>
       
-      {/* Side Panels - Desktop Only (conditionally rendered) */}
-      {isDesktop && <SidePanels />}
-      
-      <div className="w-full max-w-[424px] mx-auto px-2 sm:px-4 py-3 overflow-x-hidden main-content-wrapper">
+      {/* Side rails - desktop swipe mode only */}
+      {showSidePanels && <SidePanels />}
+
+      <div
+        className={`w-full mx-auto py-3 main-content-wrapper ${
+          showGrid
+            // Grid mode: the container IS the page. Header blocks below cap
+            // themselves so they stay readable while the grid uses the width.
+            ? 'max-w-none px-4 lg:px-8'
+            : isDesktop
+              // Desktop swipe mode: one large card, not a phone-width column.
+              ? 'max-w-[560px] px-2 sm:px-4 overflow-x-hidden'
+              : 'max-w-[424px] px-2 sm:px-4 overflow-x-hidden'
+        }`}
+      >
         {/* Wallet Connection and Admin/Help - Top */}
-        <div className="flex justify-between items-center mb-3">
+        <div
+          className={`flex justify-between items-center mb-3 ${
+            showGrid ? 'max-w-[1100px] w-full mx-auto' : ''
+          }`}
+        >
           <Wallet className="z-10">
             <ConnectWallet 
               className="swipe-glow-button swipe-glow-green !px-3 !py-1.5 !text-sm !min-w-0 !font-semibold !rounded-full hover:!scale-105 !transition-all !duration-200" 
@@ -478,13 +532,37 @@ export default function App() {
         </div>
 
         {/* Menu Bar - Right after Wallet */}
-        <div className="mb-4 relative" style={{ overflow: 'visible' }}>
+        <div
+          className={`mb-4 relative ${showGrid ? 'max-w-[1100px] w-full mx-auto' : ''}`}
+          style={{ overflow: 'visible' }}
+        >
           <Menubar className="mini-app-menu">
             <MenubarMenu>
               <MenubarTrigger className="menubar-trigger" onClick={() => setActiveDashboard('tinder')}>
                 Bets
               </MenubarTrigger>
             </MenubarMenu>
+            {/* Layout switch lives in the main nav on desktop; mobile is always swipe */}
+            {isDesktop && activeDashboard === 'tinder' && (
+              <div className="nav-view-switch" role="group" aria-label="Markets layout">
+                <button
+                  type="button"
+                  className={`nav-view-switch__option${desktopView === 'grid' ? ' nav-view-switch__option--active' : ''}`}
+                  aria-pressed={desktopView === 'grid'}
+                  onClick={() => setDesktopView('grid')}
+                >
+                  Grid
+                </button>
+                <button
+                  type="button"
+                  className={`nav-view-switch__option${desktopView === 'swipe' ? ' nav-view-switch__option--active' : ''}`}
+                  aria-pressed={desktopView === 'swipe'}
+                  onClick={() => setDesktopView('swipe')}
+                >
+                  Swipe
+                </button>
+              </div>
+            )}
             <MenubarMenu>
               <MenubarTrigger 
                 className="menubar-trigger !bg-gradient-to-r !from-blue-500 !to-green-500 !text-white !font-bold hover:!from-blue-400 hover:!to-green-400" 
@@ -528,9 +606,29 @@ export default function App() {
           </Menubar>
         </div>
 
+        {/* Swipe mode only ever offers markets you can still bet on, so when
+            none are open it is a dead end. This is the way out to the full
+            history, which lives in grid mode. */}
+        {isDesktop && desktopView === 'swipe' && activeDashboard === 'tinder' && (
+          <button
+            type="button"
+            className="browse-all-link"
+            onClick={() => setDesktopView('grid')}
+          >
+            Browse all markets →
+          </button>
+        )}
+
         {/* Main Content with Tinder Cards */}
         <main className="flex-1">
-          {activeDashboard === 'tinder' && (
+          {showGrid && (
+            <>
+              <ProductPanels layout="bar" />
+              <MarketGrid />
+            </>
+          )}
+
+          {activeDashboard === 'tinder' && !showGrid && (
             <TinderCardComponent
               ref={tinderCardRef}
               activeDashboard={activeDashboard}

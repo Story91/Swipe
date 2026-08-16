@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createPublicClient, http } from 'viem';
-import { base } from 'viem/chains';
+import { createChainPublicClient } from '@/lib/chains';
 import { CONTRACTS } from '../../../../lib/contract';
 
 // Initialize public client for Base network
-const publicClient = createPublicClient({
-  chain: base,
-  transport: http(process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org'),
-});
+const publicClient = createChainPublicClient();
 
 // GET /api/debug/blockchain-prediction - Debug specific prediction on blockchain
 export async function GET(request: NextRequest) {

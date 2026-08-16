@@ -31,6 +31,8 @@ export const REDIS_KEYS = {
   PREDICTIONS_RESOLVED: 'predictions:resolved',
   PREDICTIONS_PENDING_APPROVAL: 'predictions:pending_approval',
   PREDICTIONS_COUNT: 'predictions:count',
+  /** Denormalised snapshot of every prediction, so a listing is one read. */
+  PREDICTIONS_INDEX: 'predictions:index',
   USER_STAKES: (userId: string, predictionId: string) => `user_stakes:${userId}:${predictionId}`,
   USER_TRANSACTIONS: (userId: string) => `user_transactions:${userId}`,
   MARKET_STATS: 'market:stats',
@@ -64,37 +66,155 @@ export type {
   RedisMarketStats 
 } from './types/redis';
 
+/** Upstash caps request size, so very large id lists are split. */
+const MGET_CHUNK_SIZE = 100;
+
+function parsePrediction(raw: unknown): RedisPrediction | null {
+  if (!raw) return null;
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (parsed && typeof parsed === 'object' && 'id' in parsed && 'question' in parsed) {
+      return parsed as RedisPrediction;
+    }
+  } catch {
+    // A single corrupt record must not take down the whole listing.
+  }
+  return null;
+}
+
+function isTestPrediction(id: string, prediction: RedisPrediction): boolean {
+  return (
+    id.startsWith('test_') ||
+    prediction.creator === 'anonymous' ||
+    prediction.creator.toLowerCase().includes('test')
+  );
+}
+
+/**
+ * Short-lived in-process cache for the full prediction list.
+ *
+ * Several endpoints (/api/predictions, /api/activity, /api/market/compact-stats)
+ * each re-read all 244 records per request, and a single page load hits more
+ * than one of them. A few seconds of reuse collapses that to one read without
+ * making anything meaningfully staler than the client's own 2-minute refresh.
+ * Writes invalidate it, so a change is never hidden behind the TTL.
+ */
+const ALL_PREDICTIONS_TTL_MS = 10_000;
+let allPredictionsCache: { at: number; data: RedisPrediction[] } | null = null;
+
+/**
+ * Reading a listing used to mean one Redis round trip per prediction. Batching
+ * cut that to a handful; this index cuts it to one. The snapshot is rebuilt
+ * only when a prediction is written or deleted, so steady-state reads never
+ * touch the individual keys at all.
+ */
+function invalidatePredictionsCache(): void {
+  allPredictionsCache = null;
+  // Fire-and-forget: a failed delete only costs us a rebuild on the next read.
+  void redis.del(REDIS_KEYS.PREDICTIONS_INDEX).catch(() => {});
+}
+
+async function readPredictionsIndex(): Promise<RedisPrediction[] | null> {
+  try {
+    const raw = await redis.get(REDIS_KEYS.PREDICTIONS_INDEX);
+    if (!raw) return null;
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return Array.isArray(parsed) ? (parsed as RedisPrediction[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function writePredictionsIndex(predictions: RedisPrediction[]): Promise<void> {
+  try {
+    await redis.set(REDIS_KEYS.PREDICTIONS_INDEX, JSON.stringify(predictions));
+  } catch (error) {
+    // The index is an optimisation; failing to store it must not fail the read.
+    console.error('⚠️ Failed to store predictions index:', error);
+  }
+}
+
+/**
+ * Batch-read predictions by id.
+ *
+ * This used to be one redis.get per id inside a serial loop. Against Upstash
+ * every read is an HTTP round trip, so 244 predictions meant 244 sequential
+ * requests — measured at ~73s for /api/market/compact-stats and ~153s for
+ * /api/activity. mget in chunks turns that into a handful of round trips.
+ */
+async function getPredictionsByIds(ids: string[]): Promise<RedisPrediction[]> {
+  if (ids.length === 0) return [];
+
+  const out: RedisPrediction[] = [];
+
+  for (let i = 0; i < ids.length; i += MGET_CHUNK_SIZE) {
+    const chunk = ids.slice(i, i + MGET_CHUNK_SIZE);
+    const keys = chunk.map((id) => REDIS_KEYS.PREDICTION(id));
+    const rows = (await redis.mget(...keys)) as unknown[];
+
+    rows.forEach((row, index) => {
+      const prediction = parsePrediction(row);
+      if (prediction && !isTestPrediction(chunk[index], prediction)) {
+        out.push(prediction);
+      }
+    });
+  }
+
+  return out;
+}
+
 // Helper functions for Redis operations
 export const redisHelpers = {
   // Save prediction to Redis
   async savePrediction(prediction: RedisPrediction): Promise<void> {
     try {
       const predictionKey = REDIS_KEYS.PREDICTION(prediction.id);
-      
+
       // Save individual prediction
       await redis.set(predictionKey, JSON.stringify(prediction));
       
-      // Add to predictions list
-      await redis.sadd(REDIS_KEYS.PREDICTIONS, prediction.id);
-      
+      // Add to predictions list. sadd returns the number of NEW members, so a
+      // non-zero result means this is a first-time insert rather than a re-sync.
+      const addedCount = await redis.sadd(REDIS_KEYS.PREDICTIONS, prediction.id);
+
       // Add to category index
       await redis.sadd(REDIS_KEYS.PREDICTIONS_BY_CATEGORY(prediction.category), prediction.id);
-      
+
       // Add to creator index
       await redis.sadd(REDIS_KEYS.PREDICTIONS_BY_CREATOR(prediction.creator), prediction.id);
-      
-      // Add to appropriate status index
-      if (prediction.needsApproval) {
-        await redis.sadd(REDIS_KEYS.PREDICTIONS_PENDING_APPROVAL, prediction.id);
-      } else if (prediction.resolved) {
-        await redis.sadd(REDIS_KEYS.PREDICTIONS_RESOLVED, prediction.id);
-      } else {
-        await redis.sadd(REDIS_KEYS.PREDICTIONS_ACTIVE, prediction.id);
+
+      // Move into exactly one status index. A prediction changes status over its
+      // lifetime (pending -> active -> resolved), so the stale memberships must be
+      // removed, otherwise it lingers in every set it has ever been in.
+      const statusSets = {
+        pending: REDIS_KEYS.PREDICTIONS_PENDING_APPROVAL,
+        resolved: REDIS_KEYS.PREDICTIONS_RESOLVED,
+        active: REDIS_KEYS.PREDICTIONS_ACTIVE,
+      };
+      const targetSet = prediction.needsApproval
+        ? statusSets.pending
+        : (prediction.resolved || prediction.cancelled)
+          ? statusSets.resolved
+          : statusSets.active;
+
+      await redis.sadd(targetSet, prediction.id);
+      await Promise.all(
+        Object.values(statusSets)
+          .filter(set => set !== targetSet)
+          .map(set => redis.srem(set, prediction.id))
+      );
+
+      // Update count only on first insert; savePrediction is also the update path
+      // and re-syncs would otherwise inflate this forever.
+      if (addedCount) {
+        await redis.incr(REDIS_KEYS.PREDICTIONS_COUNT);
       }
-      
-      // Update count
-      await redis.incr(REDIS_KEYS.PREDICTIONS_COUNT);
-      
+
+      // Invalidate last, once the record and its indexes are all in place.
+      // Dropping the snapshot first would let a concurrent read rebuild it from
+      // the pre-write state and cache that.
+      invalidatePredictionsCache();
+
       console.log(`✅ Prediction ${prediction.id} saved to Redis`);
     } catch (error) {
       console.error('❌ Failed to save prediction to Redis:', error);
@@ -127,25 +247,28 @@ export const redisHelpers = {
   // Get all predictions (only live/real predictions, exclude test data)
   async getAllPredictions(): Promise<RedisPrediction[]> {
     try {
-      const predictionIds = await redis.smembers(REDIS_KEYS.PREDICTIONS);
-      const predictions: RedisPrediction[] = [];
-
-      for (const id of predictionIds) {
-        const prediction = await this.getPrediction(id);
-        if (prediction) {
-          // Filter out test predictions
-          const isTestPrediction = id.startsWith('test_') ||
-            prediction.creator === 'anonymous' ||
-            prediction.creator.toLowerCase().includes('test');
-
-          if (!isTestPrediction) {
-            predictions.push(prediction);
-          }
-        }
+      // 1. Same process, same few seconds: nothing to do.
+      const cached = allPredictionsCache;
+      if (cached && Date.now() - cached.at < ALL_PREDICTIONS_TTL_MS) {
+        return cached.data;
       }
 
+      // 2. Prebuilt snapshot: one read instead of one per prediction.
+      const indexed = await readPredictionsIndex();
+      if (indexed) {
+        allPredictionsCache = { at: Date.now(), data: indexed };
+        return indexed;
+      }
+
+      // 3. Cold: rebuild from the individual keys and store the snapshot.
+      const predictionIds = await redis.smembers(REDIS_KEYS.PREDICTIONS);
+      const predictions = await getPredictionsByIds(predictionIds);
+
       // Sort by creation date (newest first)
-      return predictions.sort((a, b) => b.createdAt - a.createdAt);
+      const sorted = predictions.sort((a, b) => b.createdAt - a.createdAt);
+      allPredictionsCache = { at: Date.now(), data: sorted };
+      await writePredictionsIndex(sorted);
+      return sorted;
     } catch (error) {
       console.error('❌ Failed to get all predictions from Redis:', error);
       return [];
@@ -156,25 +279,12 @@ export const redisHelpers = {
   async getActivePredictions(): Promise<RedisPrediction[]> {
     try {
       const activeIds = await redis.smembers(REDIS_KEYS.PREDICTIONS_ACTIVE);
-      const predictions: RedisPrediction[] = [];
       const currentTime = Math.floor(Date.now() / 1000);
 
-      for (const id of activeIds) {
-        const prediction = await this.getPrediction(id);
-        if (prediction && !prediction.resolved && !prediction.cancelled) {
-          // Check if deadline has not passed
-          const deadlineNotPassed = prediction.deadline > currentTime;
-          
-          // Filter out test predictions
-          const isTestPrediction = id.startsWith('test_') ||
-            prediction.creator === 'anonymous' ||
-            prediction.creator.toLowerCase().includes('test');
-
-          if (!isTestPrediction && deadlineNotPassed) {
-            predictions.push(prediction);
-          }
-        }
-      }
+      // getPredictionsByIds already drops test predictions.
+      const predictions = (await getPredictionsByIds(activeIds)).filter(
+        (p) => !p.resolved && !p.cancelled && p.deadline > currentTime
+      );
 
       return predictions.sort((a, b) => a.deadline - b.deadline); // Sort by deadline
     } catch (error) {
@@ -282,9 +392,14 @@ export const redisHelpers = {
   // Update market stats
   async updateMarketStats(): Promise<void> {
     try {
-      const activePredictions = await this.getActivePredictions();
+      // One scan, not two: active markets are a subset of all of them, so
+      // deriving the subset in memory saves a second full read of Redis.
       const allPredictions = await this.getAllPredictions();
-      
+      const currentTime = Math.floor(Date.now() / 1000);
+      const activePredictions = allPredictions.filter(
+        (p) => !p.resolved && !p.cancelled && p.deadline > currentTime
+      );
+
       const stats: RedisMarketStats = {
         totalPredictions: allPredictions.length,
         totalStakes: allPredictions.reduce((sum, p) => sum + (p.totalStakes || 0), 0),
@@ -361,7 +476,7 @@ export const redisHelpers = {
     try {
       const prediction = await this.getPrediction(id);
       if (!prediction) return;
-      
+
       // Remove from all indexes
       await redis.srem(REDIS_KEYS.PREDICTIONS, id);
       await redis.srem(REDIS_KEYS.PREDICTIONS_BY_CATEGORY(prediction.category), id);
@@ -375,7 +490,10 @@ export const redisHelpers = {
       
       // Update count
       await redis.decr(REDIS_KEYS.PREDICTIONS_COUNT);
-      
+
+      // Invalidate last, so a concurrent read cannot cache the pre-delete state.
+      invalidatePredictionsCache();
+
       console.log(`✅ Prediction ${id} deleted from Redis`);
     } catch (error) {
       console.error(`❌ Failed to delete prediction ${id} from Redis:`, error);

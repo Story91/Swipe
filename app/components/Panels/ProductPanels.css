@@ -1,0 +1,159 @@
+/*
+ * Product panels: one component, two arrangements.
+ *   .pp--bar  - horizontal strip above the market grid
+ *   .pp--rail - vertical stack inside the desktop side panels
+ * Cards are near-black for the same reason the market cards are: the page
+ * background is the brand lime, so content has to read as foreground.
+ */
+
+.pp {
+  display: flex;
+  gap: 12px;
+}
+
+.pp--bar {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: stretch;
+  margin-bottom: 16px;
+}
+
+.pp--rail {
+  flex-direction: column;
+}
+
+.pp--loading {
+  min-height: 84px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* ---------- card ---------- */
+
+.pp-card {
+  background: #0d0d0d;
+  border: 1px solid #262626;
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: #f0f0f0;
+}
+
+.pp--bar .pp-card {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.pp--bar .pp-card--activity {
+  flex: 2 1 420px;
+}
+
+.pp-card__title {
+  margin: 0 0 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a8a8a;
+}
+
+.pp-card__sub {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: #8a8a8a;
+}
+
+/* ---------- ready to claim ---------- */
+
+.pp-card--claim {
+  border-color: #d4ff00;
+}
+
+.pp-claim__count {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1;
+  font-weight: 800;
+  color: #d4ff00;
+}
+
+/* ---------- stats ---------- */
+
+.pp-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 14px;
+  margin: 0;
+}
+
+.pp-stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.pp-stats dt {
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #8a8a8a;
+}
+
+.pp-stats dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #f0f0f0;
+  white-space: nowrap;
+}
+
+/* ---------- activity ---------- */
+
+.pp-activity {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pp-activity__row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.35;
+  min-width: 0;
+}
+
+.pp-activity__avatar {
+  flex: 0 0 auto;
+  font-size: 13px;
+}
+
+.pp-activity__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: #c8c8c8;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pp-activity__who {
+  color: #f0f0f0;
+  font-weight: 700;
+}
+
+.pp-activity__what {
+  color: #9a9a9a;
+}
+
+.pp-activity__when {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: #6f6f6f;
+  white-space: nowrap;
+}

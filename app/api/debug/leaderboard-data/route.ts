@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createChainPublicClient } from '@/lib/chains';
 import { redisHelpers, redis } from '../../../../lib/redis';
-import { createPublicClient, http } from 'viem';
-import { base } from 'viem/chains';
+import { http } from 'viem';
 import { CONTRACTS } from '../../../../lib/contract';
 
 export async function POST(request: NextRequest) {
@@ -39,10 +39,7 @@ export async function POST(request: NextRequest) {
     }>();
 
     // Initialize public client for Base network
-    const publicClient = createPublicClient({
-      chain: base,
-      transport: http(process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org'),
-    });
+    const publicClient = createChainPublicClient();
 
     // Process each prediction - get participants from blockchain
     for (const prediction of allPredictions) {

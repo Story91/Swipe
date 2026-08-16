@@ -3861,3 +3861,26 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
   gap: 8px;
   padding: 0 4px;
 }
+/* ---------------------------------------------------------------
+   Desktop swipe mode: actually enlarge the card.
+
+   .card-container, .tinder-card and .card are all capped at 330px with no
+   desktop override, so widening the page container alone left the card at
+   phone size floating in empty space. Raised here only from 1024px up, so
+   mobile and the mini-app keep their tuned dimensions untouched.
+
+   Height grows with width to hold roughly the original 330x528 proportion.
+   --------------------------------------------------------------- */
+@media (min-width: 1024px) {
+  .card-container,
+  .tinder-card,
+  .card {
+    max-width: 420px;
+  }
+
+  /* .tinder-container is capped at 65vh on desktop, so a fixed height would
+     overflow on shorter screens. min() takes whichever is smaller. */
+  .card {
+    height: min(640px, 60vh);
+  }
+}

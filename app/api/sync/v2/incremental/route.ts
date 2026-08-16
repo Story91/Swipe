@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createPublicClient, http } from 'viem';
-import { base } from 'viem/chains';
+import { createChainPublicClient } from '@/lib/chains';
 import { CONTRACTS } from '../../../../../lib/contract';
 import { redisHelpers } from '../../../../../lib/redis';
 
 // Initialize public client for Base network
-const publicClient = createPublicClient({
-  chain: base,
-  transport: http(process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org'),
-});
+const publicClient = createChainPublicClient();
 
 // Helper function for retry with backoff
 async function retryWithBackoff<T>(
@@ -132,39 +128,66 @@ export async function GET(request: NextRequest) {
           continue;
         }
 
-        // Get existing prediction from Redis to preserve non-blockchain fields
         const predictionId = `pred_v2_${i}`;
+
+        // Parse prediction data (V2 ABI order)
+        const [question, description, category, imageUrl, yesTotalAmount, noTotalAmount, swipeYesTotalAmount, swipeNoTotalAmount, deadline, resolutionDeadline, resolved, outcome, cancelled, createdAt, creator, verified, approved, needsApproval, creationToken, creationTokenAmount] = predictionData as any[];
+
+        const deadlineNum = Number(deadline);
+
+        // Validate deadline - skip predictions with deadline 0 (uninitialized)
+        if (!deadlineNum || deadlineNum <= 0 || isNaN(deadlineNum)) {
+          console.log(`⚠️ Skipping prediction ${i} - invalid deadline: ${deadlineNum}`);
+          continue;
+        }
+
+        const deadlineDate = new Date(deadlineNum * 1000);
+        if (isNaN(deadlineDate.getTime())) {
+          console.error(`❌ Invalid date created from deadline ${deadline} for prediction ${i}`);
+          continue;
+        }
+
+        // Get participants from contract (needed for stake sync and totalStakes)
+        const participants = await retryWithBackoff(async () => {
+          return await publicClient.readContract({
+            address: CONTRACTS.V2.address as `0x${string}`,
+            abi: CONTRACTS.V2.abi,
+            functionName: 'getParticipants',
+            args: [BigInt(i)],
+          });
+        }) as readonly `0x${string}`[];
+
+        // Get existing prediction from Redis to preserve non-blockchain fields
         const existingPrediction = await redisHelpers.getPrediction(predictionId);
-        
+
         // Convert contract data to Redis format - preserve existing non-blockchain fields
-        const predictionArray = predictionData as any[];
         const redisPrediction = {
           id: predictionId,
-          question: predictionArray[0] || '',
-          description: predictionArray[1] || '',
-          category: predictionArray[2] || 'general',
-          imageUrl: predictionArray[3] || '',
+          question: String(question),
+          description: String(description),
+          category: String(category),
+          imageUrl: String(imageUrl),
           // Preserve existing non-blockchain fields, or use defaults for new predictions
           includeChart: existingPrediction?.includeChart ?? false,
           selectedCrypto: existingPrediction?.selectedCrypto ?? '',
-          endDate: new Date(Number(predictionArray[4]) * 1000).toISOString().split('T')[0],
-          endTime: new Date(Number(predictionArray[4]) * 1000).toTimeString().split(' ')[0],
-          deadline: Number(predictionArray[4]),
-          resolutionDeadline: Number(predictionArray[4]) + (7 * 24 * 60 * 60), // 7 days after deadline
-          yesTotalAmount: Number(predictionArray[5]),
-          noTotalAmount: Number(predictionArray[6]),
-          swipeYesTotalAmount: Number(predictionArray[7]),
-          swipeNoTotalAmount: Number(predictionArray[8]),
-          resolved: predictionArray[9],
-          outcome: predictionArray[10] ? Boolean(predictionArray[10]) : undefined,
-          cancelled: predictionArray[11],
-          createdAt: Number(predictionArray[12]),
-          creator: predictionArray[13] || '0x0000000000000000000000000000000000000000',
-          verified: false,
-          approved: true,
-          needsApproval: false,
-          participants: [],
-          totalStakes: Number(predictionArray[5]) + Number(predictionArray[6]) + Number(predictionArray[7]) + Number(predictionArray[8]),
+          endDate: deadlineDate.toISOString().split('T')[0],
+          endTime: deadlineDate.toISOString().split('T')[1].split('.')[0],
+          deadline: deadlineNum,
+          resolutionDeadline: Number(resolutionDeadline),
+          yesTotalAmount: Number(yesTotalAmount),
+          noTotalAmount: Number(noTotalAmount),
+          swipeYesTotalAmount: Number(swipeYesTotalAmount),
+          swipeNoTotalAmount: Number(swipeNoTotalAmount),
+          resolved: Boolean(resolved),
+          outcome: Boolean(outcome),
+          cancelled: Boolean(cancelled),
+          createdAt: Number(createdAt),
+          creator: String(creator),
+          verified: Boolean(verified),
+          approved: true, // V2 predictions are auto-approved
+          needsApproval: Boolean(needsApproval),
+          participants: participants.map(p => String(p).toLowerCase()),
+          totalStakes: participants.length,
           contractVersion: 'V2' as const
         };
 
@@ -172,42 +195,73 @@ export async function GET(request: NextRequest) {
         await redisHelpers.savePrediction(redisPrediction);
         syncedPredictions++;
 
-        // Sync stakes for this prediction
-        try {
-          const stakesData = await retryWithBackoff(async () => {
-            return await publicClient.readContract({
-              address: CONTRACTS.V2.address as `0x${string}`,
-              abi: CONTRACTS.V2.abi,
-              functionName: 'getPredictionStakes',
-              args: [BigInt(i)]
-            });
-          });
+        // Sync user stakes for each participant (V2 has no getPredictionStakes;
+        // stakes live in the userStakes / userSwipeStakes mappings)
+        for (const participant of participants) {
+          try {
+            const [userStakeData, userSwipeStakeData] = await Promise.all([
+              retryWithBackoff(async () => {
+                return await publicClient.readContract({
+                  address: CONTRACTS.V2.address as `0x${string}`,
+                  abi: CONTRACTS.V2.abi,
+                  functionName: 'userStakes',
+                  args: [BigInt(i), participant],
+                });
+              }) as unknown as [bigint, bigint, boolean],
 
-          if (stakesData && Array.isArray(stakesData) && stakesData.length > 0) {
-            for (const stake of stakesData) {
-              try {
-                const redisStake = {
-                  user: stake[0],
-                  predictionId: `pred_v2_${i}`,
-                  yesAmount: Number(stake[1]),
-                  noAmount: Number(stake[2]),
-                  claimed: stake[3],
-                  stakedAt: Number(stake[4]),
-                  contractVersion: 'V2' as const,
-                  tokenType: 'ETH' as const
-                };
+              retryWithBackoff(async () => {
+                return await publicClient.readContract({
+                  address: CONTRACTS.V2.address as `0x${string}`,
+                  abi: CONTRACTS.V2.abi,
+                  functionName: 'userSwipeStakes',
+                  args: [BigInt(i), participant],
+                });
+              }) as unknown as [bigint, bigint, boolean]
+            ]);
 
-                await redisHelpers.saveUserStake(redisStake);
-                syncedStakes++;
-              } catch (stakeError) {
-                console.error(`❌ Failed to sync stake for prediction ${i}:`, stakeError);
-                errorsCount++;
-              }
+            // V2 returns struct {yesAmount, noAmount, claimed}
+            const ethYesAmount = userStakeData[0] || 0;
+            const ethNoAmount = userStakeData[1] || 0;
+            const ethClaimed = userStakeData[2] || false;
+
+            const swipeYesAmount = userSwipeStakeData[0] || 0;
+            const swipeNoAmount = userSwipeStakeData[1] || 0;
+            const swipeClaimed = userSwipeStakeData[2] || false;
+
+            const userStake: any = {
+              user: participant.toLowerCase(),
+              predictionId: predictionId,
+              stakedAt: Math.floor(Date.now() / 1000),
+              contractVersion: 'V2' as const
+            };
+
+            if (ethYesAmount > 0 || ethNoAmount > 0) {
+              userStake.ETH = {
+                yesAmount: Number(ethYesAmount),
+                noAmount: Number(ethNoAmount),
+                claimed: ethClaimed,
+                tokenType: 'ETH' as const
+              };
+              syncedStakes++;
             }
+
+            if (swipeYesAmount > 0 || swipeNoAmount > 0) {
+              userStake.SWIPE = {
+                yesAmount: Number(swipeYesAmount),
+                noAmount: Number(swipeNoAmount),
+                claimed: swipeClaimed,
+                tokenType: 'SWIPE' as const
+              };
+              syncedStakes++;
+            }
+
+            if (userStake.ETH || userStake.SWIPE) {
+              await redisHelpers.saveUserStake(userStake);
+            }
+          } catch (stakeError) {
+            console.error(`❌ Failed to sync stake for participant ${participant}:`, stakeError);
+            errorsCount++;
           }
-        } catch (stakesError) {
-          console.error(`❌ Failed to sync stakes for prediction ${i}:`, stakesError);
-          errorsCount++;
         }
 
         console.log(`✅ Synced prediction ${i} successfully`);

@@ -1,26 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createPublicClient, http } from 'viem';
-import { base } from 'viem/chains';
+import { createChainPublicClient } from '@/lib/chains';
 import { CONTRACTS } from '../../../../../lib/contract';
 import { redisHelpers } from '../../../../../lib/redis';
 
 // Initialize public client for Base network
-const publicClient = createPublicClient({
-  chain: base,
-  transport: http(process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org'),
-});
+const publicClient = createChainPublicClient();
+
+/**
+ * This route is POSTed on every page mount by useHybridPredictions, so without
+ * a throttle a burst of visitors means a burst of blockchain reads for the same
+ * data. One sync per window is plenty: stakes also resync after each bet.
+ */
+const SYNC_THROTTLE_MS = 60_000;
+let lastSyncAt = 0;
 
 // POST /api/sync/v2/active-stakes - Sync only stakes data for active predictions
 export async function POST(request: NextRequest) {
   try {
+    const sinceLast = Date.now() - lastSyncAt;
+    if (sinceLast < SYNC_THROTTLE_MS) {
+      return NextResponse.json({
+        success: true,
+        skipped: true,
+        reason: 'throttled',
+        retryInMs: SYNC_THROTTLE_MS - sinceLast,
+      });
+    }
+    lastSyncAt = Date.now();
+
     console.log('🔄 Starting active predictions stakes sync...');
-    
+
     // Get all predictions from Redis first
     const allPredictions = await redisHelpers.getAllPredictions();
     
-    // Filter only active predictions (not resolved, not cancelled)
-    const activePredictions = allPredictions.filter(p => 
-      !p.resolved && !p.cancelled && p.contractVersion === 'V2'
+    // Filter only genuinely active predictions. The deadline check matters:
+    // without it this walked every unresolved market ever created, including
+    // ones months past their deadline whose stakes can no longer change, and
+    // did blockchain reads for each. Measured at ~43s per call — and this runs
+    // on every page mount.
+    const now = Math.floor(Date.now() / 1000);
+    const activePredictions = allPredictions.filter(p =>
+      !p.resolved && !p.cancelled && p.contractVersion === 'V2' && p.deadline > now
     );
     
     console.log(`📊 Found ${activePredictions.length} active predictions to sync stakes for`);

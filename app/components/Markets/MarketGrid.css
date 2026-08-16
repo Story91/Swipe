@@ -1,0 +1,398 @@
+/*
+ * Desktop market grid.
+ *
+ * The page background is the brand lime (#d4ff00). Cards are near-black so that
+ * content reads as foreground against it — the previous desktop layout put lime
+ * panels on a lime page, which left nothing for the eye to lock onto.
+ */
+
+/* The grid fills its container, and in grid mode page.tsx makes that container
+   the full page width. An earlier version used a 100vw full-bleed hack, but vw
+   includes the vertical scrollbar, so it produced a horizontal scrollbar and was
+   clipped by the wrapper's overflow-x. Widening the real container avoids both. */
+.market-grid {
+  display: grid;
+  /* Compact tiles: at 1920px this lands on six columns, at 1400px on four,
+     matching the density the layout was benchmarked against. */
+  grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+  gap: 14px;
+  width: 100%;
+  padding-top: 8px;
+  padding-bottom: 40px;
+}
+
+/* ---------- status filter ---------- */
+
+.market-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.market-filter {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.market-filter__hint {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1a1a1a;
+  opacity: 0.65;
+}
+
+.market-filter__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: "Orbitron", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #1a1a1a;
+  background: transparent;
+  border: 2px solid #000;
+  border-radius: 999px;
+  padding: 7px 16px;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.market-filter__chip:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.market-filter__chip--active {
+  background: #000;
+  color: #d4ff00;
+}
+
+.market-filter__chip:focus-visible {
+  outline: 3px solid #000;
+  outline-offset: 3px;
+}
+
+.market-filter__count {
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #d4ff00;
+  color: #000;
+}
+
+.market-filter__chip--active .market-filter__count {
+  background: #d4ff00;
+  color: #000;
+}
+
+/* ---------- card ---------- */
+
+.market-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #0d0d0d;
+  border: 1px solid #262626;
+  border-radius: 12px;
+  padding: 14px;
+  cursor: pointer;
+  transition: transform 140ms ease, border-color 140ms ease;
+}
+
+.market-card:hover,
+.market-card:focus-visible {
+  transform: translateY(-2px);
+  border-color: #d4ff00;
+}
+
+.market-card:focus-visible {
+  outline: 2px solid #d4ff00;
+  outline-offset: 2px;
+}
+
+/* ---------- head: thumb + question ---------- */
+
+.market-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+
+.market-card__thumb {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border-radius: 9px;
+  object-fit: cover;
+  background: #1a1a1a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.market-card__thumb--chart {
+  background: #16240a;
+  color: #d4ff00;
+}
+
+.market-card__question {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.35;
+  font-weight: 600;
+  color: #f0f0f0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ---------- odds ---------- */
+
+.market-card__odds {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: auto;
+}
+
+.market-card__odds-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.market-card__yes {
+  color: #d4ff00;
+}
+
+.market-card__no {
+  color: #ff7a7a;
+}
+
+.market-card__bar {
+  height: 5px;
+  border-radius: 999px;
+  background: #3a1f22;
+  overflow: hidden;
+}
+
+.market-card__bar-yes {
+  display: block;
+  height: 100%;
+  background: #d4ff00;
+  border-radius: 999px;
+  transition: width 240ms ease;
+}
+
+/* ---------- foot ---------- */
+
+.market-card__foot {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding-top: 10px;
+  border-top: 1px solid #1f1f1f;
+  font-size: 11px;
+}
+
+.market-card__stat {
+  color: #9a9a9a;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.market-card__dot {
+  color: #4a4a4a;
+}
+
+.market-card__spacer {
+  flex: 1 1 auto;
+}
+
+.market-card__badge {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #1f1f1f;
+  color: #cfcfcf;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.market-card__badge--urgent {
+  color: #ffb020;
+}
+
+.market-card__badge--yes {
+  background: #d4ff00;
+  color: #000;
+}
+
+.market-card__badge--no {
+  background: #2a2a2a;
+  color: #ff8a8a;
+}
+
+/* ---------- pagination ---------- */
+
+.market-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 0 48px;
+}
+
+.market-pagination__page,
+.market-pagination__step {
+  min-width: 38px;
+  height: 38px;
+  padding: 0 10px;
+  font-family: "Orbitron", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a1a;
+  background: transparent;
+  border: 2px solid #000;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.market-pagination__page:hover:not(:disabled),
+.market-pagination__step:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.market-pagination__page--active {
+  background: #000;
+  color: #d4ff00;
+}
+
+.market-pagination__step:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.market-pagination__page:focus-visible,
+.market-pagination__step:focus-visible {
+  outline: 3px solid #000;
+  outline-offset: 3px;
+}
+
+.market-pagination__gap {
+  padding: 0 2px;
+  color: #1a1a1a;
+  opacity: 0.5;
+}
+
+.market-pagination__summary {
+  margin-left: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1a1a1a;
+  opacity: 0.65;
+}
+
+@media (max-width: 520px) {
+  .market-pagination__summary {
+    width: 100%;
+    margin: 6px 0 0;
+    text-align: center;
+  }
+}
+
+/* ---------- loading skeleton ---------- */
+
+.market-card--skeleton {
+  min-height: 148px;
+  background: #0d0d0d;
+  opacity: 0.5;
+  animation: market-card-pulse 1.4s ease-in-out infinite;
+  cursor: default;
+}
+
+@keyframes market-card-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.6; }
+}
+
+/* ---------- empty / error ---------- */
+
+.market-grid__notice {
+  max-width: 520px;
+  margin: 48px auto;
+  padding: 32px;
+  text-align: center;
+  background: #0d0d0d;
+  border: 2px solid #000;
+  border-radius: 16px;
+  color: #f5f5f5;
+}
+
+.market-grid__notice h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.market-grid__notice p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #a8a8a8;
+}
+
+.market-grid__notice-action {
+  margin-top: 20px;
+  font-family: "Orbitron", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #000;
+  background: #d4ff00;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 22px;
+  cursor: pointer;
+  transition: filter 140ms ease;
+}
+
+.market-grid__notice-action:hover {
+  filter: brightness(0.92);
+}
+
+.market-grid__notice-action:focus-visible {
+  outline: 3px solid #d4ff00;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .market-card,
+  .market-card__bar-yes {
+    transition: none;
+  }
+  .market-card:hover,
+  .market-card:focus-visible {
+    transform: none;
+  }
+  .market-card--skeleton {
+    animation: none;
+  }
+}

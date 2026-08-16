@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createChainPublicClient } from '@/lib/chains';
 import { redisHelpers } from '../../../../../lib/redis';
 import { RedisUserStake } from '../../../../../lib/types/redis';
-import { createPublicClient, http } from 'viem';
-import { base } from 'viem/chains';
 import { CONTRACTS } from '../../../../../lib/contract';
 
 // GET /api/predictions/[id]/stakes - Get user stakes for a specific prediction
@@ -20,10 +19,7 @@ export async function GET(
     }
 
     // Initialize public client for Base network
-    const publicClient = createPublicClient({
-      chain: base,
-      transport: http(process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org'),
-    });
+    const publicClient = createChainPublicClient();
 
     // Get prediction data to determine contract version
     const prediction = await redisHelpers.getPrediction(predictionId);

@@ -115,7 +115,9 @@ body::before {
   right: 0;
   bottom: 0;
   background: var(--app-background);
-  opacity: 0.85;
+  /* 0.85 left hero.png legible enough to read as a photo behind the content,
+     which fought with it on wide screens. At 0.95 it survives as texture. */
+  opacity: 0.95;
   z-index: -1;
   pointer-events: none;
 }
@@ -636,4 +638,96 @@ button.swipe-glow-button[class*="ock"] *:not(img) {
 [data-testid="ockConnectWallet_Container"] button span,
 .ock-connect-wallet-button span {
   color: #000000 !important;
+}
+
+/* ---------- desktop layout switch, inside the main nav ---------- */
+
+.nav-view-switch {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 4px;
+  padding: 2px;
+  background: rgba(212, 255, 0, 0.12);
+  border: 1px solid rgba(212, 255, 0, 0.35);
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.nav-view-switch__option {
+  font-family: "Spicy Rice", cursive;
+  font-size: 0.8rem;
+  line-height: 1;
+  color: #d4ff00;
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  padding: 5px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.nav-view-switch__option:hover {
+  background: rgba(212, 255, 0, 0.2);
+}
+
+.nav-view-switch__option--active {
+  background: #d4ff00;
+  color: #000;
+}
+
+.nav-view-switch__option:focus-visible {
+  outline: 2px solid #d4ff00;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-view-switch__option {
+    transition: none;
+  }
+}
+
+/* Placeholder shown while a lazily-loaded dashboard arrives. Deliberately
+   quiet: these chunks land in well under a second on a warm connection, and a
+   spinner that flashes for 200ms reads as a glitch. */
+.dashboard-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  font-family: "Orbitron", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #1a1a1a;
+  opacity: 0.45;
+}
+
+/* Way out of swipe mode when nothing is open to bet on. */
+.browse-all-link {
+  display: block;
+  margin: 0 auto 12px;
+  padding: 8px 18px;
+  font-family: "Orbitron", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #d4ff00;
+  background: #000;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: filter 140ms ease;
+}
+
+.browse-all-link:hover {
+  filter: brightness(1.25);
+}
+
+.browse-all-link:focus-visible {
+  outline: 3px solid #000;
+  outline-offset: 3px;
 }
