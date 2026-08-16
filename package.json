@@ -13,6 +13,7 @@
     "deploy:v2:sepolia": "hardhat run scripts/deploy_V2.js --network baseSepolia",
     "deploy:robinhood:testnet": "hardhat run scripts/deploy_robinhood_testnet.js --network robinhoodTestnet",
     "test": "hardhat test",
+    "test:unit": "vitest run",
     "compile": "hardhat compile",
     "compile:via-ir": "hardhat compile --config hardhat.config.js"
   },
@@ -77,6 +78,7 @@
     "postcss": "^8",
     "prettier": "^3.5.3",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   }
 }
