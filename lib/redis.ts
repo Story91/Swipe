@@ -89,6 +89,22 @@ function isTestPrediction(id: string, prediction: RedisPrediction): boolean {
 }
 
 /**
+ * Short-lived in-process cache for the full prediction list.
+ *
+ * Several endpoints (/api/predictions, /api/activity, /api/market/compact-stats)
+ * each re-read all 244 records per request, and a single page load hits more
+ * than one of them. A few seconds of reuse collapses that to one read without
+ * making anything meaningfully staler than the client's own 2-minute refresh.
+ * Writes invalidate it, so a change is never hidden behind the TTL.
+ */
+const ALL_PREDICTIONS_TTL_MS = 10_000;
+let allPredictionsCache: { at: number; data: RedisPrediction[] } | null = null;
+
+function invalidatePredictionsCache(): void {
+  allPredictionsCache = null;
+}
+
+/**
  * Batch-read predictions by id.
  *
  * This used to be one redis.get per id inside a serial loop. Against Upstash
@@ -124,6 +140,9 @@ export const redisHelpers = {
     try {
       const predictionKey = REDIS_KEYS.PREDICTION(prediction.id);
       
+      // Any write makes the cached listing wrong, so drop it first.
+      invalidatePredictionsCache();
+
       // Save individual prediction
       await redis.set(predictionKey, JSON.stringify(prediction));
       
@@ -196,11 +215,18 @@ export const redisHelpers = {
   // Get all predictions (only live/real predictions, exclude test data)
   async getAllPredictions(): Promise<RedisPrediction[]> {
     try {
+      const cached = allPredictionsCache;
+      if (cached && Date.now() - cached.at < ALL_PREDICTIONS_TTL_MS) {
+        return cached.data;
+      }
+
       const predictionIds = await redis.smembers(REDIS_KEYS.PREDICTIONS);
       const predictions = await getPredictionsByIds(predictionIds);
 
       // Sort by creation date (newest first)
-      return predictions.sort((a, b) => b.createdAt - a.createdAt);
+      const sorted = predictions.sort((a, b) => b.createdAt - a.createdAt);
+      allPredictionsCache = { at: Date.now(), data: sorted };
+      return sorted;
     } catch (error) {
       console.error('❌ Failed to get all predictions from Redis:', error);
       return [];
@@ -324,9 +350,14 @@ export const redisHelpers = {
   // Update market stats
   async updateMarketStats(): Promise<void> {
     try {
-      const activePredictions = await this.getActivePredictions();
+      // One scan, not two: active markets are a subset of all of them, so
+      // deriving the subset in memory saves a second full read of Redis.
       const allPredictions = await this.getAllPredictions();
-      
+      const currentTime = Math.floor(Date.now() / 1000);
+      const activePredictions = allPredictions.filter(
+        (p) => !p.resolved && !p.cancelled && p.deadline > currentTime
+      );
+
       const stats: RedisMarketStats = {
         totalPredictions: allPredictions.length,
         totalStakes: allPredictions.reduce((sum, p) => sum + (p.totalStakes || 0), 0),
@@ -403,7 +434,9 @@ export const redisHelpers = {
     try {
       const prediction = await this.getPrediction(id);
       if (!prediction) return;
-      
+
+      invalidatePredictionsCache();
+
       // Remove from all indexes
       await redis.srem(REDIS_KEYS.PREDICTIONS, id);
       await redis.srem(REDIS_KEYS.PREDICTIONS_BY_CATEGORY(prediction.category), id);
