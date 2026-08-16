@@ -23,9 +23,20 @@ export async function GET(request: NextRequest) {
 
     const normalizedUserId = userId.toLowerCase();
 
-    // Get all user stakes
-    const userStakePattern = `user_stakes:${normalizedUserId}:*`;
-    const stakeKeys = await redis.keys(userStakePattern);
+    // Get all predictions at once (cached and index-backed)
+    const allPredictions = await redisHelpers.getAllPredictions();
+    const predictionsMap = new Map(allPredictions.map(p => [p.id, p]));
+
+    // Candidate stake keys come from the participants list each prediction
+    // already carries, which is read from the contract during sync.
+    //
+    // This replaces a redis.keys('user_stakes:<user>:*') call. KEYS walks the
+    // entire keyspace and blocks the server, and this endpoint is polled every
+    // 30 seconds by every open tab — so the cost scaled with users online, not
+    // with the work actually needed.
+    const stakeKeys = allPredictions
+      .filter(p => (p.participants || []).some(a => a.toLowerCase() === normalizedUserId))
+      .map(p => `user_stakes:${normalizedUserId}:${p.id}`);
 
     if (stakeKeys.length === 0) {
       return NextResponse.json({
@@ -35,22 +46,19 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Get all predictions at once (faster than individual fetches)
-    const allPredictions = await redisHelpers.getAllPredictions();
-    const predictionsMap = new Map(allPredictions.map(p => [p.id, p]));
-
     let readyToClaimCount = 0;
     const processedPredictions = new Set<string>();
 
-    // Fetch stakes in batches
+    // Fetch stakes in batches, one round trip per batch rather than per key.
     const batchSize = 50;
     for (let i = 0; i < stakeKeys.length; i += batchSize) {
       const batchKeys = stakeKeys.slice(i, i + batchSize);
-      const stakePromises = batchKeys.map(async (key) => {
+      const batchValues = (await redis.mget(...batchKeys)) as unknown[];
+      const stakePromises = batchKeys.map(async (key, batchIndex) => {
         try {
-          const data = await redis.get(key);
+          const data = batchValues[batchIndex];
           if (!data) return null;
-          
+
           const stake = typeof data === 'string' ? JSON.parse(data) : data;
           if (!stake || typeof stake !== 'object' || !('user' in stake)) {
             return null;

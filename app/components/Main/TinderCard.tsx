@@ -552,11 +552,14 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   // Auto-refresh SWIPE allowance when modal is open and using SWIPE
   useEffect(() => {
     if (stakeModal.isOpen && stakeModal.selectedToken === 'SWIPE' && !isTransactionLoading) {
+      // 3s rather than 1s: this is an RPC read per tick, running for as long as
+      // the modal sits open. An approval takes seconds to land and nobody
+      // perceives the difference, so this is two thirds fewer calls for free.
       const interval = setInterval(async () => {
         if (refetchAllowance) {
           await refetchAllowance();
         }
-      }, 1000); // Check every second
+      }, 3000);
       
       return () => clearInterval(interval);
     }
