@@ -66,7 +66,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
   const composeCast = useCallback(async (params: { text: string; embeds?: string[] }) => {
     try {
       if (minikitComposeCast) {
-        console.log('đź“± Using MiniKit composeCast...');
+        console.log('📱 Using MiniKit composeCast...');
         const embedsParam = params.embeds?.slice(0, 2) as [] | [string] | [string, string] | undefined;
         await minikitComposeCast({ text: params.text, embeds: embedsParam });
         return;
@@ -76,7 +76,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
     }
     
     try {
-      console.log('đź“± Using Farcaster SDK composeCast...');
+      console.log('📱 Using Farcaster SDK composeCast...');
       await sdk.actions.composeCast({
         text: params.text,
         embeds: params.embeds?.map(url => ({ url })) as any
@@ -90,7 +90,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
   // Share created prediction
   const shareCreatedPrediction = async () => {
     const appUrl = 'https://theswipe.app';
-    const shareText = `đźŽŻ I just created a new prediction on SWIPE!\n\n"${createdQuestion}"\n\nWill it happen? Cast your vote! đź‘€\n\nJoin the prediction market on Base:`;
+    const shareText = `🎯 I just created a new prediction on SWIPE!\n\n"${createdQuestion}"\n\nWill it happen? Cast your vote! 👀\n\nJoin the prediction market on Base:`;
     
     try {
       await composeCast({
@@ -260,7 +260,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
         // Cache user's Farcaster profile to Redis (reduces Neynar API calls)
         if (address && context?.user) {
           try {
-            console.log('đź’ľ Caching user Farcaster profile to Redis...');
+            console.log('💾 Caching user Farcaster profile to Redis...');
             fetch('/api/farcaster/cache-profile', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -275,30 +275,30 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
         }
         
         try {
-          console.log('âŹł Waiting for blockchain propagation before auto-sync...');
+          console.log('⏳ Waiting for blockchain propagation before auto-sync...');
           await new Promise(resolve => setTimeout(resolve, 3000));
           
-          console.log('đź”„ Auto-syncing new prediction to Redis...');
+          console.log('🔄 Auto-syncing new prediction to Redis...');
           const syncResponse = await fetch('/api/predictions/auto-sync', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
           });
           
           if (syncResponse.ok) {
-            console.log('âś… New prediction auto-synced to Redis');
+            console.log('✅ New prediction auto-synced to Redis');
           } else {
             // Fallback: incremental sync walks every id above the highest one in
             // Redis, so it also recovers predictions auto-sync missed under a race.
-            console.warn('âš ď¸Ź Auto-sync failed, falling back to incremental sync...');
+            console.warn('⚠️ Auto-sync failed, falling back to incremental sync...');
             const fallback = await fetch('/api/sync/v2/incremental');
             if (!fallback.ok) {
-              console.error('âťŚ Fallback incremental sync also failed:', fallback.status);
+              console.error('❌ Fallback incremental sync also failed:', fallback.status);
             }
           }
           
           await new Promise(resolve => setTimeout(resolve, 1000));
         } catch (error) {
-          console.warn('âš ď¸Ź Sync failed:', error);
+          console.warn('⚠️ Sync failed:', error);
         }
         
         onSuccess?.();
@@ -387,7 +387,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
     // Validate 1:1 aspect ratio
     const isSquare = await validateImageAspectRatio(file);
     if (!isSquare) {
-      setErrors(prev => ({ ...prev, imageUrl: 'âš ď¸Ź Image must be square (1:1 aspect ratio)' }));
+      setErrors(prev => ({ ...prev, imageUrl: '⚠️ Image must be square (1:1 aspect ratio)' }));
       return;
     }
 
@@ -556,7 +556,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
             chainId: ACTIVE_CHAIN_ID
           }, {
             onSuccess: async () => {
-              console.log('âś… SWIPE approval successful, now creating prediction...');
+              console.log('✅ SWIPE approval successful, now creating prediction...');
               setIsApproving(false);
               
               // Wait a moment for approval to be mined, then create prediction
@@ -570,7 +570,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
               }, 2000);
             },
             onError: (error) => {
-              console.error('âťŚ SWIPE approval failed:', error);
+              console.error('❌ SWIPE approval failed:', error);
               setIsApproving(false);
               setErrors({ submit: 'SWIPE approval failed. Please try again.' });
             }
@@ -660,7 +660,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
           
           {canCreateFree && (
             <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px] px-2 py-0.5">
-              âś¨ FREE FOR YOU
+              ✨ FREE FOR YOU
             </Badge>
           )}
         </div>
@@ -671,7 +671,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center">
-                  <span className="text-[10px]">âź </span>
+                  <span className="text-[10px]">⟠</span>
                 </div>
                 <p className="text-[10px] text-blue-400 font-medium">
                   {canCreateFree ? 'Free' : `Fee: ${formatFee(ethFee as bigint | undefined, false)}`}
@@ -690,11 +690,11 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
               publicCreationEnabled ? 'text-zinc-500' :
               'text-red-400'
             }`}>
-              {isOwner ? 'đź‘‘ Owner - Free' :
-               isEnvAdmin ? 'đź”§ Admin - Free' :
-               isApprovedCreator ? 'âś… Approved - Free' :
-               publicCreationEnabled ? 'đź‘¤ Public User - Fee required' :
-               'đźš« Creation disabled'}
+              {isOwner ? '👑 Owner - Free' :
+               isEnvAdmin ? '🔧 Admin - Free' :
+               isApprovedCreator ? '✅ Approved - Free' :
+               publicCreationEnabled ? '👤 Public User - Fee required' :
+               '🚫 Creation disabled'}
             </p>
           </div>
         ) : (
@@ -702,7 +702,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <div className="w-5 h-5 rounded-full bg-[#d4ff00]/20 flex items-center justify-center">
-                  <span className="text-[10px]">đź’Ž</span>
+                  <span className="text-[10px]">💎</span>
                 </div>
                 <p className="text-[10px] text-[#d4ff00] font-medium">
                   {canCreateFree ? 'Free' : `Fee: ${formatFee(swipeFee as bigint | undefined, true)}`}
@@ -721,11 +721,11 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
               publicCreationEnabled ? 'text-zinc-500' :
               'text-red-400'
             }`}>
-              {isOwner ? 'đź‘‘ Owner - Free' :
-               isEnvAdmin ? 'đź”§ Admin - Free' :
-               isApprovedCreator ? 'âś… Approved - Free' :
-               publicCreationEnabled ? 'đź‘¤ Public User - Fee required' :
-               'đźš« Creation disabled'}
+              {isOwner ? '👑 Owner - Free' :
+               isEnvAdmin ? '🔧 Admin - Free' :
+               isApprovedCreator ? '✅ Approved - Free' :
+               publicCreationEnabled ? '👤 Public User - Fee required' :
+               '🚫 Creation disabled'}
             </p>
           </div>
         )}
@@ -793,7 +793,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
                   className="w-4 h-4 rounded border-[#d4ff00]/50 bg-black text-[#d4ff00] focus:ring-[#d4ff00] accent-[#d4ff00]"
                 />
                 <label htmlFor="includeChart" className="text-sm text-white cursor-pointer font-medium">
-                  đź“Š Include live crypto chart
+                  📊 Include live crypto chart
                 </label>
               </div>
 
@@ -835,20 +835,20 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
                   {isUploading && (
                     <div className="absolute inset-0 bg-black/70 rounded-lg flex items-center justify-center">
                       <div className="text-center">
-                        <span className="animate-spin text-2xl block mb-1">âŹł</span>
+                        <span className="animate-spin text-2xl block mb-1">⏳</span>
                         <span className="text-[#d4ff00] text-xs">Uploading...</span>
                       </div>
                     </div>
                   )}
                   {uploadedImageUrl && !isUploading && (
                     <div className="absolute top-1 right-1 flex gap-1">
-                      <span className="bg-emerald-500 text-white text-[8px] px-1.5 py-0.5 rounded-full">âś“ Uploaded</span>
+                      <span className="bg-emerald-500 text-white text-[8px] px-1.5 py-0.5 rounded-full">✓ Uploaded</span>
                       <button
                         type="button"
                         onClick={clearUploadedImage}
                         className="bg-red-500 hover:bg-red-600 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center transition-colors"
                       >
-                        âś•
+                        ✕
                       </button>
                     </div>
                   )}
@@ -858,7 +858,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
                   onClick={() => fileInputRef.current?.click()}
                   className="w-full aspect-square max-w-[200px] mx-auto border-2 border-dashed border-[#d4ff00]/30 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#d4ff00]/60 hover:bg-[#d4ff00]/5 transition-all"
                 >
-                  <span className="text-3xl mb-2">đź“·</span>
+                  <span className="text-3xl mb-2">📷</span>
                   <span className="text-[#d4ff00] text-xs font-medium">Click to upload</span>
                   <span className="text-zinc-500 text-[10px] mt-1">1:1 square only</span>
                 </div>
@@ -901,7 +901,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
           {/* Mini Card Preview */}
           {(formData.question.trim() || formData.imageUrl || formData.includeChart) && (
             <div className="space-y-2">
-              <label className="text-xs font-bold text-[#d4ff00]">đź“± Card Preview</label>
+              <label className="text-xs font-bold text-[#d4ff00]">📱 Card Preview</label>
               <div className="relative w-full max-w-[280px] mx-auto bg-white rounded-2xl overflow-hidden shadow-xl border border-zinc-200">
                 {/* Image/Chart Section */}
                 <div className="relative aspect-square bg-zinc-100">
@@ -923,7 +923,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
                       return (
                         <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-900">
                           <div className="text-center">
-                            <span className="text-4xl block mb-2">đź“Š</span>
+                            <span className="text-4xl block mb-2">📊</span>
                             <span className="text-white text-xs font-mono">Select crypto...</span>
                           </div>
                         </div>
@@ -940,7 +940,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-200 to-zinc-300">
-                      <span className="text-6xl opacity-30">đź–Ľď¸Ź</span>
+                      <span className="text-6xl opacity-30">🖼️</span>
                     </div>
                   )}
                   {/* Category Badge */}
@@ -961,10 +961,10 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
                   
                   {/* Countdown placeholder */}
                   <div className="flex items-center justify-center gap-1.5 mt-2 py-1.5 px-3 bg-zinc-100 rounded-full mx-auto w-fit">
-                    <span className="text-rose-500 text-xs">âŹ°</span>
+                    <span className="text-rose-500 text-xs">⏰</span>
                     <span className="text-zinc-700 text-[11px] font-semibold tracking-wide">
                       {formData.endDate && formData.endTime 
-                        ? `${formData.endDate} â€˘ ${formData.endTime}` 
+                        ? `${formData.endDate} • ${formData.endTime}` 
                         : 'Set deadline...'}
                     </span>
                   </div>
@@ -1010,7 +1010,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
             <Card className="bg-red-500/10 border-red-500/30">
               <CardContent className="p-3">
                 <p className="text-red-400 text-sm font-medium">
-                  âš ď¸Ź Public creation is disabled. Only approved creators can create predictions.
+                  ⚠️ Public creation is disabled. Only approved creators can create predictions.
                 </p>
               </CardContent>
             </Card>
@@ -1020,7 +1020,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
             <Card className="bg-red-500/10 border-red-500/30 overflow-hidden">
               <CardContent className="p-3">
                 <p className="text-red-400 text-xs break-words whitespace-pre-wrap overflow-hidden" style={{ wordBreak: 'break-all', maxHeight: '80px', overflowY: 'auto' }}>
-                  âťŚ {writeError.message.length > 150 ? writeError.message.substring(0, 150) + '...' : writeError.message}
+                  ❌ {writeError.message.length > 150 ? writeError.message.substring(0, 150) + '...' : writeError.message}
                 </p>
               </CardContent>
             </Card>
@@ -1056,11 +1056,11 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
             >
               {isApproving ? (
                 <span className="flex items-center gap-2">
-                  <span className="animate-spin">âŹł</span> Approving...
+                  <span className="animate-spin">⏳</span> Approving...
                 </span>
               ) : isPending || isConfirming ? (
                 <span className="flex items-center gap-2">
-                  <span className="animate-spin">âŹł</span> Creating...
+                  <span className="animate-spin">⏳</span> Creating...
                 </span>
               ) : formData.paymentToken === 'SWIPE' && !canCreateFree ? (
                 `Approve & Create with SWIPE`
@@ -1082,20 +1082,20 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
             onClick={() => setShowSuccessModal(false)}
             className="absolute top-4 right-4 w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 flex items-center justify-center transition-all"
           >
-            âś•
+            ✕
           </button>
           
           {/* Header with logos */}
           <div className="flex items-center justify-center gap-3 mb-5">
             <img src="/farc.png" alt="Farcaster" className="w-10 h-10 rounded-lg" />
-            <span className="text-zinc-500 text-lg">Ă—</span>
+            <span className="text-zinc-500 text-lg">×</span>
             <img src="/Base_square_blue.png" alt="Base" className="w-10 h-10 rounded-lg" />
           </div>
           
           {/* Success icon */}
           <div className="mb-4">
             <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-[#d4ff00] to-[#a8cc00] flex items-center justify-center shadow-lg shadow-[#d4ff00]/30">
-              <span className="text-3xl text-black font-bold">âś“</span>
+              <span className="text-3xl text-black font-bold">✓</span>
             </div>
           </div>
           
@@ -1115,7 +1115,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
             rel="noopener noreferrer"
             className="text-xs text-blue-400 hover:text-blue-300 underline mb-5 block"
           >
-            View on Basescan â†’
+            View on Basescan →
           </a>
           
           {/* Description */}
