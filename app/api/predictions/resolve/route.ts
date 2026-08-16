@@ -1,19 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { redisHelpers } from '../../../../lib/redis';
 
+// This endpoint is the sole resolution authority for predictions that live only in
+// Redis and were never registered on-chain. Predictions backed by a contract
+// (pred_v1_* / pred_v2_*) must be resolved through the contract instead — writing
+// their Redis mirror directly would desynchronise it from the chain until the next
+// sync, so those ids are rejected outright.
+function isPureRedisPrediction(predictionId: string): boolean {
+  return (
+    typeof predictionId === 'string' &&
+    predictionId.startsWith('pred_') &&
+    !predictionId.startsWith('pred_v1_') &&
+    !predictionId.startsWith('pred_v2_')
+  );
+}
+
 // POST /api/predictions/resolve - Resolve a Redis-based prediction
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { predictionId, outcome, reason } = body;
-    
+
     if (!predictionId) {
       return NextResponse.json(
         { success: false, error: 'Prediction ID is required' },
         { status: 400 }
       );
     }
-    
+
+    if (!isPureRedisPrediction(predictionId)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'On-chain predictions must be resolved via the contract, not this endpoint'
+        },
+        { status: 400 }
+      );
+    }
+
     if (typeof outcome !== 'boolean') {
       return NextResponse.json(
         { success: false, error: 'Outcome must be true (YES) or false (NO)' },
@@ -198,7 +222,17 @@ export async function PUT(request: NextRequest) {
         { status: 400 }
       );
     }
-    
+
+    if (!isPureRedisPrediction(predictionId)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'On-chain predictions must be cancelled via the contract, not this endpoint'
+        },
+        { status: 400 }
+      );
+    }
+
     if (!reason || reason.trim().length === 0) {
       return NextResponse.json(
         { success: false, error: 'Cancellation reason is required' },

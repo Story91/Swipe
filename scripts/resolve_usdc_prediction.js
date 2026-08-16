@@ -13,8 +13,9 @@ const USDC_DUALPOOL_ADDRESS = "0xf5Fa6206c2a7d5473ae7468082c9D260DFF83205";
 
 const USDC_DUALPOOL_ABI = [
   "function resolvePrediction(uint256 predictionId, bool outcome) external",
-  "function getPrediction(uint256 predictionId) external view returns (bool registered, address creator, uint256 deadline, uint256 yesPool, uint256 noPool, bool resolved, bool cancelled, bool outcome, uint256 createdAt, uint256 resolvedAt, uint256 creatorReward)",
-  "function resolver() external view returns (address)",
+  "function getPrediction(uint256 predictionId) external view returns (bool registered, address creator, uint256 deadline, uint256 yesPool, uint256 noPool, bool resolved, bool cancelled, bool outcome, uint256 participantCount)",
+  // Resolvers is a mapping, not a single address — there is no resolver() getter
+  "function resolvers(address) external view returns (bool)",
   "function owner() external view returns (address)"
 ];
 
@@ -66,16 +67,17 @@ async function main() {
     process.exit(1);
   }
   
-  // Check if signer is resolver
-  const resolver = await contract.resolver();
+  // Check if signer is authorised (owner, or listed in the resolvers mapping)
+  const isResolver = await contract.resolvers(signer.address);
   const owner = await contract.owner();
-  console.log(`\n🔐 Resolver: ${resolver}`);
-  console.log(`🔐 Owner: ${owner}`);
+  const isOwner = signer.address.toLowerCase() === owner.toLowerCase();
+  console.log(`\n🔐 Owner: ${owner}`);
   console.log(`🔐 Signer: ${signer.address}`);
-  
-  if (signer.address.toLowerCase() !== resolver.toLowerCase() && 
-      signer.address.toLowerCase() !== owner.toLowerCase()) {
-    console.error(`\n❌ Signer is not resolver or owner!`);
+  console.log(`🔐 Signer is resolver: ${isResolver}`);
+  console.log(`🔐 Signer is owner: ${isOwner}`);
+
+  if (!isResolver && !isOwner) {
+    console.error(`\n❌ Signer is neither a resolver nor the owner!`);
     process.exit(1);
   }
   

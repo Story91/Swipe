@@ -113,7 +113,8 @@ export async function POST(request: NextRequest) {
       selectedCrypto: imageUrl.includes('geckoterminal.com') ? 
         imageUrl.split('/pools/')[1]?.split('?')[0] || '' : '',
       endDate: new Date(Number(deadline) * 1000).toISOString().split('T')[0],
-      endTime: new Date(Number(deadline) * 1000).toTimeString().slice(0, 5),
+      // UTC, matching every other sync route — toTimeString() would emit server-local time
+      endTime: new Date(Number(deadline) * 1000).toISOString().split('T')[1].split('.')[0],
       deadline: Number(deadline),
       resolutionDeadline: Number(resolutionDeadline),
       yesTotalAmount: Number(yesTotalAmount),
@@ -129,7 +130,9 @@ export async function POST(request: NextRequest) {
       approved,
       needsApproval,
       participants: participants.map(p => p.toLowerCase()),
-      totalStakes: Number(totalPool),
+      // Count of stakers, not a wei amount — updateMarketStats() sums this field
+      // across predictions, so a pool value here corrupts the aggregate.
+      totalStakes: participants.length,
       marketStats: {
         yesPercentage: Number(yesPercentage),
         noPercentage: Number(noPercentage),

@@ -1,53 +1,23 @@
-const { ethers } = require("hardhat");
+/**
+ * DEPRECATED — this script no longer works.
+ *
+ * It deployed a contract named "PredictionMarket", which came from
+ * contracts/PredictionMarket_Optimized.sol. That file has been removed, so
+ * getContractFactory("PredictionMarket") fails with HH701.
+ *
+ * Use one of the current deploy scripts instead:
+ *   npm run deploy:v2    -> scripts/deploy_V2.js                    (PredictionMarketV2)
+ *   npm run deploy:usdc  -> scripts/deploy_USDC_DualPool_mainnet.js (PredictionMarket_USDC_DualPool)
+ */
 
-async function main() {
-  console.log("🚀 Deploying Prediction Market Contract...");
+console.error(`
+❌ scripts/deploy.js is deprecated and non-functional.
 
-  // Get the contract factory
-  const PredictionMarket = await ethers.getContractFactory("PredictionMarket");
+   The "PredictionMarket" contract it deploys no longer exists in contracts/.
 
-  // Deploy the contract
-  const predictionMarket = await PredictionMarket.deploy();
+   Use instead:
+     npm run deploy:v2     (PredictionMarketV2)
+     npm run deploy:usdc   (PredictionMarket_USDC_DualPool)
+`);
 
-  // Wait for deployment to finish
-  await predictionMarket.waitForDeployment();
-
-  const contractAddress = await predictionMarket.getAddress();
-
-  console.log("✅ Prediction Market deployed successfully!");
-  console.log("📍 Contract Address:", contractAddress);
-  console.log("🔗 Network:", network.name);
-  console.log("👤 Deployer:", await predictionMarket.owner());
-
-  // Verify contract on block explorer if not localhost/hardhat
-  if (network.name !== "hardhat" && network.name !== "localhost") {
-    console.log("\n🔍 Verifying contract on block explorer...");
-
-    try {
-      await run("verify:verify", {
-        address: contractAddress,
-        constructorArguments: [],
-      });
-      console.log("✅ Contract verified successfully!");
-    } catch (error) {
-      console.log("❌ Contract verification failed:", error.message);
-      console.log("📝 You can verify manually later with:");
-      console.log(`npx hardhat verify --network ${network.name} ${contractAddress}`);
-    }
-  }
-
-  console.log("\n🎉 Deployment complete!");
-  console.log("📋 Contract Details:");
-  console.log(`   Address: ${contractAddress}`);
-  console.log(`   Network: ${network.name}`);
-  console.log(`   Explorer: https://basescan.org/address/${contractAddress}`);
-
-  return contractAddress;
-}
-
-main()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    console.error("❌ Deployment failed:", error);
-    process.exit(1);
-  });
+process.exit(1);

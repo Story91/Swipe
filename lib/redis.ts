@@ -74,26 +74,42 @@ export const redisHelpers = {
       // Save individual prediction
       await redis.set(predictionKey, JSON.stringify(prediction));
       
-      // Add to predictions list
-      await redis.sadd(REDIS_KEYS.PREDICTIONS, prediction.id);
-      
+      // Add to predictions list. sadd returns the number of NEW members, so a
+      // non-zero result means this is a first-time insert rather than a re-sync.
+      const addedCount = await redis.sadd(REDIS_KEYS.PREDICTIONS, prediction.id);
+
       // Add to category index
       await redis.sadd(REDIS_KEYS.PREDICTIONS_BY_CATEGORY(prediction.category), prediction.id);
-      
+
       // Add to creator index
       await redis.sadd(REDIS_KEYS.PREDICTIONS_BY_CREATOR(prediction.creator), prediction.id);
-      
-      // Add to appropriate status index
-      if (prediction.needsApproval) {
-        await redis.sadd(REDIS_KEYS.PREDICTIONS_PENDING_APPROVAL, prediction.id);
-      } else if (prediction.resolved) {
-        await redis.sadd(REDIS_KEYS.PREDICTIONS_RESOLVED, prediction.id);
-      } else {
-        await redis.sadd(REDIS_KEYS.PREDICTIONS_ACTIVE, prediction.id);
+
+      // Move into exactly one status index. A prediction changes status over its
+      // lifetime (pending -> active -> resolved), so the stale memberships must be
+      // removed, otherwise it lingers in every set it has ever been in.
+      const statusSets = {
+        pending: REDIS_KEYS.PREDICTIONS_PENDING_APPROVAL,
+        resolved: REDIS_KEYS.PREDICTIONS_RESOLVED,
+        active: REDIS_KEYS.PREDICTIONS_ACTIVE,
+      };
+      const targetSet = prediction.needsApproval
+        ? statusSets.pending
+        : (prediction.resolved || prediction.cancelled)
+          ? statusSets.resolved
+          : statusSets.active;
+
+      await redis.sadd(targetSet, prediction.id);
+      await Promise.all(
+        Object.values(statusSets)
+          .filter(set => set !== targetSet)
+          .map(set => redis.srem(set, prediction.id))
+      );
+
+      // Update count only on first insert; savePrediction is also the update path
+      // and re-syncs would otherwise inflate this forever.
+      if (addedCount) {
+        await redis.incr(REDIS_KEYS.PREDICTIONS_COUNT);
       }
-      
-      // Update count
-      await redis.incr(REDIS_KEYS.PREDICTIONS_COUNT);
       
       console.log(`✅ Prediction ${prediction.id} saved to Redis`);
     } catch (error) {

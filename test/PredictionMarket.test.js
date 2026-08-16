@@ -1,7 +1,17 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-describe("PredictionMarket", function () {
+// SKIPPED: this suite targets the "PredictionMarket" contract from the removed
+// contracts/PredictionMarket_Optimized.sol, so every run fails at getContractFactory.
+//
+// It cannot be mechanically repointed at PredictionMarketV2: V2 takes a
+// constructor argument (address _swipeTokenAddress) and ships different defaults
+// (creation fee 0.0001 ETH, ethMinimumStake 0.00001 ETH) than the constants
+// asserted below. Porting it means writing a real V2 suite.
+//
+// PredictionMarketV2 currently has NO test coverage. Kept here as the starting
+// point for that suite rather than deleted.
+describe.skip("PredictionMarket (legacy - contract removed)", function () {
   let PredictionMarket;
   let predictionMarket;
   let owner, user1, user2, approver;

@@ -338,12 +338,16 @@ export function AdminDashboard({
           
           // Sync USDC data to Redis
           try {
-            await fetch('/api/sync/usdc', {
+            const syncRes = await fetch('/api/sync/usdc', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ predictionId: numericId })
+              body: JSON.stringify({ predictionIds: [numericId] })
             });
-            console.log('✅ USDC data synced to Redis');
+            if (syncRes.ok) {
+              console.log('✅ USDC data synced to Redis');
+            } else {
+              console.error('❌ USDC sync rejected:', syncRes.status, await syncRes.text());
+            }
           } catch (syncErr) {
             console.warn('⚠️ USDC sync failed:', syncErr);
           }

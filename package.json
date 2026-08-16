@@ -8,10 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "hardhat": "hardhat",
-    "deploy": "hardhat run scripts/deploy.js",
-    "deploy:base": "hardhat run scripts/deploy.js --network base",
-    "deploy:base-goerli": "hardhat run scripts/deploy.js --network baseGoerli",
-    "deploy:sepolia": "hardhat run scripts/deploy.js --network sepolia",
+    "deploy:v2": "hardhat run scripts/deploy_V2.js --network base",
+    "deploy:usdc": "hardhat run scripts/deploy_USDC_DualPool_mainnet.js --network base",
+    "deploy:v2:sepolia": "hardhat run scripts/deploy_V2.js --network baseSepolia",
     "test": "hardhat test",
     "compile": "hardhat compile",
     "compile:via-ir": "hardhat compile --config hardhat.config.js"

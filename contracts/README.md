@@ -31,15 +31,19 @@ cp deployment-config.js .env
 ### Deploy to Base
 
 ```bash
-# Deploy to Base Goerli testnet
-npx hardhat run scripts/deploy.js --network baseGoerli
+# PredictionMarketV2 (ETH + SWIPE pools) to Base mainnet
+npm run deploy:v2
 
-# Deploy to Base mainnet
-npx hardhat run scripts/deploy.js --network base
+# PredictionMarket_USDC_DualPool to Base mainnet
+npm run deploy:usdc
 
-# Deploy to local Hardhat network
-npx hardhat run scripts/deploy.js --network localhost
+# PredictionMarketV2 to Base Sepolia testnet
+npm run deploy:v2:sepolia
 ```
+
+> `scripts/deploy.js` is deprecated — it deployed the since-removed
+> `PredictionMarket_Optimized.sol`. Base Goerli is also discontinued;
+> use Base Sepolia for testing.
 
 ## 📋 Contract Functions
 

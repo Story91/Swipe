@@ -64,13 +64,15 @@ export async function POST(request: NextRequest) {
 
             const stakeKey = `user_stakes:${participant.toLowerCase()}:${predictionKey}`;
             
-            // V2 format - multi-token stake (all predictions use V2)
-            const ethYesAmount = userStakeData.ethYesAmount || 0;
-            const ethNoAmount = userStakeData.ethNoAmount || 0;
-            const swipeYesAmount = userSwipeStakeData.swipeYesAmount || 0;
-            const swipeNoAmount = userSwipeStakeData.swipeNoAmount || 0;
-            const ethClaimed = userStakeData.ethClaimed || false;
-            const swipeClaimed = userSwipeStakeData.swipeClaimed || false;
+            // V2 format - multi-token stake (all predictions use V2).
+            // userStakes / userSwipeStakes return the struct {yesAmount, noAmount, claimed}
+            // as a positional tuple, so index it — named property access yields undefined.
+            const ethYesAmount = userStakeData[0] || 0;
+            const ethNoAmount = userStakeData[1] || 0;
+            const ethClaimed = userStakeData[2] || false;
+            const swipeYesAmount = userSwipeStakeData[0] || 0;
+            const swipeNoAmount = userSwipeStakeData[1] || 0;
+            const swipeClaimed = userSwipeStakeData[2] || false;
 
             const stakeData: any = {
               user: participant.toLowerCase(),

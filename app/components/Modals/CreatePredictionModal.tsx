@@ -285,7 +285,13 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
           if (syncResponse.ok) {
             console.log('✅ New prediction auto-synced to Redis');
           } else {
-            await fetch('/api/sync');
+            // Fallback: incremental sync walks every id above the highest one in
+            // Redis, so it also recovers predictions auto-sync missed under a race.
+            console.warn('⚠️ Auto-sync failed, falling back to incremental sync...');
+            const fallback = await fetch('/api/sync/v2/incremental');
+            if (!fallback.ok) {
+              console.error('❌ Fallback incremental sync also failed:', fallback.status);
+            }
           }
           
           await new Promise(resolve => setTimeout(resolve, 1000));
