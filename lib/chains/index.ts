@@ -15,6 +15,11 @@ export const CHAINS: Record<ChainKey, ChainConfig> = {
     viemChain: base,
     rpcUrl: process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org',
     explorer: 'https://basescan.org',
+    // Every Base contract is owned by 0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd,
+    // whose key was compromised and cannot be recovered. PredictionMarketV2 has
+    // no transferOwnership at all, so its markets can never be resolved again.
+    // History stays readable; nothing new is written here.
+    readOnly: true,
     contracts: {
       v2: (process.env.NEXT_PUBLIC_CONTRACT_V2_ADDRESS
         || '0x2bA339Df34B98099a9047d9442075F7B3a792f74') as `0x${string}`,
@@ -38,6 +43,8 @@ export const CHAINS: Record<ChainKey, ChainConfig> = {
     contracts: {
       // No $SWIPE on Robinhood, so there is no v2 leg by design.
       dualPool: (process.env.ROBINHOOD_TESTNET_DUALPOOL || ZERO) as `0x${string}`,
+      // Audited successor, owned by the current key.
+      usdgPool: (process.env.ROBINHOOD_TESTNET_USDG_DUALPOOL || ZERO) as `0x${string}`,
     },
     stable: {
       // Testnet has no USDG; MockUSDC stands in for it.
@@ -54,7 +61,7 @@ export const CHAINS: Record<ChainKey, ChainConfig> = {
     rpcUrl: process.env.ROBINHOOD_RPC_URL || 'https://rpc.mainnet.chain.robinhood.com',
     explorer: 'https://robinhoodchain.blockscout.com',
     contracts: {
-      dualPool: (process.env.ROBINHOOD_DUALPOOL_CONTRACT || ZERO) as `0x${string}`,
+      usdgPool: (process.env.ROBINHOOD_USDG_DUALPOOL || ZERO) as `0x${string}`,
     },
     stable: {
       // Paxos USDG. Verified on-chain: symbol() == "USDG", decimals() == 6.
@@ -83,4 +90,24 @@ export function getChainConfig(key: ChainKey = DEFAULT_CHAIN_KEY): ChainConfig {
 export function createChainPublicClient(key: ChainKey = DEFAULT_CHAIN_KEY): PublicClient {
   const { viemChain, rpcUrl } = getChainConfig(key);
   return createPublicClient({ chain: viemChain, transport: http(rpcUrl) }) as PublicClient;
+}
+
+/** True when a chain's markets are history only and accept no new writes. */
+export function isReadOnlyChain(key: ChainKey = DEFAULT_CHAIN_KEY): boolean {
+  return getChainConfig(key).readOnly === true;
+}
+
+/**
+ * The market contract new bets should go to, or null when the chain is
+ * read-only. Callers that write must check this rather than reaching for
+ * `contracts.dualPool`, which on Base points at a contract nobody controls.
+ */
+export function getWritableMarket(
+  key: ChainKey = DEFAULT_CHAIN_KEY
+): `0x${string}` | null {
+  const config = getChainConfig(key);
+  if (config.readOnly) return null;
+  const pool = config.contracts.usdgPool;
+  if (!pool || pool === ZERO) return null;
+  return pool;
 }

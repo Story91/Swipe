@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { ethers } from 'ethers';
 import { getChainConfig } from '@/lib/chains';
 import { isBlacklisted } from '../../../../lib/blacklist';

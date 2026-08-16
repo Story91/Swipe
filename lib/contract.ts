@@ -1660,7 +1660,47 @@ export const USDC_DUALPOOL_ABI = [
   }
 ] as const;
 
-// USDC DualPool Contract Config
+/**
+ * PredictionMarket_USDG_DualPool — the audited successor to the USDC pool.
+ *
+ * The ABI is read from the compiled artifact rather than hand-written, so it
+ * cannot drift from the deployed bytecode. The hand-written USDC ABI above
+ * already drifted once: scripts/resolve_usdc_prediction.js called a resolver()
+ * getter that does not exist, and declared getPrediction with 11 outputs
+ * against the real 9.
+ *
+ * Differences that matter to callers:
+ *  - getPrediction returns `refundable` where the old one returned createdAt
+ *  - creator rewards are pull-based via claimCreatorReward()
+ *  - a market with no winners is refundable, so claimRefund covers that case
+ */
+const USDG_ABI_DATA = require('../artifacts/contracts/PredictionMarket_USDG_DualPool.sol/PredictionMarket_USDG_DualPool.json');
+export const USDG_DUALPOOL_ABI = USDG_ABI_DATA.abi;
+
+/** Address of the writable market, or the zero address on read-only chains. */
+export const USDG_DUALPOOL_CONTRACT_ADDRESS =
+  getChainConfig().contracts.usdgPool ?? '';
+
+export const USDG_DUALPOOL_CONFIG = {
+  address: USDG_DUALPOOL_CONTRACT_ADDRESS,
+  abi: USDG_DUALPOOL_ABI,
+  fees: {
+    platform: 100, // 1%
+    creator: 50,   // 0.5%
+    earlyExit: 500 // 5%
+  },
+  minBet: 1_000_000, // 1 token at 6 decimals
+  refundGracePeriodDays: 30
+};
+
+export function getUSDGDualPoolContract(signer?: ethers.Signer) {
+  if (!signer) {
+    return new ethers.Contract(USDG_DUALPOOL_CONTRACT_ADDRESS, USDG_DUALPOOL_ABI);
+  }
+  return new ethers.Contract(USDG_DUALPOOL_CONTRACT_ADDRESS, USDG_DUALPOOL_ABI, signer);
+}
+
+// USDC DualPool Contract Config (legacy - owner key compromised, read-only)
 export const USDC_DUALPOOL_CONFIG = {
   address: USDC_DUALPOOL_CONTRACT_ADDRESS,
   abi: USDC_DUALPOOL_ABI,

@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { CHAINS, getChainConfig, DEFAULT_CHAIN_KEY } from './index';
+import {
+  CHAINS,
+  getChainConfig,
+  DEFAULT_CHAIN_KEY,
+  isReadOnlyChain,
+  getWritableMarket,
+} from './index';
 
 describe('chain registry', () => {
   it('defaults to Base', () => {
@@ -45,5 +51,33 @@ describe('chain registry', () => {
   it('throws on an unknown chain key', () => {
     // @ts-expect-error deliberately invalid key
     expect(() => getChainConfig('ethereum')).toThrow(/unknown chain/i);
+  });
+});
+
+describe('read-only chains', () => {
+  it('marks Base read-only: its contracts are owned by a lost key', () => {
+    expect(isReadOnlyChain('base')).toBe(true);
+  });
+
+  it('offers no writable market on a read-only chain', () => {
+    expect(getWritableMarket('base')).toBeNull();
+  });
+
+  it('never routes writes at the old dual pool, which nobody controls', () => {
+    const legacy = CHAINS.base.contracts.dualPool;
+    expect(legacy).toBeDefined();
+    expect(getWritableMarket('base')).not.toBe(legacy);
+  });
+
+  it('keeps Robinhood writable', () => {
+    expect(isReadOnlyChain('robinhood')).toBe(false);
+    expect(isReadOnlyChain('robinhoodTestnet')).toBe(false);
+  });
+
+  it('returns null rather than the zero address when no market is deployed yet', () => {
+    // Env-driven, so in a bare checkout this is the unset case.
+    const market = getWritableMarket('robinhood');
+    expect(market === null || /^0x[0-9a-fA-F]{40}$/.test(market)).toBe(true);
+    expect(market).not.toBe('0x0000000000000000000000000000000000000000');
   });
 });

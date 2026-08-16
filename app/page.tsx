@@ -38,6 +38,7 @@ import { useIsDesktop } from "@/lib/hooks/useMediaQuery";
 import { useDesktopViewMode } from "@/lib/hooks/desktopViewMode";
 import { MarketGrid } from "./components/Markets/MarketGrid";
 import { ProductPanels } from "./components/Panels/ProductPanels";
+import { ReadOnlyNotice } from "./components/Panels/ReadOnlyNotice";
 
 /**
  * Everything below renders behind a dashboard switch or a modal, so at most one
@@ -623,6 +624,7 @@ export default function App() {
         <main className="flex-1">
           {showGrid && (
             <>
+              <ReadOnlyNotice />
               <ProductPanels layout="bar" />
               <MarketGrid />
             </>
