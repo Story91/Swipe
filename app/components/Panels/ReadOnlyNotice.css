@@ -33,3 +33,29 @@
   color: #c8c8c8;
   max-width: 70ch;
 }
+
+/*
+ * On desktop the notice spans the whole grid, so a 70ch column left it as a
+ * narrow paragraph in a very wide box. Put the label and the sentence on one
+ * line instead: the label keeps its own column, the sentence takes the rest of
+ * the width, and the banner reads as a single wide strip rather than a stub.
+ */
+@media (min-width: 768px) {
+  .readonly-notice {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 16px;
+    padding: 14px 20px;
+  }
+
+  .readonly-notice__title {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  .readonly-notice__body {
+    flex: 1;
+    max-width: none;
+    font-size: 13px;
+  }
+}
