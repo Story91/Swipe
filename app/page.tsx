@@ -41,6 +41,7 @@ import { ProductPanels } from "./components/Panels/ProductPanels";
 import { ReadOnlyNotice } from "./components/Panels/ReadOnlyNotice";
 import { ComingSoonOverlay } from "./components/Panels/ComingSoonOverlay";
 import { ChainSwitcher } from "./components/Wallet/ChainSwitcher";
+import { WalletPicker } from "./components/Wallet/WalletPicker";
 
 /**
  * Everything below renders behind a dashboard switch or a modal, so at most one
@@ -403,9 +404,21 @@ export default function App() {
             showGrid ? 'max-w-[1100px] w-full mx-auto' : ''
           }`}
         >
+          {/*
+            Disconnected: our own picker, because OnchainKit's <ConnectWallet>
+            connects with a single connector — that is why the app only ever
+            offered Coinbase Smart Wallet and MetaMask was unreachable.
+
+            Connected: OnchainKit's components stay, since they carry the
+            avatar, the Farcaster display name and the whole <WalletDropdown>.
+            Replacing them outright would trade one wallet for a worse header.
+          */}
+          {!address ? (
+            <WalletPicker />
+          ) : (
           <Wallet className="z-10">
-            <ConnectWallet 
-              className="swipe-glow-button swipe-glow-green !px-3 !py-1.5 !text-sm !min-w-0 !font-semibold !rounded-full hover:!scale-105 !transition-all !duration-200" 
+            <ConnectWallet
+              className="swipe-glow-button swipe-glow-green !px-3 !py-1.5 !text-sm !min-w-0 !font-semibold !rounded-full hover:!scale-105 !transition-all !duration-200"
               text="Sign In"
             >
               {address && userProfile ? (
@@ -461,7 +474,8 @@ export default function App() {
               <WalletDropdownDisconnect />
             </WalletDropdown>
           </Wallet>
-          
+          )}
+
           {/* Menu Dropdown - Top Right */}
           <Menubar className="!bg-transparent !border-0 !p-0 !h-auto">
             <MenubarMenu>
