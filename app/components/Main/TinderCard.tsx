@@ -4,6 +4,7 @@ import { useAccount, useWriteContract, useReadContract, useWaitForTransactionRec
 import { ethers } from 'ethers';
 import { CONTRACTS, SWIPE_TOKEN, getV2Contract, getContractForAction } from '../../../lib/contract';
 import { calculateApprovalAmount } from '../../../lib/constants/approval';
+import { useAdminRequest } from '../../../lib/auth/useAdminRequest';
 import { useViewProfile, useComposeCast, useMiniKit, useViewCast, useOpenUrl } from '@coinbase/onchainkit/minikit';
 import sdk from '@farcaster/miniapp-sdk';
 import './TinderCard.css';
@@ -245,6 +246,8 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   }, [aiModal.analysis, aiModal.isOpen]);
   
   const { address } = useAccount();
+  // Signs each admin action; the server verifies it rather than trusting the UI.
+  const signAdminRequest = useAdminRequest();
   const { writeContract } = useWriteContract();
   const { composeCast: minikitComposeCast } = useComposeCast();
   const { context } = useMiniKit();
@@ -1525,7 +1528,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     }
   };
 
-  const handleResolvePrediction = (predictionId: string | number, outcome: boolean) => {
+  const handleResolvePrediction = async (predictionId: string | number, outcome: boolean) => {
     // Resolving prediction
 
     // Check if this is a Redis-based prediction (string ID) or on-chain prediction (number ID)
@@ -1535,6 +1538,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(await signAdminRequest('resolve')),
         },
         body: JSON.stringify({
           predictionId: predictionId,
@@ -1599,7 +1603,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     }
   };
 
-  const handleCancelPrediction = (predictionId: string | number, reason: string) => {
+  const handleCancelPrediction = async (predictionId: string | number, reason: string) => {
     console.log(`🚫 Cancelling prediction ${predictionId} with reason: ${reason}`);
 
     // Check if this is a Redis-based prediction (string ID) or on-chain prediction (number ID)
@@ -1609,6 +1613,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          ...(await signAdminRequest('cancel')),
         },
         body: JSON.stringify({
           predictionId: predictionId,

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useReadContract, usePublicClient, useWriteContract } from 'wagmi';
 import { CONTRACTS, getV2Contract, USDC_DUALPOOL_CONTRACT_ADDRESS, USDC_DUALPOOL_ABI } from '../../../lib/contract';
 import { useAdminPredictions } from '../../../lib/hooks/useAdminPredictions';
+import { useAdminRequest } from '../../../lib/auth/useAdminRequest';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 
 interface Prediction {
@@ -49,6 +50,8 @@ export function AdminDashboard({
   const { writeContract } = useWriteContract();
   
   // Filter state
+  // Signs each admin action; the server verifies it rather than trusting the UI.
+  const signAdminRequest = useAdminRequest();
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
   
   // Use optimized admin predictions hook - loads only essential data by default
@@ -447,6 +450,7 @@ export function AdminDashboard({
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
+              ...(await signAdminRequest('cancel')),
             },
             body: JSON.stringify({
               predictionId: predictionId,
@@ -518,6 +522,7 @@ export function AdminDashboard({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            ...(await signAdminRequest('resolve')),
           },
           body: JSON.stringify({
             predictionId: predictionId,

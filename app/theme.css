@@ -704,3 +704,30 @@ button.swipe-glow-button[class*="ock"] *:not(img) {
   color: #1a1a1a;
   opacity: 0.45;
 }
+
+/* Way out of swipe mode when nothing is open to bet on. */
+.browse-all-link {
+  display: block;
+  margin: 0 auto 12px;
+  padding: 8px 18px;
+  font-family: "Orbitron", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #d4ff00;
+  background: #000;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: filter 140ms ease;
+}
+
+.browse-all-link:hover {
+  filter: brightness(1.25);
+}
+
+.browse-all-link:focus-visible {
+  outline: 3px solid #000;
+  outline-offset: 3px;
+}

@@ -606,6 +606,19 @@ export default function App() {
           </Menubar>
         </div>
 
+        {/* Swipe mode only ever offers markets you can still bet on, so when
+            none are open it is a dead end. This is the way out to the full
+            history, which lives in grid mode. */}
+        {isDesktop && desktopView === 'swipe' && activeDashboard === 'tinder' && (
+          <button
+            type="button"
+            className="browse-all-link"
+            onClick={() => setDesktopView('grid')}
+          >
+            Browse all markets →
+          </button>
+        )}
+
         {/* Main Content with Tinder Cards */}
         <main className="flex-1">
           {showGrid && (

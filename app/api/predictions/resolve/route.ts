@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { redisHelpers } from '../../../../lib/redis';
+import { requireAdmin } from '../../../../lib/auth/requireAdmin';
 
 // This endpoint is the sole resolution authority for predictions that live only in
 // Redis and were never registered on-chain. Predictions backed by a contract
@@ -18,6 +19,9 @@ function isPureRedisPrediction(predictionId: string): boolean {
 // POST /api/predictions/resolve - Resolve a Redis-based prediction
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAdmin(request, 'resolve');
+    if (!auth.ok) return auth.response;
+
     const body = await request.json();
     const { predictionId, outcome, reason } = body;
 
@@ -84,7 +88,7 @@ export async function POST(request: NextRequest) {
       resolved: true,
       outcome: outcome,
       resolvedAt: now,
-      resolvedBy: 'admin', // TODO: Get actual admin address
+      resolvedBy: auth.address, // verified by signature, not self-reported
       resolutionReason: reason || 'Admin resolution'
     };
     
@@ -213,6 +217,9 @@ export async function POST(request: NextRequest) {
 // POST /api/predictions/resolve/cancel - Cancel a Redis-based prediction
 export async function PUT(request: NextRequest) {
   try {
+    const auth = await requireAdmin(request, 'cancel');
+    if (!auth.ok) return auth.response;
+
     const body = await request.json();
     const { predictionId, reason } = body;
     
@@ -269,7 +276,7 @@ export async function PUT(request: NextRequest) {
       ...existingPrediction,
       cancelled: true,
       cancelledAt: Math.floor(Date.now() / 1000),
-      cancelledBy: 'admin', // TODO: Get actual admin address
+      cancelledBy: auth.address, // verified by signature, not self-reported
       cancellationReason: reason.trim()
     };
     
