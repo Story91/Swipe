@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createChainPublicClient } from '@/lib/chains';
 import { redis, redisHelpers } from '../../../../../lib/redis';
-import { createPublicClient, http } from 'viem';
-import { base } from 'viem/chains';
 import { CONTRACTS } from '../../../../../lib/contract';
 
 // Retry function with exponential backoff
@@ -28,10 +27,7 @@ export async function GET(request: NextRequest) {
     console.log('🚀 Starting V2 resolved predictions sync...');
 
     // Initialize public client for Base network
-    const publicClient = createPublicClient({
-      chain: base,
-      transport: http(process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org'),
-    });
+    const publicClient = createChainPublicClient();
 
     // Get total prediction count
     const totalCount = await retryWithBackoff(async () => {

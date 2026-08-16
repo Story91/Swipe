@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createPublicClient, http, parseAbiItem } from 'viem';
-import { base } from 'viem/chains';
+import { createChainPublicClient } from '@/lib/chains';
 import { CONTRACTS } from '../../../../lib/contract';
 import { redisHelpers, redis } from '../../../../lib/redis';
 
 // Initialize public client for Base network
-const publicClient = createPublicClient({
-  chain: base,
-  transport: http(process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org'),
-});
+const publicClient = createChainPublicClient();
 
 // POST /api/blockchain/events - Handle blockchain events and auto-sync
 export async function POST(request: NextRequest) {

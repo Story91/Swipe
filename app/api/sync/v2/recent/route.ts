@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createPublicClient, http } from 'viem';
-import { base } from 'viem/chains';
+import { createChainPublicClient } from '@/lib/chains';
 import { CONTRACTS } from '../../../../../lib/contract';
 import { redisHelpers, redis, REDIS_KEYS } from '../../../../../lib/redis';
 
@@ -27,10 +26,7 @@ const USDC_DUALPOOL_ABI = [
 ] as const;
 
 // Initialize public client for Base network
-const publicClient = createPublicClient({
-  chain: base,
-  transport: http(process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org'),
-});
+const publicClient = createChainPublicClient();
 
 // Helper function for retry with backoff
 async function retryWithBackoff<T>(

@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { ethers } from 'ethers';
+import { getChainConfig } from '@/lib/chains';
 import { isBlacklisted } from '../../../../lib/blacklist';
 
 /**
@@ -76,7 +77,9 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL || 'https://mainnet.base.org');
+      // NEXT_PUBLIC_RPC_URL is not a name this project sets, so this used to fall
+      // through to the public Base endpoint. Use the configured RPC instead.
+      const provider = new ethers.JsonRpcProvider(getChainConfig().rpcUrl);
 
       // Read user stats from contract
       const contractABI = [

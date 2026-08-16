@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createChainPublicClient } from '@/lib/chains';
 import { redisHelpers, redis } from '../../../../lib/redis';
-import { createPublicClient, http } from 'viem';
-import { base } from 'viem/chains';
 import { CONTRACTS } from '../../../../lib/contract';
 import { RedisUserStake } from '../../../../lib/types/redis';
 
@@ -23,10 +22,7 @@ export async function POST(request: NextRequest) {
     console.log(`📊 Processing ${v2Predictions.length} V2 predictions`);
 
     // Initialize public client
-    const publicClient = createPublicClient({
-      chain: base,
-      transport: http(process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org'),
-    });
+    const publicClient = createChainPublicClient();
 
     // Aggregate user stakes data (accurate - from blockchain)
     const userStakesMap = new Map<string, {

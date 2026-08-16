@@ -487,13 +487,13 @@ async function verifyTradingActivity(address: string): Promise<boolean> {
         console.log(`🔍 Checking blockchain for StakePlaced events from ${address}...`);
         console.log(`📍 Contract: ${V2_CONTRACT}`);
         
-        const { createPublicClient, http, parseAbiItem } = await import('viem');
-        const { base } = await import('viem/chains');
-        
-        const publicClient = createPublicClient({
-          chain: base,
-          transport: http(process.env.ALCHEMY_RPC_URL || 'https://mainnet.base.org'),
-        });
+        const { parseAbiItem } = await import('viem');
+        const { createChainPublicClient } = await import('@/lib/chains');
+
+        // Previously read ALCHEMY_RPC_URL, which is not set, so this silently fell
+        // through to the public Base endpoint while the rest of the app used the
+        // configured RPC. That is why event scans here were slow and rate-limited.
+        const publicClient = createChainPublicClient();
         
         // Get current block and calculate start block for today (~2 seconds per block on Base)
         const currentBlock = await publicClient.getBlockNumber();
