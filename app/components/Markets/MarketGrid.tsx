@@ -67,7 +67,7 @@ function MarketThumb({ prediction }: { prediction: HybridPrediction }) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        className="market-card__thumb"
+        className="mgcard__thumb"
         src={prediction.imageUrl}
         alt=""
         loading="lazy"
@@ -78,7 +78,7 @@ function MarketThumb({ prediction }: { prediction: HybridPrediction }) {
 
   if (kind === "chart") {
     return (
-      <div className="market-card__thumb market-card__thumb--chart" aria-hidden="true">
+      <div className="mgcard__thumb mgcard__thumb--chart" aria-hidden="true">
         <svg viewBox="0 0 32 32" width="20" height="20" role="presentation">
           <polyline
             points="2,24 9,16 15,20 22,8 30,12"
@@ -96,7 +96,7 @@ function MarketThumb({ prediction }: { prediction: HybridPrediction }) {
   const hue = hueFromSeed(prediction.id);
   return (
     <div
-      className="market-card__thumb market-card__thumb--generated"
+      className="mgcard__thumb mgcard__thumb--generated"
       style={{ background: `hsl(${hue} 55% 28%)`, color: `hsl(${hue} 85% 78%)` }}
       aria-hidden="true"
     >
@@ -120,7 +120,7 @@ function MarketCard({
 
   return (
     <article
-      className="market-card"
+      className="mgcard"
       role="link"
       tabIndex={0}
       onClick={() => onOpen(prediction.id)}
@@ -132,39 +132,39 @@ function MarketCard({
       }}
       aria-label={prediction.question}
     >
-      <div className="market-card__head">
+      <div className="mgcard__head">
         <MarketThumb prediction={prediction} />
-        <h3 className="market-card__question">{prediction.question}</h3>
+        <h3 className="mgcard__question">{prediction.question}</h3>
       </div>
 
-      <div className="market-card__odds">
-        <div className="market-card__odds-labels">
-          <span className="market-card__yes">YES {yes}%</span>
-          <span className="market-card__no">NO {no}%</span>
+      <div className="mgcard__odds">
+        <div className="mgcard__odds-labels">
+          <span className="mgcard__yes">YES {yes}%</span>
+          <span className="mgcard__no">NO {no}%</span>
         </div>
-        <div className="market-card__bar" aria-hidden="true">
-          <span className="market-card__bar-yes" style={{ width: `${yes}%` }} />
+        <div className="mgcard__bar" aria-hidden="true">
+          <span className="mgcard__bar-yes" style={{ width: `${yes}%` }} />
         </div>
       </div>
 
-      <div className="market-card__foot">
-        <span className="market-card__stat">{pool} ETH</span>
-        <span className="market-card__dot" aria-hidden="true">·</span>
-        <span className="market-card__stat">
+      <div className="mgcard__foot">
+        <span className="mgcard__stat">{pool} ETH</span>
+        <span className="mgcard__dot" aria-hidden="true">·</span>
+        <span className="mgcard__stat">
           {prediction.participants?.length ?? 0} players
         </span>
-        <span className="market-card__spacer" />
+        <span className="mgcard__spacer" />
         {prediction.cancelled ? (
-          <span className="market-card__badge">Cancelled</span>
+          <span className="mgcard__badge">Cancelled</span>
         ) : settled ? (
           <span
-            className={`market-card__badge market-card__badge--${prediction.outcome ? "yes" : "no"}`}
+            className={`mgcard__badge mgcard__badge--${prediction.outcome ? "yes" : "no"}`}
           >
             {prediction.outcome ? "YES won" : "NO won"}
           </span>
         ) : (
           <span
-            className={`market-card__badge${time.urgent ? " market-card__badge--urgent" : ""}`}
+            className={`mgcard__badge${time.urgent ? " mgcard__badge--urgent" : ""}`}
           >
             {time.label}
           </span>
@@ -276,7 +276,7 @@ export function MarketGrid() {
     return (
       <div className="market-grid" aria-busy="true">
         {Array.from({ length: 6 }, (_, i) => (
-          <div key={i} className="market-card market-card--skeleton" />
+          <div key={i} className="mgcard mgcard--skeleton" />
         ))}
       </div>
     );

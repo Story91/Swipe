@@ -92,7 +92,7 @@
 
 /* ---------- card ---------- */
 
-.market-card {
+.mgcard {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -104,26 +104,26 @@
   transition: transform 140ms ease, border-color 140ms ease;
 }
 
-.market-card:hover,
-.market-card:focus-visible {
+.mgcard:hover,
+.mgcard:focus-visible {
   transform: translateY(-2px);
   border-color: #d4ff00;
 }
 
-.market-card:focus-visible {
+.mgcard:focus-visible {
   outline: 2px solid #d4ff00;
   outline-offset: 2px;
 }
 
 /* ---------- head: thumb + question ---------- */
 
-.market-card__head {
+.mgcard__head {
   display: flex;
   align-items: flex-start;
   gap: 11px;
 }
 
-.market-card__thumb {
+.mgcard__thumb {
   flex: 0 0 auto;
   width: 42px;
   height: 42px;
@@ -138,17 +138,19 @@
   letter-spacing: 0.02em;
 }
 
-.market-card__thumb--chart {
+.mgcard__thumb--chart {
   background: #16240a;
   color: #d4ff00;
 }
 
-.market-card__question {
+.mgcard__question {
   margin: 0;
   font-size: 13.5px;
   line-height: 1.35;
   font-weight: 600;
-  color: #f0f0f0;
+  /* Pure white on near-black: the question is the one thing that must be
+     readable at a glance across a dense grid. */
+  color: #ffffff;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
@@ -157,14 +159,14 @@
 
 /* ---------- odds ---------- */
 
-.market-card__odds {
+.mgcard__odds {
   display: flex;
   flex-direction: column;
   gap: 5px;
   margin-top: auto;
 }
 
-.market-card__odds-labels {
+.mgcard__odds-labels {
   display: flex;
   justify-content: space-between;
   font-size: 11.5px;
@@ -172,22 +174,22 @@
   letter-spacing: 0.02em;
 }
 
-.market-card__yes {
+.mgcard__yes {
   color: #d4ff00;
 }
 
-.market-card__no {
+.mgcard__no {
   color: #ff7a7a;
 }
 
-.market-card__bar {
+.mgcard__bar {
   height: 5px;
   border-radius: 999px;
   background: #3a1f22;
   overflow: hidden;
 }
 
-.market-card__bar-yes {
+.mgcard__bar-yes {
   display: block;
   height: 100%;
   background: #d4ff00;
@@ -197,7 +199,7 @@
 
 /* ---------- foot ---------- */
 
-.market-card__foot {
+.mgcard__foot {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -206,21 +208,21 @@
   font-size: 11px;
 }
 
-.market-card__stat {
-  color: #9a9a9a;
+.mgcard__stat {
+  color: #b0b0b0;
   font-weight: 600;
   white-space: nowrap;
 }
 
-.market-card__dot {
+.mgcard__dot {
   color: #4a4a4a;
 }
 
-.market-card__spacer {
+.mgcard__spacer {
   flex: 1 1 auto;
 }
 
-.market-card__badge {
+.mgcard__badge {
   flex: 0 0 auto;
   padding: 3px 8px;
   border-radius: 999px;
@@ -233,16 +235,16 @@
   white-space: nowrap;
 }
 
-.market-card__badge--urgent {
+.mgcard__badge--urgent {
   color: #ffb020;
 }
 
-.market-card__badge--yes {
+.mgcard__badge--yes {
   background: #d4ff00;
   color: #000;
 }
 
-.market-card__badge--no {
+.mgcard__badge--no {
   background: #2a2a2a;
   color: #ff8a8a;
 }
@@ -319,15 +321,15 @@
 
 /* ---------- loading skeleton ---------- */
 
-.market-card--skeleton {
+.mgcard--skeleton {
   min-height: 148px;
   background: #0d0d0d;
   opacity: 0.5;
-  animation: market-card-pulse 1.4s ease-in-out infinite;
+  animation: mgcard-pulse 1.4s ease-in-out infinite;
   cursor: default;
 }
 
-@keyframes market-card-pulse {
+@keyframes mgcard-pulse {
   0%, 100% { opacity: 0.35; }
   50% { opacity: 0.6; }
 }
@@ -384,15 +386,15 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .market-card,
-  .market-card__bar-yes {
+  .mgcard,
+  .mgcard__bar-yes {
     transition: none;
   }
-  .market-card:hover,
-  .market-card:focus-visible {
+  .mgcard:hover,
+  .mgcard:focus-visible {
     transform: none;
   }
-  .market-card--skeleton {
+  .mgcard--skeleton {
     animation: none;
   }
 }
