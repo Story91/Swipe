@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useHybridPredictions } from "@/lib/hooks/useHybridPredictions";
 import type { HybridPrediction } from "@/lib/hooks/useHybridPredictions";
+import { pageWindow } from "./pageWindow";
 import "./MarketGrid.css";
 
 /**
@@ -44,6 +45,9 @@ const FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "resolved", label: "Resolved" },
   { key: "all", label: "All" },
 ];
+
+/** Divisible by 2, 3 and 4 so the last row is full at every column count. */
+const PAGE_SIZE = 24;
 
 function isOpen(p: HybridPrediction, now: number): boolean {
   return !p.resolved && !p.cancelled && p.deadline > now;
@@ -134,6 +138,7 @@ export function MarketGrid() {
   const { predictions, loading, error, allPredictionsLoaded, fetchAllPredictions } =
     useHybridPredictions();
   const [filter, setFilter] = useState<StatusFilter>("open");
+  const [page, setPage] = useState(1);
 
   // The hook loads only open markets by default, so the settled filters would
   // show nothing until the full set is requested.
@@ -177,6 +182,24 @@ export function MarketGrid() {
     return { visible: sorted, openCount: open.length };
   }, [predictions, filter]);
 
+  const pageCount = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+  // Clamp rather than reset: if the list shrinks under us (a background refresh,
+  // a filter change) the current page can fall past the end.
+  const currentPage = Math.min(page, pageCount);
+  const pageItems = visible.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
+
+  const goToPage = (next: number) => {
+    setPage(next);
+    // A new page of cards replaces the viewport contents; without this you land
+    // mid-list looking at row four.
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
   const openMarket = (id: string) => router.push(`/prediction/${id}`);
 
   const filterBar = (
@@ -188,7 +211,10 @@ export function MarketGrid() {
             type="button"
             className={`market-filter__chip${filter === key ? " market-filter__chip--active" : ""}`}
             aria-pressed={filter === key}
-            onClick={() => setFilter(key)}
+            onClick={() => {
+              setFilter(key);
+              setPage(1);
+            }}
           >
             {label}
             {key === "open" && openCount > 0 && (
@@ -251,15 +277,65 @@ export function MarketGrid() {
           )}
         </div>
       ) : (
-        <div className="market-grid">
-          {visible.map((prediction) => (
-            <MarketCard
-              key={prediction.id}
-              prediction={prediction}
-              onOpen={openMarket}
-            />
-          ))}
-        </div>
+        <>
+          <div className="market-grid">
+            {pageItems.map((prediction) => (
+              <MarketCard
+                key={prediction.id}
+                prediction={prediction}
+                onOpen={openMarket}
+              />
+            ))}
+          </div>
+
+          {pageCount > 1 && (
+            <nav className="market-pagination" aria-label="Market pages">
+              <button
+                type="button"
+                className="market-pagination__step"
+                onClick={() => goToPage(currentPage - 1)}
+                disabled={currentPage === 1}
+                aria-label="Previous page"
+              >
+                ‹
+              </button>
+
+              {pageWindow(currentPage, pageCount).map((p, i) =>
+                p === null ? (
+                  <span key={`gap-${i}`} className="market-pagination__gap">
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={p}
+                    type="button"
+                    className={`market-pagination__page${p === currentPage ? " market-pagination__page--active" : ""}`}
+                    aria-current={p === currentPage ? "page" : undefined}
+                    onClick={() => goToPage(p)}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+
+              <button
+                type="button"
+                className="market-pagination__step"
+                onClick={() => goToPage(currentPage + 1)}
+                disabled={currentPage === pageCount}
+                aria-label="Next page"
+              >
+                ›
+              </button>
+
+              <span className="market-pagination__summary">
+                {(currentPage - 1) * PAGE_SIZE + 1}–
+                {Math.min(currentPage * PAGE_SIZE, visible.length)} of{" "}
+                {visible.length}
+              </span>
+            </nav>
+          )}
+        </>
       )}
     </>
   );
