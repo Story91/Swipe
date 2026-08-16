@@ -175,6 +175,23 @@ export function useHybridPredictions() {
       }
     }
   }, [redisPredictions, transformPredictions]);
+
+  // A fetch that legitimately returns nothing still ends the initial load.
+  // Without this the effect above never fires when there are no open markets,
+  // initialLoading stays true forever, and every consumer is stuck on a
+  // spinner instead of rendering its empty state.
+  const fetchWasInFlightRef = useRef(false);
+  useEffect(() => {
+    if (redisLoading) {
+      fetchWasInFlightRef.current = true;
+    } else if (fetchWasInFlightRef.current) {
+      fetchWasInFlightRef.current = false;
+      setInitialLoading(false);
+      if (fetchAllModeRef.current) {
+        setAllPredictionsLoaded(true);
+      }
+    }
+  }, [redisLoading]);
   
   // Fetch predictions on mount with blockchain sync
   useEffect(() => {

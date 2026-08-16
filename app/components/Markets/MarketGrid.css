@@ -6,22 +6,15 @@
  * panels on a lime page, which left nothing for the eye to lock onto.
  */
 
-/* Full-bleed: the grid escapes the centred content column and spans the whole
-   viewport, while the header above it stays at a readable width. On desktop the
-   grid IS the page, so capping it at the header's width wasted most of the screen. */
-.market-grid,
-.market-filter {
-  width: 100vw;
-  margin-left: calc(50% - 50vw);
-  padding-left: clamp(16px, 3vw, 48px);
-  padding-right: clamp(16px, 3vw, 48px);
-  box-sizing: border-box;
-}
-
+/* The grid fills its container, and in grid mode page.tsx makes that container
+   the full page width. An earlier version used a 100vw full-bleed hack, but vw
+   includes the vertical scrollbar, so it produced a horizontal scrollbar and was
+   clipped by the wrapper's overflow-x. Widening the real container avoids both. */
 .market-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 20px;
+  width: 100%;
   padding-top: 8px;
   padding-bottom: 40px;
 }

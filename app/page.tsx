@@ -363,18 +363,23 @@ export default function App() {
       {showSidePanels && <SidePanels />}
 
       <div
-        className={`w-full mx-auto px-2 sm:px-4 py-3 overflow-x-hidden main-content-wrapper ${
+        className={`w-full mx-auto py-3 main-content-wrapper ${
           showGrid
-            // Header stays readable; MarketGrid breaks out to the full viewport itself.
-            ? 'max-w-[1100px]'
+            // Grid mode: the container IS the page. Header blocks below cap
+            // themselves so they stay readable while the grid uses the width.
+            ? 'max-w-none px-4 lg:px-8'
             : isDesktop
-              // Desktop swipe mode: one large card rather than a phone-width column.
-              ? 'max-w-[560px]'
-              : 'max-w-[424px]'
+              // Desktop swipe mode: one large card, not a phone-width column.
+              ? 'max-w-[560px] px-2 sm:px-4 overflow-x-hidden'
+              : 'max-w-[424px] px-2 sm:px-4 overflow-x-hidden'
         }`}
       >
         {/* Wallet Connection and Admin/Help - Top */}
-        <div className="flex justify-between items-center mb-3">
+        <div
+          className={`flex justify-between items-center mb-3 ${
+            showGrid ? 'max-w-[1100px] w-full mx-auto' : ''
+          }`}
+        >
           <Wallet className="z-10">
             <ConnectWallet 
               className="swipe-glow-button swipe-glow-green !px-3 !py-1.5 !text-sm !min-w-0 !font-semibold !rounded-full hover:!scale-105 !transition-all !duration-200" 
@@ -507,7 +512,10 @@ export default function App() {
         </div>
 
         {/* Menu Bar - Right after Wallet */}
-        <div className="mb-4 relative" style={{ overflow: 'visible' }}>
+        <div
+          className={`mb-4 relative ${showGrid ? 'max-w-[1100px] w-full mx-auto' : ''}`}
+          style={{ overflow: 'visible' }}
+        >
           <Menubar className="mini-app-menu">
             <MenubarMenu>
               <MenubarTrigger className="menubar-trigger" onClick={() => setActiveDashboard('tinder')}>
