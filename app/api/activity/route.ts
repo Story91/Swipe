@@ -37,9 +37,30 @@ export async function GET(request: NextRequest) {
 
     // Get all predictions
     const allPredictions = await redisHelpers.getAllPredictions();
+    const consideredPredictions = allPredictions.slice(-100); // Last 100 for performance
+
+    // Batch-read every stake up front. This used to be one redis.get per
+    // participant inside a nested loop; against Upstash each is an HTTP round
+    // trip, which measured at ~118s for this endpoint alone.
+    const stakeKeys: string[] = [];
+    for (const prediction of consideredPredictions) {
+      for (const participant of prediction.participants || []) {
+        stakeKeys.push(`user_stakes:${participant}:${prediction.id}`);
+      }
+    }
+
+    const stakesByKey = new Map<string, unknown>();
+    const STAKE_CHUNK = 100;
+    for (let i = 0; i < stakeKeys.length; i += STAKE_CHUNK) {
+      const chunk = stakeKeys.slice(i, i + STAKE_CHUNK);
+      const rows = (await redis.mget(...chunk)) as unknown[];
+      rows.forEach((row, index) => {
+        if (row) stakesByKey.set(chunk[index], row);
+      });
+    }
 
     // Process predictions for activities
-    for (const prediction of allPredictions.slice(-100)) { // Last 100 predictions for performance
+    for (const prediction of consideredPredictions) {
       // Prediction created activity
       if (prediction.creator) {
         activities.push({
@@ -85,13 +106,29 @@ export async function GET(request: NextRequest) {
       // Process stakes for this prediction
       for (const participant of prediction.participants) {
         const stakeKey = `user_stakes:${participant}:${prediction.id}`;
-        const stakeData = await redis.get(stakeKey);
+        const stakeData = stakesByKey.get(stakeKey);
 
         if (stakeData) {
           const stake = typeof stakeData === 'string' ? JSON.parse(stakeData) : stakeData;
-          if (stake && typeof stake === 'object' && 'yesAmount' in stake) {
-            const userStake = stake as RedisUserStake;
-            const totalStake = userStake.yesAmount + userStake.noAmount;
+          // Stakes are stored per token: { user, stakedAt, ETH?: {...}, SWIPE?: {...} }.
+          // This branch used to test for a top-level `yesAmount`, which the
+          // multi-token shape does not have, so every bet and payout was
+          // silently dropped from the feed.
+          const legs = stake && typeof stake === 'object'
+            ? [(stake as any).ETH, (stake as any).SWIPE].filter(Boolean)
+            : [];
+
+          if (legs.length > 0) {
+            const yesAmount = legs.reduce((sum: number, leg: any) => sum + (Number(leg.yesAmount) || 0), 0);
+            const noAmount = legs.reduce((sum: number, leg: any) => sum + (Number(leg.noAmount) || 0), 0);
+            const userStake = {
+              ...(stake as any),
+              yesAmount,
+              noAmount,
+              // Claimed only when every leg the user holds has been claimed.
+              claimed: legs.every((leg: any) => leg.claimed),
+            } as RedisUserStake;
+            const totalStake = yesAmount + noAmount;
 
             if (totalStake > 0) {
               // Bet placed activity

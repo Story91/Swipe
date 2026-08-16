@@ -64,6 +64,59 @@ export type {
   RedisMarketStats 
 } from './types/redis';
 
+/** Upstash caps request size, so very large id lists are split. */
+const MGET_CHUNK_SIZE = 100;
+
+function parsePrediction(raw: unknown): RedisPrediction | null {
+  if (!raw) return null;
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (parsed && typeof parsed === 'object' && 'id' in parsed && 'question' in parsed) {
+      return parsed as RedisPrediction;
+    }
+  } catch {
+    // A single corrupt record must not take down the whole listing.
+  }
+  return null;
+}
+
+function isTestPrediction(id: string, prediction: RedisPrediction): boolean {
+  return (
+    id.startsWith('test_') ||
+    prediction.creator === 'anonymous' ||
+    prediction.creator.toLowerCase().includes('test')
+  );
+}
+
+/**
+ * Batch-read predictions by id.
+ *
+ * This used to be one redis.get per id inside a serial loop. Against Upstash
+ * every read is an HTTP round trip, so 244 predictions meant 244 sequential
+ * requests — measured at ~73s for /api/market/compact-stats and ~153s for
+ * /api/activity. mget in chunks turns that into a handful of round trips.
+ */
+async function getPredictionsByIds(ids: string[]): Promise<RedisPrediction[]> {
+  if (ids.length === 0) return [];
+
+  const out: RedisPrediction[] = [];
+
+  for (let i = 0; i < ids.length; i += MGET_CHUNK_SIZE) {
+    const chunk = ids.slice(i, i + MGET_CHUNK_SIZE);
+    const keys = chunk.map((id) => REDIS_KEYS.PREDICTION(id));
+    const rows = (await redis.mget(...keys)) as unknown[];
+
+    rows.forEach((row, index) => {
+      const prediction = parsePrediction(row);
+      if (prediction && !isTestPrediction(chunk[index], prediction)) {
+        out.push(prediction);
+      }
+    });
+  }
+
+  return out;
+}
+
 // Helper functions for Redis operations
 export const redisHelpers = {
   // Save prediction to Redis
@@ -144,21 +197,7 @@ export const redisHelpers = {
   async getAllPredictions(): Promise<RedisPrediction[]> {
     try {
       const predictionIds = await redis.smembers(REDIS_KEYS.PREDICTIONS);
-      const predictions: RedisPrediction[] = [];
-
-      for (const id of predictionIds) {
-        const prediction = await this.getPrediction(id);
-        if (prediction) {
-          // Filter out test predictions
-          const isTestPrediction = id.startsWith('test_') ||
-            prediction.creator === 'anonymous' ||
-            prediction.creator.toLowerCase().includes('test');
-
-          if (!isTestPrediction) {
-            predictions.push(prediction);
-          }
-        }
-      }
+      const predictions = await getPredictionsByIds(predictionIds);
 
       // Sort by creation date (newest first)
       return predictions.sort((a, b) => b.createdAt - a.createdAt);
@@ -172,25 +211,12 @@ export const redisHelpers = {
   async getActivePredictions(): Promise<RedisPrediction[]> {
     try {
       const activeIds = await redis.smembers(REDIS_KEYS.PREDICTIONS_ACTIVE);
-      const predictions: RedisPrediction[] = [];
       const currentTime = Math.floor(Date.now() / 1000);
 
-      for (const id of activeIds) {
-        const prediction = await this.getPrediction(id);
-        if (prediction && !prediction.resolved && !prediction.cancelled) {
-          // Check if deadline has not passed
-          const deadlineNotPassed = prediction.deadline > currentTime;
-          
-          // Filter out test predictions
-          const isTestPrediction = id.startsWith('test_') ||
-            prediction.creator === 'anonymous' ||
-            prediction.creator.toLowerCase().includes('test');
-
-          if (!isTestPrediction && deadlineNotPassed) {
-            predictions.push(prediction);
-          }
-        }
-      }
+      // getPredictionsByIds already drops test predictions.
+      const predictions = (await getPredictionsByIds(activeIds)).filter(
+        (p) => !p.resolved && !p.cancelled && p.deadline > currentTime
+      );
 
       return predictions.sort((a, b) => a.deadline - b.deadline); // Sort by deadline
     } catch (error) {
