@@ -22,43 +22,27 @@ have to be redeployed once this lands, but the reward design itself waits.
 A holder snapshot exists at `docs/swipe-holder-snapshot-50065584.json` — 16k
 lines — so a migration path is possible if that is the direction.
 
-### 2. Wiring the wallet picker
-
-**Blocks:** users choosing a wallet. Right now `app/page.tsx:407` renders
-OnchainKit's `<ConnectWallet>`, which connects with one connector.
-`app/components/Wallet/WalletPicker.tsx` exists but nothing imports it.
-
-Two ways to close it, and they are not equivalent:
-
-- **Replace `<ConnectWallet>` with `<WalletPicker>`.** Real choice, but
-  `<ConnectWallet>` also carries the avatar, the profile name and the
-  `<WalletDropdown>` — all of that has to be rebuilt or the header regresses.
-- **Keep `<ConnectWallet>`, add the picker as a secondary path.** Cheaper, no
-  regression, but two connect buttons is a confusing header.
-
-Its connector filter is also wrong and must be fixed first — see the worklog.
-
 ## Parameters, needed before the contract is final
 
-### 3. Minimum pool threshold
+### 2. Minimum pool threshold
 
 The value, and whether it is one global number or set per market. Too low and it
 changes nothing; too high and every market on a quiet week auto-refunds, which
 reads to users as the platform being broken.
 
-### 4. Cap on simultaneously open markets
+### 3. Cap on simultaneously open markets
 
 The number, and where it is enforced. In the contract it is a real guarantee but
 costs gas to track; in the market creation path it is trivial but is only a
 convention.
 
-### 5. Early-entry bracket boundaries for short markets
+### 4. Early-entry bracket boundaries for short markets
 
 The ×1.50 bracket is "the first 24 hours". A market that is only open for two
 hours has no such window. Options: brackets as fractions of the market's own
 lifetime rather than absolute hours, or a minimum market duration.
 
-### 6. Creator bond: size, and where a forfeited bond goes
+### 5. Creator bond: size, and where a forfeited bond goes
 
 Size has to be high enough to deter spam and low enough that a genuine creator
 will risk it. Destination is a design choice with a real difference: to the

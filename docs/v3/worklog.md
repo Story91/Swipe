@@ -19,18 +19,31 @@ records successes is not worth keeping.
   three commits ahead of origin. Production had therefore never built the Sign In
   fix, which is why wallet connection still appeared broken.
 
+- **Wallet choice actually works now.** Two separate defects, both closed
+  (`5e7526f`):
+  - `WalletPicker` was dead code. `95ff025` built the chooser but nothing
+    rendered it — `app/page.tsx` still used OnchainKit's `<ConnectWallet>`,
+    which connects with one connector. Disconnected now renders the picker;
+    connected keeps OnchainKit, which carries the avatar, the Farcaster name and
+    the `<WalletDropdown>`.
+  - Its connector filter was wrong. `c.type !== 'injected' || c.id === 'injected'`
+    claimed to hide wallets that are not installed. What it did was drop every
+    injected connector whose id is not literally `injected` — exactly the set
+    wagmi discovers over EIP-6963, which is where MetaMask and every other
+    announced browser wallet come from.
+
+  Typecheck and build pass. **Which wallets actually appear depends on what the
+  browser announces, so this still needs confirming in a real browser.**
+- **Double-encoded emoji repaired** in the create-prediction modal (`2a9a27b`).
+  Every emoji in that one file was mojibake — text that was once correct UTF-8,
+  read back as a single-byte codepage, and saved as UTF-8 again. It still
+  validated as UTF-8, which is why nothing caught it. Users saw it in the share
+  text and in the creator-status labels. 45 runs repaired; the file's one
+  legitimate non-ASCII character, an em dash, was left alone. No other file in
+  the repo is affected.
+
 ### Found, not yet fixed
 
-- **`WalletPicker` is dead code.** `95ff025` added a wallet chooser, but nothing
-  renders it. `app/page.tsx:407` still uses OnchainKit's `<ConnectWallet>`, which
-  connects with a single connector. Users still get no choice of wallet. See
-  [`open-questions.md`](./open-questions.md).
-- **`WalletPicker`'s availability filter is wrong.** Line 59 reads
-  `c.type !== 'injected' || c.id === 'injected'`. The comment says it hides
-  wallets that are not installed; it does not do that. What it actually does is
-  drop every injected connector whose id is not literally `injected` — which
-  removes EIP-6963-discovered wallets like MetaMask, and the Farcaster connector.
-  It must be fixed before the picker is wired in.
 - **`NEXT_PUBLIC_WC_PROJECT_ID` is set locally but unverified on Vercel.**
   `wagmi.ts:53` passes it to the WalletConnect connector with a non-null
   assertion. Unset in production, connector construction is the failure point —
