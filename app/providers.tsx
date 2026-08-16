@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode } from "react";
-import { base } from "wagmi/chains";
+import { getChainConfig } from "@/lib/chains";
 import { MiniKitProvider } from "@coinbase/onchainkit/minikit";
 
 export function Providers(props: { children: ReactNode }) {
@@ -15,7 +15,7 @@ export function Providers(props: { children: ReactNode }) {
   return (
     <MiniKitProvider
       apiKey={apiKey}
-      chain={base}
+      chain={getChainConfig().viemChain}
       config={{
         appearance: {
           mode: "auto",

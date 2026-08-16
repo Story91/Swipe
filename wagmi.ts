@@ -1,5 +1,5 @@
 import { http, cookieStorage, createConfig, createStorage } from 'wagmi';
-import { base } from 'wagmi/chains';
+import { getChainConfig } from '@/lib/chains';
 import { coinbaseWallet, injected, walletConnect } from 'wagmi/connectors';
 import sdk from '@farcaster/miniapp-sdk';
 
@@ -21,8 +21,10 @@ function farcasterFrame() {
 }
 
 export function getConfig() {
+  const activeChain = getChainConfig();
+
   return createConfig({
-    chains: [base],
+    chains: [activeChain.viemChain],
     connectors: [
       farcasterFrame(), // Farcaster Frame wallet (for Warpcast)
       injected(),
@@ -36,7 +38,9 @@ export function getConfig() {
     }),
     ssr: true,
     transports: {
-      [base.id]: http(process.env.NEXT_PUBLIC_BASE_RPC_URL!),
+      // rpcUrl always has a value, so this no longer risks http(undefined)
+      // when NEXT_PUBLIC_BASE_RPC_URL is unset.
+      [activeChain.viemChain.id]: http(activeChain.rpcUrl),
     },
   });
 }
