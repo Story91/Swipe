@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useHybridPredictions } from "@/lib/hooks/useHybridPredictions";
 import type { HybridPrediction } from "@/lib/hooks/useHybridPredictions";
@@ -143,6 +143,20 @@ export function MarketGrid() {
     }
   }, [filter, allPredictionsLoaded, fetchAllPredictions]);
 
+  // Open markets are the right default, but when there are none the page would
+  // greet everyone with an empty screen. Fall back to the full history once,
+  // after loading settles. A manual choice afterwards is never overridden.
+  const autoFellBack = useRef(false);
+  useEffect(() => {
+    if (loading || autoFellBack.current || filter !== "open") return;
+    const now = Math.floor(Date.now() / 1000);
+    const hasOpen = (predictions ?? []).some((p) => isOpen(p, now));
+    if (!hasOpen) {
+      autoFellBack.current = true;
+      setFilter("all");
+    }
+  }, [loading, predictions, filter]);
+
   const { visible, openCount } = useMemo(() => {
     const now = Math.floor(Date.now() / 1000);
     const all = predictions ?? [];
@@ -166,21 +180,28 @@ export function MarketGrid() {
   const openMarket = (id: string) => router.push(`/prediction/${id}`);
 
   const filterBar = (
-    <div className="market-filter" role="group" aria-label="Filter markets">
-      {FILTERS.map(({ key, label }) => (
-        <button
-          key={key}
-          type="button"
-          className={`market-filter__chip${filter === key ? " market-filter__chip--active" : ""}`}
-          aria-pressed={filter === key}
-          onClick={() => setFilter(key)}
-        >
-          {label}
-          {key === "open" && openCount > 0 && (
-            <span className="market-filter__count">{openCount}</span>
-          )}
-        </button>
-      ))}
+    <div className="market-filter-bar">
+      <div className="market-filter" role="group" aria-label="Filter markets">
+        {FILTERS.map(({ key, label }) => (
+          <button
+            key={key}
+            type="button"
+            className={`market-filter__chip${filter === key ? " market-filter__chip--active" : ""}`}
+            aria-pressed={filter === key}
+            onClick={() => setFilter(key)}
+          >
+            {label}
+            {key === "open" && openCount > 0 && (
+              <span className="market-filter__count">{openCount}</span>
+            )}
+          </button>
+        ))}
+      </div>
+      {openCount === 0 && !loading && (
+        <p className="market-filter__hint">
+          No markets are open right now — showing past ones.
+        </p>
+      )}
     </div>
   );
 

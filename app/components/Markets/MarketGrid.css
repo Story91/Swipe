@@ -21,11 +21,26 @@
 
 /* ---------- status filter ---------- */
 
+.market-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
 .market-filter {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 18px;
+}
+
+.market-filter__hint {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1a1a1a;
+  opacity: 0.65;
 }
 
 .market-filter__chip {
