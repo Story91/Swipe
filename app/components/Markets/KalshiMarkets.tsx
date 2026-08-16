@@ -874,8 +874,8 @@ export default function KalshiMarkets() {
     // placed here could never be resolved or claimed.
     if (isReadOnlyChain()) {
       setErrorMessage(
-        'These markets are archived. This network is read-only: its contracts can no ' +
-        'longer resolve markets or pay out, so new bets are disabled.'
+        'Betting is moving to V3 — audited contracts with fairer payouts and lower fees. ' +
+        'Switch network to place a bet.'
       );
       return;
     }

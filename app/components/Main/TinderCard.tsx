@@ -1057,9 +1057,9 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     // transaction is refused rather than taking the user's money.
     if (isReadOnlyChain()) {
       alert(
-        '❌ These markets are archived.\n\n' +
-        'This network is read-only: its contracts can no longer resolve markets or ' +
-        'pay out, so new stakes are disabled. Existing positions stay visible.'
+        'Betting is moving to V3.\n\n' +
+        'V3 brings audited contracts with fairer payouts and lower fees. ' +
+        'Your existing positions stay visible here.'
       );
       return;
     }

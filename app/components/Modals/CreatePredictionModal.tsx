@@ -522,8 +522,8 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
     // market created there could never be resolved.
     if (isReadOnlyChain()) {
       alert(
-        '❌ This network is archived.\n\n' +
-        'Its contracts can no longer resolve markets, so new ones cannot be created here.'
+        'Markets are moving to V3.\n\n' +
+        'New markets are created on V3 now — switch network to create one.'
       );
       return;
     }

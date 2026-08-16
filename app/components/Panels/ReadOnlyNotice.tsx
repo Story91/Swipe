@@ -21,10 +21,10 @@ export function ReadOnlyNotice() {
     <aside className="readonly-notice" role="status">
       <p className="readonly-notice__title">{config.label} markets are archived</p>
       <p className="readonly-notice__body">
-        These markets are shown for reference only. New bets, new markets and
-        payouts are disabled here after the contract owner key was compromised —
-        it cannot be replaced, because the contract has no way to transfer
-        ownership. Your past positions and results stay visible.
+        We are moving to V3: audited contracts with fairer payouts, lower fees
+        and protections the old ones could not offer. These markets stay here
+        for reference — your past positions and results remain visible — while
+        new betting moves to V3 on Robinhood Chain.
       </p>
     </aside>
   );
