@@ -31,6 +31,8 @@ export const REDIS_KEYS = {
   PREDICTIONS_RESOLVED: 'predictions:resolved',
   PREDICTIONS_PENDING_APPROVAL: 'predictions:pending_approval',
   PREDICTIONS_COUNT: 'predictions:count',
+  /** Denormalised snapshot of every prediction, so a listing is one read. */
+  PREDICTIONS_INDEX: 'predictions:index',
   USER_STAKES: (userId: string, predictionId: string) => `user_stakes:${userId}:${predictionId}`,
   USER_TRANSACTIONS: (userId: string) => `user_transactions:${userId}`,
   MARKET_STATS: 'market:stats',
@@ -100,8 +102,36 @@ function isTestPrediction(id: string, prediction: RedisPrediction): boolean {
 const ALL_PREDICTIONS_TTL_MS = 10_000;
 let allPredictionsCache: { at: number; data: RedisPrediction[] } | null = null;
 
+/**
+ * Reading a listing used to mean one Redis round trip per prediction. Batching
+ * cut that to a handful; this index cuts it to one. The snapshot is rebuilt
+ * only when a prediction is written or deleted, so steady-state reads never
+ * touch the individual keys at all.
+ */
 function invalidatePredictionsCache(): void {
   allPredictionsCache = null;
+  // Fire-and-forget: a failed delete only costs us a rebuild on the next read.
+  void redis.del(REDIS_KEYS.PREDICTIONS_INDEX).catch(() => {});
+}
+
+async function readPredictionsIndex(): Promise<RedisPrediction[] | null> {
+  try {
+    const raw = await redis.get(REDIS_KEYS.PREDICTIONS_INDEX);
+    if (!raw) return null;
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return Array.isArray(parsed) ? (parsed as RedisPrediction[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function writePredictionsIndex(predictions: RedisPrediction[]): Promise<void> {
+  try {
+    await redis.set(REDIS_KEYS.PREDICTIONS_INDEX, JSON.stringify(predictions));
+  } catch (error) {
+    // The index is an optimisation; failing to store it must not fail the read.
+    console.error('⚠️ Failed to store predictions index:', error);
+  }
 }
 
 /**
@@ -139,9 +169,6 @@ export const redisHelpers = {
   async savePrediction(prediction: RedisPrediction): Promise<void> {
     try {
       const predictionKey = REDIS_KEYS.PREDICTION(prediction.id);
-      
-      // Any write makes the cached listing wrong, so drop it first.
-      invalidatePredictionsCache();
 
       // Save individual prediction
       await redis.set(predictionKey, JSON.stringify(prediction));
@@ -182,7 +209,12 @@ export const redisHelpers = {
       if (addedCount) {
         await redis.incr(REDIS_KEYS.PREDICTIONS_COUNT);
       }
-      
+
+      // Invalidate last, once the record and its indexes are all in place.
+      // Dropping the snapshot first would let a concurrent read rebuild it from
+      // the pre-write state and cache that.
+      invalidatePredictionsCache();
+
       console.log(`✅ Prediction ${prediction.id} saved to Redis`);
     } catch (error) {
       console.error('❌ Failed to save prediction to Redis:', error);
@@ -215,17 +247,27 @@ export const redisHelpers = {
   // Get all predictions (only live/real predictions, exclude test data)
   async getAllPredictions(): Promise<RedisPrediction[]> {
     try {
+      // 1. Same process, same few seconds: nothing to do.
       const cached = allPredictionsCache;
       if (cached && Date.now() - cached.at < ALL_PREDICTIONS_TTL_MS) {
         return cached.data;
       }
 
+      // 2. Prebuilt snapshot: one read instead of one per prediction.
+      const indexed = await readPredictionsIndex();
+      if (indexed) {
+        allPredictionsCache = { at: Date.now(), data: indexed };
+        return indexed;
+      }
+
+      // 3. Cold: rebuild from the individual keys and store the snapshot.
       const predictionIds = await redis.smembers(REDIS_KEYS.PREDICTIONS);
       const predictions = await getPredictionsByIds(predictionIds);
 
       // Sort by creation date (newest first)
       const sorted = predictions.sort((a, b) => b.createdAt - a.createdAt);
       allPredictionsCache = { at: Date.now(), data: sorted };
+      await writePredictionsIndex(sorted);
       return sorted;
     } catch (error) {
       console.error('❌ Failed to get all predictions from Redis:', error);
@@ -435,8 +477,6 @@ export const redisHelpers = {
       const prediction = await this.getPrediction(id);
       if (!prediction) return;
 
-      invalidatePredictionsCache();
-
       // Remove from all indexes
       await redis.srem(REDIS_KEYS.PREDICTIONS, id);
       await redis.srem(REDIS_KEYS.PREDICTIONS_BY_CATEGORY(prediction.category), id);
@@ -450,7 +490,10 @@ export const redisHelpers = {
       
       // Update count
       await redis.decr(REDIS_KEYS.PREDICTIONS_COUNT);
-      
+
+      // Invalidate last, so a concurrent read cannot cache the pre-delete state.
+      invalidatePredictionsCache();
+
       console.log(`✅ Prediction ${id} deleted from Redis`);
     } catch (error) {
       console.error(`❌ Failed to delete prediction ${id} from Redis:`, error);
