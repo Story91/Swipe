@@ -10,6 +10,7 @@ import { ArrowLeft, Clock, Users, TrendingUp, Share2 } from "lucide-react";
 import sdk from "@farcaster/miniapp-sdk";
 import { useComposeCast } from "@coinbase/onchainkit/minikit";
 import type { RedisPrediction } from "@/lib/types/redis";
+import { useActiveChain } from "@/lib/chains/activeChain";
 
 export default function PredictionPage() {
   const params = useParams();
@@ -18,6 +19,7 @@ export default function PredictionPage() {
   const { setFrameReady, isFrameReady } = useMiniKit();
   const { address } = useAccount();
   const { composeCast: minikitComposeCast } = useComposeCast();
+  const { isReadOnly } = useActiveChain();
   
   const [prediction, setPrediction] = useState<RedisPrediction | null>(null);
   const [loading, setLoading] = useState(true);
@@ -268,8 +270,17 @@ export default function PredictionPage() {
             <div className="flex bg-black/30 rounded-lg border border-zinc-700/50 mb-3 divide-x divide-zinc-700/50">
               <div className="flex-1 py-2 text-center">
                 <Clock className="w-4 h-4 text-[#d4ff00] mx-auto mb-0.5" />
-                <p className="text-[9px] text-gray-400 uppercase">Time Left</p>
-                <p className="text-xs font-bold text-white">{formatTimeLeft(prediction.deadline)}</p>
+                <p className="text-[9px] text-gray-400 uppercase">
+                  {isReadOnly && !prediction.resolved ? 'Status' : 'Time Left'}
+                </p>
+                {/* A countdown on an archived market is a lie with a clock on
+                    it: the deadline is real, but nothing can be staked against
+                    it any more. */}
+                <p className="text-xs font-bold text-white">
+                  {isReadOnly && !prediction.resolved
+                    ? 'Archived'
+                    : formatTimeLeft(prediction.deadline)}
+                </p>
               </div>
               
               <div className="flex-1 py-2 text-center">
@@ -351,14 +362,32 @@ export default function PredictionPage() {
               </div>
             </div>
 
-            {/* CTA Button */}
-            <Button 
-              onClick={handleOpenInApp}
-              className="w-full bg-[#d4ff00] text-black font-bold hover:bg-[#c4ef00] py-4 text-base rounded-xl"
-              style={{ fontFamily: '"Spicy Rice", cursive' }}
-            >
-              {prediction.resolved ? 'View Results' : 'Place Your Bet'}
-            </Button>
+            {/* CTA.
+
+                On an archived chain there is nothing to stake into, so the
+                button used to send the user to the home screen and leave them
+                there with no explanation. Saying the market is archived is the
+                honest version of the same information. Resolved markets keep
+                their results link either way. */}
+            {isReadOnly && !prediction.resolved ? (
+              <div className="w-full rounded-xl border border-[#ffb020] bg-[#0d0d0d] px-4 py-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[#ffb020]">
+                  Archived market
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+                  Kept for reference — it takes no new bets. We are building V3:
+                  audited contracts that are safer and pay out better for users.
+                </p>
+              </div>
+            ) : (
+              <Button
+                onClick={handleOpenInApp}
+                className="w-full bg-[#d4ff00] text-black font-bold hover:bg-[#c4ef00] py-4 text-base rounded-xl"
+                style={{ fontFamily: '"Spicy Rice", cursive' }}
+              >
+                {prediction.resolved ? 'View Results' : 'Place Your Bet'}
+              </Button>
+            )}
           </div>
         </div>
 
