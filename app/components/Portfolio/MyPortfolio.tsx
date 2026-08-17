@@ -2,6 +2,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
+import '../../styles/sheet.css';
+import './MyPortfolio.css';
+
+/**
+ * Portfolio, on the shared sheet.
+ *
+ * Data comes from /api/portfolio and is unchanged; this is a presentation
+ * rewrite. Figures are V2-era and in ETH, which is what that endpoint returns.
+ */
 
 interface PortfolioStats {
   totalInvested: number;
@@ -26,9 +35,23 @@ interface PortfolioItem {
   imageUrl: string;
 }
 
+type Tab = 'overview' | 'active' | 'history';
+
+const signed = (n: number, dp = 4) =>
+  `${n >= 0 ? '+' : '−'}${Math.abs(n).toFixed(dp)}`;
+
+function timeAgo(timestamp: number) {
+  const diff = Date.now() - timestamp;
+  const hours = Math.floor(diff / 3_600_000);
+  const days = Math.floor(hours / 24);
+  if (days > 0) return `${days}d ago`;
+  if (hours > 0) return `${hours}h ago`;
+  return 'just now';
+}
+
 export function MyPortfolio() {
   const { address } = useAccount();
-  const [activeTab, setActiveTab] = useState<'overview' | 'active' | 'history'>('overview');
+  const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
   const [stats, setStats] = useState<PortfolioStats>({
     totalInvested: 0,
@@ -37,7 +60,7 @@ export function MyPortfolio() {
     activeBets: 0,
     wonBets: 0,
     lostBets: 0,
-    winRate: 0
+    winRate: 0,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,201 +104,242 @@ export function MyPortfolio() {
     return () => clearInterval(interval);
   }, [address]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'text-blue-600 bg-blue-100';
-      case 'won': return 'text-green-600 bg-green-100';
-      case 'lost': return 'text-red-600 bg-red-100';
-      case 'pending': return 'text-yellow-600 bg-yellow-100';
-      default: return 'text-gray-600 bg-gray-100';
-    }
-  };
-
-  const formatTime = (timestamp: number) => {
-    const now = Date.now();
-    const diff = now - timestamp;
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const days = Math.floor(hours / 24);
-
-    if (days > 0) return `${days}d ago`;
-    if (hours > 0) return `${hours}h ago`;
-    return 'Just now';
-  };
-
   const filteredItems = portfolioItems.filter(item => {
     switch (activeTab) {
-      case 'active': return item.status === 'active' || item.status === 'pending';
-      case 'history': return item.status === 'won' || item.status === 'lost';
-      default: return true;
+      case 'active':
+        return item.status === 'active' || item.status === 'pending';
+      case 'history':
+        return item.status === 'won' || item.status === 'lost';
+      default:
+        return true;
     }
   });
 
-  if (!address) {
-    return (
-      <div className="my-portfolio">
-        <div className="connect-wallet-notice">
-          <h2>🔒 Connect Wallet</h2>
-          <p>Please connect your wallet to view your portfolio.</p>
-        </div>
+  const TABS: { key: Tab; label: string }[] = [
+    { key: 'overview', label: 'Everything' },
+    { key: 'active', label: `Open (${stats.activeBets})` },
+    { key: 'history', label: `Settled (${stats.wonBets + stats.lostBets})` },
+  ];
+
+  const shell = (body: React.ReactNode) => (
+    <div className="sheet">
+      <div className="sheet-shell">
+        <header className="sheet-hero">
+          <div className="sheet-hero-top">
+            <div>
+              <p className="sheet-eyebrow">Portfolio</p>
+              <h1 className="sheet-hero-title">
+                Your <em>book</em>
+              </h1>
+            </div>
+          </div>
+          <p className="sheet-hero-lede">
+            Every position you have taken, what it cost and what it returned.
+            Figures are V2-era and in ETH; profit is what you took out of losing
+            pools, net of your own losing stakes.
+          </p>
+        </header>
+        <main className="sheet-body">{body}</main>
       </div>
+    </div>
+  );
+
+  if (!address) {
+    return shell(
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">Positions</p>
+        </div>
+        <div>
+          <div className="sheet-empty">
+            <strong>No wallet connected</strong>
+            Connect a wallet and this fills with whatever it has staked.
+          </div>
+        </div>
+      </section>
     );
   }
 
   if (loading) {
-    return (
-      <div className="my-portfolio">
-        <div className="portfolio-header">
-          <h1>💼 My Portfolio</h1>
-          <p>Loading portfolio data...</p>
+    return shell(
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">Positions</p>
         </div>
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <div>Loading...</div>
+        <div>
+          <div className="sheet-empty">
+            <strong>Reading your positions</strong>
+            Matching stakes against settled markets.
+          </div>
         </div>
-      </div>
+      </section>
     );
   }
 
   if (error) {
-    return (
-      <div className="my-portfolio">
-        <div className="portfolio-header">
-          <h1>💼 My Portfolio</h1>
-          <p>Your prediction investments and performance</p>
+    return shell(
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">Positions</p>
         </div>
-        <div style={{ textAlign: 'center', padding: '40px', color: 'red' }}>
-          <div>❌ Failed to load portfolio</div>
-          <div style={{ fontSize: '14px', marginTop: '10px' }}>{error}</div>
+        <div>
+          <div className="sheet-empty">
+            <strong>Could not load your book</strong>
+            {error}
+          </div>
         </div>
-      </div>
+      </section>
     );
   }
 
-  return (
-    <div className="my-portfolio">
-      <div className="portfolio-header">
-        <h1>💼 My Portfolio</h1>
-        <p>Your prediction investments and performance</p>
-      </div>
-
-      {/* Overview Stats */}
-      <div className="portfolio-stats">
-        <div className="stat-card">
-          <div className="stat-icon">💰</div>
-          <div className="stat-content">
-            <div className="stat-value">{stats.totalInvested.toFixed(3)} ETH</div>
-            <div className="stat-label">Total Invested</div>
-          </div>
+  return shell(
+    <>
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">Standing</p>
+          <p className="sheet-rail-meta">{`Across every\nposition`}</p>
         </div>
-
-        <div className="stat-card">
-          <div className="stat-icon">📈</div>
-          <div className="stat-content">
-            <div className="stat-value">{stats.totalProfit >= 0 ? '+' : ''}{stats.totalProfit.toFixed(3)} ETH</div>
-            <div className="stat-label">Total Profit/Loss</div>
-            <div className={`stat-change ${stats.totalProfit >= 0 ? 'positive' : 'negative'}`}>
-              {stats.totalProfit >= 0 ? '↗' : '↘'}
+        <div>
+          <div className="sheet-board">
+            <div className="sheet-settle">
+              <div className="sheet-settle-row">
+                <span className="sheet-settle-key">Staked</span>
+                <span className="sheet-settle-val">
+                  {stats.totalInvested.toFixed(4)} ETH
+                </span>
+              </div>
+              <div className="sheet-settle-row">
+                <span className="sheet-settle-key">Returned</span>
+                <span className="sheet-settle-val">
+                  {stats.totalPayout.toFixed(4)} ETH
+                </span>
+              </div>
+              <div className="sheet-settle-row">
+                <span className="sheet-settle-key">Win rate</span>
+                <span className="sheet-settle-val">
+                  {stats.winRate.toFixed(1)}%
+                  <span className="sheet-settle-sub">
+                    {stats.wonBets} won, {stats.lostBets} lost
+                  </span>
+                </span>
+              </div>
+              <div className="sheet-settle-row sheet-settle-row--total">
+                <span className="sheet-settle-key">Profit and loss</span>
+                <span className="sheet-settle-val">
+                  {signed(stats.totalProfit)} ETH
+                </span>
+              </div>
             </div>
           </div>
         </div>
+      </section>
 
-        <div className="stat-card">
-          <div className="stat-icon">🎯</div>
-          <div className="stat-content">
-            <div className="stat-value">{stats.winRate.toFixed(1)}%</div>
-            <div className="stat-label">Win Rate</div>
-          </div>
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">Positions</p>
+          <p className="sheet-rail-meta">
+            {`${filteredItems.length} shown\nof ${portfolioItems.length}`}
+          </p>
         </div>
-
-        <div className="stat-card">
-          <div className="stat-icon">⚡</div>
-          <div className="stat-content">
-            <div className="stat-value">{stats.activeBets}</div>
-            <div className="stat-label">Active Bets</div>
+        <div>
+          <div className="pf-tabs">
+            <div className="sheet-segment" role="group" aria-label="Which positions to show">
+              {TABS.map(t => (
+                <button
+                  key={t.key}
+                  type="button"
+                  className="sheet-segment-item"
+                  aria-pressed={activeTab === t.key}
+                  onClick={() => setActiveTab(t.key)}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* Tab Navigation */}
-      <div className="portfolio-tabs">
-        <button
-          className={`tab-button ${activeTab === 'overview' ? 'active' : ''}`}
-          onClick={() => setActiveTab('overview')}
-        >
-          📊 Overview
-        </button>
-        <button
-          className={`tab-button ${activeTab === 'active' ? 'active' : ''}`}
-          onClick={() => setActiveTab('active')}
-        >
-          ⚡ Active Bets ({stats.activeBets})
-        </button>
-        <button
-          className={`tab-button ${activeTab === 'history' ? 'active' : ''}`}
-          onClick={() => setActiveTab('history')}
-        >
-          📚 History ({stats.wonBets + stats.lostBets})
-        </button>
-      </div>
-
-      {/* Content */}
-      <div className="portfolio-content">
-        {filteredItems.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">📭</div>
-            <h3>No {activeTab === 'active' ? 'active' : 'historical'} bets found</h3>
-            <p>
+          {filteredItems.length === 0 ? (
+            <div className="sheet-empty">
+              <strong>
+                {activeTab === 'active'
+                  ? 'Nothing open'
+                  : activeTab === 'history'
+                    ? 'Nothing settled yet'
+                    : 'No positions'}
+              </strong>
               {activeTab === 'active'
-                ? 'Your active predictions will appear here.'
-                : 'Your prediction history will appear here once you have completed bets.'
-              }
-            </p>
-          </div>
-        ) : (
-          <div className="portfolio-items">
-            {filteredItems.map((item) => (
-              <div key={item.id} className="portfolio-item">
-                <div className="item-image">
-                  <img src={item.imageUrl} alt={item.question} />
-                </div>
-
-                <div className="item-content">
-                  <div className="item-header">
-                    <h4>{item.question}</h4>
-                    <span className={`status-badge ${getStatusColor(item.status)}`}>
-                      {item.status.toUpperCase()}
-                    </span>
-                  </div>
-
-                  <div className="item-details">
-                    <div className="detail-row">
-                      <span className="label">Category:</span>
-                      <span className="value">{item.category}</span>
-                    </div>
-                    <div className="detail-row">
-                      <span className="label">Your Bet:</span>
-                      <span className="value">{item.stakeAmount} ETH on {item.choice}</span>
-                    </div>
-                    <div className="detail-row">
-                      <span className="label">Potential Payout:</span>
-                      <span className="value">{item.potentialPayout.toFixed(3)} ETH</span>
-                    </div>
-                    <div className="detail-row">
-                      <span className="label">Profit/Loss:</span>
-                      <span className={`value ${item.profit >= 0 ? 'profit' : 'loss'}`}>
-                        {item.profit >= 0 ? '+' : ''}{item.profit.toFixed(3)} ETH
-                      </span>
-                    </div>
-                    <div className="detail-row">
-                      <span className="label">Created:</span>
-                      <span className="value">{formatTime(item.createdAt)}</span>
-                    </div>
-                  </div>
-                </div>
+                ? 'Positions you are still holding will appear here.'
+                : activeTab === 'history'
+                  ? 'Once a market you backed resolves, it lands here with what it paid.'
+                  : 'Back a side on a market and it shows up here.'}
+            </div>
+          ) : (
+            <div className="pf-list">
+              <div className="pf-head" aria-hidden="true">
+                <span />
+                <span>Market</span>
+                <span>Stake</span>
+                <span>Result</span>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+
+              {filteredItems.map(item => {
+                const settled = item.status === 'won' || item.status === 'lost';
+                return (
+                  <div key={item.id} className="pf-row">
+                    {item.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img className="pf-thumb" src={item.imageUrl} alt="" />
+                    ) : (
+                      <span className="pf-thumb" />
+                    )}
+
+                    <div className="pf-main">
+                      <div className="pf-question">{item.question}</div>
+                      <div className="pf-sub">
+                        {item.category && (
+                          <span className="pf-category">{item.category}</span>
+                        )}
+                        <span className={`pf-side pf-side--${item.choice === 'YES' ? 'yes' : 'no'}`}>
+                          {item.choice}
+                        </span>
+                        <span className={`pf-status pf-status--${item.status}`}>
+                          {item.status}
+                        </span>
+                        <span className="pf-age">{timeAgo(item.createdAt)}</span>
+                      </div>
+                    </div>
+
+                    <div className="pf-figures">
+                      <div>
+                        <span className="pf-figure-label">Stake</span>
+                        <span className="pf-figure">{item.stakeAmount} ETH</span>
+                      </div>
+
+                      <div>
+                        <span className="pf-figure-label">
+                          {settled ? 'Result' : 'If it lands'}
+                        </span>
+                        {settled ? (
+                          <span
+                            className={`pf-figure ${item.profit >= 0 ? 'pf-figure--gain' : 'pf-figure--loss'}`}
+                          >
+                            {signed(item.profit)} ETH
+                          </span>
+                        ) : (
+                          <span className="pf-figure">
+                            {item.potentialPayout.toFixed(4)} ETH
+                            <span className="pf-figure-sub">if it lands</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
+    </>
   );
 }
