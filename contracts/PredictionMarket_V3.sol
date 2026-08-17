@@ -77,6 +77,10 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
         uint256 deadline;
         uint256 yesPool;
         uint256 noPool;
+        /// @notice Stake times its entry weight. Decides how the losing pool is
+        ///         split; the raw pools still decide odds and refunds.
+        uint256 weightedYesPool;
+        uint256 weightedNoPool;
         bool resolved;
         bool cancelled;
         bool outcome;
@@ -88,12 +92,17 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
         /// @notice Losers' pool net of fees, fixed at resolution. Claims read
         ///         this rather than recomputing from mutable fee rates.
         uint256 netLosersPool;
+        /// @notice Weighted pool of the winning side, fixed at resolution for
+        ///         the same reason netLosersPool is.
+        uint256 weightedWinnersPool;
         uint256 participantCount;
     }
 
     struct Position {
         uint256 yesAmount;
         uint256 noAmount;
+        uint256 weightedYes;
+        uint256 weightedNo;
         bool claimed;
     }
 
@@ -196,12 +205,18 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
 
         collateral.safeTransferFrom(msg.sender, address(this), amount);
 
+        uint256 weighted = (amount * weightBpsAt(predictionId, block.timestamp)) / BASIS_POINTS;
+
         if (isYes) {
             pos.yesAmount += amount;
             pred.yesPool += amount;
+            pos.weightedYes += weighted;
+            pred.weightedYesPool += weighted;
         } else {
             pos.noAmount += amount;
             pred.noPool += amount;
+            pos.weightedNo += weighted;
+            pred.weightedNoPool += weighted;
         }
 
         if (!isParticipant[predictionId][msg.sender]) {
@@ -303,6 +318,7 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
 
         // Fixed here, so later fee changes cannot alter what this market pays.
         pred.netLosersPool = losersPool - platformFeeAmount - creatorReward;
+        pred.weightedWinnersPool = outcome ? pred.weightedYesPool : pred.weightedNoPool;
 
         emit PredictionResolved(predictionId, outcome, platformFeeAmount, creatorReward, pred.netLosersPool);
     }
@@ -347,8 +363,12 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
         uint256 winningStake = pred.outcome ? pos.yesAmount : pos.noAmount;
         require(winningStake > 0, "No winning position");
 
-        uint256 winnersPool = pred.outcome ? pred.yesPool : pred.noPool;
-        uint256 payout = winningStake + (winningStake * pred.netLosersPool) / winnersPool;
+        uint256 weightedStake = pred.outcome ? pos.weightedYes : pos.weightedNo;
+        // Stake returns raw; only the share of the losing pool is weighted.
+        // Summed over winners the second term is exactly netLosersPool, minus
+        // integer dust that stays in the contract as it always has.
+        uint256 payout = winningStake
+            + (weightedStake * pred.netLosersPool) / pred.weightedWinnersPool;
 
         pos.claimed = true;
         collateral.safeTransfer(msg.sender, payout);

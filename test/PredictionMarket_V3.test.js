@@ -333,4 +333,85 @@ describe("PredictionMarket_V3", function () {
       );
     });
   });
+
+  describe("weighted payouts", function () {
+    it("pays an early backer more than a late one for the same stake", async function () {
+      const deadline = await openMarket(1, 4 * DAY);
+      const pred = await market.predictions(1);
+      const createdAt = Number(pred.createdAt);
+      const span = Number(pred.deadline) - createdAt;
+
+      // Alice enters in the first quarter, at x1.50.
+      await market.connect(alice).placeBet(1, true, usd(100));
+
+      // Bob enters three quarters of the way through, at x1.00.
+      await ethers.provider.send("evm_setNextBlockTimestamp", [
+        createdAt + Math.floor((span * 3) / 4),
+      ]);
+      await ethers.provider.send("evm_mine", []);
+      await market.connect(bob).placeBet(1, true, usd(100));
+
+      // Someone has to lose for there to be anything to split.
+      await token.mint(owner.address, usd(1000));
+      await token.connect(owner).approve(await market.getAddress(), usd(1000));
+      await market.connect(owner).placeBet(1, false, usd(200));
+
+      await warpPast(deadline);
+      await market.connect(resolver).resolvePrediction(1, true);
+
+      const aliceBefore = await token.balanceOf(alice.address);
+      const bobBefore = await token.balanceOf(bob.address);
+      await market.connect(alice).claimWinnings(1);
+      await market.connect(bob).claimWinnings(1);
+      const alicePaid = (await token.balanceOf(alice.address)) - aliceBefore;
+      const bobPaid = (await token.balanceOf(bob.address)) - bobBefore;
+
+      expect(alicePaid).to.be.gt(bobPaid);
+
+      // Both get their stake back; only the share of the losers differs, and
+      // Alice's share is 1.5x Bob's.
+      const aliceProfit = alicePaid - usd(100);
+      const bobProfit = bobPaid - usd(100);
+      expect(aliceProfit).to.equal((bobProfit * 15000n) / 10000n);
+    });
+
+    it("never pays a winner less than their stake", async function () {
+      const deadline = await openMarket(1, DAY);
+      await market.connect(alice).placeBet(1, true, usd(100));
+      await market.connect(bob).placeBet(1, false, usd(1));
+      await warpPast(deadline);
+      await market.connect(resolver).resolvePrediction(1, true);
+
+      const before = await token.balanceOf(alice.address);
+      await market.connect(alice).claimWinnings(1);
+      expect((await token.balanceOf(alice.address)) - before).to.be.gte(usd(100));
+    });
+
+    it("refunds the raw stake, never the weighted amount", async function () {
+      const deadline = await openMarket(1, DAY);
+      // First quarter, so the weight is 1.5x — the refund must ignore it.
+      await market.connect(alice).placeBet(1, true, usd(100));
+      await market.connect(resolver).cancelPrediction(1, "test");
+
+      const before = await token.balanceOf(alice.address);
+      await market.connect(alice).claimRefund(1);
+      expect((await token.balanceOf(alice.address)) - before).to.equal(usd(100));
+    });
+
+    it("does not let a later fee change alter a settled market", async function () {
+      const deadline = await openMarket(1, DAY);
+      await market.connect(alice).placeBet(1, true, usd(100));
+      await market.connect(bob).placeBet(1, false, usd(100));
+      await warpPast(deadline);
+      await market.connect(resolver).resolvePrediction(1, true);
+
+      await market.setPlatformFee(500);
+
+      const before = await token.balanceOf(alice.address);
+      await market.connect(alice).claimWinnings(1);
+      const paid = (await token.balanceOf(alice.address)) - before;
+      // 100 stake + 100 losers less the 1% + 0.5% charged at resolution.
+      expect(paid).to.equal(usd(100) + usd(100) - usd(1) - usd(0.5));
+    });
+  });
 });
