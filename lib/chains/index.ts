@@ -35,7 +35,7 @@ export const CHAINS: Record<ChainKey, ChainConfig> = {
       // because isWritableMarket compares the address a caller is about to
       // write to; a reachable address is not on its own permission to write.
       market: (process.env.NEXT_PUBLIC_BASE_V3_CONTRACT
-        || '0x4753685Af9b317db5690E036AeBD4337627A070E') as `0x${string}`,
+        || '0x5C4078BB24f352809B93FF395cA7655835D1CA4a') as `0x${string}`,
       swipeClaim: (process.env.NEXT_PUBLIC_SWIPE_CLAIM_CONTRACT || ZERO) as `0x${string}`,
     },
     stable: {

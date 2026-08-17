@@ -28,7 +28,7 @@ risk in every market.
 | Robinhood Chain | USDG (6 dec) `0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168` | V3 target, after Base |
 
 **V3 is live on Base.** `PredictionMarket_V3` is deployed and verified at
-[`0x4753685Af9b317db5690E036AeBD4337627A070E`](https://basescan.org/address/0x4753685Af9b317db5690E036AeBD4337627A070E),
+[`0x5C4078BB24f352809B93FF395cA7655835D1CA4a`](https://basescan.org/address/0x5C4078BB24f352809B93FF395cA7655835D1CA4a),
 collateralised in Base USDC, with platform fee 3%, creator fee 0.5%, early exit
 fee 5% and a minimum bet of 0.1 USDC, all confirmed on-chain.
 

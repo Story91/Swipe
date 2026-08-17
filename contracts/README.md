@@ -19,7 +19,7 @@ below.
 ## 🚀 V3: current generation
 
 Verified live on Base:
-[`0x4753...070E`](https://basescan.org/address/0x4753685Af9b317db5690E036AeBD4337627A070E#code).
+[`0x5C40...CA4a`](https://basescan.org/address/0x5C4078BB24f352809B93FF395cA7655835D1CA4a#code).
 Values below are read directly from that deployment, not just the source —
 the constructor defaults are lower and get overridden at deploy time by
 `scripts/deploy_v3.js`, which is the actual launch configuration.

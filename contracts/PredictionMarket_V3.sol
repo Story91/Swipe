@@ -11,28 +11,35 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  * @notice Parimutuel YES/NO prediction market collateralised by a 6-decimal
  *         stablecoin (USDC on Base, USDG on Robinhood Chain).
  *
- * Successor to PredictionMarket_USDC_DualPool. Every change from that contract
- * is a fix for a finding in
- * docs/superpowers/specs/2026-08-17-usdc-dualpool-security-audit.md:
+ * Backers stake on YES or NO. At the deadline a resolver settles the outcome and
+ * the winning side splits the losing pool in proportion to weighted stake, with
+ * fees taken from the losing pool only. The platform never holds a position, so
+ * a correct prediction always returns at least its stake.
  *
- *  1. No house-takes-all branch. A market with no winners becomes refundable
- *     instead of paying its entire pool to the platform, which removed the
- *     incentive for a resolver to settle dishonestly.
- *  2. rescueOrphanedUSDC is gone. It accepted a caller-supplied pool total and
- *     would transfer every user's stake to the owner if given zero. It existed
- *     only to mop up the leak in finding 5, which is now closed, so there is
- *     nothing to rescue.
- *  3. resolvePrediction requires the deadline to have passed.
- *  4. The winners' share is computed once at resolution and stored, so changing
- *     fee rates afterwards cannot alter payouts or overdraw other markets.
- *  5. exitEarly retains exactly what it does not pay out, tracked as fees.
+ * Design properties, each enforced here rather than by policy:
+ *
+ *  1. A market that nobody won is refundable to every backer. There is no branch
+ *     that pays a whole pool to the platform, so settling one way rather than
+ *     another is never worth anything to a resolver.
+ *  2. No administrative function can move a live stake. The owner can withdraw
+ *     accrued fees and recover unrelated tokens sent here by mistake, and that
+ *     is the whole of it.
+ *  3. Settlement requires the deadline to have passed.
+ *  4. The winners' share is computed once at settlement and stored, so a later
+ *     fee change cannot alter what an already-settled market pays.
+ *  5. An early exit retains exactly what it does not pay out, booked as fees, so
+ *     no balance is ever untracked.
  *  6. SafeERC20 throughout.
- *  7. A permissionless refund path opens once a market is long past its
- *     deadline and still unresolved, so stakes never depend on one key staying
- *     available. The predecessor's owner key was lost and 33.7M SWIPE in the
- *     sibling V2 contract is stranded because of exactly this.
- *  8. Resolvers are a separate, revocable role from the owner, so automation
- *     runs on a narrow hot key while ownership stays cold.
+ *  7. Once a market is long past its deadline and still unsettled, anyone at all
+ *     can open refunds. Stakes never depend on one key staying available.
+ *  8. Settling is a separate, revocable role from ownership, so automation runs
+ *     on a narrow hot key while ownership stays cold. Ownership itself transfers
+ *     in two steps.
+ *
+ * Stake weighting: a bet's weight is fixed when it is placed, by which quarter of
+ * the market's lifetime it lands in, and decides only how the losing pool is
+ * divided. Stake is always returned raw, and every refund path returns the raw
+ * amount.
  */
 contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -43,8 +50,8 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
     uint256 public constant MIN_BET_FLOOR = 100000; // 0.1 token at 6 decimals
 
     /// @notice How long after the deadline an unresolved market becomes
-    ///         refundable to anyone who asks. Long enough for honest operational
-    ///         delay, short enough that funds are never stranded for good.
+    ///         refundable to anyone who asks. Long enough to absorb ordinary
+    ///         operational delay, short enough to be a real guarantee.
     uint256 public constant REFUND_GRACE_PERIOD = 30 days;
 
     /// @notice Stake weight by how early in a market's life the bet was placed.
@@ -170,8 +177,8 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
             predictionIds.length == creators.length && creators.length == deadlines.length,
             "Length mismatch"
         );
-        // Reverts on any invalid entry rather than skipping it: the predecessor
-        // silently skipped, making a partial batch indistinguishable from success.
+        // Reverts on any invalid entry rather than skipping it. Skipping would
+        // make a partial batch indistinguishable from a complete one.
         for (uint256 i = 0; i < predictionIds.length; i++) {
             _register(predictionIds[i], creators[i], deadlines[i]);
         }
@@ -230,10 +237,10 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
 
     /**
      * @notice Sell part of a position back before the deadline.
-     * @dev The pool loses the full notional and the contract pays out netValue;
-     *      the difference is retained and booked as platform fees. The
-     *      predecessor left that difference untracked, which is what created
-     *      "orphaned" balances and the drain function written to collect them.
+     * @dev The pool loses the full notional and the contract pays out netValue.
+     *      The difference is retained and booked as platform fees in the same
+     *      transaction, so the contract's balance is always fully accounted for
+     *      and no residue accumulates outside the fee ledger.
      */
     function exitEarly(
         uint256 predictionId,
@@ -316,7 +323,7 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
         require(!pred.resolved, "Already resolved");
         require(!pred.cancelled, "Prediction cancelled");
         require(!pred.refundable, "Prediction refundable");
-        // The predecessor allowed settlement while betting was still open.
+        // Betting must be closed before an outcome can be recorded.
         require(block.timestamp >= pred.deadline, "Deadline not reached");
 
         uint256 winnersPool = outcome ? pred.yesPool : pred.noPool;
@@ -327,9 +334,10 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
         pred.resolvedAt = block.timestamp;
 
         if (winnersPool == 0) {
-            // Nobody backed the winning side. The predecessor handed the entire
-            // losing pool to the platform, which paid a resolver ~99.5% of every
-            // pool for choosing the empty side. Everyone gets their stake back.
+            // Nobody backed the winning side, so there is no one to pay and
+            // nothing to divide. Every backer gets their stake back, and the
+            // platform takes nothing. This is why the outcome a resolver picks
+            // is never worth anything to the platform.
             pred.refundable = true;
             emit PredictionRefundable(predictionId, "No winners");
             emit PredictionResolved(predictionId, outcome, 0, 0, 0);
@@ -363,10 +371,10 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
     }
 
     /**
-     * @notice Open refunds on a market abandoned past the grace period.
-     * @dev Callable by anyone on purpose. If the resolver keys are lost, this is
-     *      what stops stakes being stranded for good — the failure mode that
-     *      permanently locked 33.7M SWIPE in the sibling V2 contract.
+     * @notice Open refunds on a market left unsettled past the grace period.
+     * @dev Callable by anyone on purpose. Whatever the reason a market went
+     *      unsettled, backers can recover their stakes without needing any
+     *      privileged party to still be around.
      */
     function enableRefundsAfterGrace(uint256 predictionId) external predictionExists(predictionId) {
         Prediction storage pred = predictions[predictionId];

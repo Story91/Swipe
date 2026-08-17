@@ -66,7 +66,7 @@ a longer-term governance plan here yet either. More on this later.
 
 ### 💰 Economic model (V3, the live generation)
 Verified directly against the deployed contract on Base
-([`0x4753...070E`](https://basescan.org/address/0x4753685Af9b317db5690E036AeBD4337627A070E#code)),
+([`0x5C40...CA4a`](https://basescan.org/address/0x5C4078BB24f352809B93FF395cA7655835D1CA4a#code)),
 not just the source:
 - **Parimutuel pools** — YES/NO stakes settle from the losing side's pool;
   there's no fixed payout table

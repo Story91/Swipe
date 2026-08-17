@@ -5,7 +5,7 @@ import { useOpenUrl } from '@coinbase/onchainkit/minikit';
 import sdk from '@farcaster/miniapp-sdk';
 import './Manifesto.css';
 
-const V3_ADDRESS = '0x4753685Af9b317db5690E036AeBD4337627A070E';
+const V3_ADDRESS = '0x5C4078BB24f352809B93FF395cA7655835D1CA4a';
 
 /**
  * One worked settlement, carried through the whole page.
