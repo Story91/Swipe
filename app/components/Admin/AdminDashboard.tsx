@@ -5,6 +5,7 @@ import { useReadContract, usePublicClient, useWriteContract } from 'wagmi';
 import { CONTRACTS, getV2Contract, USDC_DUALPOOL_CONTRACT_ADDRESS, USDC_DUALPOOL_ABI } from '../../../lib/contract';
 import { useAdminPredictions } from '../../../lib/hooks/useAdminPredictions';
 import { useAdminRequest } from '../../../lib/auth/useAdminRequest';
+import { marketNumber } from '@/lib/marketId';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 
 interface Prediction {
@@ -312,14 +313,13 @@ export function AdminDashboard({
     const side = outcome ? 'YES' : 'NO';
     
     // Extract numeric ID
-    let numericId: number | null = null;
-    if (typeof predictionId === 'string' && predictionId.startsWith('pred_v2_')) {
-      numericId = parseInt(predictionId.replace('pred_v2_', ''));
-    } else if (typeof predictionId === 'number') {
-      numericId = predictionId;
-    }
+    // Reads every generation rather than v2 only, and returns null instead of a
+    // fallback for an id it cannot read. A pred_v3_ id used to fall straight
+    // through this block as null, so the admin path silently ignored it.
+    const numericId: number | null = marketNumber(predictionId);
     
-    if (!numericId || isNaN(numericId)) {
+    // `!numericId` rejected market 0, which is a real on-chain id.
+    if (numericId === null) {
       alert('❌ Invalid prediction ID for USDC contract');
       return;
     }
@@ -371,14 +371,13 @@ export function AdminDashboard({
   // Register prediction on USDC DualPool contract
   const handleRegisterUsdc = async (predictionId: string | number) => {
     // Extract numeric ID
-    let numericId: number | null = null;
-    if (typeof predictionId === 'string' && predictionId.startsWith('pred_v2_')) {
-      numericId = parseInt(predictionId.replace('pred_v2_', ''));
-    } else if (typeof predictionId === 'number') {
-      numericId = predictionId;
-    }
+    // Reads every generation rather than v2 only, and returns null instead of a
+    // fallback for an id it cannot read. A pred_v3_ id used to fall straight
+    // through this block as null, so the admin path silently ignored it.
+    const numericId: number | null = marketNumber(predictionId);
     
-    if (!numericId || isNaN(numericId)) {
+    // `!numericId` rejected market 0, which is a real on-chain id.
+    if (numericId === null) {
       alert('❌ Invalid prediction ID for USDC registration');
       return;
     }
@@ -550,7 +549,8 @@ export function AdminDashboard({
       // For numeric IDs, we can't determine version, so default to V2
     }
     
-    if (!numericId || isNaN(numericId)) {
+    // `!numericId` rejected market 0, which is a real on-chain id.
+    if (numericId === null) {
       alert('❌ Invalid prediction ID for contract transaction');
       return;
     }

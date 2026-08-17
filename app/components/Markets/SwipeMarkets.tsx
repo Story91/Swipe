@@ -31,6 +31,7 @@ import { useHybridPredictions } from '../../../lib/hooks/useHybridPredictions';
 import { useAccount, useWriteContract, useReadContract, useWaitForTransactionReceipt } from 'wagmi';
 import { isWritableMarket } from '@/lib/chains';
 import { useActiveChain } from '@/lib/chains/activeChain';
+import { parseMarketId, marketNumber } from '@/lib/marketId';
 import { parseUnits, formatUnits } from 'viem';
 import { 
   USDC_DUALPOOL_ABI, 
@@ -136,17 +137,21 @@ function MarketCard({
   const [priceHistory, setPriceHistory] = useState<PricePoint[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   
-  // Get numeric ID for contract calls
-  const numericId = parseInt(predictionId.replace('pred_v2_', '').replace('pred_v1_', '').replace('pred_', ''), 10);
-  
+  // The market number the contract knows, or null when this record's id cannot
+  // be read. Null disables every on-chain call below rather than substituting a
+  // number: this used to strip prefixes by hand in four places that disagreed,
+  // and one of them fell back to market 0.
+  const marketRef = parseMarketId(predictionId);
+  const numericId = marketRef?.numericId ?? null;
+
   // Fetch user's position in this market
   const { data: userPositionData } = useReadContract({
     address: USDC_DUALPOOL_CONTRACT_ADDRESS as `0x${string}`,
     abi: USDC_DUALPOOL_ABI,
     functionName: 'getPosition',
-    args: address && !isNaN(numericId) ? [BigInt(numericId), address] : undefined,
+    args: address && numericId !== null ? [BigInt(numericId), address] : undefined,
     query: {
-      enabled: !!address && !isNaN(numericId)
+      enabled: !!address && numericId !== null
     }
   });
   
@@ -173,9 +178,9 @@ function MarketCard({
     address: USDC_DUALPOOL_CONTRACT_ADDRESS as `0x${string}`,
     abi: USDC_DUALPOOL_ABI,
     functionName: 'calculateExitValue',
-    args: hasPosition && positionSide ? [BigInt(numericId), positionSide === 'yes', positionAmount] : undefined,
+    args: hasPosition && positionSide && numericId !== null ? [BigInt(numericId), positionSide === 'yes', positionAmount] : undefined,
     query: {
-      enabled: !!hasPosition && !!positionSide && positionAmount > BigInt(0)
+      enabled: !!hasPosition && !!positionSide && positionAmount > BigInt(0) && numericId !== null
     }
   });
   
@@ -549,7 +554,7 @@ function MarketCard({
                     {positionSide.toUpperCase()}
                   </strong> ${(Number(positionAmount) / 1e6).toFixed(2)}</span>
                 </div>
-                {exitNetValue > BigInt(0) ? (
+                {exitNetValue > BigInt(0) && numericId !== null ? (
                   <button
                     className="early-exit-btn"
                     onClick={() => onEarlyExit?.(predictionId, numericId, positionSide === 'yes', positionAmount, exitNetValue, exitFee, title)}
@@ -782,8 +787,11 @@ export default function SwipeMarkets() {
       
       // Sync USDC data to Redis and save price history after successful bet with retry logic
       const syncUSDCAndHistory = async () => {
-        const numericId = parseInt(betModal.predictionId.replace('pred_v2_', ''), 10);
-        if (isNaN(numericId)) return;
+        // One parse, and it carries the canonical id so the price-history POST
+        // below cannot rebuild a v2 prefix for a v1 market.
+        const ref = parseMarketId(betModal.predictionId);
+        if (!ref) return;
+        const numericId = ref.numericId;
         
         // Wait for blockchain propagation
         console.log('⏳ Waiting 2s for blockchain propagation after stake...');
@@ -960,7 +968,11 @@ export default function SwipeMarkets() {
       // Sync USDC pools to Redis after early exit with retry logic
       const syncUSDCAfterExit = async () => {
         const numericId = exitModal.numericId;
-        if (!numericId) return;
+        // `!numericId` rejected market 0, which is a real on-chain id.
+        if (numericId === null || numericId === undefined) return;
+        // The canonical Redis id for the price-history POST below. Rebuilding it
+        // as `pred_v2_${n}` sent a v1 market's history into a v2 market's key.
+        const exitRef = parseMarketId(exitModal.predictionId);
         
         // Wait for blockchain propagation
         console.log('⏳ Waiting 2s for blockchain propagation after exit...');
@@ -986,11 +998,11 @@ export default function SwipeMarkets() {
               console.log('✅ USDC pools synced to Redis after early exit');
               
               // Save price history point to update chart (may go back to 50/50)
-              if (result?.registered) {
+              if (result?.registered && exitRef) {
                 const yesPool = (result.yesPool || 0) * 1e6;
                 const noPool = (result.noPool || 0) * 1e6;
-                
-                await fetch(`/api/predictions/pred_v2_${numericId}/price-history`, {
+
+                await fetch(`/api/predictions/${exitRef.redisId}/price-history`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
@@ -1077,10 +1089,13 @@ export default function SwipeMarkets() {
         if (pred.deadline && pred.deadline < Date.now() / 1000) return false;
         return true;
       })
+      // A record whose id cannot be read is dropped rather than rendered with a
+      // substituted number. The old `|| 0` turned every pred_v1_ record into
+      // market 0 and handed that to placeBet, so the user bet on a market they
+      // never saw.
+      .filter(pred => marketNumber(pred.id) !== null)
       .map(pred => ({
-        id: typeof pred.id === 'string' 
-          ? parseInt(pred.id.replace('pred_v2_', ''), 10) || 0
-          : pred.id,
+        id: marketNumber(pred.id) as number,
         predictionId: pred.id,
         title: pred.question,
         description: pred.description,
