@@ -238,12 +238,20 @@ export function MarketGrid() {
     const all = predictions ?? [];
     const open = all.filter((p) => isOpen(p, now));
 
+    // A settled market nobody bet on has nothing to show: no pool, no players,
+    // no result worth reading. Those were filling the grid with empty tiles, so
+    // they are dropped from the settled and combined views. Open markets are
+    // never dropped for having no players yet - having none is what an open
+    // market with room in it looks like.
+    const worthShowing = (p: HybridPrediction) =>
+      !(p.resolved || p.cancelled) || (p.participants?.length ?? 0) > 0;
+
     const list =
       filter === "open"
         ? open
         : filter === "resolved"
-          ? all.filter((p) => p.resolved || p.cancelled)
-          : all;
+          ? all.filter((p) => (p.resolved || p.cancelled) && worthShowing(p))
+          : all.filter(worthShowing);
 
     // Open markets read best soonest-first; settled ones most-recent-first.
     const sorted = [...list].sort((a, b) =>

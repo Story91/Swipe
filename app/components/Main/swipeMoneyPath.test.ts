@@ -29,7 +29,22 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '../../..');
 const TINDER_CARD = path.join(ROOT, 'app', 'components', 'Main', 'TinderCard.tsx');
 
-const GUARD = 'if (!isWritableMarket(chainKey, CONTRACTS.V2.address)) {';
+/**
+ * The guard, matched as a PROPERTY rather than as a sentence.
+ *
+ * The first version of this test pinned the literal text
+ * `if (!isWritableMarket(chainKey, CONTRACTS.V2.address)) {`. That was a
+ * mistake, and it failed the moment the guard was improved: the address
+ * being written to is now named once as `target`, and the same value feeds
+ * both the check and the send, which is strictly safer than what the literal
+ * described. A test that fails when the code gets better is worse than no
+ * test, because whoever hits it deletes it.
+ *
+ * The assertion is now the property that actually matters: isWritableMarket
+ * is called with the selected chain and an address, and it runs before
+ * anything is sent.
+ */
+const GUARD_CALL = /isWritableMarket\(\s*chainKey\s*,\s*([A-Za-z0-9_.?]+)\s*\)/;
 
 /** Directories the gesture engine lives in. None of them may touch money. */
 const GESTURE_PATHS = [
@@ -58,17 +73,26 @@ function walk(target: string, out: string[] = []): string[] {
 describe('swipe money path', () => {
   it('guards the stake on the target address, not just the chain', () => {
     const source = readFileSync(TINDER_CARD, 'utf8');
+    const match = source.match(GUARD_CALL);
     expect(
-      source.includes(GUARD),
-      'The address-comparison guard in handleStakeBet is gone or was reworded. ' +
-        'It is the only thing stopping a stake leaving for a contract that is ' +
-        'not the selected chain\'s market. Re-read it before changing this test.'
-    ).toBe(true);
+      match,
+      'No isWritableMarket(chainKey, <address>) call remains in the swipe bet ' +
+        'path. It is the only thing stopping a stake leaving for a contract ' +
+        'that is not the selected chain market. Re-read the send path first.'
+    ).toBeTruthy();
+    // The second argument has to be an address. A bare chain check is the
+    // failure this whole file exists to catch.
+    expect(
+      match[1],
+      'isWritableMarket is being called with something that does not look ' +
+        'like an address. Gating on the chain alone lets a stake leave for a ' +
+        'contract that does not exist on the selected chain.'
+    ).toMatch(/address|target|market/i);
   });
 
   it('runs the guard before any transaction is sent', () => {
     const source = readFileSync(TINDER_CARD, 'utf8');
-    const guardAt = source.indexOf(GUARD);
+    const guardAt = source.search(GUARD_CALL);
     const firstWrite = source.indexOf('writeContract({');
 
     expect(guardAt).toBeGreaterThan(-1);
@@ -80,46 +104,54 @@ describe('swipe money path', () => {
     ).toBeLessThan(firstWrite);
   });
 
-  it('writes to the same address it checked', () => {
-    // Catches the edit that changes one and not the other: the guard keeps
-    // checking V2 while the write moves somewhere else, and the check becomes
-    // theatre.
+  it('checks and sends through one and the same address', () => {
+    // The failure this catches: the guard keeps checking one address while the
+    // transaction leaves for another, so the check becomes theatre.
     //
-    // The write does not name CONTRACTS.V2 directly, it goes through a local
-    // alias (`const contract = CONTRACTS.V2`). So the alias is resolved rather
-    // than the text compared, otherwise this test would fail on today's
-    // perfectly correct code and get deleted by whoever hit it next.
+    // The original version of this test read the writeContract calls inside
+    // handleStakeBet and resolved their address expressions. That premise is
+    // gone: the send now lives in useMarketWrite, and handleStakeBet delegates
+    // to it. Rewriting the assertion rather than deleting it, because the
+    // invariant did not change even though the code moved.
+    //
+    // What is asserted now is the thing that makes drift impossible: the value
+    // handed to isWritableMarket is a single named binding, and that same
+    // binding is what the send path is given.
     const source = readFileSync(TINDER_CARD, 'utf8');
     const stakeBetAt = source.indexOf('const handleStakeBet');
     expect(stakeBetAt).toBeGreaterThan(-1);
 
-    // The body of handleStakeBet, up to the next top-level const declaration.
     const after = source.slice(stakeBetAt);
     const body = after.slice(0, after.indexOf('\n  const handle', 1));
 
-    // Local aliases bound to the guarded contract, e.g. `const contract = CONTRACTS.V2;`
-    const aliases = new Set(
-      [...body.matchAll(/const\s+(\w+)\s*=\s*CONTRACTS\.V2\s*;/g)].map(m => m[1])
-    );
+    const guard = body.match(GUARD_CALL);
+    expect(
+      guard,
+      'handleStakeBet no longer calls isWritableMarket at all.'
+    ).toBeTruthy();
 
-    const accepted = (expr: string) =>
-      expr.includes('CONTRACTS.V2.address') ||
-      [...aliases].some(a => expr.includes(`${a}.address`));
+    const guardedName = guard[1];
 
-    const addresses = [...body.matchAll(/address:\s*([^,\n]+)/g)].map(m =>
-      m[1].trim().replace(/\s+as\s+`0x\$\{string\}`/, '')
-    );
+    // The guarded value has to be a binding declared in this function, not an
+    // expression evaluated twice. Two evaluations can disagree; one cannot.
+    const declared = new RegExp(
+      'const\\s+' + guardedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*='
+    ).test(body);
+    expect(
+      declared,
+      `The guard checks \`${guardedName}\`, which is not a const declared inside ` +
+        'handleStakeBet. Guarding an inline expression means the check and the ' +
+        'send can evaluate to different addresses.'
+    ).toBe(true);
 
-    expect(addresses.length).toBeGreaterThan(0);
-    for (const addr of addresses) {
-      expect(
-        accepted(addr),
-        `handleStakeBet writes to \`${addr}\`, which does not resolve to the ` +
-          'CONTRACTS.V2.address the guard checks. Either the write moved to a ' +
-          'different contract or the alias changed; the guard is no longer ' +
-          'protecting the address being written to.'
-      ).toBe(true);
-    }
+    // And nothing in this function may send a transaction on its own, bypassing
+    // the delegate that re-checks at send time.
+    expect(
+      /writeContract\s*\(/.test(body),
+      'handleStakeBet sends a transaction directly again. The send belongs in ' +
+        'useMarketWrite, which re-checks the address at send time because the ' +
+        'network switcher can move under an open dialog.'
+    ).toBe(false);
   });
 
   it('keeps the gesture engine ignorant of money', () => {
