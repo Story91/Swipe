@@ -759,10 +759,18 @@ describe("PredictionMarket_V3", function () {
       await warpPast(deadline);
       await market.connect(resolver).resolvePrediction(1, false);
 
+      const aliceBefore = await token.balanceOf(alice.address);
+      const bobBefore = await token.balanceOf(bob.address);
       await market.connect(alice).claimRefund(1);
       await market.connect(bob).claimRefund(1);
 
-      // Both got exactly their stakes; the bond went to fees, not to them.
+      // The refunds themselves — the claim this test's name makes. Without
+      // these it only checked where the bond went, never what the players got,
+      // and a claimRefund that underpaid every claimant passed it silently.
+      expect((await token.balanceOf(alice.address)) - aliceBefore).to.equal(usd(100));
+      expect((await token.balanceOf(bob.address)) - bobBefore).to.equal(usd(50));
+
+      // ...and the bond went to fees rather than coming out of those refunds.
       expect(await market.platformFeeBalance()).to.equal(usd(10));
     });
   });
