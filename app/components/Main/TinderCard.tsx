@@ -1,12 +1,14 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef, forwardRef, useImperativeHandle } from 'react';
 import TinderCard from 'react-tinder-card';
 import { useAccount, useWriteContract, useReadContract, useWaitForTransactionReceipt } from "wagmi";
-import { ethers } from 'ethers';
-import { CONTRACTS, SWIPE_TOKEN, getV2Contract, getContractForAction } from '../../../lib/contract';
-import { calculateApprovalAmount } from '../../../lib/constants/approval';
+import { parseUnits, formatUnits } from 'viem';
+import { CONTRACTS } from '../../../lib/contract';
 import { useAdminRequest } from '../../../lib/auth/useAdminRequest';
 import { isWritableMarket } from '@/lib/chains';
 import { useActiveChain } from '@/lib/chains/activeChain';
+import { useMarketWrite } from '@/lib/chains/useMarketWrite';
+import { txUrl } from '@/lib/chains/market';
+import { marketNumber, parseMarketId } from '@/lib/marketId';
 import { useViewProfile, useComposeCast, useMiniKit, useViewCast, useOpenUrl } from '@coinbase/onchainkit/minikit';
 import sdk from '@farcaster/miniapp-sdk';
 import './TinderCard.css';
@@ -18,7 +20,6 @@ import { useHybridPredictions } from '../../../lib/hooks/useHybridPredictions';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -29,7 +30,7 @@ import { useFarcasterProfiles } from '../../../lib/hooks/useFarcasterProfiles';
 import SharePredictionButton from '../Actions/SharePredictionButton';
 import { buildStakeShareText, buildCurrentPredictionShareText } from '../../../lib/constants/share-texts';
 import { notifyPredictionShared, notifyStakeSuccess } from '../../../lib/notification-helpers';
-import { generateTransactionId, generateBasescanUrl } from '../../../lib/utils/redis-utils';
+import { generateTransactionId } from '../../../lib/utils/redis-utils';
 import { useTokenPrices } from '../../../lib/hooks/useTokenPrices';
 import { Bot, Loader2, Sparkles, X, TrendingUp, TrendingDown, AlertTriangle, DollarSign, Coins, PieChart, ArrowUpRight, ArrowDownRight, Info, Zap, Target, Award, Wallet, Calculator } from 'lucide-react';
 import ElectricBorder from '@/components/ElectricBorder';
@@ -38,8 +39,51 @@ import GradientText from '@/components/GradientText';
 import TextType from '@/components/TextType';
 import { SharePreviewModal } from '../Modals/SharePreviewModal';
 
+// Just the two entry points the collateral needs. Kept minimal on purpose: the
+// spender and the token address are never literals here, they come from
+// marketWrite.market, so this ABI can be reused on any chain's collateral.
+const ERC20_ABI = [
+  {
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'amount', type: 'uint256' }
+    ],
+    name: 'approve',
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'spender', type: 'address' }
+    ],
+    name: 'allowance',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: 'account', type: 'address' }],
+    name: 'balanceOf',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  }
+] as const;
+
 interface PredictionData {
   id: number;
+  /**
+   * The canonical Redis id this card came from, e.g. `pred_v3_2`.
+   *
+   * `id` alone is the market number, which is unique only within a contract
+   * generation: `pred_v2_2` and `pred_v3_2` are two different markets that both
+   * reduce to 2. The bet path re-reads this string and refuses when it cannot be
+   * parsed, rather than betting on whatever market carries that number on the
+   * live contract.
+   */
+  redisId?: string;
   title: string;
   image: string;
   prediction: string;
@@ -151,18 +195,22 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   // Ref for TinderCard to restore card if stake is cancelled
   const tinderCardRef = useRef<TinderCardAPI>(null);
   const [internalActiveDashboard, setInternalActiveDashboard] = useState<DashboardType>('tinder');
+  // One market, one collateral. The ETH/SWIPE selector is gone with the archived
+  // V2 pool: V3 takes an ERC-20 amount and has no payable function at all, so
+  // there is nothing left to choose between. `redisId` travels with the number
+  // so the send can re-derive the market instead of trusting a bare integer.
   const [stakeModal, setStakeModal] = useState<{
     isOpen: boolean;
     predictionId: number;
+    redisId: string;
     isYes: boolean;
     stakeAmount: string;
-    selectedToken: 'ETH' | 'SWIPE';
   }>({
     isOpen: false,
     predictionId: 0,
+    redisId: '',
     isYes: true,
-    stakeAmount: '0.001',
-    selectedToken: 'ETH'
+    stakeAmount: '1'
   });
 
   // Track user actions for feedback.
@@ -183,20 +231,25 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   // Show share prompt after successful stake
   const [showSharePrompt, setShowSharePrompt] = useState(false);
   const [lastStakedPrediction, setLastStakedPrediction] = useState<PredictionData | null>(null);
-  // Store stake details for sharing (separate from transaction tracking to avoid reset issues)
+  // Store stake details for sharing (separate from transaction tracking to avoid reset issues).
+  // `token` is the collateral symbol of the chain the bet was signed on, USDC on
+  // Base and USDG on Robinhood, not a choice the user made.
   const [shareStakeData, setShareStakeData] = useState<{
     amount: number;
-    token: 'ETH' | 'SWIPE';
+    token: string;
     isYes: boolean;
   } | null>(null);
-  
+
   // State for tracking stake transactions
   const [stakeTransactionHash, setStakeTransactionHash] = useState<`0x${string}` | null>(null);
   const [stakePredictionId, setStakePredictionId] = useState<number | null>(null);
+  // The canonical Redis id of the market that was bet on, captured at send time.
+  // The bookkeeping below writes under this instead of rebuilding `pred_v2_${n}`,
+  // which filed every V3 bet under an archived market's key.
+  const [stakeRedisId, setStakeRedisId] = useState<string | null>(null);
   const [stakeAmount, setStakeAmount] = useState<number | null>(null);
-  const [stakeToken, setStakeToken] = useState<'ETH' | 'SWIPE' | null>(null);
+  const [stakeToken, setStakeToken] = useState<string | null>(null);
   const [stakeIsYes, setStakeIsYes] = useState<boolean | null>(null);
-  const [ethInputMode, setEthInputMode] = useState<'eth' | 'usd'>('eth');
   
   // AI Analysis Modal State
   const [aiModal, setAiModal] = useState<{
@@ -224,7 +277,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     shareUrl: string;
     stakeInfo?: {
       amount: number;
-      token: 'ETH' | 'SWIPE';
+      token: string;
       isYes: boolean;
     };
   }>({
@@ -258,6 +311,12 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   const { chainKey } = useActiveChain();
   // Signs each admin action; the server verifies it rather than trusting the UI.
   const signAdminRequest = useAdminRequest();
+  // Every bet and every approval leaves through this. It resolves address, ABI,
+  // chain id and collateral from one chainKey, re-checks isWritableMarket at send
+  // time, moves the wallet onto the matching chain and pins chainId. The bare
+  // useWriteContract below is what the admin and claim paths still use against
+  // the archived contracts; it must not be used for a bet.
+  const marketWrite = useMarketWrite();
   const { writeContract } = useWriteContract();
   const { composeCast: minikitComposeCast } = useComposeCast();
   const { context } = useMiniKit();
@@ -414,7 +473,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   }, [viewCast, openUrl]);
   
   // Token prices for USD conversion
-  const { formatUsdValue, getUsdValue } = useTokenPrices();
+  const { formatUsdValue } = useTokenPrices();
 
   // State for category filtering
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -430,24 +489,6 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     return amount.toLocaleString();
   };
 
-  const formatEthAmount = (amount: number): string => {
-    if (!Number.isFinite(amount)) return '0';
-    const fixed = amount.toFixed(6);
-    return fixed.replace(/\.?0+$/, '');
-  };
-
-  const formatTokenAmount = (amount: number, token: 'ETH' | 'SWIPE'): string => {
-    return token === 'ETH' ? formatEthAmount(amount) : formatSwipeAmount(amount);
-  };
-
-  const formatUsdValueLocal = (amount: number, token: 'ETH' | 'SWIPE'): string | null => {
-    const usdValue = getUsdValue(amount, token);
-    if (usdValue === null || !Number.isFinite(usdValue)) return null;
-    if (usdValue < 0.01) return usdValue.toFixed(4);
-    if (usdValue < 1) return usdValue.toFixed(3);
-    return usdValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
-  
   // Wait for stake transaction confirmation
   const { isLoading: isStakeConfirming, isSuccess: isStakeConfirmed, isError: isStakeError } = useWaitForTransactionReceipt({
     hash: stakeTransactionHash || undefined,
@@ -482,36 +523,58 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     }
   }, [stakeTransactionHash]);
   
-  // Check SWIPE allowance for user
-  const { data: swipeAllowance, refetch: refetchAllowance } = useReadContract({
-    address: SWIPE_TOKEN.address as `0x${string}`,
-    abi: [
-      {
-        "inputs": [{"name": "owner", "type": "address"}, {"name": "spender", "type": "address"}],
-        "name": "allowance",
-        "outputs": [{"name": "", "type": "uint256"}],
-        "stateMutability": "view",
-        "type": "function"
-      }
-    ],
-    functionName: 'allowance',
-    args: address ? [address as `0x${string}`, CONTRACTS.V2.address as `0x${string}`] : undefined,
+  // How much collateral the user holds, on whichever chain is selected. Read
+  // against marketWrite.market.collateral rather than a Base USDC literal: USDC
+  // and USDG share 6 decimals and differ in address, so a literal reads a
+  // nonexistent token on the other chain and reports a confident zero.
+  const { data: collateralBalance } = useReadContract({
+    address: marketWrite.market?.collateral.address,
+    abi: ERC20_ABI,
+    functionName: 'balanceOf',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address && !!marketWrite.market }
   });
 
-  // Debug log
-  useEffect(() => {
-    if (swipeAllowance !== undefined) {
-      console.log('=== SWIPE ALLOWANCE DEBUG ===');
-      console.log('Raw allowance:', swipeAllowance);
-      console.log('Allowance type:', typeof swipeAllowance);
-      console.log('Allowance string:', swipeAllowance.toString());
-      console.log('User address:', address);
-      console.log('Spender (V2 contract):', CONTRACTS.V2.address);
-      console.log('=============================');
-    } else {
-      console.log('SWIPE Allowance is undefined');
-    }
-  }, [swipeAllowance, address]);
+  // Allowance against the contract that will actually pull the tokens. Reading
+  // it against one address while approving another gives a needsApproval that
+  // never clears.
+  const { data: collateralAllowance, refetch: refetchAllowance } = useReadContract({
+    address: marketWrite.market?.collateral.address,
+    abi: ERC20_ABI,
+    functionName: 'allowance',
+    args: address && marketWrite.market ? [address, marketWrite.market.address] : undefined,
+    query: { enabled: !!address && !!marketWrite.market }
+  });
+
+  // getFeeConfig() returns (platformFee, creatorFee, earlyExitFee, minBet), all
+  // live values. The minimum and the fee are both settable by the owner, and the
+  // contract's constructor defaults are not the launch rates, so both are read
+  // rather than written down here.
+  const { data: feeConfig } = useReadContract({
+    address: marketWrite.market?.address,
+    abi: marketWrite.market?.abi,
+    functionName: 'getFeeConfig',
+    query: { enabled: !!marketWrite.market }
+  });
+
+  // MIN_BET_FLOOR in PredictionMarket_V3.sol: 100000 units, 0.1 token at 6
+  // decimals. Used only until getFeeConfig answers. It is the value minBet can
+  // never go below, so a bet the UI accepts on this basis and the contract then
+  // rejects is the worst case, and it costs a revert rather than a refusal on a
+  // bet that was actually legal.
+  const MIN_BET_FLOOR = BigInt(100000);
+  const minBetUnits = feeConfig ? (feeConfig as readonly bigint[])[3] : MIN_BET_FLOOR;
+  const platformFeeBps = feeConfig ? Number((feeConfig as readonly bigint[])[0]) : 0;
+  const creatorFeeBps = feeConfig ? Number((feeConfig as readonly bigint[])[1]) : 0;
+
+  // Labels for the dialog. The symbol is the chain's, never the string 'USDC'.
+  const collateralDecimals = marketWrite.market?.collateral.decimals ?? 6;
+  const collateralSymbol = marketWrite.market?.collateral.symbol ?? '';
+  const minBetDisplay = formatUnits(minBetUnits, collateralDecimals);
+  const formattedCollateralBalance = collateralBalance !== undefined
+    ? parseFloat(formatUnits(collateralBalance as bigint, collateralDecimals)).toFixed(2)
+    : '0.00';
+
   const [isTransactionLoading, setIsTransactionLoading] = useState(false);
   const viewProfile = useViewProfile();
 
@@ -559,9 +622,10 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   // Auto-refresh was causing unnecessary flickering and API calls
 
 
-  // Auto-refresh SWIPE allowance when modal is open and using SWIPE
+  // Auto-refresh the collateral allowance while the stake dialog is open, so the
+  // button flips from "Approve & bet" to "Confirm bet" without a reload.
   useEffect(() => {
-    if (stakeModal.isOpen && stakeModal.selectedToken === 'SWIPE' && !isTransactionLoading) {
+    if (stakeModal.isOpen && !isTransactionLoading) {
       // 3s rather than 1s: this is an RPC read per tick, running for as long as
       // the modal sits open. An approval takes seconds to land and nobody
       // perceives the difference, so this is two thirds fewer calls for free.
@@ -570,18 +634,10 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
           await refetchAllowance();
         }
       }, 3000);
-      
+
       return () => clearInterval(interval);
     }
-  }, [stakeModal.isOpen, stakeModal.selectedToken, isTransactionLoading, refetchAllowance]);
-
-  // Force re-render when allowance changes (for button text update)
-  useEffect(() => {
-    if (stakeModal.isOpen && stakeModal.selectedToken === 'SWIPE') {
-      console.log('Allowance changed, forcing modal re-render');
-      // This will trigger a re-render of the modal component
-    }
-  }, [swipeAllowance, stakeModal.isOpen, stakeModal.selectedToken]);
+  }, [stakeModal.isOpen, isTransactionLoading, refetchAllowance]);
 
   // Expose refresh function to parent component via ref
   useImperativeHandle(ref, () => ({
@@ -622,19 +678,29 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
 
 
 
-  // Transform hybrid predictions to match the expected format (memoized)
-  const transformedPredictions = useMemo(() => (hybridPredictions || []).map((pred) => ({
-    id: typeof pred.id === 'string' 
-      ? (pred.id.includes('v2') 
-        ? parseInt(pred.id.replace('pred_v2_', ''), 10) || Date.now()
-        : parseInt(pred.id.replace('pred_', ''), 10) || Date.now())
-      : (pred.id || Date.now()),
+  // Transform hybrid predictions to match the expected format (memoized).
+  //
+  // The id used to be stripped by hand: `id.includes('v2')` then a replace, and
+  // `|| Date.now()` when the parse failed. A `pred_v3_2` id took the else branch,
+  // parseInt('v3_2') is NaN, and the fallback handed a millisecond timestamp on
+  // as a market number. That number then reached placeBet. marketNumber returns
+  // null instead of guessing, and a record it cannot read is dropped here rather
+  // than rendered with a substitute.
+  const transformedPredictions = useMemo(() => (hybridPredictions || [])
+    .filter((pred) => marketNumber(pred.id) !== null)
+    .map((pred) => ({
+    id: marketNumber(pred.id) as number,
+    // Canonical, never rebuilt by hand. Empty means "unknown", which the bet
+    // path treats as a refusal rather than a prefix to guess at.
+    redisId: parseMarketId(pred.id)?.redisId ?? '',
     question: pred.question,
     category: pred.category,
     yesTotalAmount: pred.yesTotalAmount,
     noTotalAmount: pred.noTotalAmount,
     swipeYesTotalAmount: pred.swipeYesTotalAmount,
     swipeNoTotalAmount: pred.swipeNoTotalAmount,
+    usdcYesTotalAmount: pred.usdcYesTotalAmount || 0,
+    usdcNoTotalAmount: pred.usdcNoTotalAmount || 0,
     deadline: pred.deadline,
     resolved: pred.resolved,
     outcome: pred.outcome || false,
@@ -661,26 +727,36 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     selectedCrypto: pred.selectedCrypto
   })), [hybridPredictions]);
 
+  // A preview, and only that. It is the plain parimutuel split: your stake back
+  // plus your share of the losing pool after the platform and creator fees. V3
+  // additionally weights the share of the losing pool by how early the bet was
+  // placed (weightBpsAt), which is not modelled here, so a late bet's real payout
+  // is lower than this and an early one's is higher. The dialog labels it EST.
+  //
+  // Pools are the collateral pools at the collateral's own decimals, not the
+  // archived ETH and SWIPE pools divided by 1e18.
   const potentialEarnings = useMemo(() => {
     const amount = parseFloat(stakeModal.stakeAmount);
     if (!amount || amount <= 0) return null;
+    if (!marketWrite.market) return null;
 
-    const currentPred = transformedPredictions[currentIndex];
+    // Keyed off the market the dialog is actually betting on. It used to read
+    // transformedPredictions[currentIndex], which is a different list from the
+    // sorted, filtered one the card came from.
+    const currentPred = transformedPredictions.find(p => p.id === stakeModal.predictionId);
     if (!currentPred) return null;
 
-    const isEth = stakeModal.selectedToken === 'ETH';
-    const yesPool = isEth
-      ? (currentPred.yesTotalAmount || 0) / 1e18
-      : (currentPred.swipeYesTotalAmount || 0) / 1e18;
-    const noPool = isEth
-      ? (currentPred.noTotalAmount || 0) / 1e18
-      : (currentPred.swipeNoTotalAmount || 0) / 1e18;
+    const unit = Math.pow(10, marketWrite.market.collateral.decimals);
+    const yesPool = (currentPred.usdcYesTotalAmount || 0) / unit;
+    const noPool = (currentPred.usdcNoTotalAmount || 0) / unit;
 
-    const platformFee = 0.01;
+    // Live rates from getFeeConfig, in basis points. Both come off the losing
+    // pool before winners split it, so both belong in the preview.
+    const feeRate = (platformFeeBps + creatorFeeBps) / 10000;
     const winningPool = stakeModal.isYes ? yesPool : noPool;
     const losingPool = stakeModal.isYes ? noPool : yesPool;
     const winningPoolAfter = winningPool + amount;
-    const netLosingPool = losingPool * (1 - platformFee);
+    const netLosingPool = losingPool * (1 - feeRate);
 
     const payout = amount + (winningPoolAfter > 0 ? (amount / winningPoolAfter) * netLosingPool : 0);
     const profit = payout - amount;
@@ -689,45 +765,44 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     const totalPoolAfter = winningPoolAfter + losingPool;
 
     return {
-      token: stakeModal.selectedToken,
+      token: marketWrite.market.collateral.symbol,
       amount,
       payout,
       profit,
       profitPercent,
       sharePercent,
       totalPoolAfter,
-      platformFee,
+      feeRate,
       yesPool,
       noPool,
     };
   }, [
     stakeModal.stakeAmount,
-    stakeModal.selectedToken,
     stakeModal.isYes,
+    stakeModal.predictionId,
     transformedPredictions,
-    currentIndex,
+    marketWrite.market,
+    platformFeeBps,
+    creatorFeeBps,
   ]);
   
   // Transform real predictions to match TinderCard format (memoized for performance)
   const realCardItems: PredictionData[] = useMemo(() => transformedPredictions.map((pred) => {
-    // Only use ETH amounts for main display (SWIPE is separate)
-    const totalPool = (pred.yesTotalAmount || 0) + (pred.noTotalAmount || 0);
-    const totalYesAmount = (pred.yesTotalAmount || 0);
-    const totalNoAmount = (pred.noTotalAmount || 0);
+    // The live market's pools, at the collateral's decimals. These used to be the
+    // archived ETH pools divided by 1e18, which read zero for every V3 market and
+    // pinned every card at a flat 50/50.
+    const collateralUnit = Math.pow(10, marketWrite.market?.collateral.decimals ?? 6);
+    const collateralSymbol = marketWrite.market?.collateral.symbol ?? '';
+    const totalYesAmount = pred.usdcYesTotalAmount || 0;
+    const totalNoAmount = pred.usdcNoTotalAmount || 0;
+    const totalPool = totalYesAmount + totalNoAmount;
     const votingYes = totalPool > 0 ? Math.floor((totalYesAmount / totalPool) * 100) : 50;
 
     return {
-      id: typeof pred.id === 'string'
-        ? (() => {
-            const idStr = pred.id as string;
-            if (idStr.includes('v2')) {
-              return parseInt(idStr.replace('pred_v2_', ''), 10) || Date.now();
-            }
-            return idStr.startsWith('pred_')
-              ? parseInt(idStr.replace('pred_', ''), 10) || Date.now()
-              : parseInt(idStr, 10) || Date.now();
-          })()
-        : (pred.id || Date.now()),
+      // Already a number by the time it reaches here: transformedPredictions
+      // resolved it through marketNumber and dropped anything unreadable.
+      id: pred.id,
+      redisId: pred.redisId,
       title: (pred.question || 'Unknown prediction').length > 50 ? (pred.question || 'Unknown prediction').substring(0, 50) + '...' : (pred.question || 'Unknown prediction'),
       image: pred.imageUrl || (() => {
             // Fixed images for each category
@@ -746,58 +821,28 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
           })(),
       prediction: pred.question || 'Unknown prediction',
       timeframe: pred.deadline ? formatTimeLeft(pred.deadline) : 'Unknown',
-      confidence: (() => {
-        // Calculate confidence based on ETH stake distribution only (SWIPE is separate)
-        const yesAmount = (pred.yesTotalAmount || 0);
-        const noAmount = (pred.noTotalAmount || 0);
-        const totalAmount = yesAmount + noAmount;
-        
-        if (totalAmount === 0) {
-          return 50; // Neutral confidence when no stakes
-        }
-        
-        // Confidence = percentage of YES stakes
-        const yesPercentage = (yesAmount / totalAmount) * 100;
-        
-        // Return the actual percentage (0-100%)
-        return Math.round(yesPercentage);
-      })(),
+      confidence: totalPool > 0 ? Math.round((totalYesAmount / totalPool) * 100) : 50,
       category: pred.category || 'Unknown',
-      price: totalPool > 0 ? `${(totalPool / 1e18).toFixed(4)} ETH` : "0.0000 ETH", // Convert wei to ETH
+      price: totalPool > 0
+        ? `${(totalPool / collateralUnit).toFixed(2)} ${collateralSymbol}`.trim()
+        : `0.00 ${collateralSymbol}`.trim(),
       change: (() => {
-        const yesAmount = (pred.yesTotalAmount || 0);
-        const noAmount = (pred.noTotalAmount || 0);
-        const totalAmount = yesAmount + noAmount;
-        
-        if (totalAmount === 0) return "0%"; // No stakes yet
-        
-        // Calculate profit percentage after 1% platform fee
-        const platformFee = totalAmount * 0.01; // 1% fee from total pool
-        const netPool = totalAmount - platformFee; // Pool after fee
-        
-        if (netPool <= 0) return "0%"; // After fee, nothing left
-        
-        // Show profit as percentage of original stake (99% after 1% fee)
-        const yesProfitPercentage = yesAmount > 0 ? 99.0 : 0; // 99% profit after 1% fee
-        const noProfitPercentage = noAmount > 0 ? 99.0 : 0; // 99% profit after 1% fee
-        
-        // Show the winning side percentage (after platform fee)
-        return yesProfitPercentage > noProfitPercentage ? `+${yesProfitPercentage.toFixed(1)}%` : `-${noProfitPercentage.toFixed(1)}%`;
+        if (totalPool === 0) return "0%"; // No bets yet
+        // Which side the money is on, as a signed swing off an even split. The
+        // old string claimed a flat "99% profit after a 1% fee" on whichever side
+        // had any stake at all, which was never a real number.
+        const yesPercent = (totalYesAmount / totalPool) * 100;
+        const swing = yesPercent - 50;
+        return `${swing >= 0 ? '+' : ''}${swing.toFixed(1)}%`;
       })(),
       description: pred.description || 'No description available',
       isChart: pred.includeChart || false,
       votingYes: votingYes,
       creator: pred.creator,
-      participants: hybridPredictions.find(hp => {
-        const hpId = typeof hp.id === 'string' 
-          ? (hp.id.includes('v2') 
-            ? parseInt(hp.id.replace('pred_v2_', ''), 10) || Date.now()
-            : parseInt(hp.id.replace('pred_', ''), 10) || Date.now())
-          : (hp.id || Date.now());
-        return hpId === pred.id;
-      })?.participants || []
+      // Matched on the canonical Redis id, not on a number both generations share.
+      participants: hybridPredictions.find(hp => parseMarketId(hp.id)?.redisId === pred.redisId)?.participants || []
     };
-  }), [transformedPredictions]);
+  }), [transformedPredictions, hybridPredictions, marketWrite.market]);
 
 
   // Open stake modal after swipe
@@ -811,12 +856,15 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       setLastStakedPrediction(prediction);
     }
 
+    // The card carries the Redis id it came from. Passing it through means the
+    // send can re-parse the market instead of trusting a bare number that two
+    // contract generations both answer to.
     setStakeModal({
       isOpen: true,
       predictionId,
+      redisId: prediction?.redisId ?? '',
       isYes,
-      stakeAmount: '0.001',
-      selectedToken: 'ETH' // Default to ETH
+      stakeAmount: '1'
     });
   }, [realCardItems]);
 
@@ -887,16 +935,12 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     
     // Find the index of the prediction with matching ID
     const targetIndex = cardItems.findIndex((card, idx) => {
-      // Get the original prediction from hybridPredictions
-      const originalPred = hybridPredictions.find(hp => {
-        const hpId = typeof hp.id === 'string' 
-          ? (hp.id.includes('v2') 
-            ? parseInt(hp.id.replace('pred_v2_', ''), 10) || 0
-            : parseInt(hp.id.replace('pred_', ''), 10) || 0)
-          : (hp.id || 0);
-        return hpId === card.id;
-      });
-      
+      // Matched on the canonical Redis id the card came from. The old hand parse
+      // fell back to 0 here, so every unreadable record collided on market 0.
+      const originalPred = card.redisId
+        ? hybridPredictions.find(hp => parseMarketId(hp.id)?.redisId === card.redisId)
+        : undefined;
+
       // Check if the original prediction ID matches
       if (originalPred) {
         const matches = originalPred.id === initialPredictionId || 
@@ -924,34 +968,41 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
 
   // Auto-sync after stake transaction confirmation
   useEffect(() => {
-    if (isStakeConfirmed && stakeTransactionHash && stakePredictionId && stakeAmount && stakeToken && stakeIsYes !== null) {
+    if (isStakeConfirmed && stakeTransactionHash && stakePredictionId !== null && stakeRedisId && stakeAmount && stakeToken && stakeIsYes !== null) {
       const handleStakeAutoSync = async () => {
         console.log('⏳ Waiting for blockchain propagation after stake...');
         // Wait for blockchain propagation (same as create prediction)
         await new Promise(resolve => setTimeout(resolve, 3000));
-        
+
         // Find prediction data for transaction history
         const prediction = cardItems.find(card => card.id === stakePredictionId);
         const predictionQuestion = prediction?.title || `Prediction ${stakePredictionId}`;
-        
+
         // Save transaction to user history
         try {
           console.log('💾 Saving stake transaction to user history...');
-          // Convert amount to wei for consistent storage
-          const amountInWei = stakeAmount ? stakeAmount * Math.pow(10, 18) : 0;
+          // Raw collateral units, at the collateral's own decimals. It used to
+          // multiply by 1e18 regardless, so a 5 USDC bet was recorded as five
+          // million million USDC.
+          const decimals = marketWrite.market?.collateral.decimals ?? 6;
+          const amountInUnits = stakeAmount ? Math.round(stakeAmount * Math.pow(10, decimals)) : 0;
           const transactionData = {
             id: generateTransactionId(),
             type: 'stake' as const,
-            predictionId: `pred_v2_${stakePredictionId}`,
+            // The market that was actually bet on, not a rebuilt v2 prefix.
+            predictionId: stakeRedisId,
             predictionQuestion,
-            amount: amountInWei,
-            tokenType: stakeToken || 'ETH',
+            amount: amountInUnits,
+            tokenType: stakeToken,
             txHash: stakeTransactionHash,
-            basescanUrl: generateBasescanUrl(stakeTransactionHash),
+            // The explorer of the chain the transaction was signed on. This is
+            // stored, not derived at render, so a basescan link written for a
+            // Robinhood transaction is wrong permanently.
+            basescanUrl: txUrl(chainKey, stakeTransactionHash),
             timestamp: Date.now(),
             status: 'success' as const
           };
-          
+
           const saveResponse = await fetch('/api/user-transactions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -985,18 +1036,17 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
           console.log(`🔄 Auto-sync attempt ${syncAttempts}/${maxSyncAttempts}...`);
           
           try {
-            const syncResponse = await fetch('/api/blockchain/events', {
+            // /api/sync/usdc resolves the market through getMarketContract, so
+            // it reads the same contract the bet was sent to. The old call went
+            // to /api/blockchain/events, which hardcodes CONTRACTS.V2 and reads
+            // userStakes/userSwipeStakes: against a V3 market number that reads
+            // an archived contract and writes the answer back as truth.
+            const syncResponse = await fetch('/api/sync/usdc', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                eventType: 'stake_placed',
-                predictionId: stakePredictionId,
-                contractVersion: 'V2',
-                userId: address?.toLowerCase(),
-                txHash: stakeTransactionHash
-              })
+              body: JSON.stringify({ predictionIds: [stakeRedisId] })
             });
-            
+
             if (syncResponse.ok) {
               const result = await syncResponse.json();
               console.log('✅ Prediction auto-synced after stake:', result);
@@ -1049,126 +1099,111 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
         // Reset transaction tracking
         setStakeTransactionHash(null);
         setStakePredictionId(null);
+        setStakeRedisId(null);
         setStakeAmount(null);
         setStakeToken(null);
         setStakeIsYes(null);
       };
-      
+
       handleStakeAutoSync();
     }
-  }, [isStakeConfirmed, stakeTransactionHash, stakePredictionId, stakeAmount, stakeToken, stakeIsYes, address, cardItems, refreshPredictions]);
+  }, [isStakeConfirmed, stakeTransactionHash, stakePredictionId, stakeRedisId, stakeAmount, stakeToken, stakeIsYes, address, cardItems, refreshPredictions, chainKey, marketWrite.market]);
 
   // Dashboard handlers
 
-  const handleStakeBet = (predictionId: number, isYes: boolean, amount: number, token: 'ETH' | 'SWIPE') => {
-    // Refuse unless the contract this function is about to write to *is* the
-    // market of the chain the user actually has selected (not the build-time
-    // default). Both halves matter, and the address half is the one that
-    // protects the money: `contract` below is CONTRACTS.V2, a module-load
-    // constant pinned to Base's V2 address that does not follow the switcher.
-    // Gating on the chain alone would let this open the moment a Robinhood pool
-    // address became configured, and then send the stake to a Base address on
-    // Robinhood — an address with no contract behind it, where the tokens are
-    // simply gone.
+  /** Sends one bet. Returns true only when a transaction actually left. */
+  const handleStakeBet = async (redisId: string, isYes: boolean, amount: number): Promise<boolean> => {
+    const market = marketWrite.market;
+    // The address this function is about to write to, named once. Everything
+    // below, the guard and the send alike, goes through this one value, so the
+    // check and the transaction cannot drift apart.
+    const target = market?.address ?? null;
+
+    // Refuse unless `target` *is* the market of the chain the user actually has
+    // selected (not the build-time default). Both halves matter and the address
+    // half is the one that protects the money: gating on the chain alone would
+    // let a stake leave for a Base address while Robinhood is selected, an
+    // address with no contract behind it, where the tokens are simply gone.
     //
-    // So this stays shut until V3 routes both the address and the ABI through
-    // lib/chains. Configuring an env var must not be enough to open it; see
-    // isWritableMarket.
-    if (!isWritableMarket(chainKey, CONTRACTS.V2.address)) {
-      console.warn(
-        `[swipe-bet] refused: ${CONTRACTS.V2.address} is not ${chainKey}'s market contract.`
-      );
+    // useMarketWrite re-checks this at send time as well, because the network
+    // switcher can move under an open dialog. This copy is the one that keeps
+    // the refusal quiet and legible instead of throwing out of the wallet.
+    if (!marketWrite.ready || !market || !isWritableMarket(chainKey, target)) {
+      console.warn(`[swipe-bet] refused: ${target} is not ${chainKey}'s market contract.`);
       alert(
-        'Betting is moving to V3.\n\n' +
-        'V3 brings audited contracts with fairer payouts and lower fees. ' +
-        'Your existing positions stay visible here.'
+        marketWrite.wrongNetwork
+          ? 'Your wallet is on a different network. Switch it to place this bet.'
+          : 'This network has no Swipe market yet. Switch networks to place a bet.'
       );
-      return;
+      return false;
     }
 
-    // Validate based on token type
-    if (token === 'ETH') {
-      if (amount < 0.00001) {
-        alert('❌ Minimum stake is 0.00001 ETH');
-        return;
-      }
-      if (amount > 100) {
-        alert('❌ Maximum stake is 100 ETH');
-        return;
-      }
-    } else if (token === 'SWIPE') {
-      if (amount < 100000) {
-        alert('❌ Minimum stake is 100,000 SWIPE');
-        return;
-      }
-      // SWIPE has unlimited maximum
-      // Note: Allowance check is handled in the modal before calling this function
+    // The market number comes from parsing the Redis id, never from stripping a
+    // prefix by hand. Null means "I do not know which market this is", and that
+    // refuses the bet: the old code answered NaN here and then fell back to
+    // Date.now(), handing a fabricated market number to the contract.
+    const ref = parseMarketId(redisId);
+    if (!ref) {
+      console.warn(`[swipe-bet] refused: cannot read a market number from "${redisId}".`);
+      alert('Cannot identify this market. Refresh and try again.');
+      return false;
+    }
+    const predictionId = ref.numericId;
+
+    const { decimals, symbol } = market.collateral;
+    if (!Number.isFinite(amount) || amount <= 0) {
+      alert('Enter an amount to bet.');
+      return false;
+    }
+    // 6 decimals for USDC and USDG, not 18. toFixed keeps this a plain decimal
+    // string: String(1e-7) is "1e-7", which parseUnits rejects, and the dialog
+    // accepts free text.
+    const amountInCollateral = parseUnits(amount.toFixed(decimals), decimals);
+
+    // The contract's own floor, read live from getFeeConfig. There is no maximum
+    // in V3, so there is no maximum here either.
+    if (amountInCollateral < minBetUnits) {
+      alert(`Minimum bet is ${formatUnits(minBetUnits, decimals)} ${symbol}`);
+      return false;
+    }
+
+    if (collateralBalance !== undefined && amountInCollateral > (collateralBalance as bigint)) {
+      alert(`Not enough ${symbol}. You have ${formatUnits(collateralBalance as bigint, decimals)}.`);
+      return false;
     }
 
     // Check if user is trying to bet on their own prediction
-    const currentPrediction = cardItems.find(card => card.id === predictionId);
+    const currentPrediction = cardItems.find(card => card.redisId === ref.redisId);
     if (currentPrediction && address && currentPrediction.creator && currentPrediction.creator.toLowerCase() === address.toLowerCase()) {
       alert('❌ You cannot bet on your own prediction!');
-      return;
+      return false;
     }
 
-    const side = isYes ? 'YES' : 'NO';
-    const contract = CONTRACTS.V2; // Always use V2 for new stakes
+    // V3 is collateralised in an ERC-20 and has no payable function at all, so
+    // there is no `value:` here and no ETH branch. placeStake and
+    // placeStakeWithToken do not exist on this contract.
+    try {
+      const tx = await marketWrite.write({
+        functionName: 'placeBet',
+        args: [BigInt(predictionId), isYes, amountInCollateral],
+      });
+      console.log('📤 Bet transaction sent:', tx);
+      showNotification('info', 'Transaction Sent', 'Waiting for blockchain confirmation...');
 
-    // Execute transaction based on token type
-    if (token === 'ETH') {
-      // ETH staking - use value parameter
-      writeContract({
-        address: contract.address as `0x${string}`,
-        abi: contract.abi,
-        functionName: 'placeStake',
-        args: [BigInt(predictionId), isYes],
-        value: ethers.parseEther(amount.toString()),
-      }, {
-        onSuccess: (tx) => {
-          console.log('📤 ETH Stake transaction sent:', tx);
-          showNotification('info', 'Transaction Sent', 'Waiting for blockchain confirmation...');
-          
-          // Set transaction hash for tracking - card will move after confirmation in useEffect
-          setStakeTransactionHash(tx);
-          setStakePredictionId(predictionId);
-          setStakeAmount(amount);
-          setStakeToken('ETH');
-          setStakeIsYes(isYes);
-          
-          // Keep modal open with loading state until confirmation
-          // Card movement and modal close will happen in useEffect when isStakeConfirmed becomes true
-        },
-        onError: (error) => {
-          handleStakeError(error);
-        }
-      });
-    } else {
-      // SWIPE staking - use placeStakeWithToken
-      writeContract({
-        address: contract.address as `0x${string}`,
-        abi: contract.abi,
-        functionName: 'placeStakeWithToken',
-        args: [BigInt(predictionId), isYes, ethers.parseEther(amount.toString())],
-      }, {
-        onSuccess: (tx) => {
-          console.log('📤 SWIPE Stake transaction sent:', tx);
-          showNotification('info', 'Transaction Sent', 'Waiting for blockchain confirmation...');
-          
-          // Set transaction hash for tracking - card will move after confirmation in useEffect
-          setStakeTransactionHash(tx);
-          setStakePredictionId(predictionId);
-          setStakeAmount(amount);
-          setStakeToken('SWIPE');
-          setStakeIsYes(isYes);
-          
-          // Keep modal open with loading state until confirmation
-          // Card movement and modal close will happen in useEffect when isStakeConfirmed becomes true
-        },
-        onError: (error) => {
-          handleStakeError(error);
-        }
-      });
+      // Set transaction hash for tracking - card will move after confirmation in useEffect
+      setStakeTransactionHash(tx);
+      setStakePredictionId(predictionId);
+      setStakeRedisId(ref.redisId);
+      setStakeAmount(amount);
+      setStakeToken(symbol);
+      setStakeIsYes(isYes);
+
+      // Keep modal open with loading state until confirmation
+      // Card movement and modal close will happen in useEffect when isStakeConfirmed becomes true
+      return true;
+    } catch (error) {
+      handleStakeError(error);
+      return false;
     }
   };
 
@@ -1229,25 +1264,30 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       refreshPredictions();
     }
     
-    // Then sync active predictions stakes from blockchain
-    try {
-      console.log('🔄 Syncing active predictions stakes from blockchain after stake...');
-      const syncResponse = await fetch('/api/sync/v2/active-stakes', { 
-        method: 'POST' 
-      });
-      
-      if (syncResponse.ok) {
-        const result = await syncResponse.json();
-        console.log(`✅ Synced stakes for ${result.data?.syncedPredictions || 0} active predictions after stake`);
-        // Refresh again after sync to show updated data
-        setTimeout(() => {
-          if (refreshPredictions) {
-            refreshPredictions();
-          }
-        }, 1000);
+    // Then sync this market's pools from the contract that was bet on.
+    // /api/sync/v2/active-stakes walked the archived V2 pool, so after a V3 bet
+    // it refreshed four dead markets and never the one the money went into.
+    if (stakeRedisId) {
+      try {
+        console.log('🔄 Syncing this market from the chain after bet...');
+        const syncResponse = await fetch('/api/sync/usdc', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ predictionIds: [stakeRedisId] })
+        });
+
+        if (syncResponse.ok) {
+          console.log(`✅ Synced pools for ${stakeRedisId} after bet`);
+          // Refresh again after sync to show updated data
+          setTimeout(() => {
+            if (refreshPredictions) {
+              refreshPredictions();
+            }
+          }, 1000);
+        }
+      } catch (error) {
+        console.error('Failed to sync market pools after bet:', error);
       }
-    } catch (error) {
-      console.error('Failed to sync active predictions stakes after stake:', error);
     }
     
     // Send Farcaster notification about successful stake
@@ -1387,25 +1427,18 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     }
   };
 
-  // Helper function to get prediction ID for sharing (converts numeric ID back to Redis format)
-  const getPredictionIdForShare = useCallback((numericId: number): string => {
-    // Find the original prediction from hybridPredictions
-    const originalPred = hybridPredictions?.find(hp => {
-      const hpId = typeof hp.id === 'string' 
-        ? (hp.id.includes('v2') 
-          ? parseInt(hp.id.replace('pred_v2_', ''), 10) || 0
-          : parseInt(hp.id.replace('pred_', ''), 10) || 0)
-        : (hp.id || 0);
-      return hpId === numericId;
-    });
-    
-    if (originalPred && typeof originalPred.id === 'string') {
-      return originalPred.id; // Return original string ID (e.g., 'pred_v2_123')
-    }
-    
-    // Fallback: assume V2 format
-    return `pred_v2_${numericId}`;
-  }, [hybridPredictions]);
+  // The Redis id behind a card, for building a share link.
+  //
+  // Returns null when no record matches. The old version fell back to
+  // `pred_v2_${numericId}`, which produced a link to an archived market that
+  // shares the number, so a shared V3 bet pointed at somebody else's market.
+  const getPredictionIdForShare = useCallback((numericId: number): string | null => {
+    const card = realCardItems.find(item => item.id === numericId);
+    if (card?.redisId) return card.redisId;
+
+    const originalPred = hybridPredictions?.find(hp => marketNumber(hp.id) === numericId);
+    return parseMarketId(originalPred?.id)?.redisId ?? null;
+  }, [hybridPredictions, realCardItems]);
 
   // Function to share prediction after stake
   // Function to open share preview modal after staking
@@ -1419,22 +1452,19 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       // Use full prediction text (not truncated title)
       const fullPredictionText = lastStakedPrediction.prediction;
     
-    // Get unique prediction URL for sharing - will show custom OG image
-    const predictionId = getPredictionIdForShare(lastStakedPrediction.id);
+    // Get unique prediction URL for sharing - will show custom OG image.
+    // Null means no record matched, and a link built on a guessed id points at
+    // whatever market happens to carry that number, so there is nothing to share.
+    const predictionId = lastStakedPrediction.redisId ?? getPredictionIdForShare(lastStakedPrediction.id);
+    if (!predictionId) {
+      console.warn('Cannot share: no canonical id for this market');
+      return;
+    }
     const predictionUrl = `${window.location.origin}/prediction/${predictionId}`;
-      
-      // Format stake amount for display
-    const formatStakeAmountLocal = (amount: number, token: 'ETH' | 'SWIPE') => {
-        if (token === 'SWIPE') {
-          if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M`;
-          if (amount >= 1000) return `${(amount / 1000).toFixed(0)}K`;
-          return amount.toFixed(0);
-        }
-        return amount.toString();
-      };
-      
-    const formattedAmount = formatStakeAmountLocal(shareStakeData.amount, shareStakeData.token);
-      
+
+    // Two decimals, the way the collateral is quoted.
+    const formattedAmount = shareStakeData.amount.toFixed(2);
+
     // Build share text with random variants from share-texts.ts
     const { text: shareText } = buildStakeShareText(
       fullPredictionText,
@@ -1824,106 +1854,94 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     }));
   };
 
-  const handleTokenChange = (token: 'ETH' | 'SWIPE') => {
-    setStakeModal(prev => ({
-      ...prev,
-      selectedToken: token,
-      stakeAmount: token === 'ETH' ? '0.00001' : '100000'
-    }));
-  };
+  // Does the market still need permission to pull this much collateral?
+  const needsApproval = useMemo(() => {
+    const market = marketWrite.market;
+    if (!market) return false;
+    const amount = parseFloat(stakeModal.stakeAmount);
+    if (!Number.isFinite(amount) || amount <= 0) return false;
+    // Unknown allowance means "ask", not "assume granted".
+    if (collateralAllowance === undefined || collateralAllowance === null) return true;
+    const required = parseUnits(amount.toFixed(market.collateral.decimals), market.collateral.decimals);
+    return BigInt(collateralAllowance.toString()) < required;
+  }, [collateralAllowance, stakeModal.stakeAmount, marketWrite.market]);
 
-  const handleConfirmStake = async () => {
-    const { predictionId, isYes, stakeAmount, selectedToken } = stakeModal;
-    const amount = parseFloat(stakeAmount);
-
-    // For SWIPE, check if approval is needed first
-    if (selectedToken === 'SWIPE') {
-      const amountWei = BigInt(Math.floor(amount * 10**18));
-      let currentAllowance = BigInt(0);
-      
-      try {
-        if (swipeAllowance !== undefined && swipeAllowance !== null) {
-          currentAllowance = BigInt(swipeAllowance.toString());
-        }
-      } catch (e) {
-        console.error('Error parsing allowance:', e);
-        currentAllowance = BigInt(0);
-      }
-      
-      console.log('Checking SWIPE approval:');
-      console.log('Amount to stake (wei):', amountWei.toString());
-      console.log('Current allowance:', currentAllowance.toString());
-      console.log('Needs approval?', currentAllowance < amountWei);
-      
-      // TEMPORARY: Always do approve for SWIPE to test
-      if (true) {
-        // Need approval first
-        setIsTransactionLoading(true);
-        showNotification('info', 'Approval Required', `Approving ${amount} SWIPE for this stake`);
-        
-        // Execute approve transaction with slippage buffer to handle price fluctuations
-        // Using calculateApprovalAmount to add 10% buffer (1000 bps)
-        // This ensures approval covers potential slippage for large stakes
-        const approvalAmount = calculateApprovalAmount(amountWei);
-        
-        console.log('💰 SWIPE Approval Details:');
-        console.log('  Stake amount:', amountWei.toString(), 'wei');
-        console.log('  Approval amount (with 10% buffer):', approvalAmount.toString(), 'wei');
-        console.log('  Buffer:', ((approvalAmount - amountWei) * BigInt(100) / amountWei).toString() + '%');
-        
-        writeContract({
-          address: SWIPE_TOKEN.address as `0x${string}`,
-          abi: [
-            {
-              "inputs": [{"name": "spender", "type": "address"}, {"name": "amount", "type": "uint256"}],
-              "name": "approve",
-              "outputs": [{"name": "", "type": "bool"}],
-              "stateMutability": "nonpayable",
-              "type": "function"
-            }
-          ],
-          functionName: 'approve',
-          args: [CONTRACTS.V2.address as `0x${string}`, approvalAmount],
-        }, {
-          onSuccess: (tx) => {
-            console.log('✅ SWIPE approval successful:', tx);
-            showNotification('success', 'Approval Successful', `${amount} SWIPE approved! Now placing stake...`);
-            
-            // Immediately proceed to stake after approval
-            setTimeout(() => {
-              console.log('Proceeding to stake after approve...');
-              // Call the actual stake function
-              handleStakeBet(predictionId, isYes, amount, 'SWIPE');
-              // Close modal
-              setStakeModal(prev => ({ ...prev, isOpen: false }));
-              setIsTransactionLoading(false);
-            }, 2000); // Wait 2 seconds for approval to be mined
-          },
-          onError: (error) => {
-            console.error('❌ SWIPE approval failed:', error);
-            showNotification('error', 'Approval Failed', 'Failed to approve SWIPE token');
-            setIsTransactionLoading(false);
-          }
-        });
-        
-        return; // Don't proceed with stake yet
+  // Wait for the approval to actually be on chain before betting.
+  //
+  // Polling the allowance is the honest test: it is the state placeBet reads
+  // when it calls transferFrom. The old code slept two seconds and hoped, which
+  // fails on a slow block and then reverts after the user has already signed.
+  const waitForAllowance = useCallback(async (needed: bigint): Promise<boolean> => {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      const { data } = await refetchAllowance();
+      if (data !== undefined && data !== null && BigInt(data.toString()) >= needed) {
+        return true;
       }
     }
+    return false;
+  }, [refetchAllowance]);
 
-    // If we get here, either it's ETH or SWIPE is already approved
-    // Set loading state
+  const handleConfirmStake = async () => {
+    const { redisId, isYes, stakeAmount } = stakeModal;
+    const amount = parseFloat(stakeAmount);
+    const market = marketWrite.market;
+
+    // Answered before any wallet UI opens. `ready` is only the "is there a
+    // market on this chain at all" half; the address comparison happens in
+    // handleStakeBet and again inside useMarketWrite at send time.
+    if (!marketWrite.ready || !market) {
+      showNotification(
+        'error',
+        'No market here',
+        'This network has no Swipe market yet. Switch networks to place a bet.'
+      );
+      return;
+    }
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      showNotification('error', 'Enter an amount', 'Type how much you want to bet.');
+      return;
+    }
+
+    const { decimals, symbol } = market.collateral;
+    const amountInCollateral = parseUnits(amount.toFixed(decimals), decimals);
+
     setIsTransactionLoading(true);
+    try {
+      if (needsApproval) {
+        showNotification('info', 'Approval required', `Approving ${amount} ${symbol} for this bet`);
 
-    // predictionId is already a number, no conversion needed
-    const numericPredictionId = predictionId;
+        // Spender is the market that will pull the tokens, and the token is this
+        // chain's collateral. Both come from the same resolution as the bet
+        // below, so an allowance can never be granted to one contract while
+        // another does the transferFrom.
+        const approveTx = await marketWrite.writeCollateral({
+          abi: ERC20_ABI,
+          functionName: 'approve',
+          args: [market.address, amountInCollateral],
+        });
+        console.log('✅ Approval sent:', approveTx);
 
-    // Call the stake handler from dashboard with token
-    // The modal will be closed and card handled by onSuccess/onError callbacks in handleStakeBet
-    handleStakeBet(numericPredictionId, isYes, amount, selectedToken);
-    
-    // Note: Modal closing and success/error handling is done in handleStakeBet callbacks
-    // - onSuccess: calls handleStakeSuccess() which moves to next card, then shows share modal
-    // - onError: calls handleStakeError() which shows notification and restores card
+        const cleared = await waitForAllowance(amountInCollateral);
+        if (!cleared) {
+          showNotification(
+            'error',
+            'Approval not confirmed',
+            'The approval has not landed yet. Try the bet again in a moment.'
+          );
+          setIsTransactionLoading(false);
+          return;
+        }
+      }
+
+      // Modal closing and success/error handling happen off the receipt:
+      // handleStakeSuccess moves to the next card, handleStakeError restores it.
+      const sent = await handleStakeBet(redisId, isYes, amount);
+      if (!sent) setIsTransactionLoading(false);
+    } catch (error) {
+      handleStakeError(error);
+    }
   };
 
   const handleCloseStakeModal = async () => {
@@ -2066,15 +2084,10 @@ KEY USER-FACING CHANGES: V1 → V2
       return [];
     }
     
-    const currentPrediction = hybridPredictions.find(hp => {
-      const hpId = typeof hp.id === 'string' 
-        ? (hp.id.includes('v2') 
-          ? parseInt(hp.id.replace('pred_v2_', ''), 10) || Date.now()
-          : parseInt(hp.id.replace('pred_', ''), 10) || Date.now())
-        : (hp.id || Date.now());
-      return hpId === currentCard.id;
-    });
-    
+    const currentPrediction = currentCard.redisId
+      ? hybridPredictions.find(hp => parseMarketId(hp.id)?.redisId === currentCard.redisId)
+      : undefined;
+
     // Remove duplicates from participants array to avoid React key conflicts
     const participants = currentPrediction?.participants || [];
     const uniqueParticipants = [...new Set(participants)];
@@ -2090,9 +2103,15 @@ KEY USER-FACING CHANGES: V1 → V2
       return;
     }
     
-    const predictionId = getPredictionIdForShare(currentCard.id);
+    // No canonical id means no link worth sharing. It used to fall through to
+    // `pred_v2_${n}`, which pointed at an archived market with the same number.
+    const predictionId = currentCard.redisId ?? getPredictionIdForShare(currentCard.id);
+    if (!predictionId) {
+      console.warn('Cannot share: no canonical id for this market');
+      return;
+    }
     const predictionUrl = `${window.location.origin}/prediction/${predictionId}`;
-    
+
     // Get pool data for share text
     const currentPred = transformedPredictions[currentIndex];
     const totalPoolETH = currentPred ? ((currentPred.yesTotalAmount || 0) + (currentPred.noTotalAmount || 0)) / 1e18 : 0;
@@ -2157,16 +2176,12 @@ KEY USER-FACING CHANGES: V1 → V2
     const fetchUserStakes = async () => {
       if (!currentCard || !currentCard.id || !hybridPredictions || hybridPredictions.length === 0) return;
       
-      // Find the original prediction ID from hybridPredictions
-      const currentPrediction = hybridPredictions.find(hp => {
-        const hpId = typeof hp.id === 'string' 
-          ? (hp.id.includes('v2') 
-            ? parseInt(hp.id.replace('pred_v2_', ''), 10) || Date.now()
-            : parseInt(hp.id.replace('pred_', ''), 10) || Date.now())
-          : (hp.id || Date.now());
-        return hpId === currentCard.id;
-      });
-      
+      // Find the original prediction from hybridPredictions, by canonical id.
+      const currentPrediction = currentCard.redisId
+        ? hybridPredictions.find(hp => parseMarketId(hp.id)?.redisId === currentCard.redisId)
+        : undefined;
+
+
       if (!currentPrediction) {
         console.warn('No matching prediction found for current card');
         return;
@@ -3386,426 +3401,159 @@ KEY USER-FACING CHANGES: V1 → V2
 
           <Separator className="bg-gradient-to-r from-transparent via-slate-700/50 to-transparent h-px" />
 
-          {/* Modern Token Selection Tabs - Compact */}
+          {/* Bet amount, in this chain's collateral. One token, no selector:
+              V3 pulls a single ERC-20 and has no payable function. */}
           <div className="p-4 pt-3">
-            <Tabs 
-              value={stakeModal.selectedToken} 
-              onValueChange={(value) => handleTokenChange(value as 'ETH' | 'SWIPE')}
-              className="w-full"
-            >
-              <TabsList className="grid w-full grid-cols-2 bg-slate-900/80 backdrop-blur-sm p-1 h-11 rounded-xl border border-slate-800/80 shadow-inner">
-                <TabsTrigger 
-                  value="ETH" 
-                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:via-blue-600 data-[state=active]:to-blue-500 data-[state=active]:text-white data-[state=active]:shadow-xl data-[state=active]:shadow-blue-500/30 rounded-lg h-9 transition-all duration-300 data-[state=inactive]:hover:bg-slate-800/50"
-                >
-                  <span className="font-bold text-xs">ETH</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="SWIPE" 
-                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#d4ff00] data-[state=active]:via-[#b8e600] data-[state=active]:to-[#d4ff00] data-[state=active]:text-black data-[state=active]:shadow-xl data-[state=active]:shadow-[#d4ff00]/30 rounded-lg h-9 transition-all duration-300 data-[state=inactive]:hover:bg-slate-800/50 font-bold"
-                >
-                  <span className="font-bold text-xs">$SWIPE</span>
-                </TabsTrigger>
-              </TabsList>
-
-              {/* ETH Content - Compact */}
-              <TabsContent value="ETH" className="mt-3 space-y-3">
-                <Card className="bg-gradient-to-br from-slate-900/90 via-slate-800/60 to-slate-900/90 border-slate-700/60 backdrop-blur-xl shadow-xl">
-                  <CardContent className="p-3">
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs text-[#d4ff00] font-semibold flex items-center gap-1.5">
-                          <Wallet className="w-3.5 h-3.5" />
-                          Bet Amount
-                        </label>
-                        {/* Modern Input Mode Toggle - Smaller */}
-                        <div className="flex bg-slate-900/80 backdrop-blur-sm rounded-lg p-0.5 border border-slate-700/60 shadow-inner">
-                    <button
-                            onClick={() => setEthInputMode('eth')}
-                            className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all duration-200 ${
-                              ethInputMode === 'eth'
-                                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30'
-                                : 'text-slate-400 hover:text-slate-200'
-                            }`}
-                          >
-                            ETH
-                    </button>
-                    <button
-                            onClick={() => setEthInputMode('usd')}
-                            className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all duration-200 ${
-                              ethInputMode === 'usd'
-                                ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30'
-                                : 'text-slate-400 hover:text-slate-200'
-                            }`}
-                          >
-                            USD
-                          </button>
-                      </div>
-                      </div>
-                      
-                      {/* Modern Quick Amount Buttons - Smaller */}
-                      <div className="grid grid-cols-4 gap-2">
-                        {ethInputMode === 'eth' 
-                          ? ['0.00001', '0.0001', '0.001', '0.01'].map((amount) => (
-                              <Button
-                                key={amount}
-                                onClick={() => handleStakeAmountChange(amount)}
-                                variant="outline"
-                                className="h-8 rounded-lg border-2 border-[#d4ff00]/50 bg-slate-900/50 text-white font-bold text-[9px] hover:bg-[#d4ff00]/20 hover:border-[#d4ff00]/80 hover:scale-105 transition-all duration-200 backdrop-blur-sm"
-                              >
-                                {amount}
-                              </Button>
-                            ))
-                          : ['1', '5', '10', '50'].map((amount) => (
-                              <Button
-                                key={amount}
-                                onClick={() => {
-                                  const usdAmount = parseFloat(amount);
-                                  const ethPrice = getUsdValue(1, 'ETH');
-                                  if (ethPrice) {
-                                    const ethAmount = usdAmount / ethPrice;
-                                    handleStakeAmountChange(ethAmount.toFixed(6));
-                                  }
-                                }}
-                                variant="outline"
-                                className="h-8 rounded-lg border-2 border-[#d4ff00]/50 bg-slate-900/50 text-white font-bold text-[10px] hover:bg-[#d4ff00]/20 hover:border-[#d4ff00]/80 hover:scale-105 transition-all duration-200 backdrop-blur-sm"
-                              >
-                                ${amount}
-                              </Button>
-                            ))
-                        }
-                      </div>
-
-                      {/* Modern Manual Input - Smaller for mobile */}
-                      <div className="mt-3 relative">
-                        <div className="relative">
-                          <Input
-                          type="text"
-                          inputMode="decimal"
-                          value={ethInputMode === 'eth' 
-                            ? stakeModal.stakeAmount 
-                            : (getUsdValue(parseFloat(stakeModal.stakeAmount) || 0, 'ETH')?.toFixed(2) || '')
-                          }
-                          onChange={(e) => {
-                            const value = e.target.value.replace(/[^0-9.]/g, '');
-                            if (ethInputMode === 'eth') {
-                              handleStakeAmountChange(value);
-                            } else {
-                              const usdAmount = parseFloat(value);
-                              const ethPrice = getUsdValue(1, 'ETH');
-                              if (ethPrice && usdAmount) {
-                                const ethAmount = usdAmount / ethPrice;
-                                handleStakeAmountChange(ethAmount.toFixed(6));
-                              }
-                            }
-                          }}
-                          placeholder={ethInputMode === 'eth' ? '0.00001' : '10.00'}
-                            className="w-full h-12 text-2xl font-extrabold bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-2 border-[#d4ff00]/40 rounded-xl text-[#d4ff00] text-center placeholder:text-slate-600 focus:border-[#d4ff00] focus:ring-2 focus:ring-[#d4ff00]/20 focus:shadow-lg focus:shadow-[#d4ff00]/10 transition-all duration-300 backdrop-blur-sm"
-                          style={{ 
-                            WebkitAppearance: 'none', 
-                            MozAppearance: 'textfield',
-                          }}
-                        />
-                          <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#d4ff00]/0 via-[#d4ff00]/5 to-[#d4ff00]/0 pointer-events-none" />
+            <Card className="bg-gradient-to-br from-slate-900/90 via-slate-800/60 to-slate-900/90 border-slate-700/60 backdrop-blur-xl shadow-xl">
+              <CardContent className="p-3">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs text-[#d4ff00] font-semibold flex items-center gap-1.5">
+                      <Wallet className="w-3.5 h-3.5" />
+                      Bet amount ({collateralSymbol})
+                    </label>
+                    <span className="text-[10px] text-slate-400 font-medium">
+                      Balance {formattedCollateralBalance} {collateralSymbol}
+                    </span>
                   </div>
-                </div>
 
-                      {/* Modern Conversion Display */}
-                      {(() => {
-                        const amount = parseFloat(stakeModal.stakeAmount) || 0;
-                        const usdValue = getUsdValue(amount, 'ETH');
-                        if (usdValue !== null && amount > 0) {
-                          return (
-                            <div className="flex items-center justify-center gap-2 py-2 px-3 bg-gradient-to-r from-blue-500/15 via-blue-500/10 to-blue-500/15 rounded-lg border border-blue-500/30 backdrop-blur-sm shadow-lg shadow-blue-500/10">
-                              {ethInputMode === 'eth' ? (
-                                <>
-                                  <DollarSign className="w-4 h-4 text-[#d4ff00]" />
-                                  <span className="text-[#d4ff00] font-bold text-base">
-                                    ≈ ${usdValue < 0.01 ? usdValue.toFixed(4) : usdValue < 1 ? usdValue.toFixed(3) : usdValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                  </span>
-                                  <span className="text-slate-400 text-[10px] font-medium">USD</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Coins className="w-4 h-4 text-[#d4ff00]" />
-                                  <span className="text-[#d4ff00] font-bold text-base">
-                                    ≈ {amount.toFixed(6)}
-                                  </span>
-                                  <span className="text-slate-400 text-[10px] font-medium">ETH</span>
-                                </>
-                              )}
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
+                  {/* Quick amounts */}
+                  <div className="grid grid-cols-4 gap-2">
+                    {['1', '5', '10', '25'].map((amount) => (
+                      <Button
+                        key={amount}
+                        onClick={() => handleStakeAmountChange(amount)}
+                        variant="outline"
+                        className="h-8 rounded-lg border-2 border-[#d4ff00]/50 bg-slate-900/50 text-white font-bold text-[10px] hover:bg-[#d4ff00]/20 hover:border-[#d4ff00]/80 hover:scale-105 transition-all duration-200 backdrop-blur-sm"
+                      >
+                        {amount}
+                      </Button>
+                    ))}
+                  </div>
+
+                  <div className="mt-3 relative">
+                    <div className="relative">
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        value={stakeModal.stakeAmount}
+                        onChange={(e) => handleStakeAmountChange(e.target.value.replace(/[^0-9.]/g, ''))}
+                        placeholder={minBetDisplay}
+                        className="w-full h-12 text-2xl font-extrabold bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-2 border-[#d4ff00]/40 rounded-xl text-[#d4ff00] text-center placeholder:text-slate-600 focus:border-[#d4ff00] focus:ring-2 focus:ring-[#d4ff00]/20 focus:shadow-lg focus:shadow-[#d4ff00]/10 transition-all duration-300 backdrop-blur-sm"
+                        style={{
+                          WebkitAppearance: 'none',
+                          MozAppearance: 'textfield',
+                        }}
+                      />
+                      <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#d4ff00]/0 via-[#d4ff00]/5 to-[#d4ff00]/0 pointer-events-none" />
                     </div>
-
-                    {/* Modern Potential Earnings Card - Compact Table */}
-                    <Card className="bg-gradient-to-br from-slate-900/90 via-emerald-950/30 to-slate-900/90 border-2 border-emerald-500/20 backdrop-blur-xl shadow-2xl">
-                      <CardContent className="p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-1.5">
-                            <Calculator className="w-3.5 h-3.5 text-[#d4ff00]" />
-                            <span className="text-xs font-bold text-[#d4ff00]">Potential Earnings</span>
-                          </div>
-                          <Badge variant="outline" className="text-[9px] border-[#d4ff00]/40 text-[#d4ff00] bg-[#d4ff00]/10 font-semibold px-1.5 py-0.5">EST.</Badge>
-                        </div>
-                        {potentialEarnings ? (
-                          <Table>
-                            <TableBody>
-                              {/* Payout Row */}
-                              <TableRow className="border-slate-700/50 hover:bg-slate-800/30">
-                                <TableCell className="py-2 text-[10px] text-blue-300 font-medium">
-                                  <div className="flex items-center gap-1.5">
-                                    <ArrowUpRight className="w-3 h-3 text-blue-400" />
-                                    <span>Payout</span>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="py-2 text-right">
-                                  <div className="text-xs font-extrabold text-[#d4ff00]">
-                                    {formatTokenAmount(potentialEarnings.payout, 'ETH')} ETH
-                                  </div>
-                                  {(() => {
-                                    const usd = formatUsdValueLocal(potentialEarnings.payout, 'ETH');
-                                    return usd ? (
-                                      <div className="text-[9px] text-cyan-300 mt-0.5">
-                                        ${usd}
-                                      </div>
-                                    ) : null;
-                                  })()}
-                                </TableCell>
-                              </TableRow>
-                              
-                              {/* Profit Row */}
-                              <TableRow className="border-slate-700/50 hover:bg-slate-800/30">
-                                <TableCell className="py-2 text-[10px] text-emerald-300 font-medium">
-                                  <div className="flex items-center gap-1.5">
-                                    <TrendingUp className="w-3 h-3 text-emerald-400" />
-                                    <span>Profit</span>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="py-2 text-right">
-                                  <div className="text-xs font-extrabold text-[#d4ff00]">
-                                    +{formatTokenAmount(potentialEarnings.profit, 'ETH')} ETH
-                                  </div>
-                                  <div className="text-[9px] text-amber-300 font-semibold mt-0.5">
-                                    {potentialEarnings.profitPercent.toFixed(1)}% ROI
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                              
-                              {/* Share of Pool Row */}
-                              <TableRow className="border-slate-700/50 hover:bg-slate-800/30">
-                                <TableCell className="py-2 text-[10px] text-blue-300 font-medium">
-                                  <div className="flex items-center gap-1.5">
-                                    <PieChart className="w-3 h-3 text-blue-400" />
-                                    <span>Share of pool</span>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="py-2 text-right">
-                                  <div className="text-xs font-bold text-blue-300 mb-1">
-                                    {potentialEarnings.sharePercent.toFixed(2)}%
-                                  </div>
-                                  <Progress value={Math.min(potentialEarnings.sharePercent, 100)} className="h-1.5 bg-slate-800/60" />
-                                </TableCell>
-                              </TableRow>
-                              
-                              {/* Pool After Bet Row */}
-                              <TableRow className="border-slate-700/50 hover:bg-slate-800/30">
-                                <TableCell className="py-2 text-[10px] text-purple-300 font-medium">
-                                  <div className="flex items-center gap-1.5">
-                                    <Info className="w-3 h-3 text-purple-400" />
-                                    <span>Pool after bet</span>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="py-2 text-right">
-                                  <div className="text-xs font-bold text-purple-300">
-                                    {formatTokenAmount(potentialEarnings.totalPoolAfter, 'ETH')} ETH
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            </TableBody>
-                          </Table>
-                        ) : (
-                          <div className="text-center py-3 text-cyan-300 text-xs flex items-center justify-center gap-2">
-                            <Info className="w-3.5 h-3.5 text-[#d4ff00]" />
-                            <span>Enter an amount to preview potential payout</span>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* SWIPE Content - Compact */}
-              <TabsContent value="SWIPE" className="mt-3 space-y-3">
-                <Card className="bg-gradient-to-br from-slate-900/90 via-slate-800/60 to-slate-900/90 border-slate-700/60 backdrop-blur-xl shadow-xl">
-                  <CardContent className="p-3">
-                    <div className="space-y-3">
-                      <label className="text-xs text-[#d4ff00] font-semibold flex items-center gap-1.5">
-                        <Wallet className="w-3.5 h-3.5" />
-                        Bet Amount
-                      </label>
-                      
-                      {/* Modern Manual Input for SWIPE - Smaller */}
-                      <div className="mt-3 relative">
-                        <div className="relative">
-                          <Input
-                            type="text"
-                            inputMode="numeric"
-                          value={stakeModal.stakeAmount || "100000"}
-                            onChange={(e) => {
-                              const value = e.target.value.replace(/[^0-9]/g, '');
-                              if (value === '' || parseFloat(value) >= 100000) {
-                                handleStakeAmountChange(value || "100000");
-                              }
-                            }}
-                            placeholder="100000"
-                            className="w-full h-12 text-2xl font-extrabold bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-2 border-[#d4ff00]/40 rounded-xl text-[#d4ff00] text-center placeholder:text-slate-600 focus:border-[#d4ff00] focus:ring-2 focus:ring-[#d4ff00]/20 focus:shadow-lg focus:shadow-[#d4ff00]/10 transition-all duration-300 backdrop-blur-sm"
-                          style={{
-                              WebkitAppearance: 'none', 
-                              MozAppearance: 'textfield',
-                            }}
-                          />
-                          <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#d4ff00]/0 via-[#d4ff00]/5 to-[#d4ff00]/0 pointer-events-none" />
                   </div>
-                      </div>
-                      
-                      {/* Modern USD Equivalent - Smaller */}
-                      {(() => {
-                        const amount = parseFloat(stakeModal.stakeAmount) || 0;
-                        const usdValue = getUsdValue(amount, 'SWIPE');
-                        if (usdValue !== null && amount > 0) {
-                          return (
-                            <div className="flex items-center justify-center gap-2 py-2 px-3 bg-gradient-to-r from-[#d4ff00]/15 via-[#d4ff00]/10 to-[#d4ff00]/15 rounded-lg border border-[#d4ff00]/30 backdrop-blur-sm shadow-lg shadow-[#d4ff00]/10">
-                              <DollarSign className="w-3.5 h-3.5 text-[#d4ff00]" />
-                              <span className="text-[#d4ff00] font-bold text-base">
-                                ≈ ${usdValue < 0.01 ? usdValue.toFixed(4) : usdValue < 1 ? usdValue.toFixed(3) : usdValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </span>
-                              <span className="text-slate-400 text-[10px] font-medium">USD</span>
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
 
-                      {/* Modern Quick Amount Buttons - Smaller */}
-                      <div className="grid grid-cols-4 gap-2">
-                        {['100000', '500000', '1000000', '5000000'].map((amount) => (
-                          <Button
-                            key={amount}
-                            onClick={() => handleStakeAmountChange(amount)}
-                            variant="outline"
-                            className="h-8 rounded-lg border-2 border-[#d4ff00]/50 bg-slate-900/50 text-white font-bold text-[9px] hover:bg-[#d4ff00]/20 hover:border-[#d4ff00]/80 hover:scale-105 transition-all duration-200 backdrop-blur-sm"
-                          >
-                            {parseInt(amount) >= 1000000 ? `${parseInt(amount) / 1000000}M` : `${parseInt(amount) / 1000}K`}
-                          </Button>
-                        ))}
+                  <div className="flex items-center justify-center gap-2 py-2 px-3 bg-gradient-to-r from-[#d4ff00]/15 via-[#d4ff00]/10 to-[#d4ff00]/15 rounded-lg border border-[#d4ff00]/30 backdrop-blur-sm">
+                    <Info className="w-3.5 h-3.5 text-[#d4ff00]" />
+                    <span className="text-slate-300 text-[10px] font-medium">
+                      Minimum {minBetDisplay} {collateralSymbol}
+                    </span>
                   </div>
+
+                  {marketWrite.wrongNetwork && (
+                    <div className="flex items-center justify-center gap-2 py-2 px-3 bg-amber-500/10 rounded-lg border border-amber-500/30">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                      <span className="text-amber-200 text-[10px] font-medium">
+                        Your wallet is on another network. It will be asked to switch before signing.
+                      </span>
+                    </div>
+                  )}
                 </div>
 
-                    {/* Modern Potential Earnings Card for SWIPE - Compact Table */}
-                    <Card className="bg-gradient-to-br from-slate-900/90 via-emerald-950/30 to-slate-900/90 border-2 border-emerald-500/20 backdrop-blur-xl shadow-2xl">
-                      <CardContent className="p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-1.5">
-                            <Calculator className="w-3.5 h-3.5 text-[#d4ff00]" />
-                            <span className="text-xs font-bold text-[#d4ff00]">Potential Earnings</span>
-                          </div>
-                          <Badge variant="outline" className="text-[9px] border-[#d4ff00]/40 text-[#d4ff00] bg-[#d4ff00]/10 font-semibold px-1.5 py-0.5">EST.</Badge>
-                        </div>
-                        {potentialEarnings ? (
-                          <Table>
-                            <TableBody>
-                              {/* Payout Row */}
-                              <TableRow className="border-slate-700/50 hover:bg-slate-800/30">
-                                <TableCell className="py-2 text-[10px] text-blue-300 font-medium">
-                                  <div className="flex items-center gap-1.5">
-                                    <ArrowUpRight className="w-3 h-3 text-blue-400" />
-                                    <span>Payout</span>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="py-2 text-right">
-                                  <div className="text-xs font-extrabold text-[#d4ff00]">
-                                    {formatTokenAmount(potentialEarnings.payout, 'SWIPE')} SWIPE
-                                  </div>
-                                  {(() => {
-                                    const usd = formatUsdValueLocal(potentialEarnings.payout, 'SWIPE');
-                                    return usd ? (
-                                      <div className="text-[9px] text-cyan-300 mt-0.5">
-                                        ${usd}
-                                      </div>
-                                    ) : null;
-                                  })()}
-                                </TableCell>
-                              </TableRow>
-                              
-                              {/* Profit Row */}
-                              <TableRow className="border-slate-700/50 hover:bg-slate-800/30">
-                                <TableCell className="py-2 text-[10px] text-emerald-300 font-medium">
-                                  <div className="flex items-center gap-1.5">
-                                    <TrendingUp className="w-3 h-3 text-emerald-400" />
-                                    <span>Profit</span>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="py-2 text-right">
-                                  <div className="text-xs font-extrabold text-[#d4ff00]">
-                                    +{formatTokenAmount(potentialEarnings.profit, 'SWIPE')} SWIPE
-                                  </div>
-                                  <div className="text-[9px] text-amber-300 font-semibold mt-0.5">
-                                    {potentialEarnings.profitPercent.toFixed(1)}% ROI
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                              
-                              {/* Share of Pool Row */}
-                              <TableRow className="border-slate-700/50 hover:bg-slate-800/30">
-                                <TableCell className="py-2 text-[10px] text-blue-300 font-medium">
-                                  <div className="flex items-center gap-1.5">
-                                    <PieChart className="w-3 h-3 text-blue-400" />
-                                    <span>Share of pool</span>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="py-2 text-right">
-                                  <div className="text-xs font-bold text-blue-300 mb-1">
-                                    {potentialEarnings.sharePercent.toFixed(2)}%
-                                  </div>
-                                  <Progress value={Math.min(potentialEarnings.sharePercent, 100)} className="h-1.5 bg-slate-800/60" />
-                                </TableCell>
-                              </TableRow>
-                              
-                              {/* Pool After Bet Row */}
-                              <TableRow className="border-slate-700/50 hover:bg-slate-800/30">
-                                <TableCell className="py-2 text-[10px] text-purple-300 font-medium">
-                                  <div className="flex items-center gap-1.5">
-                                    <Info className="w-3 h-3 text-purple-400" />
-                                    <span>Pool after bet</span>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="py-2 text-right">
-                                  <div className="text-xs font-bold text-purple-300">
-                                    {formatTokenAmount(potentialEarnings.totalPoolAfter, 'SWIPE')} SWIPE
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            </TableBody>
-                          </Table>
-                        ) : (
-                          <div className="text-center py-3 text-cyan-300 text-xs flex items-center justify-center gap-2">
-                            <Info className="w-3.5 h-3.5 text-[#d4ff00]" />
-                            <span>Enter an amount to preview potential payout</span>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
+                {/* Potential Earnings - Compact Table */}
+                <Card className="bg-gradient-to-br from-slate-900/90 via-emerald-950/30 to-slate-900/90 border-2 border-emerald-500/20 backdrop-blur-xl shadow-2xl mt-3">
+                  <CardContent className="p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5">
+                        <Calculator className="w-3.5 h-3.5 text-[#d4ff00]" />
+                        <span className="text-xs font-bold text-[#d4ff00]">Potential earnings</span>
+                      </div>
+                      <Badge variant="outline" className="text-[9px] border-[#d4ff00]/40 text-[#d4ff00] bg-[#d4ff00]/10 font-semibold px-1.5 py-0.5">EST.</Badge>
+                    </div>
+                    {potentialEarnings ? (
+                      <Table>
+                        <TableBody>
+                          <TableRow className="border-slate-700/50 hover:bg-slate-800/30">
+                            <TableCell className="py-2 text-[10px] text-blue-300 font-medium">
+                              <div className="flex items-center gap-1.5">
+                                <ArrowUpRight className="w-3 h-3 text-blue-400" />
+                                <span>Payout</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-2 text-right">
+                              <div className="text-xs font-extrabold text-[#d4ff00]">
+                                {potentialEarnings.payout.toFixed(2)} {potentialEarnings.token}
+                              </div>
+                            </TableCell>
+                          </TableRow>
 
+                          <TableRow className="border-slate-700/50 hover:bg-slate-800/30">
+                            <TableCell className="py-2 text-[10px] text-emerald-300 font-medium">
+                              <div className="flex items-center gap-1.5">
+                                <TrendingUp className="w-3 h-3 text-emerald-400" />
+                                <span>Profit</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-2 text-right">
+                              <div className="text-xs font-extrabold text-[#d4ff00]">
+                                +{potentialEarnings.profit.toFixed(2)} {potentialEarnings.token}
+                              </div>
+                              <div className="text-[9px] text-amber-300 font-semibold mt-0.5">
+                                {potentialEarnings.profitPercent.toFixed(1)}% ROI
+                              </div>
+                            </TableCell>
+                          </TableRow>
+
+                          <TableRow className="border-slate-700/50 hover:bg-slate-800/30">
+                            <TableCell className="py-2 text-[10px] text-blue-300 font-medium">
+                              <div className="flex items-center gap-1.5">
+                                <PieChart className="w-3 h-3 text-blue-400" />
+                                <span>Share of pool</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-2 text-right">
+                              <div className="text-xs font-bold text-blue-300 mb-1">
+                                {potentialEarnings.sharePercent.toFixed(2)}%
+                              </div>
+                              <Progress value={Math.min(potentialEarnings.sharePercent, 100)} className="h-1.5 bg-slate-800/60" />
+                            </TableCell>
+                          </TableRow>
+
+                          <TableRow className="border-slate-700/50 hover:bg-slate-800/30">
+                            <TableCell className="py-2 text-[10px] text-purple-300 font-medium">
+                              <div className="flex items-center gap-1.5">
+                                <Info className="w-3 h-3 text-purple-400" />
+                                <span>Pool after bet</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-2 text-right">
+                              <div className="text-xs font-bold text-purple-300">
+                                {potentialEarnings.totalPoolAfter.toFixed(2)} {potentialEarnings.token}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    ) : (
+                      <div className="text-center py-3 text-cyan-300 text-xs flex items-center justify-center gap-2">
+                        <Info className="w-3.5 h-3.5 text-[#d4ff00]" />
+                        <span>Enter an amount to preview potential payout</span>
+                      </div>
+                    )}
+                    <p className="text-[9px] text-slate-500 mt-2 leading-snug">
+                      An estimate on the pools as they stand. V3 also weights your share of the losing pool by how early you bet, which this does not model.
+                    </p>
                   </CardContent>
                 </Card>
-              </TabsContent>
-            </Tabs>
+
+              </CardContent>
+            </Card>
               </div>
 
           {/* Modern Footer Actions - Compact */}
@@ -3820,36 +3568,29 @@ KEY USER-FACING CHANGES: V1 → V2
             </Button>
             <Button
                   onClick={handleConfirmStake}
-                  disabled={isTransactionLoading}
-              className={`flex-1 h-11 font-bold text-sm rounded-lg transition-all duration-300 shadow-xl hover:scale-[1.02] active:scale-[0.98] ${
-                stakeModal.selectedToken === 'ETH' 
-                  ? 'bg-gradient-to-r from-[#d4ff00] via-[#b8e600] to-[#d4ff00] hover:from-[#c4ef00] hover:via-[#a8cc00] hover:to-[#c4ef00] text-black shadow-[#d4ff00]/30' 
-                  : 'bg-gradient-to-r from-[#d4ff00] via-[#b8e600] to-[#d4ff00] hover:from-[#c4ef00] hover:via-[#a8cc00] hover:to-[#c4ef00] text-black shadow-[#d4ff00]/30'
-              }`}
+                  disabled={isTransactionLoading || !marketWrite.ready}
+              className="flex-1 h-11 font-bold text-sm rounded-lg transition-all duration-300 shadow-xl hover:scale-[1.02] active:scale-[0.98] bg-gradient-to-r from-[#d4ff00] via-[#b8e600] to-[#d4ff00] hover:from-[#c4ef00] hover:via-[#a8cc00] hover:to-[#c4ef00] text-black shadow-[#d4ff00]/30 disabled:opacity-60"
                 >
                   {isTransactionLoading ? (
                 <div className="flex items-center gap-2">
-                  <div className={`w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin ${stakeModal.selectedToken === 'ETH' ? 'border-black' : 'border-black'}`} />
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin border-black" />
                   <span className="text-sm">Processing...</span>
                 </div>
+                  ) : !marketWrite.ready ? (
+                    <div className="flex items-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4" />
+                      <span className="text-sm">No market on this network</span>
+                    </div>
+                  ) : needsApproval ? (
+                    <div className="flex items-center gap-1.5">
+                      <Zap className="w-4 h-4" />
+                      <span className="text-sm">Approve and bet {stakeModal.stakeAmount} {collateralSymbol}</span>
+                    </div>
                   ) : (
-                    (() => {
-                      if (stakeModal.selectedToken === 'SWIPE') {
-                        const amount = parseFloat(stakeModal.stakeAmount);
-                    return (
-                      <div className="flex items-center gap-1.5">
-                        <Zap className="w-4 h-4" />
-                        <span className="text-sm">Approve & Bet {formatSwipeAmount(amount)} SWIPE</span>
-                      </div>
-                    );
-                  }
-                  return (
                     <div className="flex items-center gap-1.5">
                       <Target className="w-4 h-4" />
-                      <span className="text-sm">Confirm Bet</span>
+                      <span className="text-sm">Bet {stakeModal.stakeAmount} {collateralSymbol}</span>
                     </div>
-                  );
-                    })()
                   )}
             </Button>
           </DialogFooter>
@@ -4237,16 +3978,16 @@ KEY USER-FACING CHANGES: V1 → V2
       </Dialog>
 
       {/* Share Preview Modal */}
-      {currentCard && currentCard.id !== 0 && (
+      {currentCard && currentCard.id !== 0 && currentCard.redisId && (
         <SharePreviewModal
           isOpen={sharePreviewModal.isOpen}
           onClose={handleShareModalClose}
           prediction={{
-            id: getPredictionIdForShare(currentCard.id),
+            id: currentCard.redisId,
             question: currentCard.prediction,
             category: currentCard.category,
-            totalPoolETH: transformedPredictions[currentIndex] 
-              ? ((transformedPredictions[currentIndex].yesTotalAmount || 0) + (transformedPredictions[currentIndex].noTotalAmount || 0)) / 1e18 
+            totalPoolETH: transformedPredictions[currentIndex]
+              ? ((transformedPredictions[currentIndex].usdcYesTotalAmount || 0) + (transformedPredictions[currentIndex].usdcNoTotalAmount || 0)) / Math.pow(10, collateralDecimals)
               : 0,
             participantsCount: currentCardParticipants.length,
             imageUrl: currentCard.image,

@@ -293,7 +293,8 @@ function MarketCard({
     if (!isExpanded) return;
     
     setLoadingHistory(true);
-    fetch(`/api/predictions/${predictionId}/price-history`)
+    // The chart is per chain: market 1 has a different price line on each.
+    fetch(`/api/predictions/${predictionId}/price-history?chain=${cardChainKey}`)
       .then(res => res.json())
       .then(data => {
         if (data.success && data.data.history) {
@@ -827,7 +828,7 @@ export default function SwipeMarkets() {
             const syncResponse = await fetch('/api/sync/usdc', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ predictionIds: [ref ? ref.redisId : numericId] })
+              body: JSON.stringify({ chain: chainKey, predictionIds: [ref ? ref.redisId : numericId] })
             });
             
             if (syncResponse.ok) {
@@ -837,7 +838,7 @@ export default function SwipeMarkets() {
               
               // Save price history point with new pool data
               if (result?.registered) {
-                await fetch(`/api/predictions/${betModal.predictionId}/price-history`, {
+                await fetch(`/api/predictions/${betModal.predictionId}/price-history?chain=${chainKey}`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
@@ -1009,7 +1010,7 @@ export default function SwipeMarkets() {
             const syncResponse = await fetch('/api/sync/usdc', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ predictionIds: [exitRef ? exitRef.redisId : numericId] })
+              body: JSON.stringify({ chain: chainKey, predictionIds: [exitRef ? exitRef.redisId : numericId] })
             });
             
             if (syncResponse.ok) {
@@ -1022,7 +1023,7 @@ export default function SwipeMarkets() {
                 const yesPool = (result.yesPool || 0) * 1e6;
                 const noPool = (result.noPool || 0) * 1e6;
 
-                await fetch(`/api/predictions/${exitRef.redisId}/price-history`, {
+                await fetch(`/api/predictions/${exitRef.redisId}/price-history?chain=${chainKey}`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
