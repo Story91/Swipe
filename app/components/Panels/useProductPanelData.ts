@@ -51,6 +51,15 @@ export function useProductPanelData(address?: string): PanelData {
     let cancelled = false;
 
     const load = async () => {
+      // Back to loading on every run, not just the first, and the previous
+      // chain's answers go with it. This effect re-runs when the chain changes,
+      // and ProductPanels only draws its skeleton while `loading && !stats`, so
+      // leaving the old stats in place would keep Base's numbers on screen
+      // under the new chain's name until the request came back.
+      setLoading(true);
+      setStats(null);
+      setActivity([]);
+
       // Both are independent; one failing must not blank the other.
       const [statsRes, activityRes] = await Promise.allSettled([
         fetch(`/api/market/compact-stats?chain=${chainKey}`).then((r) => r.json()),
@@ -72,7 +81,7 @@ export function useProductPanelData(address?: string): PanelData {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [chainKey]);
 
   useEffect(() => {
     if (!address) {
@@ -80,6 +89,11 @@ export function useProductPanelData(address?: string): PanelData {
       return;
     }
     let cancelled = false;
+
+    // Back to null while the new chain's count is in flight. This is a count of
+    // money waiting to be claimed, so the wrong chain's number is worse than no
+    // number, and null is already the state the widget hides on.
+    setClaimCount(null);
 
     fetch(`/api/claims/count?userId=${address}&chain=${chainKey}`)
       .then((r) => r.json())
@@ -93,7 +107,7 @@ export function useProductPanelData(address?: string): PanelData {
     return () => {
       cancelled = true;
     };
-  }, [address]);
+  }, [address, chainKey]);
 
   return { stats, activity, claimCount, loading };
 }

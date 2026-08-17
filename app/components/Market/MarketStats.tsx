@@ -143,8 +143,9 @@ export function MarketStats() {
 
     fetchMarketStats();
 
-    // No auto-refresh - data loads once on page load
-  }, []);
+    // No auto-refresh - data loads once on page load, and again whenever the
+    // chain changes, since every URL above carries chainKey.
+  }, [chainKey]);
 
   if (loading) {
     return (

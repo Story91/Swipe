@@ -73,6 +73,10 @@ export function Leaderboard() {
     const loadRealData = async () => {
       try {
         setLoading(true);
+        // Drop the previous chain's board before asking for this one. A chain
+        // with no snapshot cached 404s, and without this the old standings
+        // would sit there under the new chain's name as if they were its own.
+        setRealData(null);
         const response = await fetch(`/api/leaderboard/real-data?chain=${chainKey}`);
 
         if (response.ok) {
@@ -89,7 +93,11 @@ export function Leaderboard() {
     };
 
     loadRealData();
-  }, []);
+    // chainKey, because the effect reads it. It is the default on the first
+    // render and only becomes the stored preference after mount, so an empty
+    // array here pinned the board to Base: the switcher moved, the heading
+    // moved, and the standings underneath stayed Base's.
+  }, [chainKey]);
 
   const addresses = useMemo(() => {
     if (!realData) return [];

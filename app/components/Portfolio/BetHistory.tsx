@@ -130,7 +130,7 @@ export function BetHistory() {
     // Auto-refresh every 30 seconds
     const interval = setInterval(fetchBetHistory, 30000);
     return () => clearInterval(interval);
-  }, [address]);
+  }, [address, chainKey]);
 
   const shown = useMemo(() => {
     const days = RANGES.find(r => r.key === timeRange)?.days ?? null;

@@ -97,7 +97,7 @@ export function CompactStats() {
     };
 
     fetchStats();
-  }, []);
+  }, [chainKey]);
 
   if (loading) {
     return (

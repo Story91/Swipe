@@ -303,7 +303,7 @@ function MarketCard({
       })
       .catch(console.error)
       .finally(() => setLoadingHistory(false));
-  }, [isExpanded, predictionId, refreshKey]);
+  }, [isExpanded, predictionId, refreshKey, cardChainKey]);
 
   // Generate chart data - always include starting point at 50/50
   const chartData = useMemo(() => {

@@ -29,6 +29,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Menu, Plus, BarChart3, PlayCircle, Trophy, HelpCircle, Settings } from "lucide-react";
 import { useAccount, useConnect } from "wagmi";
+import { useActiveChain } from "@/lib/chains/activeChain";
 import { useState, useEffect, useRef, Suspense, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -121,6 +122,8 @@ export default function App() {
   const [isHowToPlayOpen, setIsHowToPlayOpen] = useState(false);
   const { address } = useAccount();
   const { connect, connectors } = useConnect();
+  // The claim badge is per chain, so the count has to be asked for per chain.
+  const { chainKey } = useActiveChain();
   const tinderCardRef = useRef<{ refresh: () => void; goToPrediction?: (id: string) => void } | null>(null);
   const dashboardTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [hasTriedAddMiniApp, setHasTriedAddMiniApp] = useState(false);
@@ -336,8 +339,11 @@ export default function App() {
       }
 
       try {
-        // Use fast dedicated endpoint that doesn't require loading full dashboard data
-        const response = await fetch(`/api/claims/count?userId=${address.toLowerCase()}`);
+        // Use fast dedicated endpoint that doesn't require loading full dashboard data.
+        // The chain has to travel with it, the same way useProductPanelData sends
+        // it for this very widget: without it the badge counts Base's claims and
+        // tells a user on another network they have money waiting that is not there.
+        const response = await fetch(`/api/claims/count?userId=${address.toLowerCase()}&chain=${chainKey}`);
         if (!response.ok) {
           setReadyToClaimCount(0);
           return;
@@ -361,7 +367,7 @@ export default function App() {
     // Refresh every 30 seconds
     const interval = setInterval(fetchReadyToClaimCount, 30000);
     return () => clearInterval(interval);
-  }, [address]);
+  }, [address, chainKey]);
 
 
   // Function to refresh predictions data

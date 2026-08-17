@@ -113,7 +113,7 @@ export function PlatformAnalytics() {
     // Auto-refresh every 60 seconds
     const interval = setInterval(fetchAnalytics, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [chainKey]);
 
   const shell = (body: React.ReactNode) => (
     <div className="sheet">

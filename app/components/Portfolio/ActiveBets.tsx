@@ -117,7 +117,12 @@ export function ActiveBets() {
     // Auto-refresh every 30 seconds
     const interval = setInterval(fetchActiveBets, 30000);
     return () => clearInterval(interval);
-  }, [address]);
+    // chainKey belongs here. It starts at the default and only picks up the
+    // stored preference after mount, so an effect that omits it fetches Base
+    // once and never again, and the interval it starts keeps that same closure
+    // and re-fetches Base every 30 seconds. The switcher changed the label
+    // while these positions stayed Base's.
+  }, [address, chainKey]);
 
   const shown = useMemo(() => {
     const filtered = activeBets.filter(bet =>

@@ -46,7 +46,11 @@ export function useAdminPredictions() {
     } finally {
       setLoading(false);
     }
-  }, []);
+    // chainKey, because the URL above interpolates it. It is the default until
+    // the stored preference lands after mount, so leaving it out froze the
+    // admin list on Base: the mount effect below runs once off this callback,
+    // and the callback never changed again.
+  }, [chainKey]);
 
   // Fetch all predictions (resolved, cancelled, etc.) - SLOW but comprehensive
   const fetchAllPredictions = useCallback(async () => {
@@ -80,7 +84,7 @@ export function useAdminPredictions() {
     } finally {
       setLoading(false);
     }
-  }, [loadedAll]);
+  }, [loadedAll, chainKey]);
 
   // Fetch specific category on demand
   const fetchByCategory = useCallback(async (category: 'active' | 'expired' | 'resolved' | 'cancelled' | 'all') => {
@@ -90,11 +94,15 @@ export function useAdminPredictions() {
     try {
       console.log(`🔍 Fetching ${category} predictions for admin...`);
       
-      let url = '/api/predictions';
+      // The chain goes first so the status filter can always be appended with
+      // an ampersand. This request used to send no chain at all, unlike its two
+      // siblings above, so every category filter in the admin panel answered
+      // with Base's markets no matter which network was selected.
+      let url = `/api/predictions?chain=${chainKey}`;
       if (category !== 'all') {
-        url += `?status=${category}`;
+        url += `&status=${category}`;
       }
-      
+
       const response = await fetch(url);
       
       if (!response.ok) {
@@ -144,7 +152,7 @@ export function useAdminPredictions() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [chainKey]);
 
   // Refresh data
   const refreshData = useCallback(async () => {
