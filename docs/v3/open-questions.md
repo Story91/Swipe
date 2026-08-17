@@ -24,30 +24,37 @@ lines — so a migration path is possible if that is the direction.
 
 ## Parameters, needed before the contract is final
 
-### 2. Minimum pool threshold
+All four are closed — the contract is written and its parameters are settled.
+Kept struck through rather than deleted, so the record of what was asked
+survives.
 
-The value, and whether it is one global number or set per market. Too low and it
-changes nothing; too high and every market on a quiet week auto-refunds, which
-reads to users as the platform being broken.
+### ~~2. Minimum pool threshold~~
 
-### 3. Cap on simultaneously open markets
+**Dropped, not chosen.** A market that missed a threshold would have refunded
+everyone instead of paying out — solving market sprawl a second time while
+punishing people for betting on a quiet market. `rules-v3.md` §5.1. Closed
+2026-08-17.
 
-The number, and where it is enforced. In the contract it is a real guarantee but
-costs gas to track; in the market creation path it is trivial but is only a
-convention.
+### ~~3. Cap on simultaneously open markets~~
 
-### 4. Early-entry bracket boundaries for short markets
+**12, enforced in the market creation path.** `registerPrediction` is already
+`onlyResolver`, so the backend physically controls how many markets exist; an
+on-chain counter would cost a storage write per resolution and guarantee
+nothing extra. `rules-v3.md` §5.2. Closed 2026-08-17.
 
-The ×1.50 bracket is "the first 24 hours". A market that is only open for two
-hours has no such window. Options: brackets as fractions of the market's own
-lifetime rather than absolute hours, or a minimum market duration.
+### ~~4. Early-entry bracket boundaries for short markets~~
 
-### 5. Creator bond: size, and where a forfeited bond goes
+**Quarters of the market's own lifetime**, not fixed hours — one rule that
+works for a two-hour market and a seven-day one alike. Implemented as
+`weightBpsAt`. `rules-v3.md` §5.3. Closed 2026-08-17.
 
-Size has to be high enough to deter spam and low enough that a genuine creator
-will risk it. Destination is a design choice with a real difference: to the
-platform treasury it is revenue; added to the next market's pool it is a visible
-bonus for players.
+### ~~5. Creator bond: size, and where a forfeited bond goes~~
+
+**Moot — the bond was removed.** It widened what the hot resolver key could
+reach and was defeated for one cent by wash-betting both sides. Neither size
+nor destination needs deciding. See §5.3 of
+[the spec](../superpowers/specs/2026-08-17-v3-market-rules-design.md). Closed
+2026-08-17.
 
 ## Carried over, still unanswered
 
