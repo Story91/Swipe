@@ -1,40 +1,38 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useAccount } from 'wagmi';
-import { useActiveChain } from '@/lib/chains/activeChain';
+import type { StakeToken } from '@/lib/userStake';
+import { usePortfolio, type PortfolioRow } from './usePortfolio';
+import {
+  symbolFor,
+  isArchivedLeg,
+  formatAmount,
+  formatSigned,
+  totalsByToken,
+  tokenRank,
+  rowKey,
+} from './portfolioTokens';
+import { StaleNotice, ArchivedNote, ArchivedTag } from './PortfolioNotes';
 import '../../styles/sheet.css';
 import './ActiveBets.css';
 
 /**
  * Open positions, on the shared sheet.
  *
- * The countdown and the odds bar are now real. This screen used to derive
- * "time left" from `createdAt + 7 days`, a deadline no market actually has,
- * and drew every odds bar at a hardcoded 50/50 with a pool of
- * `stake * 2`. /api/portfolio carries the market's real deadline and both
- * pools now, so all three come from the market.
+ * The countdown and the odds bar are real. This screen used to derive "time
+ * left" from `createdAt + 7 days`, a deadline no market has, and drew every
+ * odds bar at a hardcoded 50/50 with a pool of `stake * 2`. /api/portfolio
+ * carries the market's own deadline and both pools, so all three come from the
+ * market.
  *
- * That mattered more than it looks: an invented countdown in a betting app
- * tells someone they still have time to change their mind on a market that may
- * already have closed.
+ * The units are real too, which they were not. Every figure here had the word
+ * ETH typed next to it, on a screen that lists collateral positions: a bet of
+ * twenty five dollars on Robinhood was announced as "25 ETH", and the exposure
+ * ledger at the bottom added dollars to ether and printed the result as one
+ * number. Exposure is now one ledger per token, and nothing on this screen is
+ * summed across tokens.
  */
-
-interface ActiveBet {
-  id: string;
-  question: string;
-  category: string;
-  stakeAmount: number;
-  choice: 'YES' | 'NO';
-  potentialPayout: number;
-  profit: number;
-  createdAt: number;
-  imageUrl: string;
-  /** Unix seconds. */
-  deadline: number;
-  yesPool: number;
-  noPool: number;
-}
 
 type Filter = 'all' | 'yes' | 'no';
 type SortKey = 'time' | 'stake' | 'profit';
@@ -68,83 +66,56 @@ function timeLeft(deadlineSeconds: number) {
 }
 
 export function ActiveBets() {
-  // The active chain travels with every read below. The server defaults to
-  // Base when no chain is sent, which is right for Base and wrong for every
-  // other chain, so without this a user on Robinhood sees Base's numbers.
-  const { chainKey } = useActiveChain();
   const { address } = useAccount();
-  const [activeBets, setActiveBets] = useState<ActiveBet[]>([]);
+  // The chain comes out of the same hook that sent it, so the symbol beside a
+  // figure is always the symbol of the chain the figure was read from.
+  const { chainKey, rows, loading, error, refresh } = usePortfolio(address);
+
+  const symbol = (token: StakeToken | undefined) => symbolFor(token, chainKey);
+
   const [filter, setFilter] = useState<Filter>('all');
   const [sortBy, setSortBy] = useState<SortKey>('time');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchActiveBets = async () => {
-      if (!address) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        setError(null);
-
-        const response = await fetch(`/api/portfolio?userAddress=${address}&chain=${chainKey}`);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const result = await response.json();
-        if (result.success) {
-          const { portfolio } = result.data;
-          setActiveBets(
-            portfolio.filter((item: ActiveBet & { status: string }) => item.status === 'active')
-          );
-        } else {
-          throw new Error(result.error || 'Failed to fetch active bets');
-        }
-      } catch (err) {
-        console.error('❌ Failed to fetch active bets:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch active bets data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchActiveBets();
-
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchActiveBets, 30000);
-    return () => clearInterval(interval);
-    // chainKey belongs here. It starts at the default and only picks up the
-    // stored preference after mount, so an effect that omits it fetches Base
-    // once and never again, and the interval it starts keeps that same closure
-    // and re-fetches Base every 30 seconds. The switcher changed the label
-    // while these positions stayed Base's.
-  }, [address, chainKey]);
+  /**
+   * Everything that has not settled, which is more than the markets still
+   * taking bets.
+   *
+   * `pending` is a market whose deadline has passed with no result recorded, or
+   * one that was cancelled. The old screen dropped those rows entirely, so a
+   * stake sitting in a market that closed last week simply vanished from the
+   * one screen whose job is to show what you are still holding.
+   */
+  const openRows = useMemo(
+    () => (rows ?? []).filter((row) => row.status === 'active' || row.status === 'pending'),
+    [rows]
+  );
 
   const shown = useMemo(() => {
-    const filtered = activeBets.filter(bet =>
+    const filtered = openRows.filter((bet) =>
       filter === 'all' ? true : bet.choice.toLowerCase() === filter
     );
 
     return [...filtered].sort((a, b) => {
       switch (sortBy) {
         case 'stake':
-          return b.stakeAmount - a.stakeAmount;
-        case 'profit':
-          return b.profit - a.profit;
+        case 'profit': {
+          // Tokens first, then size inside a token. Ranking 25 USDC above
+          // 0.5 ETH would be a claim that one is bigger than the other, and
+          // those two numbers are not comparable.
+          const byToken = tokenRank(a.token) - tokenRank(b.token);
+          if (byToken !== 0) return byToken;
+          return sortBy === 'stake' ? b.stakeAmount - a.stakeAmount : b.profit - a.profit;
+        }
         case 'time':
         default:
           // Soonest to close first, which is the one worth acting on.
           return (a.deadline || Infinity) - (b.deadline || Infinity);
       }
     });
-  }, [activeBets, filter, sortBy]);
+  }, [openRows, filter, sortBy]);
 
-  const atStake = shown.reduce((sum, b) => sum + b.stakeAmount, 0);
-  const upside = shown.reduce((sum, b) => sum + b.profit, 0);
+  const exposure = useMemo(() => totalsByToken(shown), [shown]);
+  const hasArchived = shown.some((bet) => isArchivedLeg(bet.token));
 
   const shell = (body: React.ReactNode) => (
     <div className="sheet">
@@ -162,6 +133,7 @@ export function ActiveBets() {
             Markets you are in that have not settled. The countdown is the
             market&apos;s own deadline and the bar is where the money actually
             sits, so you can see whether you are with the crowd or against it.
+            Positions past their deadline with no result yet are here too.
           </p>
         </header>
         <main className="sheet-body">{body}</main>
@@ -185,7 +157,10 @@ export function ActiveBets() {
     );
   }
 
-  if (loading) {
+  // A read in flight and a read that failed only take the screen while there is
+  // nothing on it. After that they are a line above the rows, because rows that
+  // were read a minute ago are worth more than a spinner.
+  if (rows === null && loading) {
     return shell(
       <section className="sheet-block">
         <div className="sheet-rail">
@@ -201,7 +176,7 @@ export function ActiveBets() {
     );
   }
 
-  if (error) {
+  if (rows === null) {
     return shell(
       <section className="sheet-block">
         <div className="sheet-rail">
@@ -209,8 +184,13 @@ export function ActiveBets() {
         </div>
         <div>
           <div className="sheet-empty">
-            <strong>Could not load your positions</strong>
-            {error}
+            <strong>Could not read your positions</strong>
+            {error ?? 'The portfolio service did not answer.'}
+            <p>
+              <button type="button" className="sheet-action" onClick={refresh}>
+                Try again
+              </button>
+            </p>
           </div>
         </div>
       </section>
@@ -227,11 +207,13 @@ export function ActiveBets() {
           </p>
         </div>
         <div>
+          {error && <StaleNotice error={error} onRetry={refresh} />}
+
           <div className="ab-controls">
             <div className="ab-control-group">
               <span className="ab-control-label" id="ab-filter-label">Side</span>
               <div className="sheet-segment" role="group" aria-labelledby="ab-filter-label">
-                {FILTERS.map(f => (
+                {FILTERS.map((f) => (
                   <button
                     key={f.key}
                     type="button"
@@ -248,7 +230,7 @@ export function ActiveBets() {
             <div className="ab-control-group">
               <span className="ab-control-label" id="ab-sort-label">Sort</span>
               <div className="sheet-segment" role="group" aria-labelledby="ab-sort-label">
-                {SORTS.map(s => (
+                {SORTS.map((s) => (
                   <button
                     key={s.key}
                     type="button"
@@ -262,6 +244,8 @@ export function ActiveBets() {
               </div>
             </div>
           </div>
+
+          {hasArchived && <ArchivedNote />}
 
           {shown.length === 0 ? (
             <div className="sheet-empty">
@@ -279,13 +263,16 @@ export function ActiveBets() {
                 <span>Closes</span>
               </div>
 
-              {shown.map(bet => {
+              {shown.map((bet: PortfolioRow) => {
                 const clock = timeLeft(bet.deadline);
                 const pool = (bet.yesPool || 0) + (bet.noPool || 0);
                 const yesPct = pool > 0 ? ((bet.yesPool || 0) / pool) * 100 : null;
+                const archived = isArchivedLeg(bet.token);
 
                 return (
-                  <div key={bet.id} className="ab-row">
+                  // Keyed on market and token: one market held in two tokens is
+                  // two rows, and they share an id.
+                  <div key={rowKey(bet.id, bet.token)} className="ab-row">
                     {bet.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img className="ab-thumb" src={bet.imageUrl} alt="" />
@@ -301,8 +288,9 @@ export function ActiveBets() {
                           {bet.choice}
                         </span>
                         <span className="ab-odds-note">
-                          {bet.stakeAmount} ETH staked
+                          {formatAmount(bet.stakeAmount, bet.token)} {symbol(bet.token)} staked
                         </span>
+                        {archived && <ArchivedTag />}
                       </div>
                     </div>
 
@@ -321,7 +309,9 @@ export function ActiveBets() {
                             <span className="ab-odds-yes" style={{ width: `${yesPct}%` }} />
                             <span className="ab-odds-no" style={{ width: `${100 - yesPct}%` }} />
                           </div>
-                          <span className="ab-odds-note">{pool.toFixed(3)} ETH in the pool</span>
+                          <span className="ab-odds-note">
+                            {formatAmount(pool, bet.token)} {symbol(bet.token)} in the pool
+                          </span>
                         </>
                       )}
                     </div>
@@ -329,9 +319,11 @@ export function ActiveBets() {
                     <div
                       className={`ab-clock${clock.ended ? ' ab-clock--ended' : clock.soon ? ' ab-clock--soon' : ''}`}
                     >
-                      {clock.text}
+                      {bet.status === 'pending' ? 'Not settled' : clock.text}
                       <span className="ab-clock-sub">
-                        {bet.potentialPayout.toFixed(4)} if it lands
+                        {archived
+                          ? 'no payout, nobody can resolve it'
+                          : `${formatAmount(bet.potentialPayout, bet.token)} ${symbol(bet.token)} if it lands`}
                       </span>
                     </div>
                   </div>
@@ -345,25 +337,47 @@ export function ActiveBets() {
       <section className="sheet-block">
         <div className="sheet-rail">
           <p className="sheet-eyebrow">Exposure</p>
-          <p className="sheet-rail-meta">{`What is riding\non these`}</p>
+          <p className="sheet-rail-meta">
+            {`What is riding\non these ${shown.length}`}
+          </p>
         </div>
         <div>
-          <div className="sheet-board">
-            <div className="sheet-settle">
-              <div className="sheet-settle-row">
-                <span className="sheet-settle-key">Positions open</span>
-                <span className="sheet-settle-val">{shown.length}</span>
-              </div>
-              <div className="sheet-settle-row">
-                <span className="sheet-settle-key">At stake</span>
-                <span className="sheet-settle-val">{atStake.toFixed(4)} ETH</span>
-              </div>
-              <div className="sheet-settle-row sheet-settle-row--total">
-                <span className="sheet-settle-key">Upside if every one lands</span>
-                <span className="sheet-settle-val">+{upside.toFixed(4)} ETH</span>
-              </div>
+          {exposure.length === 0 ? (
+            <div className="sheet-empty">
+              <strong>Nothing at stake</strong>
+              With no open position there is nothing to add up.
             </div>
-          </div>
+          ) : (
+            <div className="ab-exposure">
+              {exposure.map((total) => (
+                <div key={total.token} className="sheet-board">
+                  <div className="sheet-board-head">
+                    <h2 className="sheet-board-title">
+                      {symbol(total.token)}
+                      {isArchivedLeg(total.token) ? ', archived' : ''}
+                    </h2>
+                    <p className="sheet-board-meta">
+                      {total.count} {total.count === 1 ? 'position' : 'positions'}
+                    </p>
+                  </div>
+                  <div className="sheet-settle">
+                    <div className="sheet-settle-row">
+                      <span className="sheet-settle-key">At stake</span>
+                      <span className="sheet-settle-val">
+                        {formatAmount(total.staked, total.token)} {symbol(total.token)}
+                      </span>
+                    </div>
+                    <div className="sheet-settle-row sheet-settle-row--total">
+                      <span className="sheet-settle-key">Upside if every one lands</span>
+                      <span className="sheet-settle-val">
+                        {formatSigned(total.profit, total.token)} {symbol(total.token)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="sheet-note">
             <p>

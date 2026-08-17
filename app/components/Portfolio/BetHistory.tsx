@@ -1,8 +1,19 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useAccount } from 'wagmi';
-import { useActiveChain } from '@/lib/chains/activeChain';
+import type { StakeToken } from '@/lib/userStake';
+import { usePortfolio, type PortfolioRow } from './usePortfolio';
+import {
+  symbolFor,
+  isArchivedLeg,
+  formatAmount,
+  formatSigned,
+  totalsByToken,
+  tokenRank,
+  rowKey,
+} from './portfolioTokens';
+import { StaleNotice, ArchivedNote, ArchivedTag } from './PortfolioNotes';
 import '../../styles/sheet.css';
 import './BetHistory.css';
 
@@ -22,25 +33,14 @@ import './BetHistory.css';
  *
  * `resolvedAt` was `createdAt + 1 day`, and the time-range filter ran on it, so
  * "last 7 days" filtered on invented dates. Nothing in Redis records when a
- * market was resolved, so rather than invent one, the window now filters on
- * when the stake was placed and says so.
+ * market was resolved, so rather than invent one, the window filters on when
+ * the stake was placed and says so.
+ *
+ * The fifth was the unit. Every profit here was printed with ETH beside it,
+ * including positions held in the chain's stablecoin, and the window totals
+ * added the two together. Results are now per token, and the summary is one
+ * ledger for each.
  */
-
-interface HistoricalBet {
-  id: string;
-  question: string;
-  category: string;
-  stakeAmount: number;
-  choice: 'YES' | 'NO';
-  status: 'won' | 'lost';
-  potentialPayout: number;
-  profit: number;
-  createdAt: number;
-  imageUrl: string;
-  yesPool: number;
-  noPool: number;
-  outcome?: 'YES' | 'NO';
-}
 
 type Filter = 'all' | 'won' | 'lost';
 type SortKey = 'date' | 'profit' | 'stake';
@@ -65,9 +65,6 @@ const RANGES: { key: Range; label: string; days: number | null }[] = [
   { key: 'all', label: 'All time', days: null },
 ];
 
-const signed = (n: number, dp = 4) =>
-  `${n >= 0 ? '+' : '−'}${Math.abs(n).toFixed(dp)}`;
-
 function timeAgo(timestamp: number) {
   const diff = Date.now() - timestamp;
   const hours = Math.floor(diff / 3_600_000);
@@ -78,85 +75,52 @@ function timeAgo(timestamp: number) {
 }
 
 export function BetHistory() {
-  // The active chain travels with every read below. The server defaults to
-  // Base when no chain is sent, which is right for Base and wrong for every
-  // other chain, so without this a user on Robinhood sees Base's numbers.
-  const { chainKey } = useActiveChain();
   const { address } = useAccount();
-  const [bets, setBets] = useState<HistoricalBet[]>([]);
+  // Same read as the other two screens, so the chain that was asked for is the
+  // chain whose symbol gets printed.
+  const { chainKey, rows, loading, error, refresh } = usePortfolio(address);
+
+  const symbol = (token: StakeToken | undefined) => symbolFor(token, chainKey);
+
   const [filter, setFilter] = useState<Filter>('all');
   const [sortBy, setSortBy] = useState<SortKey>('date');
   const [timeRange, setTimeRange] = useState<Range>('30d');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchBetHistory = async () => {
-      if (!address) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        setError(null);
-
-        const response = await fetch(`/api/portfolio?userAddress=${address}&chain=${chainKey}`);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const result = await response.json();
-        if (result.success) {
-          const { portfolio } = result.data;
-          setBets(
-            portfolio.filter(
-              (item: HistoricalBet) => item.status === 'won' || item.status === 'lost'
-            )
-          );
-        } else {
-          throw new Error(result.error || 'Failed to fetch bet history');
-        }
-      } catch (err) {
-        console.error('❌ Failed to fetch bet history:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch bet history data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchBetHistory();
-
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchBetHistory, 30000);
-    return () => clearInterval(interval);
-  }, [address, chainKey]);
+  const settledRows = useMemo(
+    () => (rows ?? []).filter((row) => row.status === 'won' || row.status === 'lost'),
+    [rows]
+  );
 
   const shown = useMemo(() => {
-    const days = RANGES.find(r => r.key === timeRange)?.days ?? null;
+    const days = RANGES.find((r) => r.key === timeRange)?.days ?? null;
     const cutoff = days === null ? 0 : Date.now() - days * 86_400_000;
 
-    const filtered = bets
-      .filter(b => (filter === 'all' ? true : b.status === filter))
-      .filter(b => b.createdAt >= cutoff);
+    const filtered = settledRows
+      .filter((b) => (filter === 'all' ? true : b.status === filter))
+      .filter((b) => b.createdAt >= cutoff);
 
     return [...filtered].sort((a, b) => {
       switch (sortBy) {
         case 'profit':
-          return b.profit - a.profit;
-        case 'stake':
-          return b.stakeAmount - a.stakeAmount;
+        case 'stake': {
+          // Grouped by token before size, because a result of +25 USDC and a
+          // result of +0.5 ETH cannot be put in one order without implying a
+          // conversion nobody did.
+          const byToken = tokenRank(a.token) - tokenRank(b.token);
+          if (byToken !== 0) return byToken;
+          return sortBy === 'profit' ? b.profit - a.profit : b.stakeAmount - a.stakeAmount;
+        }
         case 'date':
         default:
           return b.createdAt - a.createdAt;
       }
     });
-  }, [bets, filter, sortBy, timeRange]);
+  }, [settledRows, filter, sortBy, timeRange]);
 
-  const won = shown.filter(b => b.status === 'won').length;
-  const staked = shown.reduce((sum, b) => sum + b.stakeAmount, 0);
-  const net = shown.reduce((sum, b) => sum + b.profit, 0);
-  const winRate = shown.length > 0 ? (won / shown.length) * 100 : 0;
+  const won = shown.filter((b) => b.status === 'won').length;
+  const winRate = shown.length > 0 ? (won / shown.length) * 100 : null;
+  const perToken = useMemo(() => totalsByToken(shown), [shown]);
+  const hasArchived = shown.some((bet) => isArchivedLeg(bet.token));
 
   const shell = (body: React.ReactNode) => (
     <div className="sheet">
@@ -197,7 +161,9 @@ export function BetHistory() {
     );
   }
 
-  if (loading) {
+  // Only while there is nothing else to show. A failed refresh leaves the rows
+  // where they are, because history that was read a minute ago is still history.
+  if (rows === null && loading) {
     return shell(
       <section className="sheet-block">
         <div className="sheet-rail">
@@ -213,7 +179,7 @@ export function BetHistory() {
     );
   }
 
-  if (error) {
+  if (rows === null) {
     return shell(
       <section className="sheet-block">
         <div className="sheet-rail">
@@ -221,8 +187,13 @@ export function BetHistory() {
         </div>
         <div>
           <div className="sheet-empty">
-            <strong>Could not load your history</strong>
-            {error}
+            <strong>Could not read your history</strong>
+            {error ?? 'The portfolio service did not answer.'}
+            <p>
+              <button type="button" className="sheet-action" onClick={refresh}>
+                Try again
+              </button>
+            </p>
           </div>
         </div>
       </section>
@@ -239,11 +210,13 @@ export function BetHistory() {
           </p>
         </div>
         <div>
+          {error && <StaleNotice error={error} onRetry={refresh} />}
+
           <div className="bh-controls">
             <div className="bh-control-group">
               <span className="bh-control-label" id="bh-filter-label">Show</span>
               <div className="sheet-segment" role="group" aria-labelledby="bh-filter-label">
-                {FILTERS.map(f => (
+                {FILTERS.map((f) => (
                   <button
                     key={f.key}
                     type="button"
@@ -260,7 +233,7 @@ export function BetHistory() {
             <div className="bh-control-group">
               <span className="bh-control-label" id="bh-range-label">Staked in</span>
               <div className="sheet-segment" role="group" aria-labelledby="bh-range-label">
-                {RANGES.map(r => (
+                {RANGES.map((r) => (
                   <button
                     key={r.key}
                     type="button"
@@ -277,7 +250,7 @@ export function BetHistory() {
             <div className="bh-control-group">
               <span className="bh-control-label" id="bh-sort-label">Sort</span>
               <div className="sheet-segment" role="group" aria-labelledby="bh-sort-label">
-                {SORTS.map(s => (
+                {SORTS.map((s) => (
                   <button
                     key={s.key}
                     type="button"
@@ -291,6 +264,8 @@ export function BetHistory() {
               </div>
             </div>
           </div>
+
+          {hasArchived && <ArchivedNote />}
 
           {shown.length === 0 ? (
             <div className="sheet-empty">
@@ -306,10 +281,13 @@ export function BetHistory() {
                 <span>Returned</span>
               </div>
 
-              {shown.map(bet => {
+              {shown.map((bet: PortfolioRow) => {
                 const pool = (bet.yesPool || 0) + (bet.noPool || 0);
+                const archived = isArchivedLeg(bet.token);
                 return (
-                  <div key={bet.id} className="bh-row">
+                  // Keyed on market and token, because one market backed in two
+                  // tokens arrives as two rows carrying the same id.
+                  <div key={rowKey(bet.id, bet.token)} className="bh-row">
                     {bet.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img className="bh-thumb" src={bet.imageUrl} alt="" />
@@ -323,8 +301,11 @@ export function BetHistory() {
                         {bet.category && <span className="bh-category">{bet.category}</span>}
                         <span className="bh-age">staked {timeAgo(bet.createdAt)}</span>
                         {pool > 0 && (
-                          <span className="bh-age">{pool.toFixed(3)} ETH pool</span>
+                          <span className="bh-age">
+                            {formatAmount(pool, bet.token)} {symbol(bet.token)} pool
+                          </span>
                         )}
+                        {archived && <ArchivedTag />}
                       </div>
                     </div>
 
@@ -355,8 +336,10 @@ export function BetHistory() {
                       <span
                         className={`bh-figure ${bet.profit >= 0 ? 'bh-figure--gain' : 'bh-figure--loss'}`}
                       >
-                        {signed(bet.profit)} ETH
-                        <span className="bh-figure-sub">on {bet.stakeAmount} staked</span>
+                        {formatSigned(bet.profit, bet.token)} {symbol(bet.token)}
+                        <span className="bh-figure-sub">
+                          on {formatAmount(bet.stakeAmount, bet.token)} staked
+                        </span>
                       </span>
                     </div>
                   </div>
@@ -374,6 +357,10 @@ export function BetHistory() {
         </div>
         <div>
           <div className="sheet-board">
+            <div className="sheet-board-head">
+              <h2 className="sheet-board-title">Calls</h2>
+              <p className="sheet-board-meta">Every token</p>
+            </div>
             <div className="sheet-settle">
               <div className="sheet-settle-row">
                 <span className="sheet-settle-key">Settled</span>
@@ -382,22 +369,46 @@ export function BetHistory() {
               <div className="sheet-settle-row">
                 <span className="sheet-settle-key">Called right</span>
                 <span className="sheet-settle-val">
-                  {winRate.toFixed(1)}%
+                  {winRate === null ? 'nothing settled' : `${winRate.toFixed(1)}%`}
                   <span className="sheet-settle-sub">
                     {won} of {shown.length}
                   </span>
                 </span>
               </div>
-              <div className="sheet-settle-row">
-                <span className="sheet-settle-key">Staked</span>
-                <span className="sheet-settle-val">{staked.toFixed(4)} ETH</span>
-              </div>
-              <div className="sheet-settle-row sheet-settle-row--total">
-                <span className="sheet-settle-key">Net</span>
-                <span className="sheet-settle-val">{signed(net)} ETH</span>
-              </div>
             </div>
           </div>
+
+          {perToken.length > 0 && (
+            <div className="bh-summary">
+              {perToken.map((total) => (
+                <div key={total.token} className="sheet-board">
+                  <div className="sheet-board-head">
+                    <h2 className="sheet-board-title">
+                      {symbol(total.token)}
+                      {isArchivedLeg(total.token) ? ', archived' : ''}
+                    </h2>
+                    <p className="sheet-board-meta">
+                      {total.count} {total.count === 1 ? 'position' : 'positions'}
+                    </p>
+                  </div>
+                  <div className="sheet-settle">
+                    <div className="sheet-settle-row">
+                      <span className="sheet-settle-key">Staked</span>
+                      <span className="sheet-settle-val">
+                        {formatAmount(total.staked, total.token)} {symbol(total.token)}
+                      </span>
+                    </div>
+                    <div className="sheet-settle-row sheet-settle-row--total">
+                      <span className="sheet-settle-key">Net</span>
+                      <span className="sheet-settle-val">
+                        {formatSigned(total.profit, total.token)} {symbol(total.token)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
     </>

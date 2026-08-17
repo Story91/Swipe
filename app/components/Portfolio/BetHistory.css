@@ -7,6 +7,15 @@
  * it from a won/lost badge.
  */
 
+/* One summary board per token, stacked under the counts. Stacked and not in a
+   row, so nobody reads two currencies as two columns of one sum. */
+.bh-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 18px;
+}
+
 .bh-list {
   border-top: 1px solid var(--sheet-rule);
 }

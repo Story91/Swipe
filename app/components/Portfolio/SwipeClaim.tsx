@@ -1,455 +1,437 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi';
-import { SWIPE_TOKEN, SWIPE_CLAIM_CONFIG } from '../../../lib/contract';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useAccount, useReadContract } from 'wagmi';
+import { SWIPE_CLAIM_CONFIG } from '../../../lib/contract';
+import { getChainConfig } from '@/lib/chains';
+import { formatAmount } from './portfolioTokens';
+import '../../styles/sheet.css';
 import './SwipeClaim.css';
 
-const SWIPE_CLAIM_ABI = SWIPE_CLAIM_CONFIG.abi;
-const SWIPE_CLAIM_CONTRACT = (SWIPE_CLAIM_CONFIG.address as `0x${string}`) || '0x0000000000000000000000000000000000000000';
+/**
+ * The $SWIPE claim, which cannot pay anybody, said out loud.
+ *
+ * What this screen used to be: a claim flow. Tier badges, a bet counter, and a
+ * button reading "Claim 25.0M SWIPE". Measured on Base mainnet on 2026-08-18,
+ * against 0x9f5d800e4123e6cE6f429f5A5DD5018a631A2793:
+ *
+ *   getSwipeBalance()        0
+ *   claimingEnabled()        true
+ *   owner()                  0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd
+ *   PredictionMarketV2 owner 0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd
+ *
+ * So the claim contract is owned by the same key as the archived V2 market, the
+ * key nobody has any more, and the pot is empty. claimSwipe() requires
+ * `balanceOf(this) >= rewardAmount` and the smallest tier is a million tokens,
+ * so every call reverts. Simulated from a wallet the contract itself rates as
+ * eligible (10 bets, 1,000,000 SWIPE): reverted, "Insufficient SWIPE balance".
+ *
+ * A button that always reverts is worse than no button. It costs a wallet
+ * prompt, it reads as the app's fault, and it tells somebody they are owed
+ * money that is not there. So the write path is gone. What is left is the
+ * record: what this wallet did, what the tiers said it was worth, and the two
+ * on-chain numbers that decide whether any of it can be paid. The balance is
+ * read live rather than written into the copy, so if the pot is ever refilled
+ * this screen reports that instead of insisting on a stale fact.
+ *
+ * WHY THERE IS NO ?chain= HERE, on a screen where every other read has one.
+ * $SWIPE exists on Base and nowhere else. /api/swipe-claim/user-bets hardcodes
+ * Base server-side for that reason and takes no chain parameter, and the two
+ * contract reads below pin Base's chain id rather than following the wallet, so
+ * a user sitting on Robinhood gets Base's answer instead of a failed read
+ * against an address that holds no code there. The screen says which chain it
+ * is talking about rather than letting the switcher imply another.
+ */
 
-interface ClaimInfo {
-  eligible: boolean;
-  betCount: bigint;
-  rewardAmount: bigint;
+const BASE = getChainConfig('base');
+const CLAIM_ADDRESS = (SWIPE_CLAIM_CONFIG.address || '') as `0x${string}` | '';
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+const CONFIGURED = CLAIM_ADDRESS !== '' && CLAIM_ADDRESS !== ZERO_ADDRESS;
+
+/** The contract's own constants, in whole tokens. */
+const TIERS = [
+  { bets: 10, reward: 1_000_000 },
+  { bets: 25, reward: 10_000_000 },
+  { bets: 50, reward: 15_000_000 },
+  { bets: 100, reward: 25_000_000 },
+] as const;
+
+const SMALLEST_REWARD = TIERS[0].reward;
+
+function tierFor(betCount: number) {
+  return [...TIERS].reverse().find((tier) => betCount >= tier.bets) ?? null;
+}
+
+interface ClaimHistory {
+  hasClaimed: boolean;
+  betCount: number;
+  swipeAmountFormatted: string;
+  tier: string;
+  transactionHash?: string;
 }
 
 export function SwipeClaim() {
   const { address } = useAccount();
-  const { writeContract, data: hash, isPending } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
-    hash,
+
+  const [betCount, setBetCount] = useState<number | null>(null);
+  const [betCountError, setBetCountError] = useState<string | null>(null);
+  const [history, setHistory] = useState<ClaimHistory | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+
+  // Both reads are pinned to Base. Without chainId wagmi uses whatever chain
+  // the wallet is on, and on any other chain this address has no code, so the
+  // read fails and the screen would report "unknown" for a number it can
+  // perfectly well fetch.
+  const { data: potBalance, isError: potFailed } = useReadContract({
+    address: CONFIGURED ? (CLAIM_ADDRESS as `0x${string}`) : undefined,
+    abi: SWIPE_CLAIM_CONFIG.abi,
+    functionName: 'getSwipeBalance',
+    chainId: BASE.viemChain.id,
+    query: { enabled: CONFIGURED },
   });
 
-  const [claimInfo, setClaimInfo] = useState<ClaimInfo | null>(null);
-  const [hasClaimed, setHasClaimed] = useState<boolean>(false);
-  const [claimingEnabled, setClaimingEnabled] = useState<boolean>(true);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const { data: userClaimInfo, refetch: refetchClaimInfo } = useReadContract({
-    address: SWIPE_CLAIM_CONTRACT,
-    abi: SWIPE_CLAIM_ABI,
-    functionName: 'getUserClaimInfo',
-    args: address ? [address] : undefined,
-    query: {
-      enabled: !!address && SWIPE_CLAIM_CONTRACT !== '0x0000000000000000000000000000000000000000',
-    },
-  });
-
-  const { data: claimedStatus } = useReadContract({
-    address: SWIPE_CLAIM_CONTRACT,
-    abi: SWIPE_CLAIM_ABI,
+  const { data: claimedOnChain } = useReadContract({
+    address: CONFIGURED ? (CLAIM_ADDRESS as `0x${string}`) : undefined,
+    abi: SWIPE_CLAIM_CONFIG.abi,
     functionName: 'hasClaimed',
     args: address ? [address] : undefined,
-    query: {
-      enabled: !!address && SWIPE_CLAIM_CONTRACT !== '0x0000000000000000000000000000000000000000',
-    },
+    chainId: BASE.viemChain.id,
+    query: { enabled: CONFIGURED && !!address },
   });
 
-  const { data: enabledStatus } = useReadContract({
-    address: SWIPE_CLAIM_CONTRACT,
-    abi: SWIPE_CLAIM_ABI,
-    functionName: 'claimingEnabled',
-    query: {
-      enabled: SWIPE_CLAIM_CONTRACT !== '0x0000000000000000000000000000000000000000',
-    },
-  });
-
-  const [redisBetCount, setRedisBetCount] = useState<number | null>(null);
-  const [loadingRedisBets, setLoadingRedisBets] = useState(false);
-  const [claimHistory, setClaimHistory] = useState<{
-    hasClaimed: boolean;
-    betCount: number;
-    swipeAmount: number;
-    swipeAmountFormatted: string;
-    tier: string;
-    transactionHash?: string;
-  } | null>(null);
-
-  const fetchBetCountFromRedis = async () => {
+  const loadBets = useCallback(async () => {
     if (!address) return;
-    setLoadingRedisBets(true);
     try {
       const response = await fetch(`/api/swipe-claim/user-bets?address=${address}`);
-      const data = await response.json();
-      if (data.success && data.data) {
-        setRedisBetCount(data.data.betCount);
-      }
+      if (!response.ok) throw new Error(`the bet count service answered ${response.status}`);
+      const body = await response.json();
+      if (!body?.success || !body.data) throw new Error(body?.error || 'no bet count came back');
+      setBetCount(Number(body.data.betCount) || 0);
+      setBetCountError(null);
     } catch (err) {
-      console.error('Error fetching bets from Redis:', err);
-    } finally {
-      setLoadingRedisBets(false);
+      // The previous count stays. Writing 0 here would tell somebody with a
+      // hundred bets on record that they had none, on the one screen whose
+      // whole subject is what they did.
+      setBetCountError(err instanceof Error ? err.message : 'the bet count could not be read');
     }
-  };
+  }, [address]);
 
-  const fetchClaimHistory = async () => {
+  const loadHistory = useCallback(async () => {
     if (!address) return;
     try {
       const response = await fetch(`/api/swipe-claim/claim-history?address=${address}`);
-      const data = await response.json();
-      if (data.success && data.data) {
-        setClaimHistory(data.data);
-      }
+      if (!response.ok) throw new Error(`the claim history service answered ${response.status}`);
+      const body = await response.json();
+      if (!body?.success) throw new Error(body?.error || 'the claim history could not be read');
+      // A successful answer with no data means no claim was ever made, which is
+      // a fact and is allowed to clear what is held.
+      setHistory((body.data as ClaimHistory) ?? null);
+      setHistoryError(null);
     } catch (err) {
-      console.error('Error fetching claim history:', err);
-    }
-  };
-
-  useEffect(() => {
-    if (address) {
-      if (redisBetCount === null && !loadingRedisBets) {
-        fetchBetCountFromRedis();
-      }
-      fetchClaimHistory();
+      setHistoryError(err instanceof Error ? err.message : 'the claim history could not be read');
     }
   }, [address]);
 
   useEffect(() => {
-    const effectiveBetCount = redisBetCount !== null 
-      ? BigInt(redisBetCount) 
-      : userClaimInfo 
-        ? (userClaimInfo as [boolean, bigint, bigint])[1]
-        : BigInt(0);
-
-    let rewardAmount = BigInt(0);
-    let eligible = false;
-
-    if (effectiveBetCount >= BigInt(100)) {
-      rewardAmount = BigInt(25_000_000 * 10**18);
-      eligible = true;
-    } else if (effectiveBetCount >= BigInt(50)) {
-      rewardAmount = BigInt(15_000_000 * 10**18);
-      eligible = true;
-    } else if (effectiveBetCount >= BigInt(25)) {
-      rewardAmount = BigInt(10_000_000 * 10**18);
-      eligible = true;
-    } else if (effectiveBetCount >= BigInt(10)) {
-      rewardAmount = BigInt(1_000_000 * 10**18);
-      eligible = true;
-    }
-
-    if (effectiveBetCount > BigInt(0) || userClaimInfo) {
-      setClaimInfo({ eligible, betCount: effectiveBetCount, rewardAmount });
-    }
-
-    if (claimedStatus !== undefined) {
-      setHasClaimed(claimedStatus as boolean);
-    }
-    if (enabledStatus !== undefined) {
-      setClaimingEnabled(enabledStatus as boolean);
-    }
-    
-    if (claimedStatus !== undefined && enabledStatus !== undefined) {
-      setLoading(false);
-    }
-  }, [userClaimInfo, claimedStatus, enabledStatus, redisBetCount]);
-
-  useEffect(() => {
-    if (isConfirmed && hash) {
-      refetchClaimInfo();
-      setHasClaimed(true);
-      
-      // Save claim history to Redis immediately (don't wait for blockchain events)
-      if (claimInfo) {
-        const betCount = Number(claimInfo.betCount);
-        let tier = '—';
-        if (betCount >= 100) tier = '100+';
-        else if (betCount >= 50) tier = '50+';
-        else if (betCount >= 25) tier = '25+';
-        else if (betCount >= 10) tier = '10+';
-
-        // Save to Redis via API
-        fetch('/api/swipe-claim/save-history', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            address: address?.toLowerCase(),
-            betCount,
-            swipeAmount: claimInfo.rewardAmount.toString(),
-            tier,
-            transactionHash: hash
-          })
-        }).catch(err => console.error('Failed to save claim history:', err));
-
-        // Also refresh from blockchain after delay
-        setTimeout(() => {
-          fetchClaimHistory();
-        }, 5000);
-      }
-    }
-  }, [isConfirmed, hash, claimInfo, address, refetchClaimInfo]);
-
-  const formatSwipe = (amount: bigint | number): string => {
-    const amountNum = typeof amount === 'bigint' ? Number(amount) / 1e18 : amount;
-    if (amountNum >= 1_000_000) {
-      return `${(amountNum / 1_000_000).toFixed(1)}M SWIPE`;
-    } else if (amountNum >= 1_000) {
-      return `${(amountNum / 1_000).toFixed(1)}K SWIPE`;
-    }
-    return `${amountNum.toFixed(0)} SWIPE`;
-  };
-
-  const handleClaim = async () => {
-    if (!address || !claimInfo || !claimInfo.eligible) {
-      setError('Not eligible to claim');
+    if (!address) {
+      setBetCount(null);
+      setHistory(null);
+      setBetCountError(null);
+      setHistoryError(null);
       return;
     }
+    loadBets();
+    loadHistory();
+  }, [address, loadBets, loadHistory]);
 
-    if (hasClaimed) {
-      setError('You have already claimed your SWIPE rewards');
-      return;
-    }
+  const pot = potBalance === undefined ? null : Number(potBalance) / 1e18;
+  const potKnown = pot !== null;
+  const canPayAnyone = potKnown && pot >= SMALLEST_REWARD;
+  const reached = betCount === null ? null : tierFor(betCount);
 
-    if (!claimingEnabled) {
-      setError('Claiming is currently disabled');
-      return;
-    }
+  // The headline follows the balance rather than asserting one. Today the pot
+  // reads zero, and if that ever changes the page should not still be telling
+  // people there is nothing there.
+  const headline = !potKnown
+    ? { lead: 'The old $SWIPE', accent: 'claim' }
+    : canPayAnyone
+      ? { lead: 'Claims are', accent: 'closed' }
+      : { lead: 'Nothing left to', accent: 'claim' };
 
-    try {
-      setError(null);
-      await writeContract({
-        address: SWIPE_CLAIM_CONTRACT,
-        abi: SWIPE_CLAIM_ABI,
-        functionName: 'claimSwipe',
-      });
-    } catch (err: any) {
-      setError(err?.message || 'Failed to claim SWIPE');
-      console.error('Claim error:', err);
-    }
-  };
+  const lede = !potKnown ? (
+    <>
+      This paid $SWIPE for bets placed on the old Base contract. What it holds
+      today could not be read, so nothing here promises a payout. Claims are not
+      sent from this screen either way: the contract belongs to the archived set,
+      and its owner key is gone.
+    </>
+  ) : canPayAnyone ? (
+    <>
+      This paid $SWIPE for bets placed on the old Base contract, and the pot has
+      tokens in it again. Claims are still not sent from here. The contract
+      belongs to the archived set, its owner key is gone, and $SWIPE claims are
+      moving to the new token on Robinhood Chain.
+    </>
+  ) : (
+    <>
+      This paid $SWIPE for bets placed on the old Base contract. The contract is
+      still there and still says claiming is switched on, but it holds no
+      tokens, so a claim reverts before it does anything. The wallet that funded
+      it is the one lost along with the archived markets. What your wallet did
+      is below.
+    </>
+  );
 
-  if (!address) {
-    return (
-      <div className="claim-container">
-        <Card className="claim-card">
-          <CardHeader className="claim-header">
-            <CardTitle className="claim-title">💰 100M $SWIPE to Grab!</CardTitle>
-            <CardDescription className="claim-subtitle">Connect wallet to check eligibility</CardDescription>
-          </CardHeader>
-        </Card>
+  const shell = (body: React.ReactNode) => (
+    <div className="sheet">
+      <div className="sheet-shell">
+        <header className="sheet-hero">
+          <div className="sheet-hero-top">
+            <div>
+              <p className="sheet-eyebrow">$SWIPE claim</p>
+              <h1 className="sheet-hero-title">
+                {headline.lead} <em>{headline.accent}</em>
+              </h1>
+            </div>
+          </div>
+          <p className="sheet-hero-lede">{lede}</p>
+        </header>
+        <main className="sheet-body">{body}</main>
       </div>
-    );
-  }
+    </div>
+  );
 
-  if (SWIPE_CLAIM_CONTRACT === '0x0000000000000000000000000000000000000000') {
-    return (
-      <div className="claim-container">
-        <Card className="claim-card">
-          <CardHeader className="claim-header">
-            <CardTitle className="claim-title">⚠️ Contract Not Configured</CardTitle>
-            <CardDescription className="claim-error-text">SwipeClaim contract address not set</CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="claim-container">
-        <Card className="claim-card">
-          <CardHeader className="claim-header">
-            <CardTitle className="claim-title">⏳ Loading...</CardTitle>
-          </CardHeader>
-        </Card>
-      </div>
-    );
-  }
-
-  const isLoading = isPending || isConfirming;
-  const canClaim = claimInfo?.eligible && !hasClaimed && claimingEnabled && !isLoading;
-
-  return (
-    <div className="claim-container">
-      <Card className="claim-card">
-        <CardHeader className="claim-header">
-          <CardTitle className="claim-title">💰 100M $SWIPE to Grab!</CardTitle>
-          <CardDescription className="claim-subtitle">
-          For previous activities
-        </CardDescription>
-        <div className="claim-tiers-info">
-          <div className="tier-info-item">🥉 10+ bets → 1M</div>
-          <div className="tier-info-item">🥈 25+ bets → 10M</div>
-          <div className="tier-info-item">🥇 50+ bets → 15M</div>
-          <div className="tier-info-item">👑 100+ bets → 25M</div>
+  if (!CONFIGURED) {
+    return shell(
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">Contract</p>
         </div>
-        </CardHeader>
-        <CardContent className="claim-content">
-          {error && (
-            <div className="claim-alert claim-alert-error">
-              {error}
-            </div>
-          )}
+        <div>
+          <div className="sheet-empty">
+            <strong>No claim contract configured</strong>
+            NEXT_PUBLIC_SWIPE_CLAIM_CONTRACT is not set, so this build has no
+            address to read. Nothing is being hidden, there is simply nothing
+            pointed at.
+          </div>
+        </div>
+      </section>
+    );
+  }
 
-          {isConfirmed && (
-            <div className="claim-alert claim-alert-success">
-              ✅ Claimed {claimInfo ? formatSwipe(claimInfo.rewardAmount) : ''}! Refreshing...
-            </div>
-          )}
-
-          {claimHistory?.hasClaimed && (
-            <div className="claim-claimed-info">
-              <div className="claim-claimed-header">✅ Already Claimed Rewards</div>
-              <div className="claim-claimed-details">
-                <div className="claim-claimed-item">
-                  <span className="claim-claimed-label">Tier:</span>
-                  <Badge variant="default" className="claim-tier-badge">{claimHistory.tier}</Badge>
-                </div>
-                <div className="claim-claimed-item">
-                  <span className="claim-claimed-label">Amount Claimed:</span>
-                  <span className="claim-claimed-value">{claimHistory.swipeAmountFormatted} SWIPE</span>
-                </div>
-                <div className="claim-claimed-item">
-                  <span className="claim-claimed-label">Bets at Claim:</span>
-                  <span className="claim-claimed-value">{claimHistory.betCount}</span>
-                </div>
-                {claimHistory.transactionHash && (
-                  <div className="claim-claimed-item">
-                    <span className="claim-claimed-label">Transaction:</span>
-                    <a 
-                      href={`https://basescan.org/tx/${claimHistory.transactionHash}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="claim-basescan-link"
-                    >
-                      View on Basescan ↗
-                    </a>
-                  </div>
-                )}
-              </div>
-              <div className="claim-note" style={{ marginTop: '8px', fontSize: '9px', color: 'rgba(255,255,255,0.5)', fontStyle: 'italic' }}>
-                ⚠️ One-time claim only • Historical bets counted
-              </div>
-            </div>
-          )}
-
-          {hasClaimed && !claimHistory && (
-            <div className="claim-status claim-status-claimed">
-              ✅ Already Claimed Rewards
-              <div style={{ fontSize: '9px', marginTop: '4px', opacity: 0.8 }}>
-                Loading claim details...
-              </div>
-            </div>
-          )}
-
-          {redisBetCount !== null && (
-            <div className="claim-bet-info">
-              <div className="claim-bet-count">
-                <span className="claim-label">Bets:</span>
-                <Badge variant="secondary" className="claim-badge">{redisBetCount}</Badge>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={fetchBetCountFromRedis}
-                disabled={loadingRedisBets}
-                className="claim-refresh-btn"
-              >
-                {loadingRedisBets ? '⏳' : '🔄'}
-              </Button>
-            </div>
-          )}
-
-          {claimInfo && !hasClaimed && (
-            <>
-              <div className="claim-stats">
-                <div className="claim-stat">
-                  <span className="claim-stat-label">Your Bets</span>
-                  <span className="claim-stat-value">{claimInfo.betCount.toString()}</span>
-                </div>
-                <div className="claim-stat">
-                  <span className="claim-stat-label">Tier</span>
-                  <Badge variant={claimInfo.eligible ? "default" : "secondary"} className="claim-tier-badge">
-                    {Number(claimInfo.betCount) >= 100
-                      ? '100+'
-                      : Number(claimInfo.betCount) >= 50
-                      ? '50+'
-                      : Number(claimInfo.betCount) >= 25
-                      ? '25+'
-                      : Number(claimInfo.betCount) >= 10
-                      ? '10+'
-                      : '—'}
-                  </Badge>
-                </div>
-                <div className="claim-stat claim-stat-reward">
-                  <span className="claim-stat-label">Reward</span>
-                  <span className="claim-stat-value claim-stat-reward-value">
-                    {formatSwipe(claimInfo.rewardAmount)}
-                  </span>
-                </div>
-              </div>
-
-              {(() => {
-                const betCount = Number(claimInfo.betCount);
-                // Determine current tier based on bet count
-                let currentTier: string | null = null;
-                if (betCount >= 100) currentTier = '100+';
-                else if (betCount >= 50) currentTier = '50+';
-                else if (betCount >= 25) currentTier = '25+';
-                else if (betCount >= 10) currentTier = '10+';
-                
-                return (
-                  <div className="claim-tiers">
-                    <div className={`claim-tier-item ${currentTier === '10+' ? 'claim-tier-active' : ''}`}>
-                      <span className="claim-tier-label">10</span>
-                      <span className="claim-tier-reward">1M</span>
-                    </div>
-                    <div className={`claim-tier-item ${currentTier === '25+' ? 'claim-tier-active' : ''}`}>
-                      <span className="claim-tier-label">25</span>
-                      <span className="claim-tier-reward">10M</span>
-                    </div>
-                    <div className={`claim-tier-item ${currentTier === '50+' ? 'claim-tier-active' : ''}`}>
-                      <span className="claim-tier-label">50</span>
-                      <span className="claim-tier-reward">15M</span>
-                    </div>
-                    <div className={`claim-tier-item ${currentTier === '100+' ? 'claim-tier-active' : ''}`}>
-                      <span className="claim-tier-label">100+</span>
-                      <span className="claim-tier-reward">25M</span>
-                    </div>
-                  </div>
-                );
-              })()}
-            </>
-          )}
-
-          {!hasClaimed && !claimHistory && (
-            <>
-              {!claimingEnabled ? (
-                <div className="claim-status claim-status-disabled">
-                  ⚠️ Claiming Disabled
-                </div>
-              ) : !claimInfo?.eligible ? (
-                <div className="claim-status claim-status-not-eligible">
-                  ❌ Need 10+ Bets
-                </div>
-              ) : (
-                <Button
-                  className="claim-button"
-                  onClick={handleClaim}
-                  disabled={!canClaim}
-                  size="lg"
+  return shell(
+    <>
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">The pot</p>
+          <p className="sheet-rail-meta">{`Read from Base,\nnot from memory`}</p>
+        </div>
+        <div>
+          <div className="sheet-board">
+            <div className="sheet-board-head">
+              <h2 className="sheet-board-title">SwipeClaim on Base</h2>
+              <p className="sheet-board-meta">
+                <a
+                  className="sc-link"
+                  href={`${BASE.explorer}/address/${CLAIM_ADDRESS}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
                 >
-                  {isLoading ? '⏳ Processing...' : `🎁 Claim ${claimInfo ? formatSwipe(claimInfo.rewardAmount) : 'SWIPE'}`}
-                </Button>
+                  {CLAIM_ADDRESS.slice(0, 6)}…{CLAIM_ADDRESS.slice(-4)}
+                </a>
+              </p>
+            </div>
+            <div className="sheet-settle">
+              <div className="sheet-settle-row">
+                <span className="sheet-settle-key">$SWIPE it holds</span>
+                <span className="sheet-settle-val">
+                  {potKnown ? `${formatAmount(pot, 'SWIPE')} SWIPE` : 'could not read'}
+                  {potFailed && (
+                    <span className="sheet-settle-sub">the Base node did not answer</span>
+                  )}
+                </span>
+              </div>
+              <div className="sheet-settle-row">
+                <span className="sheet-settle-key">Smallest claim it can pay</span>
+                <span className="sheet-settle-val">
+                  {formatAmount(SMALLEST_REWARD, 'SWIPE')} SWIPE
+                  <span className="sheet-settle-sub">the 10 bet tier</span>
+                </span>
+              </div>
+              <div className="sheet-settle-row sheet-settle-row--total">
+                <span className="sheet-settle-key">Can it pay anyone</span>
+                <span className="sheet-settle-val">
+                  {!potKnown ? 'unknown' : canPayAnyone ? 'yes' : 'no'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="sheet-note">
+            {canPayAnyone ? (
+              <p>
+                The pot has tokens in it again. Claims are still not sent from
+                here: this contract belongs to the archived set and $SWIPE
+                claims are moving to the new token on Robinhood Chain. Anything
+                left in it can only be moved by its owner, and that key is gone.
+              </p>
+            ) : (
+              <p>
+                Zero tokens against a smallest tier of{' '}
+                {formatAmount(SMALLEST_REWARD, 'SWIPE')} is why a claim reverts
+                rather than fails politely. The contract checks its own balance
+                last, after it has decided you are eligible, so the old screen
+                could offer a button with real numbers on it and still have
+                nothing behind it.
+              </p>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">Your record</p>
+          <p className="sheet-rail-meta">{`Bets on the old\nBase contract`}</p>
+        </div>
+        <div>
+          {!address ? (
+            <div className="sheet-empty">
+              <strong>No wallet connected</strong>
+              Connect one and this shows how many bets it placed on the old
+              contract, and which tier that reached.
+            </div>
+          ) : (
+            <>
+              {betCountError && (
+                <div className="sheet-empty">
+                  <strong>Could not count your bets</strong>
+                  {betCountError}
+                </div>
+              )}
+
+              <div className="sheet-board">
+                <div className="sheet-board-head">
+                  <h2 className="sheet-board-title">What this wallet did</h2>
+                  <p className="sheet-board-meta">Base, V2 markets</p>
+                </div>
+                <div className="sheet-settle">
+                  <div className="sheet-settle-row">
+                    <span className="sheet-settle-key">Markets you bet on</span>
+                    <span className="sheet-settle-val">
+                      {betCount === null ? 'not read yet' : betCount}
+                    </span>
+                  </div>
+                  <div className="sheet-settle-row">
+                    <span className="sheet-settle-key">Tier that reached</span>
+                    <span className="sheet-settle-val">
+                      {betCount === null
+                        ? 'not read yet'
+                        : reached
+                          ? `${reached.bets}+`
+                          : 'below the first tier'}
+                    </span>
+                  </div>
+                  <div className="sheet-settle-row sheet-settle-row--total">
+                    <span className="sheet-settle-key">What that tier promised</span>
+                    <span className="sheet-settle-val">
+                      {reached ? `${formatAmount(reached.reward, 'SWIPE')} SWIPE` : 'nothing'}
+                      <span className="sheet-settle-sub">
+                        {reached ? 'unpayable, the pot is empty' : '10 bets was the floor'}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {history?.hasClaimed ? (
+                <div className="sheet-board sc-claimed">
+                  <div className="sheet-board-head">
+                    <h2 className="sheet-board-title">You already claimed</h2>
+                    <p className="sheet-board-meta">Tier {history.tier}</p>
+                  </div>
+                  <div className="sheet-settle">
+                    <div className="sheet-settle-row">
+                      <span className="sheet-settle-key">Received</span>
+                      <span className="sheet-settle-val">
+                        {history.swipeAmountFormatted} SWIPE
+                      </span>
+                    </div>
+                    <div className="sheet-settle-row">
+                      <span className="sheet-settle-key">Bets counted then</span>
+                      <span className="sheet-settle-val">{history.betCount}</span>
+                    </div>
+                    {history.transactionHash && (
+                      <div className="sheet-settle-row">
+                        <span className="sheet-settle-key">Transaction</span>
+                        <span className="sheet-settle-val">
+                          <a
+                            className="sc-link"
+                            href={`${BASE.explorer}/tx/${history.transactionHash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            view it
+                          </a>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : claimedOnChain ? (
+                <div className="sheet-empty">
+                  <strong>The contract has you down as claimed</strong>
+                  hasClaimed is true for this wallet, so a claim went through at
+                  some point. The amount and the transaction are not in the
+                  cache, and the event scan only reaches back thirty days.
+                </div>
+              ) : null}
+
+              {historyError && (
+                <div className="sheet-empty">
+                  <strong>Could not read the claim history</strong>
+                  {historyError}
+                </div>
               )}
             </>
           )}
+        </div>
+      </section>
 
-          {/* Footer with logo and thanks */}
-          <div className="claim-footer">
-            <div className="claim-thanks">
-              <p>Thank you for your support!</p>
-            </div>
-            <div className="claim-logo">
-              <img src="/splash.png" alt="Logo" />
-            </div>
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">The tiers</p>
+          <p className="sheet-rail-meta">{`As the contract\nstill has them`}</p>
+        </div>
+        <div>
+          <div className="sc-tiers">
+            {TIERS.map((tier) => {
+              const isReached = reached?.bets === tier.bets;
+              return (
+                <div
+                  key={tier.bets}
+                  className={`sc-tiers__item${isReached ? ' sc-tiers__item--reached' : ''}`}
+                >
+                  <span className="sc-tiers__count">{tier.bets}+ bets</span>
+                  <span className="sc-tiers__reward">
+                    {formatAmount(tier.reward, 'SWIPE')}
+                  </span>
+                </div>
+              );
+            })}
           </div>
-        </CardContent>
-      </Card>
-    </div>
+
+          <div className="sheet-note">
+            <p>
+              These are the contract&apos;s own constants, kept here so the
+              record is checkable rather than remembered. One claim per wallet,
+              counted from bets on the V2 markets only. $SWIPE claims are moving
+              to the new token on Robinhood Chain, which is why nothing here has
+              been repointed at a live contract.
+            </p>
+          </div>
+        </div>
+      </section>
+    </>
   );
 }

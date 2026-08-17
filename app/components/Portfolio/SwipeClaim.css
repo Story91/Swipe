@@ -1,421 +1,92 @@
-/* Claim Page - Hacker/Tech style similar to BETS but more minimal */
-.claim-container {
-  width: 100%;
-  max-width: 424px;
-  margin: 0 auto;
-  padding: 16px;
-  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0f0f0f 100%);
-  min-height: 100vh;
-  font-family: 'Orbitron', 'Source Code Pro', monospace;
+/*
+ * The $SWIPE claim screen, on the shared sheet (app/styles/sheet.css).
+ *
+ * It sits in the dashboard panel slot, the same slot as the portfolio, the open
+ * positions and the history, so it takes the same language: dark tote-board
+ * ground, hairline rules, --sheet-* tokens, figures in the mono face. Not the
+ * lime card face of MarketPools, which belongs on the swipe card where
+ * everything around it is lime, and not the #0d0d0d panel of
+ * MarketChooserModal, which belongs to a dialog floating over the app.
+ *
+ * The old file styled a shadcn Card with gradients, glow shadows and emoji tier
+ * badges, for a claim flow that no longer exists. Nearly all of it went with
+ * the button. What is left is the tier table and two link styles.
+ *
+ * Mobile first, one column, no sideways scroll.
+ */
+
+.sc-link {
+  color: var(--sheet-lime);
+  text-decoration: none;
+  border-bottom: 1px solid var(--sheet-lime-line);
+  overflow-wrap: anywhere;
 }
 
-.claim-card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(212, 255, 0, 0.2);
-  border-radius: 12px;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  overflow: hidden;
+.sc-link:hover,
+.sc-link:focus-visible {
+  border-bottom-color: var(--sheet-lime);
 }
 
-.claim-header {
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(212, 255, 0, 0.1);
-  background: rgba(212, 255, 0, 0.05);
-  text-align: center;
+.sc-claimed {
+  margin-top: 18px;
 }
 
-.claim-title {
-  font-size: 18px;
-  font-weight: 800;
-  color: #d4ff00;
-  margin: 0;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  font-family: 'Orbitron', monospace;
-  text-align: center;
-}
-
-.claim-subtitle {
-  font-size: 9px;
-  color: rgba(255, 255, 255, 0.5);
-  margin: 4px 0 0 0;
-  font-family: 'Exo 2', sans-serif;
-  text-align: center;
-}
-
-/* Tiers Info in Header */
-.claim-tiers-info {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  margin-top: 8px;
-  padding: 8px 12px;
-  background: rgba(0, 0, 0, 0.4);
-  border-radius: 8px;
-  border: 1px solid rgba(212, 255, 0, 0.15);
-}
-
-.tier-info-item {
-  font-size: 9px;
-  color: rgba(255, 255, 255, 0.85);
-  font-family: 'Exo 2', sans-serif;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  text-align: center;
-}
-
-.claim-content {
-  padding: 16px;
-}
-
-.claim-alert {
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 11px;
-  margin-bottom: 12px;
-  font-family: 'Source Code Pro', monospace;
-}
-
-.claim-alert-error {
-  background: rgba(244, 67, 54, 0.15);
-  border: 1px solid rgba(244, 67, 54, 0.4);
-  color: #f44336;
-}
-
-.claim-alert-success {
-  background: rgba(76, 175, 80, 0.15);
-  border: 1px solid rgba(76, 175, 80, 0.4);
-  color: #4caf50;
-}
-
-.claim-bet-info {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  background: rgba(212, 255, 0, 0.1);
-  border: 1px solid rgba(212, 255, 0, 0.2);
-  border-radius: 6px;
-  margin-bottom: 12px;
-}
-
-.claim-bet-count {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-}
-
-.claim-label {
-  color: rgba(255, 255, 255, 0.7);
-  font-family: 'Source Code Pro', monospace;
-}
-
-.claim-badge {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 8px;
-  background: #d4ff00;
-  color: #000;
-  font-family: 'Orbitron', monospace;
-}
-
-.claim-refresh-btn {
-  padding: 4px 8px;
-  font-size: 10px;
-  min-width: auto;
-  height: auto;
-}
-
-.claim-stats {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.claim-stat {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.claim-stat:last-of-type {
-  border-bottom: none;
-}
-
-.claim-stat-reward {
-  background: rgba(212, 255, 0, 0.1);
-  padding: 10px 12px;
-  border-radius: 6px;
-  margin-top: 4px;
-  border: 1px solid rgba(212, 255, 0, 0.2);
-}
-
-.claim-stat-label {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.6);
-  font-family: 'Source Code Pro', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.claim-stat-value {
-  font-size: 12px;
-  font-weight: 700;
-  color: #d4ff00;
-  font-family: 'Orbitron', monospace;
-}
-
-.claim-stat-reward-value {
-  font-size: 14px;
-  text-shadow: 0 0 8px rgba(212, 255, 0, 0.5);
-}
-
-.claim-tier-badge {
-  font-size: 10px;
-  padding: 2px 6px;
-  font-family: 'Orbitron', monospace;
-}
-
-.claim-tiers {
+/* Four tiers, stacked on a phone and in a row once there is width for it. Rows
+   rather than a grid of cards, so it reads as a table of rates. */
+.sc-tiers {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-  margin-bottom: 16px;
-  padding: 8px;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 6px;
-  border: 1px solid rgba(212, 255, 0, 0.1);
+  grid-template-columns: 1fr;
+  gap: 1px;
+  background: var(--sheet-rule);
+  border: 1px solid var(--sheet-rule-strong);
 }
 
-.claim-tier-item {
+.sc-tiers__item {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 4px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 4px;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--sheet-surface);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
-.claim-tier-item.claim-tier-active {
-  background: rgba(212, 255, 0, 0.15);
-  border-color: rgba(212, 255, 0, 0.5);
-  box-shadow: 0 0 8px rgba(212, 255, 0, 0.3);
+/* The tier this wallet actually reached. Marked, not celebrated: the pot is
+   empty, so this is a fact about the past. */
+.sc-tiers__item--reached {
+  background: var(--sheet-wash);
 }
 
-.claim-tier-active .claim-tier-label,
-.claim-tier-active .claim-tier-reward {
-  color: #d4ff00;
-  text-shadow: 0 0 4px rgba(212, 255, 0, 0.5);
-  font-weight: 800;
-}
-
-.claim-tier-label {
-  font-size: 9px;
-  color: rgba(255, 255, 255, 0.7);
-  font-family: 'Source Code Pro', monospace;
-}
-
-.claim-tier-reward {
-  font-size: 10px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.6);
-  font-family: 'Orbitron', monospace;
-}
-
-.claim-status {
-  text-align: center;
-  padding: 10px;
-  border-radius: 6px;
+.sc-tiers__count {
+  font-family: var(--sheet-display);
   font-size: 11px;
   font-weight: 600;
-  margin-bottom: 12px;
-  font-family: 'Source Code Pro', monospace;
-}
-
-.claim-status-claimed {
-  background: rgba(76, 175, 80, 0.1);
-  border: 1px solid rgba(76, 175, 80, 0.3);
-  color: #4caf50;
-}
-
-.claim-status-disabled {
-  background: rgba(255, 152, 0, 0.1);
-  border: 1px solid rgba(255, 152, 0, 0.3);
-  color: #ff9800;
-}
-
-.claim-status-not-eligible {
-  background: rgba(244, 67, 54, 0.1);
-  border: 1px solid rgba(244, 67, 54, 0.3);
-  color: #f44336;
-}
-
-.claim-button {
-  width: 100%;
-  background: linear-gradient(135deg, #d4ff00, #a8cc00);
-  color: #000;
-  border: none;
-  border-radius: 6px;
-  padding: 12px;
-  font-size: 11px;
-  font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-family: 'Orbitron', monospace;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(212, 255, 0, 0.3);
+  color: var(--sheet-paper-2);
 }
 
-.claim-button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(212, 255, 0, 0.4);
-  background: linear-gradient(135deg, #e4ff10, #b8dc00);
+.sc-tiers__item--reached .sc-tiers__count {
+  color: var(--sheet-lime);
 }
 
-.claim-button:active:not(:disabled) {
-  transform: translateY(0);
+.sc-tiers__reward {
+  font-family: var(--sheet-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  color: var(--sheet-paper);
+  white-space: nowrap;
 }
 
-.claim-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.claim-footer {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid rgba(212, 255, 0, 0.1);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-
-.claim-thanks {
-  text-align: center;
-}
-
-.claim-thanks p {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.6);
-  font-family: 'Source Code Pro', monospace;
-  margin: 0;
-  font-style: italic;
-}
-
-.claim-logo {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  opacity: 0.7;
-}
-
-.claim-logo img {
-  max-width: 120px;
-  height: auto;
-  filter: brightness(0.9);
-}
-
-.claim-error-text {
-  color: #f44336;
-  font-size: 10px;
-}
-
-.claim-claimed-info {
-  background: rgba(76, 175, 80, 0.1);
-  border: 1px solid rgba(76, 175, 80, 0.3);
-  border-radius: 6px;
-  padding: 12px;
-  margin-bottom: 12px;
-}
-
-.claim-claimed-header {
-  font-size: 11px;
-  font-weight: 700;
-  color: #4caf50;
-  margin-bottom: 8px;
-  font-family: 'Orbitron', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.claim-claimed-details {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.claim-claimed-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 10px;
-}
-
-.claim-claimed-label {
-  color: rgba(255, 255, 255, 0.6);
-  font-family: 'Source Code Pro', monospace;
-  text-transform: uppercase;
-}
-
-.claim-claimed-value {
-  color: #4caf50;
-  font-weight: 700;
-  font-family: 'Orbitron', monospace;
-}
-
-.claim-basescan-link {
-  color: #d4ff00;
-  text-decoration: none;
-  font-size: 10px;
-  font-family: 'Source Code Pro', monospace;
-  transition: all 0.2s ease;
-}
-
-.claim-basescan-link:hover {
-  color: #e4ff10;
-  text-decoration: underline;
-  text-shadow: 0 0 4px rgba(212, 255, 0, 0.5);
-}
-
-@media (max-width: 424px) {
-  .claim-container {
-    padding: 12px;
+@container sheet (min-width: 620px) {
+  .sc-tiers {
+    grid-template-columns: repeat(4, 1fr);
   }
 
-  .claim-title {
-    font-size: 13px;
-  }
-
-  .claim-subtitle {
-    font-size: 9px;
-  }
-
-  .claim-tiers {
-    gap: 4px;
-    padding: 6px;
-  }
-
-  .claim-tier-item {
-    padding: 4px 2px;
-  }
-
-  .claim-tier-label {
-    font-size: 8px;
-  }
-
-  .claim-tier-reward {
-    font-size: 9px;
+  .sc-tiers__item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
   }
 }

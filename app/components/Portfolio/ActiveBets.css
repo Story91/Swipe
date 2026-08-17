@@ -9,6 +9,14 @@
  * is the money" and "am I with it or against it".
  */
 
+/* One exposure board per token, stacked. Side by side would read as two halves
+   of a single total, and ether and a stablecoin have no single total. */
+.ab-exposure {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
 .ab-list {
   border-top: 1px solid var(--sheet-rule);
 }

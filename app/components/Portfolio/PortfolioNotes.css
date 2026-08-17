@@ -1,0 +1,87 @@
+/*
+ * Notices shared by the portfolio screens.
+ *
+ * These sit inside .sheet, on the dark tote-board surface the three screens
+ * use, so they take the sheet language: a hairline left rule instead of a
+ * rounded card, and the --sheet-* tokens from app/styles/tokens.css. Not the
+ * lime card face MarketPools uses, which belongs on the swipe card, and not the
+ * #0d0d0d dialog panel, which belongs in a modal floating over the app.
+ *
+ * Mobile first, one column, nothing that can widen the page.
+ */
+
+.pnote {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  border-left: 2px solid var(--sheet-rule-strong);
+  padding: 2px 0 2px 14px;
+  margin: 0 0 16px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.pnote__text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--sheet-paper-2);
+  max-width: 62ch;
+}
+
+.pnote__retry {
+  font-family: var(--sheet-display);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sheet-paper-2);
+  background: transparent;
+  border: 1px solid var(--sheet-rule);
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.pnote__retry:hover,
+.pnote__retry:focus-visible {
+  color: var(--sheet-lime);
+  border-color: var(--sheet-lime-line);
+}
+
+/* Amber, because the figures beside it are real but may be old. Red would
+   claim the screen is broken, and it is not. */
+.pnote--stale {
+  border-left-color: var(--sheet-warn);
+}
+
+.pnote--archived {
+  border-left-color: var(--sheet-rule-strong);
+}
+
+.pnote--archived .pnote__text {
+  color: var(--sheet-paper-3);
+}
+
+.ptag {
+  font-family: var(--sheet-display);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border: 1px solid var(--sheet-rule);
+  padding: 2px 6px;
+}
+
+.ptag--archived {
+  color: var(--sheet-warn);
+  border-color: rgba(255, 176, 32, 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pnote__retry {
+    transition: none;
+  }
+}

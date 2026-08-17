@@ -13,6 +13,15 @@
  * hairline border, like every other bordered thing on the sheet.
  */
 
+/* One board per token, stacked. Never side by side: two ledgers in a row read
+   as two halves of one total, and the whole point is that they cannot be
+   added. */
+.pf-standings {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
 .pf-list {
   border-top: 1px solid var(--sheet-rule);
 }
