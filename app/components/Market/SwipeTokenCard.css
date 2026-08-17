@@ -1,856 +1,579 @@
-/* SwipeTokenCard - Dark Theme with Neon Accents */
-/* Matching TinderCard and EnhancedUserDashboard styling */
+/**
+ * The $SWIPE tab.
+ *
+ * Replaces 856 lines of gradients, 24px radii and neon box-shadows built for a
+ * buy and sell widget that no longer exists. Nothing from that file survives,
+ * so the old `.swipe-token-*` classes are gone rather than orphaned: they were
+ * defined here and used in one component, and both were rewritten together.
+ *
+ * Mobile first and one column throughout. There is no desktop branch until
+ * 560px, and nothing in here can push the page sideways: the only element wider
+ * than its box is the marquee track, and its parent clips.
+ *
+ * Every colour is a --sheet-* token from app/styles/tokens.css. The one literal
+ * is #0d0d0d on the panel faces, which matches MarketChooserModal, WalletPicker
+ * and MarketPools: the app ground is lime, and a translucent panel puts that
+ * behind body text and makes it unreadable.
+ *
+ * Radius is 0 everywhere, matching the rest of the house.
+ *
+ * MOTION. This screen is meant to feel like something is about to happen, so
+ * five things move: sections rise in on a stagger, a beam sweeps the hero, the
+ * marquee scrolls, the connector into the unscheduled stage marches, and the
+ * two live nodes pulse. Every one of them is switched off in the reduce block
+ * at the bottom, which is also where the fill-mode trap lives: `animation:
+ * none` drops the keyframe entirely, so an element that starts at opacity 0
+ * inside a keyframe renders at its natural opacity rather than staying blank.
+ * That is why the rise animation carries its start state in the keyframe and
+ * not in the rule.
+ */
 
-.swipe-token-page {
-  width: 100%;
-  min-height: 100vh;
-  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0a0a0a 100%);
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-/* Main Card Container */
 .swipe-token-card {
-  width: 100%;
-  max-width: 420px;
-  background: linear-gradient(145deg, #1a1a1a 0%, #0d0d0d 100%);
-  border: 2px solid rgba(212, 255, 0, 0.4);
-  border-radius: 24px;
-  padding: 24px;
-  box-shadow: 
-    0 0 40px rgba(212, 255, 0, 0.15),
-    0 20px 60px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  position: relative;
-  overflow: hidden;
-}
-
-/* Animated border glow effect */
-.swipe-token-card::before {
-  content: '';
-  position: absolute;
-  top: -2px;
-  left: -2px;
-  right: -2px;
-  bottom: -2px;
-  background: linear-gradient(90deg, #d4ff00, #00ff88, #d4ff00, #88ff00, #d4ff00);
-  background-size: 300% 100%;
-  border-radius: 26px;
-  z-index: -1;
-  animation: borderGlow 4s linear infinite;
-  opacity: 0.5;
-}
-
-@keyframes borderGlow {
-  0% { background-position: 0% 50%; }
-  100% { background-position: 300% 50%; }
-}
-
-/* Header */
-.swipe-token-header {
-  text-align: center;
-  margin-bottom: 24px;
-  position: relative;
-}
-
-.swipe-token-logo-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.swipe-token-logo-wrapper {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #d4ff00, #a8cc00);
-  padding: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 
-    0 0 30px rgba(212, 255, 0, 0.5),
-    0 4px 20px rgba(0, 0, 0, 0.3);
-  animation: logoPulse 3s ease-in-out infinite;
-}
-
-@keyframes logoPulse {
-  0%, 100% {
-    box-shadow: 0 0 30px rgba(212, 255, 0, 0.5), 0 4px 20px rgba(0, 0, 0, 0.3);
-  }
-  50% {
-    box-shadow: 0 0 50px rgba(212, 255, 0, 0.7), 0 4px 30px rgba(0, 0, 0, 0.4);
-  }
-}
-
-.swipe-token-logo {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.swipe-token-title {
-  font-size: 32px;
-  font-weight: 800;
-  color: #d4ff00;
-  font-family: "Orbitron", sans-serif;
-  text-shadow: 0 0 20px rgba(212, 255, 0, 0.5);
-  letter-spacing: 2px;
-  margin: 0;
-}
-
-.swipe-token-eth-price {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.6);
-  font-family: "Exo 2", sans-serif;
-  margin-top: 8px;
-}
-
-.swipe-token-loading-price {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.4);
-  font-family: "Exo 2", sans-serif;
-  margin-top: 8px;
-  font-style: italic;
-}
-
-/* Token Prices Container */
-.swipe-token-prices {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  margin-top: 8px;
-}
-
-.swipe-token-swipe-price {
-  font-size: 14px;
-  font-weight: 600;
-  color: #d4ff00;
-  font-family: "Exo 2", sans-serif;
-  text-shadow: 0 0 10px rgba(212, 255, 0, 0.3);
-}
-
-/* Balance Display */
-.swipe-token-balance {
-  background: linear-gradient(135deg, rgba(212, 255, 0, 0.1), rgba(212, 255, 0, 0.05));
-  border: 1px solid rgba(212, 255, 0, 0.3);
-  border-radius: 16px;
-  padding: 16px 20px;
-  margin-bottom: 24px;
-  position: relative;
-  overflow: hidden;
-}
-
-.swipe-token-balance::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(212, 255, 0, 0.1), transparent);
-  animation: shimmer 3s ease-in-out infinite;
-}
-
-@keyframes shimmer {
-  0% { left: -100%; }
-  100% { left: 100%; }
-}
-
-.swipe-token-balance-label {
-  font-size: 12px;
-  color: #d4ff00;
-  font-family: "Orbitron", sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 6px;
-}
-
-.swipe-token-balance-value {
-  font-size: 24px;
-  font-weight: 700;
-  color: #ffffff;
-  font-family: "Exo 2", sans-serif;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
-}
-
-.swipe-token-balance-usd {
-  font-size: 16px;
-  font-weight: 600;
-  color: #d4ff00;
-  font-family: "Exo 2", sans-serif;
-  margin-top: 4px;
-  text-shadow: 0 0 8px rgba(212, 255, 0, 0.3);
-}
-
-.swipe-token-address-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.swipe-token-address {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
-  font-family: monospace;
-  cursor: pointer;
-  transition: color 0.2s ease;
-}
-
-.swipe-token-address:hover {
-  color: #d4ff00;
-}
-
-.swipe-token-link {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.5);
-  text-decoration: none;
-  transition: all 0.2s ease;
-}
-
-.swipe-token-link:hover {
-  color: #d4ff00;
-  transform: scale(1.1);
-}
-
-/* Tabs */
-.swipe-token-tabs {
-  display: flex;
-  background: rgba(0, 0, 0, 0.4);
-  border-radius: 14px;
-  padding: 4px;
-  margin-bottom: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.swipe-token-tab {
-  flex: 1;
-  padding: 12px 20px;
-  border-radius: 10px;
-  border: none;
-  font-size: 14px;
-  font-weight: 700;
-  font-family: "Orbitron", sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  background: transparent;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.swipe-token-tab:hover {
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.swipe-token-tab.active {
-  background: linear-gradient(135deg, #d4ff00, #a8cc00);
-  color: #000000;
-  box-shadow: 0 4px 15px rgba(212, 255, 0, 0.4);
-}
-
-/* Quick Buy Section */
-.swipe-token-section-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #d4ff00;
-  font-family: "Orbitron", sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 12px;
-}
-
-.swipe-token-quick-buy {
-  margin-bottom: 24px;
-}
-
-.swipe-token-quick-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
-}
-
-.swipe-token-quick-btn {
-  background: linear-gradient(135deg, #1a1a1a, #0a0a0a);
-  border: 2px solid rgba(212, 255, 0, 0.3);
-  border-radius: 12px;
-  padding: 12px 8px;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  position: relative;
-  overflow: hidden;
-}
-
-.swipe-token-quick-btn::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, rgba(212, 255, 0, 0.15), transparent);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.swipe-token-quick-btn:hover::before {
-  opacity: 1;
-}
-
-.swipe-token-quick-btn:hover {
-  border-color: #d4ff00;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(212, 255, 0, 0.2);
-}
-
-.swipe-token-quick-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.swipe-token-quick-btn-amount {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  position: relative;
-  z-index: 1;
-}
-
-.swipe-token-quick-btn-eth {
-  width: 16px;
-  height: 16px;
-}
-
-.swipe-token-quick-btn-value {
-  font-size: 14px;
-  font-weight: 700;
-  color: #ffffff;
-  font-family: "Exo 2", sans-serif;
-}
-
-.swipe-token-quick-btn-usd {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
-  font-family: "Exo 2", sans-serif;
-  position: relative;
-  z-index: 1;
-}
-
-/* Large USD display for quick buy buttons */
-.swipe-token-quick-btn-usd-main {
-  font-size: 24px;
-  font-weight: 800;
-  color: #d4ff00;
-  font-family: "Orbitron", sans-serif;
-  text-shadow: 0 0 10px rgba(212, 255, 0, 0.4);
-  position: relative;
-  z-index: 1;
-}
-
-/* Small ETH display under USD */
-.swipe-token-quick-btn-eth-small {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
-  font-family: "Exo 2", sans-serif;
-  position: relative;
-  z-index: 1;
-  margin-top: 4px;
-}
-
-.swipe-token-quick-btn-eth-small img {
-  opacity: 0.7;
-}
-
-.swipe-token-quick-btn-swipe {
-  font-size: 10px;
-  color: #d4ff00;
-  font-family: "Exo 2", sans-serif;
-  font-weight: 600;
-  margin-top: 4px;
-  text-shadow: 0 0 6px rgba(212, 255, 0, 0.4);
-  position: relative;
-  z-index: 1;
-}
-
-.swipe-token-quick-btn-loading {
-  width: 20px;
-  height: 20px;
-  border: 2px solid rgba(212, 255, 0, 0.2);
-  border-top-color: #d4ff00;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* Custom Amount Section */
-.swipe-token-custom {
-  margin-bottom: 24px;
-}
-
-.swipe-token-custom-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.swipe-token-price-info {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
-  font-family: "Exo 2", sans-serif;
-}
-
-/* Input Mode Toggle */
-.swipe-token-input-toggle {
-  display: flex;
-  background: rgba(0, 0, 0, 0.4);
-  border-radius: 10px;
-  padding: 3px;
-  margin-bottom: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.swipe-token-toggle-btn {
-  flex: 1;
-  padding: 10px 16px;
-  border-radius: 8px;
-  border: none;
-  font-size: 13px;
-  font-weight: 600;
-  font-family: "Orbitron", sans-serif;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.swipe-token-toggle-btn.active {
-  background: linear-gradient(135deg, #d4ff00, #a8cc00);
-  color: #000000;
-}
-
-/* Range Slider */
-.swipe-token-slider-container {
-  margin-bottom: 16px;
-}
-
-.swipe-token-slider-labels {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.swipe-token-slider-label {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
-  font-family: "Exo 2", sans-serif;
-}
-
-.swipe-token-slider {
   width: 100%;
-  height: 8px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.1);
-  appearance: none;
-  -webkit-appearance: none;
-  cursor: pointer;
-}
-
-.swipe-token-slider::-webkit-slider-thumb {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #d4ff00, #a8cc00);
-  border: 3px solid #000;
-  box-shadow: 0 4px 12px rgba(212, 255, 0, 0.4);
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.swipe-token-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 16px rgba(212, 255, 0, 0.5);
-}
-
-.swipe-token-slider::-moz-range-thumb {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #d4ff00, #a8cc00);
-  border: 3px solid #000;
-  box-shadow: 0 4px 12px rgba(212, 255, 0, 0.4);
-  cursor: pointer;
-}
-
-.swipe-token-slider-value {
-  text-align: center;
-  margin-top: 8px;
-  font-size: 13px;
-  color: #d4ff00;
-  font-weight: 600;
-  font-family: "Exo 2", sans-serif;
-}
-
-/* Input Row */
-.swipe-token-input-row {
-  display: flex;
-  gap: 12px;
-}
-
-.swipe-token-input-wrapper {
-  flex: 1;
-}
-
-.swipe-token-input {
-  width: 100%;
-  padding: 14px 16px;
-  background: rgba(0, 0, 0, 0.4);
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  font-size: 16px;
-  font-weight: 600;
-  color: #ffffff;
-  font-family: "Exo 2", sans-serif;
-  transition: all 0.3s ease;
-}
-
-.swipe-token-input:focus {
-  outline: none;
-  border-color: #d4ff00;
-  box-shadow: 0 0 0 3px rgba(212, 255, 0, 0.1);
-}
-
-.swipe-token-input::placeholder {
-  color: rgba(255, 255, 255, 0.3);
-}
-
-.swipe-token-input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.swipe-token-input-helper {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.4);
-  font-family: "Exo 2", sans-serif;
-  margin-top: 6px;
-}
-
-.swipe-token-receive-info {
-  font-size: 13px;
-  font-weight: 600;
-  color: #d4ff00;
-  font-family: "Exo 2", sans-serif;
-  margin-top: 8px;
-  padding: 8px 12px;
-  background: rgba(212, 255, 0, 0.1);
-  border: 1px solid rgba(212, 255, 0, 0.3);
-  border-radius: 8px;
-  text-shadow: 0 0 8px rgba(212, 255, 0, 0.3);
-}
-
-.swipe-token-action-btn {
-  padding: 14px 24px;
-  background: linear-gradient(135deg, #d4ff00, #a8cc00);
-  border: none;
-  border-radius: 12px;
-  font-size: 15px;
-  font-weight: 700;
-  color: #000000;
-  font-family: "Orbitron", sans-serif;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 15px rgba(212, 255, 0, 0.3);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.swipe-token-action-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 25px rgba(212, 255, 0, 0.5);
-}
-
-.swipe-token-action-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-}
-
-/* Sell Section */
-.swipe-token-sell {
-  margin-bottom: 24px;
-}
-
-.swipe-token-min-info {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.4);
-  font-family: "Exo 2", sans-serif;
-  margin-top: 8px;
-}
-
-/* Slippage Settings */
-.swipe-token-slippage {
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
+  max-width: 560px;
+  margin: 0 auto;
   padding: 16px;
-  margin-bottom: 24px;
+  /* A long address or a big number wraps rather than widening the page. */
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
-.swipe-token-slippage-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #d4ff00;
-  font-family: "Orbitron", sans-serif;
-  margin-bottom: 12px;
+/* ------------------------------------------------------------------ entry */
+
+.swipe-token-card > * {
+  animation: swipe-token-card-rise 460ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
-.swipe-token-slippage-options {
-  display: flex;
-  gap: 10px;
+.swipe-token-card > *:nth-child(2) { animation-delay: 60ms; }
+.swipe-token-card > *:nth-child(3) { animation-delay: 120ms; }
+.swipe-token-card > *:nth-child(4) { animation-delay: 180ms; }
+.swipe-token-card > *:nth-child(5) { animation-delay: 240ms; }
+.swipe-token-card > *:nth-child(6) { animation-delay: 300ms; }
+
+@keyframes swipe-token-card-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.swipe-token-slippage-btn {
-  padding: 8px 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.6);
-  font-family: "Exo 2", sans-serif;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
+/* ------------------------------------------------------------------- hero */
 
-.swipe-token-slippage-btn:hover {
-  border-color: rgba(212, 255, 0, 0.5);
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.swipe-token-slippage-btn.active {
-  background: linear-gradient(135deg, #d4ff00, #a8cc00);
-  border-color: transparent;
-  color: #000000;
-}
-
-.swipe-token-slippage-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Transaction Status */
-.swipe-token-tx-status {
-  background: rgba(0, 255, 136, 0.1);
-  border: 1px solid rgba(0, 255, 136, 0.3);
-  border-radius: 12px;
-  padding: 14px 16px;
-  margin-bottom: 24px;
-}
-
-.swipe-token-tx-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #00ff88;
-  font-family: "Orbitron", sans-serif;
-  margin-bottom: 8px;
-}
-
-.swipe-token-tx-link {
-  font-size: 12px;
-  color: #00ff88;
-  font-family: monospace;
-  word-break: break-all;
-  text-decoration: none;
-  transition: opacity 0.2s ease;
-}
-
-.swipe-token-tx-link:hover {
-  opacity: 0.8;
-  text-decoration: underline;
-}
-
-/* SWIPERS Section - Compact */
-.swipe-token-swipers {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  background: rgba(212, 255, 0, 0.05);
-  border: 1px solid rgba(212, 255, 0, 0.2);
-  border-radius: 12px;
-  padding: 14px 16px;
-  margin-bottom: 16px;
-}
-
-.swipe-token-swipers-info {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.6);
-  font-family: "Exo 2", sans-serif;
-  text-align: center;
-  line-height: 1.4;
-}
-
-.swipe-token-swipers-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background: linear-gradient(135deg, #d4ff00, #a8cc00);
-  border: none;
-  border-radius: 10px;
-  padding: 12px 20px;
-  font-size: 14px;
-  font-weight: 700;
-  color: #000000;
-  font-family: "Orbitron", sans-serif;
-  text-decoration: none;
-  transition: all 0.3s ease;
-}
-
-.swipe-token-swipers-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(212, 255, 0, 0.4);
-}
-
-.swipe-token-swipers-btn-icon {
-  border-radius: 4px;
-}
-
-/* DEX Icons */
-.swipe-token-dex-icons {
-  display: flex;
-  justify-content: center;
-  gap: 20px;
-  padding: 20px 0;
-  margin-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.swipe-token-dex-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 56px;
-  background: #000000;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 14px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+.swipe-token-card__hero {
+  position: relative;
   overflow: hidden;
-  padding: 0;
-}
-
-.swipe-token-dex-icon img {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover;
+  padding: 20px 16px 18px;
+  background: #0d0d0d;
+  border: 2px solid var(--sheet-lime);
   border-radius: 0;
 }
 
-.swipe-token-dex-icon:hover {
-  border-color: rgba(212, 255, 0, 0.6);
-  transform: translateY(-3px);
-  box-shadow: 0 6px 20px rgba(212, 255, 0, 0.25);
+/* A light sweeping the top edge. Clipped by the hero, so it cannot add scroll. */
+.swipe-token-card__beam {
+  position: absolute;
+  top: 0;
+  left: -40%;
+  width: 40%;
+  height: 2px;
+  opacity: 0;
+  background: linear-gradient(90deg, transparent, var(--sheet-lime), transparent);
+  animation: swipe-token-card-sweep 3600ms ease-in-out infinite;
 }
 
-/* Wallet Notice */
-.swipe-token-wallet-notice {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 16px;
-  text-align: center;
-  margin-top: 16px;
+@keyframes swipe-token-card-sweep {
+  0%   { transform: translateX(0);    opacity: 0; }
+  12%  { opacity: 1; }
+  88%  { opacity: 1; }
+  100% { transform: translateX(350%); opacity: 0; }
 }
 
-.swipe-token-wallet-text {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.6);
-  font-family: "Exo 2", sans-serif;
+.swipe-token-card__eyebrow {
+  display: block;
+  font-family: var(--sheet-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sheet-lime);
 }
 
-/* Mobile Responsive */
-@media (max-width: 480px) {
-  .swipe-token-page {
-    padding: 12px;
-  }
+h2.swipe-token-card__headline {
+  margin: 10px 0 0;
+  font-family: var(--sheet-display);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+  color: var(--sheet-paper);
+}
 
+.swipe-token-card__standfirst {
+  margin: 12px 0 0;
+  font-family: var(--sheet-body);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--sheet-paper-2);
+}
+
+/* ----------------------------------------------------------------- ticker */
+
+.swipe-token-card__ticker {
+  overflow: hidden;
+  padding: 8px 0;
+  background: #0d0d0d;
+  border-top: 1px solid var(--sheet-rule-strong);
+  border-bottom: 1px solid var(--sheet-rule-strong);
+  /* Alpha stops, not colours: this fades the strip out at both ends so items
+     do not appear to be cut off mid-word. */
+  -webkit-mask-image: linear-gradient(90deg, transparent, rgba(0, 0, 0, 1) 10%, rgba(0, 0, 0, 1) 90%, transparent);
+  mask-image: linear-gradient(90deg, transparent, rgba(0, 0, 0, 1) 10%, rgba(0, 0, 0, 1) 90%, transparent);
+}
+
+.swipe-token-card__ticker-track {
+  display: flex;
+  width: max-content;
+  animation: swipe-token-card-scroll 26s linear infinite;
+}
+
+@keyframes swipe-token-card-scroll {
+  to { transform: translateX(-50%); }
+}
+
+.swipe-token-card__ticker-item {
+  flex: 0 0 auto;
+  padding: 0 14px;
+  font-family: var(--sheet-data);
+  font-size: 11px;
+  white-space: nowrap;
+  color: var(--sheet-paper-3);
+}
+
+.swipe-token-card__ticker-item::after {
+  content: '/';
+  margin-left: 14px;
+  color: var(--sheet-lime);
+}
+
+/* ------------------------------------------------------------------ relay */
+
+.swipe-token-card__relay {
+  margin: 0;
+  padding: 16px 14px;
+  list-style: none;
+  background: #0d0d0d;
+  border: 1px solid var(--sheet-rule-strong);
+  border-radius: 0;
+}
+
+.swipe-token-card__stage {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  gap: 12px;
+  padding-bottom: 18px;
+}
+
+.swipe-token-card__stage:last-child {
+  padding-bottom: 0;
+}
+
+.swipe-token-card__stage-rail {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding-top: 4px;
+}
+
+/* The connector runs from under this stage's node to the next node. The last
+   stage has nothing below it, which is the point: the sequence stops at an
+   event with no date on it. */
+.swipe-token-card__stage-rail::after {
+  content: '';
+  position: absolute;
+  top: 18px;
+  bottom: -18px;
+  left: 50%;
+  width: 1px;
+  background: var(--sheet-lime-line);
+}
+
+.swipe-token-card__stage:last-child .swipe-token-card__stage-rail::after {
+  display: none;
+}
+
+/* Marching dashes out of the present and into the stage with no date. */
+.swipe-token-card__stage--now .swipe-token-card__stage-rail::after {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--sheet-lime) 0 4px,
+    transparent 4px 10px
+  );
+  background-size: 1px 10px;
+  animation: swipe-token-card-ants 760ms linear infinite;
+}
+
+@keyframes swipe-token-card-ants {
+  to { background-position-y: 10px; }
+}
+
+.swipe-token-card__stage-node {
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--sheet-rule-strong);
+  border-radius: 0;
+  background: transparent;
+}
+
+.swipe-token-card__stage--now .swipe-token-card__stage-node {
+  border-color: var(--sheet-lime);
+  background: var(--sheet-lime);
+  animation: swipe-token-card-pulse 2000ms ease-out infinite;
+}
+
+@keyframes swipe-token-card-pulse {
+  0%   { box-shadow: 0 0 0 0 var(--sheet-lime-line); }
+  70%  { box-shadow: 0 0 0 8px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.swipe-token-card__stage--next .swipe-token-card__stage-node {
+  border-color: var(--sheet-lime);
+  animation: swipe-token-card-breathe 2600ms ease-in-out infinite;
+}
+
+@keyframes swipe-token-card-breathe {
+  0%, 100% { opacity: 0.35; transform: scale(0.85); }
+  50%      { opacity: 1;    transform: scale(1.15); }
+}
+
+.swipe-token-card__stage-body {
+  min-width: 0;
+}
+
+.swipe-token-card__stage-when {
+  display: block;
+  font-family: var(--sheet-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sheet-paper-3);
+}
+
+.swipe-token-card__stage--now .swipe-token-card__stage-when,
+.swipe-token-card__stage--next .swipe-token-card__stage-when {
+  color: var(--sheet-lime);
+}
+
+h3.swipe-token-card__stage-what {
+  margin: 4px 0 0;
+  font-family: var(--sheet-display);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--sheet-paper);
+}
+
+.swipe-token-card__stage-text {
+  margin: 6px 0 0;
+  font-family: var(--sheet-body);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--sheet-paper-2);
+}
+
+.swipe-token-card__stage--was .swipe-token-card__stage-text {
+  color: var(--sheet-paper-3);
+}
+
+/* ----------------------------------------------------------------- panels */
+
+.swipe-token-card__panel {
+  padding: 14px;
+  background: #0d0d0d;
+  border: 1px solid var(--sheet-rule-strong);
+  border-radius: 0;
+  min-width: 0;
+}
+
+.swipe-token-card__panel--plain {
+  border-color: var(--sheet-lime-line);
+}
+
+.swipe-token-card__panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+h3.swipe-token-card__panel-title {
+  margin: 0;
+  font-family: var(--sheet-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sheet-lime);
+}
+
+.swipe-token-card__status {
+  margin: 0;
+  font-family: var(--sheet-body);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--sheet-paper-3);
+}
+
+.swipe-token-card__retry {
+  margin-top: 8px;
+  padding: 4px 10px;
+  font-family: var(--sheet-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sheet-lime);
+  background: transparent;
+  border: 1px solid var(--sheet-lime-line);
+  border-radius: 0;
+  cursor: pointer;
+  transition: border-color 140ms ease;
+}
+
+.swipe-token-card__retry:hover {
+  border-color: var(--sheet-lime);
+}
+
+/* -------------------------------------------------------------- key/value */
+
+.swipe-token-card__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+}
+
+.swipe-token-card__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-top: 1px solid var(--sheet-rule);
+}
+
+.swipe-token-card__row:first-child {
+  border-top: none;
+}
+
+.swipe-token-card__row-key {
+  font-family: var(--sheet-body);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--sheet-paper-3);
+}
+
+.swipe-token-card__row-value {
+  margin: 0;
+  font-family: var(--sheet-data);
+  font-size: 12px;
+  text-align: right;
+  color: var(--sheet-paper);
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------------ flags */
+
+.swipe-token-card__flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 12px;
+}
+
+.swipe-token-card__flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--sheet-body);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--sheet-paper-2);
+}
+
+.swipe-token-card__dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 0;
+}
+
+.swipe-token-card__dot--live {
+  background: var(--sheet-lime);
+  animation: swipe-token-card-pulse 2000ms ease-out infinite;
+}
+
+.swipe-token-card__dot--idle {
+  background: transparent;
+  border: 1px solid var(--sheet-rule-strong);
+}
+
+/* ---------------------------------------------------------------- balance */
+
+.swipe-token-card__balance {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: var(--sheet-surface);
+  border: 1px solid var(--sheet-lime-line);
+}
+
+.swipe-token-card__balance-label {
+  font-family: var(--sheet-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sheet-paper-3);
+}
+
+.swipe-token-card__balance-value {
+  font-family: var(--sheet-data);
+  font-size: 17px;
+  color: var(--sheet-paper);
+}
+
+/* ------------------------------------------------------------------ links */
+
+.swipe-token-card__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.swipe-token-card__copy {
+  padding: 5px 10px;
+  font-family: var(--sheet-body);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--sheet-paper-2);
+  background: transparent;
+  border: 1px solid var(--sheet-rule-strong);
+  border-radius: 0;
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.swipe-token-card__copy:hover {
+  color: var(--sheet-lime);
+  border-color: var(--sheet-lime-line);
+}
+
+a.swipe-token-card__link {
+  font-family: var(--sheet-body);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--sheet-lime);
+  text-decoration: none;
+  border-bottom: 1px solid var(--sheet-lime-line);
+  transition: border-color 140ms ease;
+}
+
+a.swipe-token-card__link:hover {
+  border-bottom-color: var(--sheet-lime);
+}
+
+.swipe-token-card__links a.swipe-token-card__link {
+  padding: 5px 10px;
+  border: 1px solid var(--sheet-lime-line);
+}
+
+.swipe-token-card__copy:focus-visible,
+.swipe-token-card__retry:focus-visible,
+a.swipe-token-card__link:focus-visible {
+  outline: 2px solid var(--sheet-lime);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ notes */
+
+.swipe-token-card__note {
+  margin: 12px 0 0;
+  font-family: var(--sheet-body);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--sheet-paper-2);
+}
+
+.swipe-token-card__note--quiet {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--sheet-paper-3);
+}
+
+/* A note that opens a panel sits under the head's own margin, not on top of it. */
+.swipe-token-card__panel-head + .swipe-token-card__note {
+  margin-top: 0;
+}
+
+/* Above a phone there is room for the headline to carry more weight. */
+@media (min-width: 560px) {
   .swipe-token-card {
-    padding: 20px 16px;
-    border-radius: 20px;
+    padding: 20px 0;
   }
 
-  .swipe-token-logo-wrapper {
-    width: 56px;
-    height: 56px;
+  .swipe-token-card__hero {
+    padding: 26px 22px 22px;
   }
 
-  .swipe-token-title {
+  h2.swipe-token-card__headline {
     font-size: 26px;
   }
 
-  .swipe-token-balance-value {
-    font-size: 20px;
+  .swipe-token-card__standfirst {
+    font-size: 14px;
   }
 
-  .swipe-token-quick-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-  }
-
-  .swipe-token-quick-btn {
-    padding: 10px 6px;
-  }
-
-  .swipe-token-quick-btn-value {
-    font-size: 12px;
-  }
-
-  .swipe-token-quick-btn-usd {
-    font-size: 10px;
-  }
-
-  .swipe-token-input-row {
-    flex-direction: column;
-  }
-
-  .swipe-token-action-btn {
-    width: 100%;
-  }
-
-  .swipe-token-slippage-options {
-    flex-wrap: wrap;
-  }
-
-  .swipe-token-slippage-btn {
-    flex: 1;
-    min-width: 60px;
-    text-align: center;
-  }
-
-  .swipe-token-flaunch-title {
-    font-size: 16px;
+  .swipe-token-card__panel,
+  .swipe-token-card__relay {
+    padding: 16px 18px;
   }
 }
 
+/* Everything that moves, stopped. The rise keyframe holds its own start state,
+   so dropping the animation leaves each section at full opacity rather than
+   invisible. The beam is decorative and stays hidden, the marquee parks on its
+   first items and is still readable, and both nodes keep their static colour. */
+@media (prefers-reduced-motion: reduce) {
+  .swipe-token-card > *,
+  .swipe-token-card__beam,
+  .swipe-token-card__ticker-track,
+  .swipe-token-card__stage--now .swipe-token-card__stage-rail::after,
+  .swipe-token-card__stage--now .swipe-token-card__stage-node,
+  .swipe-token-card__stage--next .swipe-token-card__stage-node,
+  .swipe-token-card__dot--live {
+    animation: none;
+  }
+
+  .swipe-token-card__stage--next .swipe-token-card__stage-node {
+    opacity: 1;
+    transform: none;
+  }
+
+  .swipe-token-card__copy,
+  .swipe-token-card__retry,
+  a.swipe-token-card__link {
+    transition: none;
+  }
+}

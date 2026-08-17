@@ -1,27 +1,46 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useWriteContract, useAccount, useReadContract, useWaitForTransactionReceipt, useChainId, useBalance } from 'wagmi';
-import { formatEther } from 'viem';
-import { getChainConfig, isWritableMarket } from '@/lib/chains';
+import { useAccount, useSignMessage } from 'wagmi';
 import { useActiveChain } from '@/lib/chains/activeChain';
 import { useMarketWrite } from '@/lib/chains/useMarketWrite';
-import { useSignMessage } from 'wagmi';
 import { PROPOSAL_HEADERS, buildProposalMessage } from '@/lib/auth/proposalMessage';
-import { CONTRACTS, SWIPE_TOKEN } from '../../../lib/contract';
-import { calculateApprovalAmount } from '../../../lib/constants/approval';
 import { uploadToImgBB } from '../../../lib/imgbb';
-import { Dialog, DialogContent } from '../../../components/ui/dialog';
-import { Card, CardContent } from '../../../components/ui/card';
-import { Button } from '../../../components/ui/button';
-import { Input } from '../../../components/ui/input';
-import { Separator } from '../../../components/ui/separator';
-import { Badge } from '../../../components/ui/badge';
-import GradientText from '../../../components/GradientText';
-import { useComposeCast, useMiniKit } from '@coinbase/onchainkit/minikit';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../../components/ui/dialog';
+import { useComposeCast } from '@coinbase/onchainkit/minikit';
 import sdk from '@farcaster/miniapp-sdk';
+import './CreatePredictionModal.css';
 
-const ACTIVE_CHAIN_ID = getChainConfig().viemChain.id;
+/**
+ * Propose a market.
+ *
+ * Nothing in this component touches a contract. V2 minted from here: a public
+ * createPrediction, a fee paid in ETH or $SWIPE, a token approval before the
+ * $SWIPE path, and the contract's own counter for the id. V4 has no public
+ * creation, no creation fee, and registerPrediction is onlyRegistrar, so the
+ * form writes a signed proposal and a resolver registers it later.
+ *
+ * Everything that survived from the paying version was display. Four reads hit
+ * CONTRACTS.V2, the archived Base contract whose owner key is lost, and two of
+ * the functions they called (creationFees, requiredApprovals) do not exist in
+ * V4's ABI at all. They fed a token toggle, a fee strip, a balance and a button
+ * label, and gated nothing: canCreate was already just "is a wallet connected".
+ * A useWaitForTransactionReceipt sat waiting on a hash that could never be
+ * produced, so the effect that opened the success modal could never fire.
+ *
+ * What replaced the fee is the rate limit in the propose route: five per address
+ * per day, and a cap on how many proposals may sit unregistered at once. A
+ * proposal is inert until registration, so the exposure is Redis writes rather
+ * than money.
+ *
+ * The signature proves only that the creator address belongs to whoever sent
+ * the request, which matters because that address earns the creator fee on
+ * every losing pool in the market. It is not an admin check. The question and
+ * deadline are inside the signed string, so a captured header cannot be
+ * replayed with a different question, and it is signed immediately before the
+ * fetch: the server allows five minutes and refuses a timestamp more than
+ * thirty seconds ahead, so nothing slow may sit between the two.
+ */
 
 interface CreatePredictionModalProps {
   isOpen: boolean;
@@ -36,7 +55,6 @@ interface FormData {
   imageUrl: string;
   endDate: string;
   endTime: string;
-  paymentToken: 'ETH' | 'SWIPE';
   includeChart: boolean;
   selectedCrypto: string;
 }
@@ -57,26 +75,25 @@ const CRYPTO_OPTIONS = [
 
 export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePredictionModalProps) {
   const { address } = useAccount();
-  // The selected chain, not the build-time default.
+  // The selected chain, not the build-time default. It goes in the body: the
+  // route's chainFromRequestOrBody falls back to Base when it is absent, so a
+  // proposal made with Robinhood selected used to land in Base's keyspace and
+  // could never be registered against the contract the user was looking at.
   const { chainKey } = useActiveChain();
   // Resolves the V3 market this proposal will eventually be registered against.
   // Nothing here writes to it; the resolver does that from the admin surface.
+  // Kept because a chain with no market can never have this proposal
+  // registered, and the form should say so rather than accept it.
   const marketWrite = useMarketWrite();
-  // The creator signs their own proposal. This proves the address being
-  // credited belongs to them and nothing more: anyone with a wallet may
-  // propose, which is the point of the product. It matters because that
-  // address earns 0.5% of every losing pool in the market.
   const { signMessageAsync } = useSignMessage();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { writeContract, data: hash, error: writeError, isPending, reset: resetWriteContract } = useWriteContract();
   const { composeCast: minikitComposeCast } = useComposeCast();
-  const { context } = useMiniKit();
-  
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // Success modal state
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [successTxHash, setSuccessTxHash] = useState<string>('');
   const [createdQuestion, setCreatedQuestion] = useState<string>('');
-  
+
   // Universal share function - works on both MiniKit (Base app) and Farcaster SDK (Warpcast)
   const composeCast = useCallback(async (params: { text: string; embeds?: string[] }) => {
     try {
@@ -89,7 +106,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
     } catch (error) {
       console.log('MiniKit composeCast failed, trying Farcaster SDK...', error);
     }
-    
+
     try {
       console.log('📱 Using Farcaster SDK composeCast...');
       await sdk.actions.composeCast({
@@ -101,12 +118,12 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
       throw error;
     }
   }, [minikitComposeCast]);
-  
+
   // Share created prediction
   const shareCreatedPrediction = async () => {
     const appUrl = 'https://theswipe.app';
-    const shareText = `🎯 I just created a new prediction on SWIPE!\n\n"${createdQuestion}"\n\nWill it happen? Cast your vote! 👀\n\nJoin the prediction market on Base:`;
-    
+    const shareText = `I just proposed a new market on SWIPE.\n\n"${createdQuestion}"\n\nIt takes bets as soon as it is registered. Come and pick a side:`;
+
     try {
       await composeCast({
         text: shareText,
@@ -117,10 +134,6 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
       console.error('Share failed:', error);
     }
   };
-  
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
-    hash,
-  });
 
   const [formData, setFormData] = useState<FormData>({
     question: '',
@@ -129,106 +142,18 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
     imageUrl: '',
     endDate: '',
     endTime: '',
-    paymentToken: 'ETH',
     includeChart: false,
     selectedCrypto: ''
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof FormData | 'submit', string>>>({});
-  
+
   // Image upload states
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string>('');
   const [imagePreview, setImagePreview] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Contract reads
-  const { data: ethFee } = useReadContract({
-    address: CONTRACTS.V2.address as `0x${string}`,
-    abi: CONTRACTS.V2.abi,
-    functionName: 'creationFees',
-    args: ['0x0000000000000000000000000000000000000000' as `0x${string}`]
-  });
-
-  const { data: swipeFee } = useReadContract({
-    address: CONTRACTS.V2.address as `0x${string}`,
-    abi: CONTRACTS.V2.abi,
-    functionName: 'creationFees',
-    args: [SWIPE_TOKEN.address as `0x${string}`]
-  });
-
-  // Check if user is an approved creator
-  const approver1 = process.env.NEXT_PUBLIC_APPROVER_1?.toLowerCase();
-  const approver2 = process.env.NEXT_PUBLIC_APPROVER_2?.toLowerCase();
-  const approver3 = process.env.NEXT_PUBLIC_APPROVER_3?.toLowerCase();
-  const approver4 = process.env.NEXT_PUBLIC_APPROVER_4?.toLowerCase();
-  const isApprovedCreator = address && (
-    approver1 === address.toLowerCase() || 
-    approver2 === address.toLowerCase() ||
-    approver3 === address.toLowerCase() ||
-    approver4 === address.toLowerCase()
-  );
-
-  const { data: contractOwner } = useReadContract({
-    address: CONTRACTS.V2.address as `0x${string}`,
-    abi: CONTRACTS.V2.abi,
-    functionName: 'owner'
-  });
-
-  const { data: requiredApprovals } = useReadContract({
-    address: CONTRACTS.V2.address as `0x${string}`,
-    abi: CONTRACTS.V2.abi,
-    functionName: 'requiredApprovals'
-  });
-
-  const { data: swipeAllowance } = useReadContract({
-    address: SWIPE_TOKEN.address as `0x${string}`,
-    abi: [{
-      inputs: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }],
-      name: 'allowance',
-      outputs: [{ name: '', type: 'uint256' }],
-      stateMutability: 'view',
-      type: 'function'
-    }],
-    functionName: 'allowance',
-    args: address ? [address, CONTRACTS.V2.address as `0x${string}`] : undefined,
-  });
-
-  // User balances
-  const { data: ethBalance } = useBalance({
-    address: address,
-    chainId: ACTIVE_CHAIN_ID
-  });
-
-  const { data: swipeBalance } = useReadContract({
-    address: SWIPE_TOKEN.address as `0x${string}`,
-    abi: [{
-      inputs: [{ name: 'account', type: 'address' }],
-      name: 'balanceOf',
-      outputs: [{ name: '', type: 'uint256' }],
-      stateMutability: 'view',
-      type: 'function'
-    }],
-    functionName: 'balanceOf',
-    args: address ? [address] : undefined,
-  });
-
-  const formatBalance = (balance: bigint | undefined, isSwipe: boolean = false): string => {
-    if (!balance) return '0';
-    const formatted = formatEther(balance);
-    const num = parseFloat(formatted);
-    if (isSwipe) {
-      if (num >= 1000000) return `${(num / 1000000).toFixed(2)}M`;
-      if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
-      return num.toFixed(0);
-    }
-    return num.toFixed(4);
-  };
-
-  const isOwner = address && contractOwner && address.toLowerCase() === (contractOwner as string).toLowerCase();
-  const isEnvAdmin = address && process.env.NEXT_PUBLIC_ADMIN_1?.toLowerCase() === address.toLowerCase();
-  const canCreateFree = Boolean(isOwner || isApprovedCreator || isEnvAdmin);
-  const publicCreationEnabled = requiredApprovals !== undefined && Number(requiredApprovals) === 0;
   /**
    * Anyone with a connected wallet may propose a market. That is the product.
    *
@@ -238,24 +163,8 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
    * on-chain creation at all, so nothing here is decided on chain: a proposal
    * is inert until a resolver registers it, and what bounds the volume is the
    * per-address rate limit in the propose endpoint.
-   *
-   * The fee labels below still read from V2 and are dead. Left in place for now
-   * because removing them touches the whole form; nothing charges anyone.
    */
   const canCreate = Boolean(address);
-
-  // Format fees for display
-  const formatFee = (fee: bigint | undefined, isSwipe: boolean = false): string => {
-    if (!fee) return isSwipe ? '5,000,000 SWIPE' : '0.001 ETH';
-    const formatted = formatEther(fee);
-    if (isSwipe) {
-      const num = parseFloat(formatted);
-      if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M SWIPE`;
-      if (num >= 1000) return `${(num / 1000).toFixed(0)}K SWIPE`;
-      return `${num.toFixed(0)} SWIPE`;
-    }
-    return `${formatted} ETH`;
-  };
 
   // Set default end date/time on mount
   useEffect(() => {
@@ -268,87 +177,16 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
     }));
   }, []);
 
-  // Track if transaction was already handled to prevent duplicate processing
-  const [transactionHandled, setTransactionHandled] = useState(false);
-
-  // Handle successful transaction
-  useEffect(() => {
-    if (isConfirmed && hash && !transactionHandled) {
-      setTransactionHandled(true); // Prevent duplicate handling
-      
-      const handleSuccess = async () => {
-        // Save data for success modal
-        setSuccessTxHash(hash);
-        setCreatedQuestion(formData.question);
-        
-        // Close create modal and show success modal
-        onClose();
-        setShowSuccessModal(true);
-        
-        // Cache user's Farcaster profile to Redis (reduces Neynar API calls)
-        if (address && context?.user) {
-          try {
-            console.log('💾 Caching user Farcaster profile to Redis...');
-            fetch('/api/farcaster/cache-profile', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                address: address,
-                profile: context.user
-              })
-            }).catch(err => console.warn('Profile cache failed:', err));
-          } catch (error) {
-            console.warn('Failed to cache user profile:', error);
-          }
-        }
-        
-        try {
-          console.log('⏳ Waiting for blockchain propagation before auto-sync...');
-          await new Promise(resolve => setTimeout(resolve, 3000));
-          
-          console.log('🔄 Auto-syncing new prediction to Redis...');
-          const syncResponse = await fetch('/api/predictions/auto-sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-          });
-          
-          if (syncResponse.ok) {
-            console.log('✅ New prediction auto-synced to Redis');
-          } else {
-            // Fallback: incremental sync walks every id above the highest one in
-            // Redis, so it also recovers predictions auto-sync missed under a race.
-            console.warn('⚠️ Auto-sync failed, falling back to incremental sync...');
-            const fallback = await fetch('/api/sync/v2/incremental');
-            if (!fallback.ok) {
-              console.error('❌ Fallback incremental sync also failed:', fallback.status);
-            }
-          }
-          
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        } catch (error) {
-          console.warn('⚠️ Sync failed:', error);
-        }
-        
-        onSuccess?.();
-        resetForm();
-      };
-      
-      handleSuccess();
-    }
-  }, [isConfirmed, hash, onSuccess, transactionHandled, onClose, formData.question]);
-
   useEffect(() => {
     if (!isOpen) {
       resetForm();
-      setTransactionHandled(false); // Reset for next time modal opens
-      if (resetWriteContract) resetWriteContract();
     }
-  }, [isOpen, resetWriteContract]);
+  }, [isOpen]);
 
   const resetForm = () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    
+
     setFormData({
       question: '',
       description: '',
@@ -356,7 +194,6 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
       imageUrl: '',
       endDate: tomorrow.toISOString().split('T')[0],
       endTime: tomorrow.toTimeString().slice(0, 5),
-      paymentToken: 'ETH',
       includeChart: false,
       selectedCrypto: ''
     });
@@ -415,7 +252,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
     // Validate 1:1 aspect ratio
     const isSquare = await validateImageAspectRatio(file);
     if (!isSquare) {
-      setErrors(prev => ({ ...prev, imageUrl: '⚠️ Image must be square (1:1 aspect ratio)' }));
+      setErrors(prev => ({ ...prev, imageUrl: 'Image must be square, 1:1.' }));
       return;
     }
 
@@ -470,7 +307,7 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
     if (!formData.includeChart && !formData.imageUrl.trim()) {
       newErrors.imageUrl = 'Image URL is required when not using chart';
     }
-    
+
     if (formData.includeChart && !formData.selectedCrypto) {
       newErrors.selectedCrypto = 'Please select a cryptocurrency for the chart';
     }
@@ -489,22 +326,13 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
     return Object.keys(newErrors).length === 0;
   };
 
-
-  // State for tracking if we're in approval phase
-  const [isApproving, setIsApproving] = useState(false);
-
-  // Helper function to execute the actual prediction creation
   /**
    * Submits a proposal rather than minting a market.
    *
-   * V2 minted on chain from here: a public createPrediction, a fee in ETH or
-   * $SWIPE, and the contract's counter for the id. V3 has no public creation and
-   * no fee, and registerPrediction is onlyResolver, so this writes a proposal
-   * and a resolver registers it afterwards from the admin surface.
-   *
-   * Nothing reaches a contract from this component any more. A proposal that is
-   * never registered is inert: it sits in the pending set, out of the feed, and
-   * no user can bet against it.
+   * The image is already uploaded by the time this runs, because the file input
+   * uploads on selection. That ordering is load-bearing: the signature carries a
+   * timestamp with a five minute life, so a slow step between signing and the
+   * fetch is a signature that expires in flight.
    */
   const executeCreatePrediction = async () => {
     const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
@@ -548,6 +376,8 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
         selectedCrypto: formData.selectedCrypto,
         deadline,
         creator: address,
+        // The chain the user is looking at. Absent, the route defaults to Base.
+        chain: chainKey,
       }),
     });
 
@@ -556,8 +386,11 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
       throw new Error(result?.error || `Proposal failed (${response.status})`);
     }
 
+    // Closed first, then the confirmation opened, so only one dialog is ever
+    // mounted. Two overlapping Radix dialogs leave the body's pointer-events
+    // locked when the second one closes.
     setCreatedQuestion(formData.question.trim());
-    setSuccessTxHash('');
+    onClose();
     setShowSuccessModal(true);
     onSuccess?.();
   };
@@ -567,18 +400,12 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
 
     // No contract write happens here any more, so there is no address to guard.
     // A proposal is inert until a resolver registers it, and registration is
-    // guarded on the admin surface where it belongs. The V3 market this will be
-    // registered against is resolved there too, through isWritableMarket.
-    if (!marketWrite.ready) {
-      alert('This network has no Swipe market yet. Switch networks to propose a market.');
-      return;
-    }
+    // guarded on the admin surface where it belongs. A chain with no market can
+    // never register this one, so the form refuses it and says so in place.
+    if (!marketWrite.ready) return;
 
     if (!validateForm() || !canCreate) return;
 
-    // V3 charges no creation fee, so the ETH and $SWIPE payment paths, and the
-    // token approval that went with them, are gone. There is nothing to pay and
-    // nothing to approve.
     setIsSubmitting(true);
     try {
       await executeCreatePrediction();
@@ -592,299 +419,168 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
     }
   };
 
+  const selectedCryptoData = CRYPTO_OPTIONS.find(c => c.symbol === formData.selectedCrypto);
+  const previewImage = imagePreview || uploadedImageUrl || formData.imageUrl;
+  const showPreview = Boolean(formData.question.trim() || formData.imageUrl || formData.includeChart);
+
   return (
     <>
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto bg-zinc-900 border-zinc-800 text-white p-4">
-        
-        {/* Compact Token Selector - Centered with Glow */}
-        <div className="flex flex-col items-center gap-2 mb-2">
-          <div className="relative">
-            {/* Glowing border effect */}
-            <div className={`absolute inset-0 rounded-xl blur-sm transition-all duration-300 ${
-              formData.paymentToken === 'ETH' 
-                ? 'bg-gradient-to-r from-blue-500/50 via-blue-400/30 to-blue-500/50' 
-                : 'bg-gradient-to-r from-[#d4ff00]/50 via-[#a8cc00]/30 to-[#d4ff00]/50'
-            }`} style={{ animation: 'pulse 2s ease-in-out infinite' }} />
-            
-            <div className="relative flex items-center gap-1 bg-zinc-900/90 p-1 rounded-xl border border-zinc-700/50 backdrop-blur-sm">
-              <button
-                type="button"
-                onClick={() => handleInputChange('paymentToken', 'ETH')}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all duration-300 ${
-                  formData.paymentToken === 'ETH'
-                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/40'
-                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/80'
-                }`}
-              >
-                <div className="relative">
-                  <div className="w-5 h-5 rounded-sm bg-gradient-to-br from-[#627eea] to-[#3c3c3d] flex items-center justify-center">
-                    <svg className="w-3 h-3" viewBox="0 0 256 417" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M127.961 0L125.166 9.5V285.168L127.961 287.958L255.923 212.32L127.961 0Z" fill="white" fillOpacity="0.9"/>
-                      <path d="M127.962 0L0 212.32L127.962 287.959V154.158V0Z" fill="white"/>
-                      <path d="M127.961 312.187L126.386 314.107V412.306L127.961 416.905L255.999 236.587L127.961 312.187Z" fill="white" fillOpacity="0.9"/>
-                      <path d="M127.962 416.905V312.187L0 236.587L127.962 416.905Z" fill="white"/>
-                    </svg>
-                  </div>
-                  <img 
-                    src="/Base_square_blue.png" 
-                    alt="Base" 
-                    className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-[2px] border border-zinc-900"
-                  />
-                </div>
-                <GradientText 
-                  colors={formData.paymentToken === 'ETH' 
-                    ? ['#ffffff', '#e0e7ff', '#ffffff'] 
-                    : ['#a1a1aa', '#71717a', '#a1a1aa']
-                  }
-                  animationSpeed={3}
-                  showBorder={false}
-                >
-                  <span className="font-bold">Base ETH</span>
-                </GradientText>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleInputChange('paymentToken', 'SWIPE')}
-                className={`group flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all duration-300 ${
-                  formData.paymentToken === 'SWIPE'
-                    ? 'bg-gradient-to-r from-[#d4ff00] to-[#b8e000] text-black shadow-lg shadow-[#d4ff00]/40'
-                    : 'bg-transparent hover:bg-black border border-transparent hover:border-[#d4ff00]/50'
-                }`}
-              >
-                <img src="/logo.png" alt="SWIPE" className="w-4 h-4 rounded-full" />
-                <span className={`font-bold transition-colors duration-300 ${
-                  formData.paymentToken === 'SWIPE'
-                    ? 'text-black'
-                    : 'text-zinc-400 group-hover:text-[#d4ff00]'
-                }`}>SWIPE</span>
-              </button>
-            </div>
-          </div>
-          
-          {canCreateFree && (
-            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px] px-2 py-0.5">
-              ✨ FREE FOR YOU
-            </Badge>
-          )}
-        </div>
+      <DialogContent className="propose">
+        <DialogTitle className="propose__title">Propose a market</DialogTitle>
+        <DialogDescription className="propose__intro">
+          Proposing is free. You sign a message, so there is no transaction and no gas to
+          pay. The market takes no bets until a resolver registers it on chain, which is a
+          separate step and not automatic. Five proposals a day per wallet.
+        </DialogDescription>
 
-        {/* Compact Fee Display - Smaller */}
-        {formData.paymentToken === 'ETH' ? (
-          <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg px-2.5 py-1.5 mb-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center">
-                  <span className="text-[10px]">⟠</span>
-                </div>
-                <p className="text-[10px] text-blue-400 font-medium">
-                  {canCreateFree ? 'Free' : `Fee: ${formatFee(ethFee as bigint | undefined, false)}`}
-                </p>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[9px] text-zinc-500">Bal:</span>
-                <span className="text-[10px] font-mono text-blue-400">{formatBalance(ethBalance?.value, false)} ETH</span>
-              </div>
-            </div>
-            {/* User status - small print */}
-            <p className={`text-[8px] mt-1 ${
-              isOwner ? 'text-amber-400' :
-              isEnvAdmin ? 'text-purple-400' :
-              isApprovedCreator ? 'text-emerald-400' :
-              publicCreationEnabled ? 'text-zinc-500' :
-              'text-red-400'
-            }`}>
-              {isOwner ? '👑 Owner - Free' :
-               isEnvAdmin ? '🔧 Admin - Free' :
-               isApprovedCreator ? '✅ Approved - Free' :
-               publicCreationEnabled ? '👤 Public User - Fee required' :
-               '🚫 Creation disabled'}
-            </p>
-          </div>
-        ) : (
-          <div className="bg-[#d4ff00]/5 border border-[#d4ff00]/20 rounded-lg px-2.5 py-1.5 mb-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <div className="w-5 h-5 rounded-full bg-[#d4ff00]/20 flex items-center justify-center">
-                  <span className="text-[10px]">💎</span>
-                </div>
-                <p className="text-[10px] text-[#d4ff00] font-medium">
-                  {canCreateFree ? 'Free' : `Fee: ${formatFee(swipeFee as bigint | undefined, true)}`}
-                </p>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[9px] text-zinc-500">Bal:</span>
-                <span className="text-[10px] font-mono text-[#d4ff00]">{formatBalance(swipeBalance as bigint | undefined, true)} SWIPE</span>
-              </div>
-            </div>
-            {/* User status - small print */}
-            <p className={`text-[8px] mt-1 ${
-              isOwner ? 'text-amber-400' :
-              isEnvAdmin ? 'text-purple-400' :
-              isApprovedCreator ? 'text-emerald-400' :
-              publicCreationEnabled ? 'text-zinc-500' :
-              'text-red-400'
-            }`}>
-              {isOwner ? '👑 Owner - Free' :
-               isEnvAdmin ? '🔧 Admin - Free' :
-               isApprovedCreator ? '✅ Approved - Free' :
-               publicCreationEnabled ? '👤 Public User - Fee required' :
-               '🚫 Creation disabled'}
-            </p>
-          </div>
+        {!canCreate && (
+          <p className="propose__status">
+            Connect a wallet first. The address you sign with is credited as the creator
+            and earns the creator fee on every losing pool in the market.
+          </p>
         )}
 
-        <Separator className="bg-zinc-800 mb-2" />
+        {/* Was an alert() on submit, which told nobody anything until they had
+            filled the whole form in. */}
+        {!marketWrite.ready && (
+          <p className="propose__status">
+            This network has no Swipe market, so nothing could register a proposal made
+            here. Switch networks and the form will send.
+          </p>
+        )}
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleSubmit} className="propose__form">
           {/* Question */}
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-[#d4ff00]">Question *</label>
+          <div className="propose__field">
+            <label className="propose__label" htmlFor="propose-question">Question</label>
             <textarea
+              id="propose-question"
               value={formData.question}
               onChange={(e) => handleInputChange('question', e.target.value)}
-              placeholder="Will Bitcoin reach $100,000 by end of 2024?"
+              placeholder="Will Bitcoin reach $100,000 by end of 2026?"
               maxLength={200}
               rows={2}
-              className={`w-full px-3 py-2 bg-black/60 border ${errors.question ? 'border-red-500' : 'border-[#d4ff00]/30'} rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-[#d4ff00]/50 focus:border-[#d4ff00] resize-none transition-all`}
+              className={`propose__input propose__input--area${errors.question ? ' propose__input--bad' : ''}`}
             />
-            {errors.question && <p className="text-red-400 text-xs">{errors.question}</p>}
-            <p className="text-[#d4ff00]/50 text-xs text-right font-mono">{formData.question.length}/200</p>
+            <p className="propose__count">{formData.question.length}/200</p>
+            {errors.question && <p className="propose__error">{errors.question}</p>}
           </div>
 
           {/* Description */}
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-[#d4ff00]">Description *</label>
+          <div className="propose__field">
+            <label className="propose__label" htmlFor="propose-description">Description</label>
             <textarea
+              id="propose-description"
               value={formData.description}
               onChange={(e) => handleInputChange('description', e.target.value)}
-              placeholder="Provide context and reasoning..."
+              placeholder="Say how this settles, and where the answer comes from."
               rows={3}
-              className={`w-full px-3 py-2 bg-black/60 border ${errors.description ? 'border-red-500' : 'border-[#d4ff00]/30'} rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-[#d4ff00]/50 focus:border-[#d4ff00] resize-none transition-all`}
+              className={`propose__input propose__input--area${errors.description ? ' propose__input--bad' : ''}`}
             />
-            {errors.description && <p className="text-red-400 text-xs">{errors.description}</p>}
+            {errors.description && <p className="propose__error">{errors.description}</p>}
           </div>
 
           {/* Category */}
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-[#d4ff00]">Category *</label>
+          <div className="propose__field">
+            <label className="propose__label" htmlFor="propose-category">Category</label>
             <select
+              id="propose-category"
               value={formData.category}
               onChange={(e) => handleInputChange('category', e.target.value)}
-              className={`w-full px-3 py-2 bg-black/60 border ${errors.category ? 'border-red-500' : 'border-[#d4ff00]/30'} rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#d4ff00]/50 focus:border-[#d4ff00] transition-all`}
+              className={`propose__input${errors.category ? ' propose__input--bad' : ''}`}
             >
-              <option value="">Select a category</option>
+              <option value="">Pick one</option>
               {CATEGORIES.map(cat => (
                 <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>
-            {errors.category && <p className="text-red-400 text-xs">{errors.category}</p>}
+            {errors.category && <p className="propose__error">{errors.category}</p>}
           </div>
 
-          {/* Chart Selection */}
-          <Card className="bg-gradient-to-br from-[#d4ff00]/5 to-black/40 border-[#d4ff00]/20">
-            <CardContent className="p-3 space-y-3">
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="includeChart"
-                  checked={formData.includeChart}
-                  onChange={(e) => {
-                    handleInputChange('includeChart', e.target.checked);
-                    if (e.target.checked) handleInputChange('imageUrl', '');
-                  }}
-                  className="w-4 h-4 rounded border-[#d4ff00]/50 bg-black text-[#d4ff00] focus:ring-[#d4ff00] accent-[#d4ff00]"
-                />
-                <label htmlFor="includeChart" className="text-sm text-white cursor-pointer font-medium">
-                  📊 Include live crypto chart
-                </label>
-              </div>
+          {/* Chart or image */}
+          <div className="propose__panel">
+            <div className="propose__check">
+              <input
+                type="checkbox"
+                id="includeChart"
+                checked={formData.includeChart}
+                onChange={(e) => {
+                  handleInputChange('includeChart', e.target.checked);
+                  if (e.target.checked) handleInputChange('imageUrl', '');
+                }}
+                className="propose__check-box"
+              />
+              <label htmlFor="includeChart" className="propose__check-label">
+                Use a live price chart instead of an image
+              </label>
+            </div>
 
-              {formData.includeChart && (
-                <div className="grid grid-cols-3 gap-2 pt-2">
-                  {CRYPTO_OPTIONS.map(crypto => (
-                    <button
-                      key={crypto.symbol}
-                      type="button"
-                      onClick={() => handleInputChange('selectedCrypto', crypto.symbol)}
-                      className={`p-2 rounded-lg border-2 transition-all duration-200 ${
-                        formData.selectedCrypto === crypto.symbol 
-                          ? 'border-[#d4ff00] bg-[#d4ff00]/20 text-[#d4ff00] shadow-lg shadow-[#d4ff00]/20' 
-                          : 'border-zinc-600 hover:border-[#d4ff00]/50 hover:bg-[#d4ff00]/5 text-zinc-300'
-                      }`}
-                    >
-                      <span className="font-bold text-sm">{crypto.symbol}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {errors.selectedCrypto && <p className="text-red-400 text-xs">{errors.selectedCrypto}</p>}
-            </CardContent>
-          </Card>
+            {formData.includeChart && (
+              <div className="propose__cryptos">
+                {CRYPTO_OPTIONS.map(crypto => (
+                  <button
+                    key={crypto.symbol}
+                    type="button"
+                    onClick={() => handleInputChange('selectedCrypto', crypto.symbol)}
+                    className={`propose__crypto${formData.selectedCrypto === crypto.symbol ? ' propose__crypto--on' : ''}`}
+                  >
+                    {crypto.symbol}
+                  </button>
+                ))}
+              </div>
+            )}
+            {errors.selectedCrypto && <p className="propose__error">{errors.selectedCrypto}</p>}
+          </div>
 
           {/* Image Upload */}
           {!formData.includeChart && (
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-[#d4ff00]">Image * <span className="text-zinc-500 font-normal">(1:1 square)</span></label>
-              
-              {/* Upload area or Preview */}
+            <div className="propose__field">
+              <label className="propose__label">
+                Image <span className="propose__label-hint">square, 1:1, up to 32MB</span>
+              </label>
+
               {imagePreview || uploadedImageUrl ? (
-                <div className="relative w-full aspect-square max-w-[200px] mx-auto">
-                  <img 
-                    src={imagePreview || uploadedImageUrl} 
-                    alt="Preview" 
-                    className="w-full h-full object-cover rounded-lg border-2 border-[#d4ff00]/50"
+                <div className="propose__thumb">
+                  <img
+                    src={imagePreview || uploadedImageUrl}
+                    alt="What the card will show"
+                    className="propose__thumb-img"
                   />
-                  {isUploading && (
-                    <div className="absolute inset-0 bg-black/70 rounded-lg flex items-center justify-center">
-                      <div className="text-center">
-                        <span className="animate-spin text-2xl block mb-1">⏳</span>
-                        <span className="text-[#d4ff00] text-xs">Uploading...</span>
-                      </div>
-                    </div>
-                  )}
+                  {isUploading && <span className="propose__thumb-busy">Uploading</span>}
                   {uploadedImageUrl && !isUploading && (
-                    <div className="absolute top-1 right-1 flex gap-1">
-                      <span className="bg-emerald-500 text-white text-[8px] px-1.5 py-0.5 rounded-full">✓ Uploaded</span>
-                      <button
-                        type="button"
-                        onClick={clearUploadedImage}
-                        className="bg-red-500 hover:bg-red-600 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center transition-colors"
-                      >
-                        ✕
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={clearUploadedImage}
+                      className="propose__thumb-clear"
+                    >
+                      Remove
+                    </button>
                   )}
                 </div>
               ) : (
-                <div 
+                <button
+                  type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full aspect-square max-w-[200px] mx-auto border-2 border-dashed border-[#d4ff00]/30 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#d4ff00]/60 hover:bg-[#d4ff00]/5 transition-all"
+                  className="propose__drop"
                 >
-                  <span className="text-3xl mb-2">📷</span>
-                  <span className="text-[#d4ff00] text-xs font-medium">Click to upload</span>
-                  <span className="text-zinc-500 text-[10px] mt-1">1:1 square only</span>
-                </div>
+                  <span className="propose__drop-main">Choose a picture</span>
+                  <span className="propose__drop-sub">It has to be square, or the card crops it badly</span>
+                </button>
               )}
-              
+
               {/* Hidden file input */}
               <input
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
                 onChange={handleImageUpload}
-                className="hidden"
+                className="propose__file"
               />
-              
-              {/* Or use URL */}
-              <div className="flex items-center gap-2">
-                <div className="flex-1 h-px bg-zinc-700"></div>
-                <span className="text-zinc-500 text-[10px]">or paste URL</span>
-                <div className="flex-1 h-px bg-zinc-700"></div>
-              </div>
-              
-              <Input
+
+              <p className="propose__or">or paste a link</p>
+
+              <input
                 type="url"
                 value={formData.imageUrl}
                 onChange={(e) => {
@@ -896,258 +592,145 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
                   }
                 }}
                 placeholder="https://example.com/image.jpg"
-                className={`bg-black/60 border-[#d4ff00]/30 text-white focus:ring-[#d4ff00]/50 focus:border-[#d4ff00] text-xs ${errors.imageUrl ? 'border-red-500' : ''}`}
+                className={`propose__input${errors.imageUrl ? ' propose__input--bad' : ''}`}
               />
-              {errors.imageUrl && <p className="text-red-400 text-xs">{errors.imageUrl}</p>}
+              {errors.imageUrl && <p className="propose__error">{errors.imageUrl}</p>}
             </div>
           )}
 
-          {/* Mini Card Preview */}
-          {(formData.question.trim() || formData.imageUrl || formData.includeChart) && (
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-[#d4ff00]">📱 Card Preview</label>
-              <div className="relative w-full max-w-[280px] mx-auto bg-white rounded-2xl overflow-hidden shadow-xl border border-zinc-200">
-                {/* Image/Chart Section */}
-                <div className="relative aspect-square bg-zinc-100">
-                  {formData.includeChart && formData.selectedCrypto ? (
-                    (() => {
-                      const selectedCryptoData = CRYPTO_OPTIONS.find(c => c.symbol === formData.selectedCrypto);
-                      if (selectedCryptoData) {
-                        const chartUrl = `https://www.geckoterminal.com/${selectedCryptoData.chain}/pools/${selectedCryptoData.poolAddress}?embed=1&info=0&swaps=0&light_chart=1&chart_type=price&resolution=1d`;
-                        return (
-                          <iframe
-                            src={chartUrl}
-                            title={`${formData.selectedCrypto} Chart`}
-                            className="w-full h-full border-0"
-                            allow="clipboard-write"
-                            sandbox="allow-scripts allow-same-origin"
-                          />
-                        );
-                      }
-                      return (
-                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-900">
-                          <div className="text-center">
-                            <span className="text-4xl block mb-2">📊</span>
-                            <span className="text-white text-xs font-mono">Select crypto...</span>
-                          </div>
-                        </div>
-                      );
-                    })()
-                  ) : (imagePreview || uploadedImageUrl || formData.imageUrl) ? (
-                    <img 
-                      src={imagePreview || uploadedImageUrl || formData.imageUrl} 
-                      alt="Preview" 
-                      className="w-full h-full object-cover"
+          {/* Deadline */}
+          <div className="propose__field">
+            <label className="propose__label" htmlFor="propose-date">Closes</label>
+            <div className="propose__dates">
+              <input
+                id="propose-date"
+                type="date"
+                value={formData.endDate}
+                onChange={(e) => handleInputChange('endDate', e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
+                className={`propose__input${errors.endDate ? ' propose__input--bad' : ''}`}
+              />
+              <input
+                type="time"
+                value={formData.endTime}
+                onChange={(e) => handleInputChange('endTime', e.target.value)}
+                className={`propose__input${errors.endDate ? ' propose__input--bad' : ''}`}
+              />
+            </div>
+            <p className="propose__hint">At least an hour from now, at most a year.</p>
+            {errors.endDate && <p className="propose__error">{errors.endDate}</p>}
+          </div>
+
+          {/* Card preview */}
+          {showPreview && (
+            <div className="propose__preview">
+              <span className="propose__label">Preview</span>
+              <div className="propose__card">
+                <div className="propose__card-media">
+                  {formData.includeChart && selectedCryptoData ? (
+                    <iframe
+                      src={`https://www.geckoterminal.com/${selectedCryptoData.chain}/pools/${selectedCryptoData.poolAddress}?embed=1&info=0&swaps=0&light_chart=1&chart_type=price&resolution=1d`}
+                      title={`${formData.selectedCrypto} chart`}
+                      className="propose__card-frame"
+                      allow="clipboard-write"
+                      sandbox="allow-scripts allow-same-origin"
+                    />
+                  ) : previewImage ? (
+                    <img
+                      src={previewImage}
+                      alt="Card preview"
+                      className="propose__card-img"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
                       }}
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-200 to-zinc-300">
-                      <span className="text-6xl opacity-30">🖼️</span>
-                    </div>
-                  )}
-                  {/* Category Badge */}
-                  {formData.category && (
-                    <div className="absolute bottom-2 left-2">
-                      <span className="bg-black/70 text-white text-[10px] px-2 py-0.5 rounded-full font-medium">
-                        {formData.category}
-                      </span>
-                    </div>
-                  )}
-                </div>
-                
-                {/* Content Section */}
-                <div className="p-3 bg-white">
-                  <h3 className="text-sm font-bold text-zinc-900 line-clamp-2 min-h-[40px]">
-                    {formData.question.trim() || 'Your prediction question...'}
-                  </h3>
-                  
-                  {/* Countdown placeholder */}
-                  <div className="flex items-center justify-center gap-1.5 mt-2 py-1.5 px-3 bg-zinc-100 rounded-full mx-auto w-fit">
-                    <span className="text-rose-500 text-xs">⏰</span>
-                    <span className="text-zinc-700 text-[11px] font-semibold tracking-wide">
-                      {formData.endDate && formData.endTime 
-                        ? `${formData.endDate} • ${formData.endTime}` 
-                        : 'Set deadline...'}
+                    <span className="propose__card-blank">
+                      {formData.includeChart ? 'Pick a coin' : 'No picture yet'}
                     </span>
-                  </div>
+                  )}
+                  {formData.category && (
+                    <span className="propose__card-tag">{formData.category}</span>
+                  )}
                 </div>
-                
-                {/* Voting Bar - 50/50 */}
-                <div className="h-6 flex">
-                  <div className="flex-1 bg-gradient-to-r from-rose-500 to-rose-400 flex items-center justify-center">
-                    <span className="text-white text-[10px] font-bold">NO 50%</span>
-                  </div>
-                  <div className="flex-1 bg-gradient-to-r from-emerald-400 to-emerald-500 flex items-center justify-center">
-                    <span className="text-white text-[10px] font-bold">YES 50%</span>
-                  </div>
+
+                <div className="propose__card-body">
+                  <h3 className="propose__card-question">
+                    {formData.question.trim() || 'Your question goes here'}
+                  </h3>
+                  <p className="propose__card-when">
+                    {formData.endDate && formData.endTime
+                      ? `Closes ${formData.endDate} at ${formData.endTime}`
+                      : 'No closing time set'}
+                  </p>
+                </div>
+
+                <div className="propose__card-bar">
+                  <span className="propose__card-bar-no">No 50%</span>
+                  <span className="propose__card-bar-yes">Yes 50%</span>
                 </div>
               </div>
-              <p className="text-center text-zinc-500 text-[9px]">This is how your prediction will look</p>
+              <p className="propose__caption">Both sides start level. The first bets move it.</p>
             </div>
           )}
 
-          {/* End Date/Time */}
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-[#d4ff00]">End Date & Time *</label>
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                type="date"
-                value={formData.endDate}
-                onChange={(e) => handleInputChange('endDate', e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
-                className={`bg-black/60 border-[#d4ff00]/30 text-white focus:ring-[#d4ff00]/50 focus:border-[#d4ff00] ${errors.endDate ? 'border-red-500' : ''}`}
-              />
-              <Input
-                type="time"
-                value={formData.endTime}
-                onChange={(e) => handleInputChange('endTime', e.target.value)}
-                className={`bg-black/60 border-[#d4ff00]/30 text-white focus:ring-[#d4ff00]/50 focus:border-[#d4ff00] ${errors.endDate ? 'border-red-500' : ''}`}
-              />
-            </div>
-            {errors.endDate && <p className="text-red-400 text-xs">{errors.endDate}</p>}
-          </div>
+          {errors.submit && <p className="propose__alert">{errors.submit}</p>}
 
-          {/* Error Messages */}
-          {!canCreate && (
-            <Card className="bg-red-500/10 border-red-500/30">
-              <CardContent className="p-3">
-                <p className="text-red-400 text-sm font-medium">
-                  ⚠️ Public creation is disabled. Only approved creators can create predictions.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {writeError && (
-            <Card className="bg-red-500/10 border-red-500/30 overflow-hidden">
-              <CardContent className="p-3">
-                <p className="text-red-400 text-xs break-words whitespace-pre-wrap overflow-hidden" style={{ wordBreak: 'break-all', maxHeight: '80px', overflowY: 'auto' }}>
-                  ❌ {writeError.message.length > 150 ? writeError.message.substring(0, 150) + '...' : writeError.message}
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {errors.submit && (
-            <Card className="bg-red-500/10 border-red-500/30">
-              <CardContent className="p-3">
-                <p className="text-red-400 text-sm">{errors.submit}</p>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Actions */}
-          <div className="flex gap-2 pt-3">
-            <Button 
-              type="button" 
-              variant="outline" 
+          <div className="propose__actions">
+            <button
+              type="button"
               onClick={onClose}
-              disabled={isPending || isConfirming}
-              className="flex-1 bg-[#d4ff00] border-[#d4ff00] text-black font-semibold hover:bg-black hover:text-[#d4ff00] hover:border-[#d4ff00] transition-all duration-300"
+              disabled={isSubmitting}
+              className="propose__btn propose__btn--quiet"
             >
               Cancel
-            </Button>
-            <Button 
+            </button>
+            <button
               type="submit"
-              disabled={!canCreate || isPending || isConfirming || transactionHandled || isApproving}
-              className={`flex-1 font-semibold ${
-                formData.paymentToken === 'ETH'
-                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700'
-                  : 'bg-gradient-to-r from-[#d4ff00] to-[#a8cc00] text-black hover:from-[#c4ef00] hover:to-[#98bc00]'
-              }`}
+              disabled={!canCreate || !marketWrite.ready || isSubmitting || isUploading}
+              className="propose__btn propose__btn--go"
+              aria-busy={isSubmitting}
             >
-              {isApproving ? (
-                <span className="flex items-center gap-2">
-                  <span className="animate-spin">⏳</span> Approving...
-                </span>
-              ) : isPending || isConfirming ? (
-                <span className="flex items-center gap-2">
-                  <span className="animate-spin">⏳</span> Creating...
-                </span>
-              ) : formData.paymentToken === 'SWIPE' && !canCreateFree ? (
-                `Approve & Create with SWIPE`
-              ) : (
-                `Create with ${formData.paymentToken}`
-              )}
-            </Button>
+              {isSubmitting ? 'Waiting for your signature' : 'Propose market'}
+            </button>
           </div>
         </form>
       </DialogContent>
     </Dialog>
 
-    {/* Success Modal - Similar to TinderCard share prompt */}
-    {showSuccessModal && (
-      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-        <div className="bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 border border-[#d4ff00]/30 rounded-3xl p-7 max-w-sm w-full text-center relative animate-in fade-in zoom-in duration-300">
-          {/* Close button */}
-          <button 
-            onClick={() => setShowSuccessModal(false)}
-            className="absolute top-4 right-4 w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 flex items-center justify-center transition-all"
-          >
-            ✕
-          </button>
-          
-          {/* Header with logos */}
-          <div className="flex items-center justify-center gap-3 mb-5">
-            <img src="/farc.png" alt="Farcaster" className="w-10 h-10 rounded-lg" />
-            <span className="text-zinc-500 text-lg">×</span>
-            <img src="/Base_square_blue.png" alt="Base" className="w-10 h-10 rounded-lg" />
-          </div>
-          
-          {/* Success icon */}
-          <div className="mb-4">
-            <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-[#d4ff00] to-[#a8cc00] flex items-center justify-center shadow-lg shadow-[#d4ff00]/30">
-              <span className="text-3xl text-black font-bold">✓</span>
-            </div>
-          </div>
-          
-          {/* Title */}
-          <h2 className="text-xl font-bold text-white mb-1">Congratulations!</h2>
-          <p className="text-[#d4ff00] font-semibold mb-3">Prediction created successfully!</p>
-          
-          {/* Question preview */}
-          <p className="text-zinc-400 text-sm mb-4 line-clamp-2 px-2">
-            "{createdQuestion}"
-          </p>
-          
-          {/* Transaction link */}
-          <a 
-            href={`https://basescan.org/tx/${successTxHash}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-blue-400 hover:text-blue-300 underline mb-5 block"
-          >
-            View on Basescan →
-          </a>
-          
-          {/* Description */}
-          <p className="text-zinc-500 text-sm mb-5">Share your prediction and challenge your friends!</p>
-          
-          {/* Share button */}
-          <button 
-            onClick={shareCreatedPrediction}
-            className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-[#d4ff00] to-[#a8cc00] text-black font-bold text-base flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-[#d4ff00]/40 hover:-translate-y-0.5 transition-all duration-300"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-              <polyline points="16 6 12 2 8 6" />
-              <line x1="12" y1="2" x2="12" y2="15" />
-            </svg>
-            Share
-          </button>
-          
-          {/* Skip link */}
-          <button 
-            onClick={() => setShowSuccessModal(false)}
-            className="mt-4 text-zinc-500 hover:text-zinc-300 text-sm transition-colors"
-          >
-            Maybe later
-          </button>
+    {/* Sent, not live. Radix supplies the close button and the focus trap. */}
+    <Dialog open={showSuccessModal} onOpenChange={(open) => !open && setShowSuccessModal(false)}>
+      <DialogContent className="proposed">
+        <div className="proposed__marks">
+          <img src="/farc.png" alt="Farcaster" className="proposed__mark" />
+          <img src="/Base_square_blue.png" alt="Base" className="proposed__mark" />
         </div>
-      </div>
-    )}
+
+        <DialogTitle className="proposed__title">Proposal sent</DialogTitle>
+        <DialogDescription className="proposed__lede">
+          It is in the queue, waiting for a resolver to register it on chain. Nobody can
+          bet on it until that happens.
+        </DialogDescription>
+
+        <p className="proposed__question">{createdQuestion}</p>
+
+        <p className="proposed__note">
+          Your address stays on it as the creator, so the creator fee is yours once it
+          starts taking bets.
+        </p>
+
+        <button type="button" onClick={shareCreatedPrediction} className="proposed__share">
+          Share it
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowSuccessModal(false)}
+          className="proposed__later"
+        >
+          Maybe later
+        </button>
+      </DialogContent>
+    </Dialog>
     </>
   );
 }

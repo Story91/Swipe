@@ -1,712 +1,355 @@
-"use client";
+'use client';
 
-import React, { useState, useCallback, useMemo, useEffect } from "react";
-import { useAccount, usePublicClient, useWalletClient, useReadContract, useSignTypedData } from "wagmi";
-import { createFlaunch, ReadWriteFlaunchSDK } from "@flaunch/sdk";
-import { parseEther, formatEther } from "viem";
-import { useNotification } from "@coinbase/onchainkit/minikit";
-import { SWIPE_TOKEN } from "../../../lib/contract";
-import { useTokenPrices } from "../../../lib/hooks/useTokenPrices";
-import Image from "next/image";
-import "./SwipeTokenCard.css";
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useAccount, useReadContract } from 'wagmi';
+import { erc20Abi, formatUnits } from 'viem';
+import { CHAINS } from '@/lib/chains';
+import { getMarketContract } from '@/lib/chains/market';
+import { formatAmount, readChainStats, type ChainStats } from '@/lib/chains/chainSummary';
+import { SWIPE_TOKEN } from '@/lib/contract';
+import './SwipeTokenCard.css';
+
+/**
+ * The $SWIPE tab.
+ *
+ * What this screen used to be: a Flaunch buy and sell widget for the Base
+ * ERC-20, with quick-buy tiles, a slippage picker and a fee-split banner. Every
+ * part of that described a token the app no longer uses for anything. Bets go
+ * through PredictionMarket_V4 and settle in the chain's stablecoin, USDC on
+ * Base and Paxos USDG on Robinhood, so the old token is not collateral, not a
+ * reward and not a fee. Selling it back to people from inside the app was the
+ * one thing this page had no business doing.
+ *
+ * What it is now: one story in three moves. The old token is the past, V4 is
+ * the present, and a Swipe token on Robinhood chain is what comes next.
+ *
+ * The hard rule here is that nothing about the new token may be invented. There
+ * is no date, no supply, no price and no ticker beyond the name, so this page
+ * prints none of those and says out loud that it will not. A countdown to a
+ * date nobody has committed to would be worse than a blank screen, because a
+ * blank screen cannot be quoted back at you.
+ *
+ * Everything numeric on the Robinhood panel is read off the contract when the
+ * page opens, through the same readChainStats the market chooser uses. A panel
+ * that recited lib/chains would keep insisting the market is live long after it
+ * stopped answering, and "the contracts are already there" is exactly the claim
+ * this page leans on.
+ *
+ * Motion is deliberate and all of it is CSS. The newest components in this repo
+ * do not pull framer-motion, and every animation here is cancelled under
+ * prefers-reduced-motion, which MarketChooserModal and WalletPicker both treat
+ * as a house rule.
+ */
+
+type Reading =
+  | { kind: 'reading' }
+  | { kind: 'ready'; stats: ChainStats }
+  | { kind: 'unreachable' };
+
+/**
+ * The marquee. Decorative and hidden from assistive tech, because every line in
+ * it is stated again in the body copy, but still true: a scrolling strip of
+ * invented facts would be the worst possible place to put them.
+ */
+function tickerItems(chainId: number): string[] {
+  return [
+    `robinhood chain, id ${chainId}`,
+    'market contracts already there',
+    'collateral is usdg',
+    'betting does not use $swipe',
+    'the token is next',
+    'no date announced',
+  ];
+}
+
+const STAGES = [
+  {
+    className: 'swipe-token-card__stage swipe-token-card__stage--was',
+    when: 'was',
+    what: '$SWIPE on Base',
+    text:
+      'The old ERC-20 is still on chain and still yours. It backs nothing now. The contracts that used to hold it are archived under a key nobody has, so a position left inside one can never be settled.',
+  },
+  {
+    className: 'swipe-token-card__stage swipe-token-card__stage--now',
+    when: 'now',
+    what: 'V4, settled in stablecoins',
+    text:
+      'PredictionMarket_V4 takes every new bet. On Base it holds USDC. On Robinhood chain it holds Paxos USDG. Neither deployment touches $SWIPE at any point.',
+  },
+  {
+    className: 'swipe-token-card__stage swipe-token-card__stage--next',
+    when: 'next',
+    what: 'A Swipe token on Robinhood chain',
+    text:
+      'The market contracts got there first. The token follows. That is the whole of what has been decided, so it is the whole of what this page says.',
+  },
+] as const;
+
+function short(value: string): string {
+  return `${value.slice(0, 6)}...${value.slice(-4)}`;
+}
 
 export function SwipeTokenCard() {
   const { address } = useAccount();
-  const publicClient = usePublicClient();
-  const { data: walletClient } = useWalletClient();
-  const sendNotification = useNotification();
-  
-  // Use the token prices hook to get both ETH and SWIPE prices
-  const { ethPrice, swipePrice, loading: priceLoading, formatUsdValue, getUsdValue } = useTokenPrices();
-  
-  const [isLoading, setIsLoading] = useState(false);
-  const [transactionHash, setTransactionHash] = useState<`0x${string}` | null>(null);
-  const [buyAmount, setBuyAmount] = useState("0.001");
-  const [buyAmountUsd, setBuyAmountUsd] = useState("");
-  const [sellAmount, setSellAmount] = useState("10000");
-  const [slippagePercent, setSlippagePercent] = useState(5);
-  const [activeTab, setActiveTab] = useState<"buy" | "sell">("buy");
-  const [inputMode, setInputMode] = useState<"eth" | "usd">("eth");
-  
-  // Signature state for Permit2
-  const { data: signature, signTypedData } = useSignTypedData();
+  const [attempt, setAttempt] = useState(0);
+  const [reading, setReading] = useState<Reading>({ kind: 'reading' });
+  const [copied, setCopied] = useState(false);
 
-  // Calculate USD value
-  const calculateUsdValue = useCallback((ethAmount: string) => {
-    if (!ethPrice || !ethAmount) return null;
-    const usdValue = parseFloat(ethAmount) * ethPrice;
-    return usdValue.toFixed(2);
-  }, [ethPrice]);
+  // Resolved once. Rebuilding it every render would restart the read below on
+  // every keystroke anywhere in the tree.
+  const market = useMemo(() => getMarketContract('robinhood'), []);
 
-  // Calculate ETH value from USD
-  const calculateEthValue = useCallback((usdAmount: string) => {
-    if (!ethPrice || !usdAmount) return null;
-    const ethValue = parseFloat(usdAmount) / ethPrice;
-    return ethValue.toFixed(6);
-  }, [ethPrice]);
+  useEffect(() => {
+    if (!market) return;
+    let cancelled = false;
+    setReading({ kind: 'reading' });
 
-  // Calculate SWIPE tokens received for buy amount (ETH or USD)
-  const calculateSwipeReceived = useCallback((amount: string, isUsd: boolean = false) => {
-    if (!swipePrice || !ethPrice || !amount) return null;
-    let usdValue: number;
-    if (isUsd) {
-      usdValue = parseFloat(amount);
-    } else {
-      const ethValue = parseFloat(amount);
-      usdValue = ethValue * ethPrice;
-    }
-    const swipeAmount = usdValue / swipePrice;
-    return swipeAmount;
-  }, [swipePrice, ethPrice]);
+    readChainStats('robinhood')
+      .then((stats) => {
+        if (!cancelled) setReading({ kind: 'ready', stats });
+      })
+      .catch(() => {
+        if (!cancelled) setReading({ kind: 'unreachable' });
+      });
 
-  // Calculate ETH received for sell amount
-  const calculateEthReceived = useCallback((swipeAmount: string) => {
-    if (!swipePrice || !ethPrice || !swipeAmount) return null;
-    const swipeValue = parseFloat(swipeAmount);
-    const usdValue = swipeValue * swipePrice;
-    const ethAmount = usdValue / ethPrice;
-    return ethAmount;
-  }, [swipePrice, ethPrice]);
+    return () => {
+      cancelled = true;
+    };
+  }, [market, attempt]);
 
-  // Handle ETH amount change
-  const handleEthAmountChange = useCallback((value: string) => {
-    setBuyAmount(value);
-    if (ethPrice && value) {
-      const usdValue = calculateUsdValue(value);
-      setBuyAmountUsd(usdValue || "");
-    } else {
-      setBuyAmountUsd("");
-    }
-  }, [ethPrice, calculateUsdValue]);
-
-  // Handle USD amount change
-  const handleUsdAmountChange = useCallback((value: string) => {
-    setBuyAmountUsd(value);
-    if (ethPrice && value) {
-      const ethValue = calculateEthValue(value);
-      setBuyAmount(ethValue || "");
-    } else {
-      setBuyAmount("");
-    }
-  }, [ethPrice, calculateEthValue]);
-  
-  // Initialize Flaunch SDK
-  const flaunchSDK = useMemo(() => {
-    if (!publicClient || !walletClient) return null;
-
-    try {
-      return createFlaunch({
-        publicClient: publicClient as any,
-        walletClient: walletClient as any,
-      }) as ReadWriteFlaunchSDK;
-    } catch (error) {
-      console.error('Failed to initialize Flaunch SDK:', error);
-      return null;
-    }
-  }, [publicClient, walletClient]);
-
-  // Read SWIPE token balance
-  const { data: swipeBalance, refetch: refetchBalance } = useReadContract({
+  // Pinned to Base. Without chainId this reads balanceOf at the Base token's
+  // address on whatever chain the wallet happens to be on, which on Robinhood
+  // is either nothing or somebody else's contract.
+  const { data: legacyBalance } = useReadContract({
     address: SWIPE_TOKEN.address as `0x${string}`,
-    abi: [
-      {
-        "inputs": [{ "internalType": "address", "name": "account", "type": "address" }],
-        "name": "balanceOf",
-        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
-        "stateMutability": "view",
-        "type": "function"
-      }
-    ],
-    functionName: "balanceOf",
+    abi: erc20Abi,
+    functionName: 'balanceOf',
     args: address ? [address] : undefined,
+    chainId: CHAINS.base.viemChain.id,
+    query: { enabled: Boolean(address) },
   });
 
-  // Buy SWIPE with ETH using Flaunch SDK
-  const buyWithETH = useCallback(async (ethAmount: string) => {
-    if (!flaunchSDK || !address) {
-      await sendNotification({
-        title: "Error",
-        body: "Wallet not connected or SDK not ready",
-      });
-      return;
-    }
+  const copyAddress = useCallback(() => {
+    if (!navigator.clipboard) return;
+    void navigator.clipboard
+      .writeText(SWIPE_TOKEN.address)
+      .then(() => setCopied(true))
+      .catch(() => undefined);
+  }, []);
 
-    setIsLoading(true);
-    setTransactionHash(null);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 1600);
+    return () => clearTimeout(timer);
+  }, [copied]);
 
-    try {
-      // STEP 1: Call buyCoin from Flaunch SDK
-      const hash = await flaunchSDK.buyCoin({
-        coinAddress: SWIPE_TOKEN.address as `0x${string}`,  // SWIPE token address
-        slippagePercent: slippagePercent,  // Slippage tolerance (1-10%)
-        swapType: "EXACT_IN",              // Exact ETH amount
-        amountIn: parseEther(ethAmount),   // ETH amount to swap
-      });
-
-      setTransactionHash(hash);
-
-      // STEP 2: Wait for confirmation
-      const receipt = await flaunchSDK.drift.waitForTransaction({ hash });
-
-      // STEP 3: Check status
-      if (receipt && receipt.status === "success") {
-        await sendNotification({
-          title: "🎉 Purchase Successful!",
-          body: `Successfully bought SWIPE tokens! TX: ${hash.slice(0, 10)}...`,
-        });
-
-        // STEP 4: Refresh balance
-        refetchBalance();
-
-        setTimeout(() => {
-          setTransactionHash(null);
-        }, 5000);
-      } else {
-        throw new Error("Transaction failed");
-      }
-    } catch (error) {
-      console.error("Buy failed:", error);
-      await sendNotification({
-        title: "❌ Purchase Failed",
-        body: error instanceof Error ? error.message : "Transaction failed",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [flaunchSDK, address, slippagePercent, sendNotification, refetchBalance]);
-
-  // Sell SWIPE tokens for ETH with Permit2
-  const sellSWIPETokens = useCallback(async () => {
-    if (!flaunchSDK || !address) {
-      await sendNotification({
-        title: "Error",
-        body: "Wallet not connected or SDK not ready",
-      });
-      return;
-    }
-
-    setIsLoading(true);
-    setTransactionHash(null);
-
-    try {
-      const amountIn = parseEther(sellAmount);
-
-      // STEP 1: Check allowance through Permit2
-      const { allowance } = await flaunchSDK.getPermit2AllowanceAndNonce(
-        SWIPE_TOKEN.address as `0x${string}`
-      );
-
-      if (allowance < amountIn) {
-        // STEP 2: Need permit - request signature
-        const { typedData, permitSingle } = await flaunchSDK.getPermit2TypedData(
-          SWIPE_TOKEN.address as `0x${string}`
-        );
-
-        await sendNotification({
-          title: "🔐 Signature Required",
-          body: "Please sign the permit to allow token sale",
-        });
-
-        signTypedData(typedData);
-
-        // Wait for signature
-        await new Promise((resolve) => {
-          const checkSignature = () => {
-            if (signature) {
-              resolve(signature);
-            } else {
-              setTimeout(checkSignature, 100);
-            }
-          };
-          checkSignature();
-        });
-
-        if (!signature) {
-          throw new Error("Signature required for token sale");
-        }
-
-        // STEP 3: Sell with permit
-        const hash = await flaunchSDK.sellCoin({
-          coinAddress: SWIPE_TOKEN.address as `0x${string}`,
-          amountIn,
-          slippagePercent,
-          permitSingle,
-          signature,
-        });
-
-        setTransactionHash(hash);
-      } else {
-        // Already approved - sell directly
-        const hash = await flaunchSDK.sellCoin({
-          coinAddress: SWIPE_TOKEN.address as `0x${string}`,
-          amountIn,
-          slippagePercent,
-        });
-
-        setTransactionHash(hash);
-      }
-
-      // Wait for confirmation
-      const receipt = await flaunchSDK.drift.waitForTransaction({
-        hash: transactionHash as `0x${string}`,
-      });
-
-      if (receipt && receipt.status === "success") {
-        await sendNotification({
-          title: "🎉 Sale Successful!",
-          body: `Successfully sold SWIPE tokens!`,
-        });
-
-        refetchBalance();
-        
-        setTimeout(() => {
-          setTransactionHash(null);
-        }, 5000);
-      } else {
-        throw new Error("Transaction failed");
-      }
-    } catch (error) {
-      console.error("Sell failed:", error);
-      await sendNotification({
-        title: "❌ Sale Failed",
-        body: error instanceof Error ? error.message : "Transaction failed",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [flaunchSDK, address, sellAmount, slippagePercent, signature, sendNotification, refetchBalance, transactionHash, signTypedData]);
-
-  // Get slider background style
-  const getSliderBackground = () => {
-    const min = inputMode === "eth" ? 0.0001 : 1;
-    const max = inputMode === "eth" ? 0.224 : 1000;
-    const value = inputMode === "eth" ? parseFloat(buyAmount || "0.0001") : parseFloat(buyAmountUsd || "1");
-    const percentage = ((value - min) / (max - min)) * 100;
-    return `linear-gradient(to right, #d4ff00 0%, #d4ff00 ${percentage}%, rgba(255,255,255,0.1) ${percentage}%, rgba(255,255,255,0.1) 100%)`;
-  };
+  const items = tickerItems(market?.chainId ?? CHAINS.robinhood.viemChain.id);
+  const held =
+    legacyBalance === undefined
+      ? null
+      : Number(formatUnits(legacyBalance as bigint, SWIPE_TOKEN.decimals));
 
   return (
-    <div className="swipe-token-page">
-      <div className="swipe-token-card">
-        {/* Header with Logo */}
-        <div className="swipe-token-header">
-          <div className="swipe-token-logo-container">
-            <div className="swipe-token-logo-wrapper">
-              <Image 
-                src="/logo.png" 
-                alt="SWIPE Logo" 
-                width={56} 
-                height={56} 
-                className="swipe-token-logo"
-              />
+    <div className="swipe-token-card">
+      <header className="swipe-token-card__hero">
+        <span className="swipe-token-card__beam" aria-hidden="true" />
+        <span className="swipe-token-card__eyebrow">Swipe token</span>
+        <h2 className="swipe-token-card__headline">
+          A Swipe token on Robinhood chain is what comes next
+        </h2>
+        <p className="swipe-token-card__standfirst">
+          The old $SWIPE on Base is finished as a betting token. Markets settle in the
+          stablecoin of whichever chain they run on, and the contracts on Robinhood chain
+          are already running. The token there has no date. This page will not invent one.
+        </p>
+      </header>
+
+      <div className="swipe-token-card__ticker" aria-hidden="true">
+        {/* Duplicated once, because the loop translates the track by exactly half
+            its width and any other ratio shows a seam. */}
+        <div className="swipe-token-card__ticker-track">
+          {[...items, ...items].map((item, index) => (
+            <span className="swipe-token-card__ticker-item" key={`${item}-${index}`}>
+              {item}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <ol className="swipe-token-card__relay">
+        {STAGES.map((stage) => (
+          <li className={stage.className} key={stage.when}>
+            <span className="swipe-token-card__stage-rail" aria-hidden="true">
+              <span className="swipe-token-card__stage-node" />
+            </span>
+            <div className="swipe-token-card__stage-body">
+              <span className="swipe-token-card__stage-when">{stage.when}</span>
+              <h3 className="swipe-token-card__stage-what">{stage.what}</h3>
+              <p className="swipe-token-card__stage-text">{stage.text}</p>
             </div>
-            <h2 className="swipe-token-title">$SWIPE</h2>
-          </div>
+          </li>
+        ))}
+      </ol>
+
+      <section className="swipe-token-card__panel">
+        <div className="swipe-token-card__panel-head">
+          <h3 className="swipe-token-card__panel-title">Robinhood chain today</h3>
         </div>
 
-        {/* Balance Display */}
-        {address && swipeBalance !== undefined && (
-          <div className="swipe-token-balance">
-            <div className="swipe-token-balance-label">Your Balance</div>
-            <div className="swipe-token-balance-value">
-              {Math.floor(parseFloat(formatEther(swipeBalance as bigint))).toLocaleString()} SWIPE
-            </div>
-            {/* Show balance value in USD */}
-            {swipePrice && (
-              <div className="swipe-token-balance-usd">
-                ≈ ${(parseFloat(formatEther(swipeBalance as bigint)) * swipePrice).toLocaleString('en-US', { 
-                  minimumFractionDigits: 2, 
-                  maximumFractionDigits: 2 
-                })} USD
-              </div>
-            )}
-            <div className="swipe-token-address-row">
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(SWIPE_TOKEN.address);
-                  sendNotification({
-                    title: "Copied!",
-                    body: "Token address copied to clipboard",
-                  });
-                }}
-                className="swipe-token-address"
-              >
-                {SWIPE_TOKEN.address.slice(0, 6)}...{SWIPE_TOKEN.address.slice(-4)}
-              </button>
-              <a
-                href={`https://basescan.org/token/${SWIPE_TOKEN.address}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="swipe-token-link"
-              >
-                🔗
-              </a>
-            </div>
-          </div>
+        {!market && (
+          <p className="swipe-token-card__status">
+            This build has no Robinhood market address, so there is nothing here to read.
+          </p>
         )}
 
-        {/* Tabs */}
-        <div className="swipe-token-tabs">
-          <button
-            onClick={() => setActiveTab("buy")}
-            className={`swipe-token-tab ${activeTab === "buy" ? "active" : ""}`}
-          >
-            Buy SWIPE
-          </button>
-          <button
-            onClick={() => setActiveTab("sell")}
-            className={`swipe-token-tab ${activeTab === "sell" ? "active" : ""}`}
-          >
-            Sell SWIPE
-          </button>
-        </div>
-
-        {/* Buy Tab */}
-        {activeTab === "buy" && (
-          <div>
-            {/* Quick Buy Buttons */}
-            <div className="swipe-token-quick-buy">
-              <div className="swipe-token-section-title">
-                Quick Buy
-              </div>
-              <div className="swipe-token-quick-grid">
-                {/* $10 */}
-                <button
-                  onClick={() => ethPrice ? buyWithETH((10 / ethPrice).toFixed(6)) : null}
-                  disabled={isLoading || !flaunchSDK || !address || !ethPrice}
-                  className="swipe-token-quick-btn"
-                >
-                  {isLoading ? (
-                    <div className="swipe-token-quick-btn-loading"></div>
-                  ) : (
-                    <>
-                      <span className="swipe-token-quick-btn-usd-main">$10</span>
-                      {ethPrice && (
-                        <div className="swipe-token-quick-btn-eth-small">
-                          <Image src="/Ethereum-icon-purple.svg" alt="ETH" width={12} height={12} />
-                          <span>{(10 / ethPrice).toFixed(4)}</span>
-                        </div>
-                      )}
-                      {swipePrice && (
-                        <div className="swipe-token-quick-btn-swipe">
-                          ~{calculateSwipeReceived("10", true)?.toLocaleString('en-US', { 
-                            maximumFractionDigits: 0,
-                            minimumFractionDigits: 0
-                          })} SWIPE
-                        </div>
-                      )}
-                    </>
-                  )}
-                </button>
-
-                {/* $50 */}
-                <button
-                  onClick={() => ethPrice ? buyWithETH((50 / ethPrice).toFixed(6)) : null}
-                  disabled={isLoading || !flaunchSDK || !address || !ethPrice}
-                  className="swipe-token-quick-btn"
-                >
-                  {isLoading ? (
-                    <div className="swipe-token-quick-btn-loading"></div>
-                  ) : (
-                    <>
-                      <span className="swipe-token-quick-btn-usd-main">$50</span>
-                      {ethPrice && (
-                        <div className="swipe-token-quick-btn-eth-small">
-                          <Image src="/Ethereum-icon-purple.svg" alt="ETH" width={12} height={12} />
-                          <span>{(50 / ethPrice).toFixed(4)}</span>
-                        </div>
-                      )}
-                      {swipePrice && (
-                        <div className="swipe-token-quick-btn-swipe">
-                          ~{calculateSwipeReceived("50", true)?.toLocaleString('en-US', { 
-                            maximumFractionDigits: 0,
-                            minimumFractionDigits: 0
-                          })} SWIPE
-                        </div>
-                      )}
-                    </>
-                  )}
-                </button>
-
-                {/* $100 */}
-                <button
-                  onClick={() => ethPrice ? buyWithETH((100 / ethPrice).toFixed(6)) : null}
-                  disabled={isLoading || !flaunchSDK || !address || !ethPrice}
-                  className="swipe-token-quick-btn"
-                >
-                  {isLoading ? (
-                    <div className="swipe-token-quick-btn-loading"></div>
-                  ) : (
-                    <>
-                      <span className="swipe-token-quick-btn-usd-main">$100</span>
-                      {ethPrice && (
-                        <div className="swipe-token-quick-btn-eth-small">
-                          <Image src="/Ethereum-icon-purple.svg" alt="ETH" width={12} height={12} />
-                          <span>{(100 / ethPrice).toFixed(4)}</span>
-                        </div>
-                      )}
-                      {swipePrice && (
-                        <div className="swipe-token-quick-btn-swipe">
-                          ~{calculateSwipeReceived("100", true)?.toLocaleString('en-US', { 
-                            maximumFractionDigits: 0,
-                            minimumFractionDigits: 0
-                          })} SWIPE
-                        </div>
-                      )}
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Custom Amount */}
-            <div className="swipe-token-custom">
-              <div className="swipe-token-custom-header">
-                <div className="swipe-token-section-title">
-                  Custom Amount
-                </div>
-                {ethPrice && (
-                  <span className="swipe-token-price-info">
-                    1 ETH = ${ethPrice.toLocaleString()}
-                  </span>
-                )}
-              </div>
-              
-              {/* Input Mode Toggle */}
-              <div className="swipe-token-input-toggle">
-                <button
-                  onClick={() => setInputMode("eth")}
-                  className={`swipe-token-toggle-btn ${inputMode === "eth" ? "active" : ""}`}
-                >
-                  ETH
-                </button>
-                <button
-                  onClick={() => setInputMode("usd")}
-                  className={`swipe-token-toggle-btn ${inputMode === "usd" ? "active" : ""}`}
-                >
-                  USD
-                </button>
-              </div>
-
-              {/* Range Slider */}
-              <div className="swipe-token-slider-container">
-                <div className="swipe-token-slider-labels">
-                  <span className="swipe-token-slider-label">
-                    {inputMode === "eth" ? "0.0001 ETH" : "$1"}
-                  </span>
-                  <span className="swipe-token-slider-label">
-                    {inputMode === "eth" ? "0.224 ETH" : "$1000"}
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={inputMode === "eth" ? "0.0001" : "1"}
-                  max={inputMode === "eth" ? "0.224" : "1000"}
-                  step={inputMode === "eth" ? "0.0001" : "1"}
-                  value={inputMode === "eth" ? (buyAmount || "0.0001") : (buyAmountUsd || "1")}
-                  onChange={(e) => {
-                    if (inputMode === "eth") {
-                      handleEthAmountChange(e.target.value);
-                    } else {
-                      handleUsdAmountChange(e.target.value);
-                    }
-                  }}
-                  className="swipe-token-slider"
-                  style={{ background: getSliderBackground() }}
-                />
-                <div className="swipe-token-slider-value">
-                  {inputMode === "eth" ? (buyAmount || "0.0001") : (buyAmountUsd || "1")} {inputMode === "eth" ? "ETH" : "USD"}
-                </div>
-              </div>
-
-              <div className="swipe-token-input-row">
-                <div className="swipe-token-input-wrapper">
-                  <input
-                    type="number"
-                    step={inputMode === "eth" ? "0.0001" : "0.01"}
-                    value={inputMode === "eth" ? buyAmount : buyAmountUsd}
-                    onChange={(e) => {
-                      if (inputMode === "eth") {
-                        handleEthAmountChange(e.target.value);
-                      } else {
-                        handleUsdAmountChange(e.target.value);
-                      }
-                    }}
-                    className="swipe-token-input"
-                    placeholder={inputMode === "eth" ? "0.001" : "100"}
-                    disabled={isLoading}
-                  />
-                  {inputMode === "eth" && buyAmount && ethPrice && (
-                    <div className="swipe-token-input-helper">
-                      ≈ ${calculateUsdValue(buyAmount)} USD
-                    </div>
-                  )}
-                  {inputMode === "usd" && buyAmountUsd && ethPrice && (
-                    <div className="swipe-token-input-helper">
-                      ≈ {calculateEthValue(buyAmountUsd)} ETH
-                    </div>
-                  )}
-                  {/* Show SWIPE tokens received */}
-                  {((inputMode === "eth" && buyAmount) || (inputMode === "usd" && buyAmountUsd)) && swipePrice && ethPrice && (
-                    <div className="swipe-token-receive-info">
-                      You will receive ~{calculateSwipeReceived(
-                        inputMode === "eth" ? buyAmount : buyAmountUsd,
-                        inputMode === "usd"
-                      )?.toLocaleString('en-US', { 
-                        maximumFractionDigits: 0,
-                        minimumFractionDigits: 0
-                      })} SWIPE
-                    </div>
-                  )}
-                </div>
-                <button
-                  onClick={() => buyWithETH(buyAmount)}
-                  disabled={isLoading || !flaunchSDK || !address || !buyAmount}
-                  className="swipe-token-action-btn"
-                >
-                  Buy
-                </button>
-              </div>
-            </div>
-          </div>
+        {market && reading.kind === 'reading' && (
+          <p className="swipe-token-card__status">Reading the contract</p>
         )}
 
-        {/* Sell Tab */}
-        {activeTab === "sell" && (
-          <div className="swipe-token-sell">
-            <div className="swipe-token-section-title">
-              SWIPE Amount to Sell
-            </div>
-            <div className="swipe-token-input-row">
-              <div className="swipe-token-input-wrapper" style={{ flex: 1 }}>
-                <input
-                  type="number"
-                  step="1000"
-                  value={sellAmount}
-                  onChange={(e) => setSellAmount(e.target.value)}
-                  className="swipe-token-input"
-                  placeholder="10000"
-                  disabled={isLoading}
-                />
-                {/* Show ETH and USD received */}
-                {sellAmount && swipePrice && ethPrice && parseFloat(sellAmount) > 0 && (
-                  <div className="swipe-token-receive-info">
-                    You will receive ~{calculateEthReceived(sellAmount)?.toFixed(6)} ETH
-                    {calculateEthReceived(sellAmount) && ethPrice && (
-                      <span> (~${((calculateEthReceived(sellAmount) ?? 0) * ethPrice).toLocaleString('en-US', { 
-                        minimumFractionDigits: 2, 
-                        maximumFractionDigits: 2 
-                      })} USD)</span>
-                    )}
-                  </div>
-                )}
-              </div>
-              <button
-                onClick={sellSWIPETokens}
-                disabled={isLoading || !flaunchSDK || !address || !sellAmount}
-                className="swipe-token-action-btn"
-              >
-                Sell
-              </button>
-            </div>
-            <p className="swipe-token-min-info">
-              Minimum: 10,000 SWIPE
+        {market && reading.kind === 'unreachable' && (
+          <div className="swipe-token-card__status">
+            <p className="swipe-token-card__note">
+              Robinhood chain did not answer. Nothing is wrong with your wallet, and the
+              numbers are worth more empty than guessed.
             </p>
-          </div>
-        )}
-
-        {/* Slippage Settings */}
-        <div className="swipe-token-slippage">
-          <div className="swipe-token-slippage-label">
-            Slippage Tolerance: {slippagePercent}%
-          </div>
-          <div className="swipe-token-slippage-options">
-            {[1, 3, 5, 10].map((percent) => (
-              <button
-                key={percent}
-                onClick={() => setSlippagePercent(percent)}
-                className={`swipe-token-slippage-btn ${slippagePercent === percent ? "active" : ""}`}
-                disabled={isLoading}
-              >
-                {percent}%
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Transaction Hash */}
-        {transactionHash && (
-          <div className="swipe-token-tx-status">
-            <div className="swipe-token-tx-label">
-              Transaction Submitted
-            </div>
-            <a
-              href={`https://basescan.org/tx/${transactionHash}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="swipe-token-tx-link"
+            <button
+              type="button"
+              className="swipe-token-card__retry"
+              onClick={() => setAttempt((n) => n + 1)}
             >
-              {transactionHash}
-            </a>
+              Try again
+            </button>
           </div>
         )}
 
-        {/* SWIPERS Community - Compact */}
-        <div className="swipe-token-swipers">
-          <div className="swipe-token-swipers-info">
-            💰 Earn ETH from trading fees • 👑 Owner 20% • ⚡ Creators 30% • 💎 Members 50%
-          </div>
-          <a
-            href="https://flaunch.gg/base/group/0x7d96076c750e65b60561491278280e3c324e1944"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="swipe-token-swipers-btn"
-          >
-            <Image src="/flaunch.jpg" alt="Flaunch" width={18} height={18} className="swipe-token-swipers-btn-icon" />
-            Join SWIPERS
-          </a>
+        {market && reading.kind === 'ready' && (
+          <>
+            <dl className="swipe-token-card__rows">
+              <Row label="network" value={`${CHAINS.robinhood.label} chain, id ${market.chainId}`} />
+              <Row
+                label="market contract"
+                value={short(market.address)}
+                href={`${market.explorer}/address/${market.address}`}
+              />
+              <Row label="collateral" value={reading.stats.collateral.symbol} />
+              <Row
+                label="markets registered"
+                value={
+                  reading.stats.marketCount === null
+                    ? 'unknown'
+                    : `${reading.stats.marketCount}${reading.stats.countIsFloor ? '+' : ''}`
+                }
+              />
+              <Row
+                label="minimum bet"
+                value={`${formatAmount(reading.stats.minBet, reading.stats.collateral.decimals)} ${reading.stats.collateral.symbol}`}
+              />
+            </dl>
+
+            <div className="swipe-token-card__flags">
+              <span className="swipe-token-card__flag">
+                <span className="swipe-token-card__dot swipe-token-card__dot--live" aria-hidden="true" />
+                market contract, live
+              </span>
+              <span className="swipe-token-card__flag">
+                <span className="swipe-token-card__dot swipe-token-card__dot--idle" aria-hidden="true" />
+                swipe token, not yet
+              </span>
+            </div>
+
+            <p className="swipe-token-card__note swipe-token-card__note--quiet">
+              Those rows come off the contract when this page opens, not out of a config
+              file. The second flag is the one thing here with no contract to ask.
+            </p>
+          </>
+        )}
+      </section>
+
+      <section className="swipe-token-card__panel">
+        <div className="swipe-token-card__panel-head">
+          <h3 className="swipe-token-card__panel-title">If you still hold the old one</h3>
         </div>
 
-        {/* DEX Icons */}
-        <div className="swipe-token-dex-icons">
+        {address ? (
+          <div className="swipe-token-card__balance">
+            <span className="swipe-token-card__balance-label">your balance on Base</span>
+            <span className="swipe-token-card__balance-value">
+              {held === null
+                ? 'reading'
+                : `${Math.floor(held).toLocaleString()} ${SWIPE_TOKEN.symbol}`}
+            </span>
+          </div>
+        ) : (
+          <p className="swipe-token-card__note">
+            Connect a wallet and this reads your balance off Base.
+          </p>
+        )}
+
+        <dl className="swipe-token-card__rows">
+          <Row label="token" value={short(SWIPE_TOKEN.address)} />
+          <Row label="chain" value={CHAINS.base.label} />
+          <Row label="used for" value="nothing in this app" />
+        </dl>
+
+        <div className="swipe-token-card__links">
+          <button type="button" className="swipe-token-card__copy" onClick={copyAddress}>
+            {copied ? 'copied' : 'copy address'}
+          </button>
           <a
-            href="https://flaunch.gg/base/coin/0xd0187d77af0ed6a44f0a631b406c78b30e160aa9"
+            className="swipe-token-card__link"
+            href={`${CHAINS.base.explorer}/token/${SWIPE_TOKEN.address}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="swipe-token-dex-icon"
-            title="Flaunch"
           >
-            <Image src="/flaunch.jpg" alt="Flaunch" width={56} height={56} />
+            contract on Basescan
           </a>
           <a
-            href={`https://app.uniswap.org/#/swap?inputCurrency=ETH&outputCurrency=${SWIPE_TOKEN.address}&chain=base`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="swipe-token-dex-icon"
-            title="Uniswap"
-          >
-            <Image src="/uni.png" alt="Uniswap" width={56} height={56} />
-          </a>
-          <a
+            className="swipe-token-card__link"
             href={`https://dexscreener.com/base/${SWIPE_TOKEN.address}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="swipe-token-dex-icon"
-            title="DexScreener"
           >
-            <Image src="/dexscreen.png" alt="DexScreener" width={56} height={56} />
+            chart on DexScreener
           </a>
         </div>
 
-        {/* Wallet Connection Notice */}
-        {!address && (
-          <div className="swipe-token-wallet-notice">
-            <div className="swipe-token-wallet-text">
-              Please connect your wallet to buy or sell SWIPE tokens
-            </div>
-          </div>
-        )}
-      </div>
+        <p className="swipe-token-card__note swipe-token-card__note--quiet">
+          Swipe does not buy or sell it for you any more. Whatever it is worth is set on a
+          DEX, and the chart link goes there.
+        </p>
+      </section>
+
+      <section className="swipe-token-card__panel swipe-token-card__panel--plain">
+        <div className="swipe-token-card__panel-head">
+          <h3 className="swipe-token-card__panel-title">What is not on this page</h3>
+        </div>
+        <p className="swipe-token-card__note">
+          No countdown, because no date has been set. Nothing here is for sale and nothing
+          here is claimable. No allocation has been promised to anyone. When the new token
+          exists it will have an address on chain, and that address is what will turn up
+          here.
+        </p>
+      </section>
     </div>
   );
 }
+
+function Row({ label, value, href }: { label: string; value: string; href?: string }) {
+  return (
+    <div className="swipe-token-card__row">
+      <dt className="swipe-token-card__row-key">{label}</dt>
+      <dd className="swipe-token-card__row-value">
+        {href ? (
+          <a className="swipe-token-card__link" href={href} target="_blank" rel="noopener noreferrer">
+            {value}
+          </a>
+        ) : (
+          value
+        )}
+      </dd>
+    </div>
+  );
+}
+
+export default SwipeTokenCard;
