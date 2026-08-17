@@ -4,7 +4,7 @@ import {
   parseChainKey,
   selectableChains,
 } from './activeChain';
-import { CHAINS, DEFAULT_CHAIN_KEY } from './index';
+import { CHAINS, DEFAULT_CHAIN_KEY, getWritableMarket } from './index';
 
 describe('parseChainKey', () => {
   it('accepts every configured chain', () => {
@@ -44,7 +44,10 @@ describe('selectableChains', () => {
   });
 
   it('offers at least one chain that accepts writes', () => {
-    const writable = selectableChains(true).filter((k) => !CHAINS[k].readOnly);
+    // Writable means a live market address, not the absence of a flag: a chain
+    // can hold archived markets and a live contract at the same time, which is
+    // exactly what Base does.
+    const writable = selectableChains(true).filter((k) => getWritableMarket(k) !== null);
     expect(writable.length).toBeGreaterThan(0);
   });
 });

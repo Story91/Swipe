@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useWriteContract, useAccount, useReadContract, useWaitForTransactionReceipt, useChainId, useBalance } from 'wagmi';
 import { formatEther } from 'viem';
-import { getChainConfig, isReadOnlyChain } from '@/lib/chains';
+import { getChainConfig, isWritableMarket } from '@/lib/chains';
+import { useActiveChain } from '@/lib/chains/activeChain';
 import { CONTRACTS, SWIPE_TOKEN } from '../../../lib/contract';
 import { calculateApprovalAmount } from '../../../lib/constants/approval';
 import { uploadToImgBB } from '../../../lib/imgbb';
@@ -53,6 +54,8 @@ const CRYPTO_OPTIONS = [
 
 export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePredictionModalProps) {
   const { address } = useAccount();
+  // The selected chain, not the build-time default: the creation guard gates on it.
+  const { chainKey } = useActiveChain();
   const { writeContract, data: hash, error: writeError, isPending, reset: resetWriteContract } = useWriteContract();
   const { composeCast: minikitComposeCast } = useComposeCast();
   const { context } = useMiniKit();
@@ -518,12 +521,19 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // The contracts on a read-only chain are owned by a compromised key, so a
-    // market created there could never be resolved.
-    if (isReadOnlyChain()) {
+    // This modal creates markets on CONTRACTS.V2, whose owner key is compromised
+    // and unrecoverable, so a market created there could never be resolved. The
+    // guard compares that target address against the selected chain's live
+    // market and refuses anything else.
+    //
+    // It used to ask isReadOnlyChain() with no argument, which held only while
+    // Base itself was unwritable. Base runs V3 now, so that form would have let
+    // this create markets on a dead contract.
+    if (!isWritableMarket(chainKey, CONTRACTS.V2.address)) {
       alert(
-        'Markets are moving to V3.\n\n' +
-        'New markets are created on V3 now — switch network to create one.'
+        'Market creation is moving to V3.\n\n' +
+        'V3 is live on Base with audited contracts, but this form still creates ' +
+        'markets on the old contract, so it is switched off until it is rewired.'
       );
       return;
     }

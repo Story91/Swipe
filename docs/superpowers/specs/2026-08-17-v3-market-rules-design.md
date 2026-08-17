@@ -46,7 +46,7 @@ thin margin, effectively no margin.
 |---|---|---|
 | Payout model | **Parimutuel, unchanged** | Players bet each other, never the house. The platform holds no position and cannot lose on an outcome. |
 | Chains | **Both, but sequenced: Base first, Robinhood after** | The user base is on Base, and Robinhood cannot go live until Redis keys are namespaced. Running both is the destination, not the first step. |
-| Contract count | **One** | "Winners take from losers" is the parimutuel model, not a V2 feature — V3 has it identically. A second contract would duplicate surface for no product difference. |
+| Contract count | **One variant, deployed once per chain** | Not one instance across chains, which is impossible: a contract lives at one address on one chain, and `collateral` is immutable, so each deployment is bound to one token. What is rejected is a *second variant* sitting beside V3 on the same chain. Keeping a "safe V2" was considered and dropped: "winners take from losers" is the parimutuel model, not a V2 feature, and V3 has it identically. |
 | Early-entry bonus | **Tiered ×1.50 / ×1.25 / ×1.00** | A user can hold three brackets in their head; a continuous curve they cannot compute. |
 | Bracket boundaries | **Quarters of the market's own lifetime** | One rule for a 2-hour market and a 7-day one, with no special cases. |
 | Minimum pool threshold | **Dropped** | It solved market sprawl a second time — the cap on open markets already does — while punishing users for betting on a quiet market. |

@@ -33,8 +33,25 @@ collateralised in Base USDC, with platform fee 3%, creator fee 0.5%, early exit
 fee 5% and a minimum bet of 0.1 USDC, all confirmed on-chain.
 
 Robinhood Chain has no market contract yet. Its testnet runs V3's audited
-predecessor, which has no time weighting. Both chains will run the same
-contract and the same rules once Robinhood follows.
+predecessor, which has no time weighting.
+
+**One source, one deployment per chain.** A contract lives at one address on one
+chain, so Base and Robinhood get separate instances of the same audited source,
+each with its own address, its own state and its own liquidity. The collateral
+token is fixed at deployment and can never change:
+
+```solidity
+IERC20 public immutable collateral;
+constructor(address collateralToken) Ownable(msg.sender) { ... }
+```
+
+That is why `scripts/deploy_v3.js` carries a collateral address per network,
+USDC for Base and USDG for Robinhood, and why the decision recorded as "one
+contract" means one *variant* of the code rather than one instance. There is no
+second, "safer" contract sitting beside V3 on the same chain.
+
+It also means each instance numbers its markets from 1 independently, so
+per-chain keys in Redis have to land before a second chain goes live.
 
 **The app cannot place a V3 bet yet.** The contract exists, but the interface
 still points at the archived Base contracts and refuses every write until the

@@ -15,16 +15,29 @@ export const CHAINS: Record<ChainKey, ChainConfig> = {
     viemChain: base,
     rpcUrl: process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org',
     explorer: 'https://basescan.org',
-    // Every Base contract is owned by 0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd,
-    // whose key was compromised and cannot be recovered. PredictionMarketV2 has
-    // no transferOwnership at all, so its markets can never be resolved again.
-    // History stays readable; nothing new is written here.
-    readOnly: true,
+    // The v2, dualPool and V1 contracts below are owned by
+    // 0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd, whose key was compromised and
+    // cannot be recovered. PredictionMarketV2 has no transferOwnership at all,
+    // so those markets can never be resolved again. They stay readable and
+    // nothing new is ever written to them.
+    archivedMarkets: true,
     contracts: {
       v2: (process.env.NEXT_PUBLIC_CONTRACT_V2_ADDRESS
         || '0x2bA339Df34B98099a9047d9442075F7B3a792f74') as `0x${string}`,
       dualPool: (process.env.NEXT_PUBLIC_USDC_DUALPOOL_CONTRACT
         || '0xf5Fa6206c2a7d5473ae7468082c9D260DFF83205') as `0x${string}`,
+      // PredictionMarket_V3, deployed and verified on Base mainnet 2026-08-17,
+      // collateralised in the USDC below. Owner and first resolver
+      // 0xD4885A5aa53446843CABcDE1F35DE9b4E906030e, a key that is not the
+      // compromised one above.
+      //
+      // Literal fallback on purpose, and NEXT_PUBLIC_ on purpose: this address
+      // has to be readable in the browser or the UI silently sees the zero
+      // address while the server sees the real one. That is safe here only
+      // because isWritableMarket compares the address a caller is about to
+      // write to; a reachable address is not on its own permission to write.
+      market: (process.env.NEXT_PUBLIC_BASE_V3_CONTRACT
+        || '0x4753685Af9b317db5690E036AeBD4337627A070E') as `0x${string}`,
       swipeClaim: (process.env.NEXT_PUBLIC_SWIPE_CLAIM_CONTRACT || ZERO) as `0x${string}`,
     },
     stable: {
@@ -55,8 +68,9 @@ export const CHAINS: Record<ChainKey, ChainConfig> = {
     contracts: {
       // No $SWIPE on Robinhood, so there is no v2 leg by design.
       dualPool: (process.env.ROBINHOOD_TESTNET_DUALPOOL || ZERO) as `0x${string}`,
-      // Audited successor, owned by the current key.
-      usdgPool: (process.env.ROBINHOOD_TESTNET_USDG_DUALPOOL || ZERO) as `0x${string}`,
+      // V3's audited predecessor, owned by the current key. Not V3 itself: the
+      // deployed code here has no weightBpsAt, so it has no time weighting.
+      market: (process.env.ROBINHOOD_TESTNET_USDG_DUALPOOL || ZERO) as `0x${string}`,
     },
     stable: {
       // Testnet has no USDG; MockUSDC stands in for it.
@@ -73,9 +87,13 @@ export const CHAINS: Record<ChainKey, ChainConfig> = {
     rpcUrl: process.env.ROBINHOOD_RPC_URL || 'https://rpc.mainnet.chain.robinhood.com',
     explorer: 'https://robinhoodchain.blockscout.com',
     contracts: {
-      // Server-only, exactly as on the testnet above: the browser reads the
-      // zero address here no matter what this env var is set to.
-      usdgPool: (process.env.ROBINHOOD_USDG_DUALPOOL || ZERO) as `0x${string}`,
+      // Nothing is deployed here yet, so this is the zero address in practice.
+      // Server-only, exactly as on the testnet above: the browser reads zero no
+      // matter what this env var is set to. When V3 does land on Robinhood, this
+      // has to become NEXT_PUBLIC_ with a literal fallback, the way Base's
+      // market above is, or the UI will refuse every bet while the server
+      // insists the market exists.
+      market: (process.env.ROBINHOOD_USDG_DUALPOOL || ZERO) as `0x${string}`,
     },
     stable: {
       // Paxos USDG. Verified on-chain: symbol() == "USDG", decimals() == 6.
@@ -129,14 +147,31 @@ export function supportedChains(): [Chain, ...Chain[]] {
   return chains as [Chain, ...Chain[]];
 }
 
-/** True when a chain's markets are history only and accept no new writes. */
+/**
+ * True when a chain has no live market, so nothing new can be bet or created on
+ * it. Derived, not declared: a chain is unwritable exactly when it has no market
+ * address, and there is no separate flag that can disagree with that.
+ *
+ * This is not the same question as "does this chain hold archived markets".
+ * Base holds three dead contracts and one live one, so it answers false here and
+ * true to `hasArchivedMarkets`. Use this for write paths and that one for copy
+ * about old markets.
+ */
 export function isReadOnlyChain(key: ChainKey = DEFAULT_CHAIN_KEY): boolean {
-  return getChainConfig(key).readOnly === true;
+  return getWritableMarket(key) === null;
 }
 
 /**
- * The market contract new bets should go to, or null when the chain is
- * read-only. Callers that write must check this rather than reaching for
+ * True when a chain carries markets on contracts nobody controls any more, whose
+ * positions can never be resolved or claimed. Drives copy, never permissions.
+ */
+export function hasArchivedMarkets(key: ChainKey = DEFAULT_CHAIN_KEY): boolean {
+  return getChainConfig(key).archivedMarkets === true;
+}
+
+/**
+ * The market contract new bets should go to, or null when the chain has none.
+ * Callers that write must check this rather than reaching for
  * `contracts.dualPool`, which on Base points at a contract nobody controls.
  *
  * This answers "does this chain have a market?", which is *not* the question a
@@ -146,11 +181,9 @@ export function isReadOnlyChain(key: ChainKey = DEFAULT_CHAIN_KEY): boolean {
 export function getWritableMarket(
   key: ChainKey = DEFAULT_CHAIN_KEY
 ): `0x${string}` | null {
-  const config = getChainConfig(key);
-  if (config.readOnly) return null;
-  const pool = config.contracts.usdgPool;
-  if (!pool || pool === ZERO) return null;
-  return pool;
+  const market = getChainConfig(key).contracts.market;
+  if (!market || market === ZERO) return null;
+  return market;
 }
 
 /**

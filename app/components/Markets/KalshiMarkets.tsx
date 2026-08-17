@@ -29,7 +29,8 @@ import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useHybridPredictions } from '../../../lib/hooks/useHybridPredictions';
 import { useAccount, useWriteContract, useReadContract, useWaitForTransactionReceipt } from 'wagmi';
-import { isReadOnlyChain } from '@/lib/chains';
+import { isWritableMarket } from '@/lib/chains';
+import { useActiveChain } from '@/lib/chains/activeChain';
 import { parseUnits, formatUnits } from 'viem';
 import { 
   USDC_DUALPOOL_ABI, 
@@ -585,6 +586,9 @@ type TxState = 'idle' | 'approving' | 'approved' | 'betting' | 'success' | 'erro
 export default function KalshiMarkets() {
   const { predictions, loading, refresh } = useHybridPredictions();
   const { address, isConnected } = useAccount();
+  // The chain the user actually selected, not the build-time default. The bet
+  // guard below has to gate on this.
+  const { chainKey } = useActiveChain();
   const [txState, setTxState] = useState<TxState>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -870,12 +874,20 @@ export default function KalshiMarkets() {
   const handlePlaceBet = useCallback(async () => {
     if (!address || !betModal.side || !betModal.marketId) return;
 
-    // The USDC pool's owner key is compromised and unrecoverable, so a bet
-    // placed here could never be resolved or claimed.
-    if (isReadOnlyChain()) {
+    // USDC_DUALPOOL_CONTRACT_ADDRESS below is the old Base pool, whose owner key
+    // is compromised and unrecoverable: a bet placed there could never be
+    // resolved or claimed. The guard therefore compares the address this is
+    // about to write to against the selected chain's live market, and refuses
+    // anything else.
+    //
+    // It used to ask isReadOnlyChain() with no argument, which answered for the
+    // build-time default rather than the selected chain. That reading blocked
+    // everything only for as long as Base itself was unwritable. Base runs V3
+    // now, so the old form would have opened this path onto the dead pool.
+    if (!isWritableMarket(chainKey, USDC_DUALPOOL_CONTRACT_ADDRESS)) {
       setErrorMessage(
-        'Betting is moving to V3 — audited contracts with fairer payouts and lower fees. ' +
-        'Switch network to place a bet.'
+        'These markets are archived and take no new bets. Betting runs on V3 now, ' +
+        'with audited contracts, fairer payouts and fees taken only from the losing side.'
       );
       return;
     }
@@ -894,7 +906,7 @@ export default function KalshiMarkets() {
       setErrorMessage(error?.message || 'Bet failed');
       setTxState('error');
     }
-  }, [address, betModal, placeBet]);
+  }, [address, betModal, placeBet, chainKey]);
 
   // Check if approval needed
   const needsApproval = useMemo(() => {

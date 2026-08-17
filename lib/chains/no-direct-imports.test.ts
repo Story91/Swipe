@@ -45,17 +45,31 @@ describe('chain abstraction is not bypassed', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('the swipe bet path gates on the address it writes to, not on the chain', () => {
-    // A guard that only asks "does this chain have a market?" while the write
-    // itself goes to a module-scope constant has checked nothing about where
-    // the money lands. That shape is what would have put a Base address on a
-    // Robinhood transaction the moment a pool address was configured.
-    const src = readFileSync(
-      path.join(ROOT, 'app', 'components', 'Main', 'TinderCard.tsx'),
-      'utf8'
-    );
-    expect(src).toContain('isWritableMarket(');
-    expect(src).not.toMatch(/if\s*\(\s*!\s*getWritableMarket\s*\(/);
+  // Every path that sends a market transaction has to compare the address it is
+  // about to write to. Two shapes are banned. Gating on the chain alone checks
+  // nothing about where the money lands, which is what would have put a Base
+  // address on a Robinhood transaction. Gating on isReadOnlyChain() with no
+  // argument answers for the build-time default, which held everything shut only
+  // while Base itself was unwritable; Base runs V3 now, so that form would open
+  // these paths onto contracts whose owner key is lost.
+  const WRITE_PATHS = [
+    ['app', 'components', 'Main', 'TinderCard.tsx'],
+    ['app', 'components', 'Markets', 'KalshiMarkets.tsx'],
+    ['app', 'components', 'Modals', 'CreatePredictionModal.tsx'],
+  ];
+
+  it.each(WRITE_PATHS)('gates on the address it writes to: %s', (...segments) => {
+    const rel = path.join(...segments);
+    const src = readFileSync(path.join(ROOT, rel), 'utf8');
+
+    // Matched in the shape of a guard, not anywhere in the file: these comments
+    // name the banned forms in order to explain them, and a bare substring
+    // search flags its own documentation.
+    expect(src, `${rel} must gate its writes on isWritableMarket`).toContain('isWritableMarket(');
+    expect(src, `${rel} must not gate a write on the chain alone`)
+      .not.toMatch(/if\s*\(\s*!\s*getWritableMarket\s*\(/);
+    expect(src, `${rel} must not gate a write on the build-time default chain`)
+      .not.toMatch(/if\s*\(\s*!?\s*isReadOnlyChain\s*\(\s*\)/);
   });
 
   it('no module hardcodes the public Base RPC as a fallback', () => {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { CHAINS, DEFAULT_CHAIN_KEY } from './index';
+import { CHAINS, DEFAULT_CHAIN_KEY, isReadOnlyChain, hasArchivedMarkets } from './index';
 import type { ChainKey } from './types';
 
 /**
@@ -63,6 +63,13 @@ export function useActiveChain() {
     chainKey,
     chain: CHAINS[chainKey],
     setChain: changeChain,
-    isReadOnly: CHAINS[chainKey].readOnly === true,
+    /**
+     * No live market on this chain, so nothing can be bet or created. Not a
+     * statement about old markets: Base is writable again and still holds
+     * archived ones.
+     */
+    isReadOnly: isReadOnlyChain(chainKey),
+    /** This chain holds markets on contracts nobody controls. Copy only. */
+    hasArchivedMarkets: hasArchivedMarkets(chainKey),
   };
 }

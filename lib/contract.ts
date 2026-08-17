@@ -1677,19 +1677,35 @@ export const USDC_DUALPOOL_ABI = [
 const USDG_ABI_DATA = require('../artifacts/contracts/PredictionMarket_V3.sol/PredictionMarket_V3.json');
 export const USDG_DUALPOOL_ABI = USDG_ABI_DATA.abi;
 
-/** Address of the writable market, or the zero address on read-only chains. */
+/**
+ * Address of V3 on the default chain, which is Base. Module-scope, so it does
+ * not follow the network switcher: a write path must not use this. Ask
+ * `getWritableMarket(chainKey)` for the address and `isWritableMarket` for
+ * permission.
+ */
 export const USDG_DUALPOOL_CONTRACT_ADDRESS =
-  getChainConfig().contracts.usdgPool ?? '';
+  getChainConfig().contracts.market ?? '';
 
+/**
+ * Rates as deployed, for display. Read back from Base mainnet on 2026-08-17
+ * rather than copied from the constructor: the contract's own defaults are 1%
+ * and a 1 token floor, and `scripts/deploy_v3.js` changes both after deploying.
+ * Anything that shows a fee to a user and takes it from here is showing the
+ * launch configuration, not the constructor's.
+ *
+ * These are still a copy of on-chain state and can drift. `getFeeConfig()` on
+ * the contract returns platform, creator, exit and minBet in one call, and is
+ * the answer whenever the real value matters.
+ */
 export const USDG_DUALPOOL_CONFIG = {
   address: USDG_DUALPOOL_CONTRACT_ADDRESS,
   abi: USDG_DUALPOOL_ABI,
   fees: {
-    platform: 100, // 1%
-    creator: 50,   // 0.5%
-    earlyExit: 500 // 5%
+    platform: 300, // 3% of the losing pool
+    creator: 50,   // 0.5% of the losing pool
+    earlyExit: 500 // 5% of the exit value
   },
-  minBet: 1_000_000, // 1 token at 6 decimals
+  minBet: 100_000, // 0.1 token at 6 decimals, the contract's MIN_BET_FLOOR
   refundGracePeriodDays: 30
 };
 

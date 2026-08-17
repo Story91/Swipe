@@ -4,6 +4,7 @@ import {
   getChainConfig,
   DEFAULT_CHAIN_KEY,
   isReadOnlyChain,
+  hasArchivedMarkets,
   getWritableMarket,
   isWritableMarket,
   chainList,
@@ -83,28 +84,54 @@ describe('chain registration for wagmi', () => {
   });
 });
 
-describe('read-only chains', () => {
-  it('marks Base read-only: its contracts are owned by a lost key', () => {
-    expect(isReadOnlyChain('base')).toBe(true);
+describe('which chains take new bets', () => {
+  const ARCHIVED_OWNER_LOST = ['v2', 'dualPool'] as const;
+
+  it('gives Base a live market, because V3 is deployed there', () => {
+    expect(getWritableMarket('base')).toMatch(/^0x[0-9a-fA-F]{40}$/);
+    expect(isReadOnlyChain('base')).toBe(false);
   });
 
-  it('offers no writable market on a read-only chain', () => {
-    expect(getWritableMarket('base')).toBeNull();
+  it('reaches that address without a NEXT_PUBLIC_ env var being set', () => {
+    // A non-NEXT_PUBLIC_ address is undefined in the browser, so the UI would
+    // see the zero address while the server saw the real one. Base's market is
+    // a literal fallback for exactly that reason, and this fails if someone
+    // turns it into an env-only value.
+    expect(CHAINS.base.contracts.market).toBeDefined();
+    expect(CHAINS.base.contracts.market).not.toBe('0x0000000000000000000000000000000000000000');
   });
 
-  it('never routes writes at the old dual pool, which nobody controls', () => {
-    const legacy = CHAINS.base.contracts.dualPool;
-    expect(legacy).toBeDefined();
-    expect(getWritableMarket('base')).not.toBe(legacy);
+  it('never routes a write at a contract whose owner key is lost', () => {
+    const market = getWritableMarket('base');
+    for (const name of ARCHIVED_OWNER_LOST) {
+      const archived = CHAINS.base.contracts[name];
+      expect(archived).toBeDefined();
+      expect(archived).not.toBe(market);
+      expect(isWritableMarket('base', archived as string)).toBe(false);
+    }
   });
 
-  it('keeps Robinhood writable', () => {
-    expect(isReadOnlyChain('robinhood')).toBe(false);
-    expect(isReadOnlyChain('robinhoodTestnet')).toBe(false);
+  it('still reports Base as holding archived markets, which is a separate thing', () => {
+    // Base is writable again *and* carries markets nobody can resolve. One
+    // boolean could not say both, which is why the readOnly flag was replaced.
+    expect(hasArchivedMarkets('base')).toBe(true);
+    expect(isReadOnlyChain('base')).toBe(false);
+  });
+
+  it('treats a chain with no deployed market as read-only', () => {
+    // Robinhood mainnet, today: the address is env-driven and unset here.
+    expect(getWritableMarket('robinhood')).toBeNull();
+    expect(isReadOnlyChain('robinhood')).toBe(true);
+    expect(hasArchivedMarkets('robinhood')).toBe(false);
+  });
+
+  it('derives read-only from the market address, so the two cannot disagree', () => {
+    for (const key of Object.keys(CHAINS) as (keyof typeof CHAINS)[]) {
+      expect(isReadOnlyChain(key)).toBe(getWritableMarket(key) === null);
+    }
   });
 
   it('returns null rather than the zero address when no market is deployed yet', () => {
-    // Env-driven, so in a bare checkout this is the unset case.
     const market = getWritableMarket('robinhood');
     expect(market === null || /^0x[0-9a-fA-F]{40}$/.test(market)).toBe(true);
     expect(market).not.toBe('0x0000000000000000000000000000000000000000');
@@ -129,9 +156,15 @@ describe('the address a write is actually addressed to', () => {
     vi.resetModules();
   });
 
-  it('refuses every target on a read-only chain', () => {
+  it('refuses an archived contract on a chain that is live again', () => {
+    // Base takes new bets on V3 while its old contracts stay dead. Being on a
+    // writable chain is not permission to write to any address on it.
     expect(isWritableMarket('base', BASE_V2)).toBe(false);
     expect(isWritableMarket('base', CHAINS.base.contracts.dualPool as string)).toBe(false);
+  });
+
+  it('accepts the live market on Base', () => {
+    expect(isWritableMarket('base', CHAINS.base.contracts.market as string)).toBe(true);
   });
 
   it('refuses a missing target instead of reading it as a match', () => {
