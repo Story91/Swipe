@@ -6,6 +6,7 @@ import { useHybridPredictions } from "@/lib/hooks/useHybridPredictions";
 import type { HybridPrediction } from "@/lib/hooks/useHybridPredictions";
 import { pageWindow } from "./pageWindow";
 import { thumbKindFor, hueFromSeed, initialsFor } from "./marketThumb";
+import type { ThumbKind } from "./marketThumb";
 import "./MarketGrid.css";
 
 /**
@@ -62,31 +63,49 @@ function isOpen(p: HybridPrediction, now: number): boolean {
 }
 
 /**
- * Card thumbnail. Crypto markets store a GeckoTerminal embed URL rather than an
- * image, so those get a chart-styled tile; anything that fails to load falls
- * back to a colour derived from the market id, keeping the grid gap-free.
+ * The card's ground.
+ *
+ * The market's picture used to be a tile on the category row, 42px once and
+ * 22px after that, which is too small to tell one upload from another — the one
+ * thing a picture is on the card for. It is the card's own background now: full
+ * bleed, blurred, and under a scrim heavy enough that the text on top does not
+ * care what was uploaded.
+ *
+ * Crypto markets store a GeckoTerminal embed URL rather than an image, and
+ * plenty of markets have no picture at all. Both get a drawn ground rather than
+ * a hole, so a card without a photo still looks like something someone chose.
  */
-function MarketThumb({ prediction }: { prediction: HybridPrediction }) {
-  const [failed, setFailed] = useState(false);
-  const kind = thumbKindFor(prediction.imageUrl);
-
-  if (kind === "image" && !failed) {
+function MarketGround({
+  prediction,
+  kind,
+  onImageError,
+}: {
+  prediction: HybridPrediction;
+  kind: ThumbKind;
+  onImageError: () => void;
+}) {
+  if (kind === "image") {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        className="mgcard__thumb"
-        src={prediction.imageUrl}
-        alt=""
-        loading="lazy"
-        onError={() => setFailed(true)}
-      />
+      <div className="mgcard__bg" aria-hidden="true">
+        {/* A real <img>, not a CSS background-image. onError is the only
+            detector there is for a 404 or a hotlink block on a user-supplied
+            URL, and background-image has no equivalent. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          className="mgcard__bg-img"
+          src={prediction.imageUrl}
+          alt=""
+          loading="lazy"
+          onError={onImageError}
+        />
+      </div>
     );
   }
 
   if (kind === "chart") {
     return (
-      <div className="mgcard__thumb mgcard__thumb--chart" aria-hidden="true">
-        <svg viewBox="0 0 32 32" width="20" height="20" role="presentation">
+      <div className="mgcard__bg" aria-hidden="true">
+        <svg className="mgcard__bg-mark" viewBox="0 0 32 32" role="presentation">
           <polyline
             points="2,24 9,16 15,20 22,8 30,12"
             fill="none"
@@ -100,14 +119,11 @@ function MarketThumb({ prediction }: { prediction: HybridPrediction }) {
     );
   }
 
-  const hue = hueFromSeed(prediction.id);
   return (
-    <div
-      className="mgcard__thumb mgcard__thumb--generated"
-      style={{ background: `hsl(${hue} 55% 28%)`, color: `hsl(${hue} 85% 78%)` }}
-      aria-hidden="true"
-    >
-      {initialsFor(prediction.question || prediction.category || "?")}
+    <div className="mgcard__bg" aria-hidden="true">
+      <span className="mgcard__bg-initials">
+        {initialsFor(prediction.question || prediction.category || "?")}
+      </span>
     </div>
   );
 }
@@ -127,9 +143,36 @@ function MarketCard({
   const players = prediction.participants?.length ?? 0;
   const hot = !settled && players >= HOT_PLAYER_THRESHOLD;
 
+  // A dead image URL falls back to the drawn ground rather than leaving the
+  // card blank, same as the tile used to.
+  const [imageFailed, setImageFailed] = useState(false);
+  const declared = thumbKindFor(prediction.imageUrl);
+  const kind: ThumbKind =
+    declared === "image" && imageFailed ? "generated" : declared;
+
+  // Fed to the stylesheet rather than set as a background here, so the scrim,
+  // the mark colour and the ground stay in one file. hueFromSeed is stable per
+  // market, so a given card is the same colour on every reload.
+  const hue = hueFromSeed(prediction.id);
+  const ground = {
+    chart: {
+      "--mgcard-ground":
+        "radial-gradient(120% 90% at 12% 0%, #16240a 0%, #0b0b0b 72%)",
+    },
+    generated: {
+      "--mgcard-ground": `linear-gradient(135deg, hsl(${hue} 45% 16%), hsl(${hue} 50% 8%))`,
+      "--mgcard-mark": `hsl(${hue} 62% 64%)`,
+    },
+    image: undefined,
+  }[kind] as React.CSSProperties | undefined;
+
   return (
     <article
-      className="mgcard"
+      // Only a photo gets the heavy scrim. The two drawn grounds are already
+      // dark and controlled, and burying them under 0.9 of black would make
+      // every one of them the same card.
+      className={`mgcard${kind === "image" ? " mgcard--photo" : ""}`}
+      style={ground}
       role="link"
       tabIndex={0}
       onClick={() => onOpen(prediction.id)}
@@ -141,8 +184,13 @@ function MarketCard({
       }}
       aria-label={prediction.question}
     >
+      <MarketGround
+        prediction={prediction}
+        kind={kind}
+        onImageError={() => setImageFailed(true)}
+      />
+
       <div className="mgcard__cat">
-        <MarketThumb prediction={prediction} />
         <span className="mgcard__cat-name">{prediction.category || "Market"}</span>
         {hot && <span className="mgcard__flag">Hot</span>}
       </div>

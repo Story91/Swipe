@@ -1,30 +1,56 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMiniKit } from "@coinbase/onchainkit/minikit";
-import { useAccount } from "wagmi";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Clock, Users, TrendingUp, Share2 } from "lucide-react";
+import { ArrowLeft, Share2 } from "lucide-react";
 import sdk from "@farcaster/miniapp-sdk";
 import { useComposeCast } from "@coinbase/onchainkit/minikit";
 import type { RedisPrediction } from "@/lib/types/redis";
 import { useActiveChain } from "@/lib/chains/activeChain";
+import { OddsChart } from "@/app/components/Markets/MarketDetail/OddsChart";
+import { PriceCards } from "@/app/components/Markets/MarketDetail/PriceCards";
+import { MarketStatsRow } from "@/app/components/Markets/MarketDetail/MarketStatsRow";
+import { formatPool, yesPriceOf } from "@/app/components/Markets/MarketDetail/marketDetail";
+import type { PricePoint } from "@/app/components/Markets/MarketDetail/marketDetail";
+import "@/app/components/Markets/MarketDetail/MarketDetail.css";
 
+/**
+ * One market, in full.
+ *
+ * Two things were wrong with the page this replaces and only one of them was
+ * the layout.
+ *
+ * It read `yesTotalAmount` and `swipeTotalAmount`, which are the V2 ETH and
+ * SWIPE pools. Nothing has written those since the role split: the sync path
+ * at app/api/sync/usdc/route.ts writes `usdcYesTotalAmount` and
+ * `usdcNoTotalAmount`, so every market the app can currently bet on rendered
+ * here as 0.00000 ETH, "No SWIPE stakes yet", and two odds bars pinned at
+ * 50/50. It was not an empty page, it was a page reading the wrong record. The
+ * two dead blocks are gone rather than left showing zeros.
+ *
+ * It also fetched without `?chain=`, and that endpoint defaults an absent chain
+ * to Base, so a Robinhood user was shown Base's market of the same number.
+ *
+ * The betting path is deliberately untouched. The button is a router.push into
+ * the swipe deck, exactly as before, and no contract call was added here: a real
+ * placeBet on this page would be a second staking implementation, and it would
+ * also owe the price-history POST that keeps the chart above it moving.
+ */
 export default function PredictionPage() {
   const params = useParams();
   const router = useRouter();
   const predictionId = params.id as string;
   const { setFrameReady, isFrameReady } = useMiniKit();
-  const { address } = useAccount();
   const { composeCast: minikitComposeCast } = useComposeCast();
-  const { isReadOnly } = useActiveChain();
-  
+  const { chainKey, chain, isReadOnly } = useActiveChain();
+
   const [prediction, setPrediction] = useState<RedisPrediction | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
+  const [history, setHistory] = useState<PricePoint[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
 
   useEffect(() => {
     if (!isFrameReady) {
@@ -33,115 +59,132 @@ export default function PredictionPage() {
   }, [setFrameReady, isFrameReady]);
 
   useEffect(() => {
+    if (!predictionId) return;
+    let cancelled = false;
+
     const fetchPrediction = async () => {
-      if (!predictionId) return;
-      
       try {
         setLoading(true);
-        const response = await fetch(`/api/predictions/${predictionId}`);
-        
+        // Market 1 exists on both chains and they are different markets, so the
+        // id alone does not identify one.
+        const response = await fetch(
+          `/api/predictions/${predictionId}?chain=${chainKey}`
+        );
+
         if (!response.ok) {
-          throw new Error('Prediction not found');
+          throw new Error("Prediction not found");
         }
-        
+
         const data = await response.json();
+        if (cancelled) return;
         if (data.success && data.prediction) {
           setPrediction(data.prediction);
+          setError(null);
         } else {
-          throw new Error(data.error || 'Failed to load prediction');
+          throw new Error(data.error || "Failed to load prediction");
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : "Unknown error");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchPrediction();
-  }, [predictionId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [predictionId, chainKey]);
+
+  // Unconditional, unlike the card's, which is gated on an expanded state this
+  // page does not have. The endpoint answers with an empty history rather than
+  // a 404 when a market has no line yet, so there is no error branch to write.
+  useEffect(() => {
+    if (!predictionId) return;
+    let cancelled = false;
+
+    setHistoryLoading(true);
+    fetch(`/api/predictions/${predictionId}/price-history?chain=${chainKey}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data.success && data.data?.history) setHistory(data.data.history);
+      })
+      .catch(() => {
+        if (!cancelled) setHistory([]);
+      })
+      .finally(() => {
+        if (!cancelled) setHistoryLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [predictionId, chainKey]);
+
+  const sym = chain.stable.symbol;
+  const decimals = chain.stable.decimals;
+
+  const pools = useMemo(() => {
+    const yes = prediction?.usdcYesTotalAmount ?? 0;
+    const no = prediction?.usdcNoTotalAmount ?? 0;
+    return { yes, no, total: yes + no };
+  }, [prediction]);
+
+  const yesPrice = yesPriceOf(pools.yes, pools.no);
+  const noPrice = 100 - yesPrice;
+
+  const settled = !!prediction?.resolved || !!prediction?.cancelled;
+  const archived = isReadOnly && !settled;
+
+  const handleGoBack = useCallback(() => router.push("/"), [router]);
+
+  // Unchanged. Resolved markets go to the results screen, live ones seek the
+  // swipe deck to this card, which is where staking lives.
+  const handleOpenInApp = useCallback(() => {
+    if (prediction?.resolved) {
+      router.push("/?dashboard=user");
+    } else {
+      router.push(`/?prediction=${predictionId}`);
+    }
+  }, [prediction?.resolved, predictionId, router]);
 
   const handleShare = async () => {
     if (isSharing || !prediction) return;
-    
     setIsSharing(true);
-    
+
     try {
       const appUrl = `${window.location.origin}/prediction/${prediction.id}`;
-      const totalPoolETH = ((prediction.yesTotalAmount || 0) + (prediction.noTotalAmount || 0)) / 1e18;
-      const shareText = `🔮 Check out this prediction: ${prediction.question}\n\n📊 Total Pool: ${totalPoolETH.toFixed(4)} ETH\n\nJoin and make your prediction! 🎯`;
-      
-      // Try MiniKit first (Base app)
+      // Was the ETH pool, which is zero on every market this app takes bets on,
+      // so every share went out advertising an empty market.
+      const shareText = `🔮 Check out this prediction: ${prediction.question}\n\n📊 Total Pool: ${formatPool(pools.total, decimals)} ${sym}\n\nJoin and make your prediction! 🎯`;
+
       try {
         if (minikitComposeCast) {
           await minikitComposeCast({
             text: shareText,
-            embeds: [appUrl] as [string]
+            embeds: [appUrl] as [string],
           });
           return;
         }
       } catch (e) {
-        console.log('MiniKit composeCast failed, trying SDK...', e);
+        console.log("MiniKit composeCast failed, trying SDK...", e);
       }
-      
-      // Fallback to Farcaster SDK
-      await sdk.actions.composeCast({
-        text: shareText,
-        embeds: [appUrl]
-      });
-    } catch (error) {
-      console.error('Error sharing prediction:', error);
+
+      await sdk.actions.composeCast({ text: shareText, embeds: [appUrl] });
+    } catch (err) {
+      console.error("Error sharing prediction:", err);
     } finally {
       setIsSharing(false);
     }
   };
 
-  const handleGoBack = () => {
-    router.push('/');
-  };
-
-  const handleOpenInApp = () => {
-    if (prediction?.resolved) {
-      // For resolved predictions, go to dashboard to see results
-      router.push('/?dashboard=user');
-    } else {
-      // For active predictions, go to main app with prediction context
-      router.push(`/?prediction=${predictionId}`);
-    }
-  };
-
-  const formatTimeLeft = (deadline: number) => {
-    const now = Date.now();
-    const diff = deadline * 1000 - now;
-    
-    if (diff <= 0) return 'Ended';
-    
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    
-    if (days > 0) return `${days}d ${hours}h`;
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
-  };
-
-  // Format large SWIPE numbers
-  const formatSwipeAmount = (amount: number): string => {
-    if (amount >= 1000000) {
-      return (amount / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-    }
-    if (amount >= 1000) {
-      return (amount / 1000).toFixed(0) + 'K';
-    }
-    return amount.toLocaleString();
-  };
-
   if (loading) {
     return (
-      <div className="flex flex-col min-h-screen bg-[#d4ff00]">
-        <div className="w-full max-w-[424px] mx-auto px-4 py-6">
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-black border-t-transparent"></div>
-          </div>
+      <div className="mdet">
+        <div className="mdet__shell">
+          <div className="mdet__spinner" role="status" aria-label="Loading market" />
         </div>
       </div>
     );
@@ -149,254 +192,166 @@ export default function PredictionPage() {
 
   if (error || !prediction) {
     return (
-      <div className="flex flex-col min-h-screen bg-[#d4ff00]">
-        <div className="w-full max-w-[424px] mx-auto px-4 py-6">
-          <div className="p-6 bg-black/90 border border-red-500/30 rounded-xl">
-            <h2 className="text-xl font-bold text-red-500 mb-2">Prediction Not Found</h2>
-            <p className="text-gray-400 mb-4">{error || 'This prediction does not exist.'}</p>
-            <Button onClick={handleGoBack} className="bg-[#d4ff00] text-black hover:bg-[#c4ef00]">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Go Back
-            </Button>
+      <div className="mdet">
+        <div className="mdet__shell">
+          <div className="mdet__state" role="alert">
+            <h2>Prediction not found</h2>
+            <p>{error || "This prediction does not exist on this network."}</p>
+            <button type="button" className="mdet-cta" onClick={handleGoBack}>
+              Go back
+            </button>
           </div>
         </div>
       </div>
     );
   }
 
-  // Convert from wei to readable values
-  const yesETH = (prediction.yesTotalAmount || 0) / 1e18;
-  const noETH = (prediction.noTotalAmount || 0) / 1e18;
-  const totalPoolETH = yesETH + noETH;
-  
-  const yesSWIPE = (prediction.swipeYesTotalAmount || 0) / 1e18;
-  const noSWIPE = (prediction.swipeNoTotalAmount || 0) / 1e18;
-  const totalPoolSWIPE = yesSWIPE + noSWIPE;
-  
-  const yesPercentage = totalPoolETH > 0 ? (yesETH / totalPoolETH) * 100 : 50;
-  const noPercentage = totalPoolETH > 0 ? (noETH / totalPoolETH) * 100 : 50;
-  
-  const swipeYesPercentage = totalPoolSWIPE > 0 ? (yesSWIPE / totalPoolSWIPE) * 100 : 50;
-  const swipeNoPercentage = totalPoolSWIPE > 0 ? (noSWIPE / totalPoolSWIPE) * 100 : 50;
-
-  // Use ogImageUrl (generated chart preview) or fallback to imageUrl
   const backgroundImageUrl = prediction.ogImageUrl || prediction.imageUrl;
+  const bettors =
+    prediction.usdcParticipants?.length ??
+    prediction.usdcMarketStats?.participantCount ??
+    0;
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#0a0a0a] relative">
-      {/* Desktop: Full screen background image */}
+    <div className="mdet">
       {backgroundImageUrl && (
-        <div 
-          className="hidden md:block fixed inset-0"
-          style={{ 
-            backgroundImage: `url(${backgroundImageUrl})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-          }}
+        <div
+          className="mdet__bleed"
+          aria-hidden="true"
+          style={{ backgroundImage: `url(${backgroundImageUrl})` }}
         />
       )}
-      {/* Desktop: Gradient overlay */}
-      <div className="hidden md:block fixed inset-0 bg-gradient-to-b from-black/30 via-black/50 to-black/90" />
-      
-      <div className="w-full max-w-[424px] mx-auto min-h-screen relative">
-        {/* Mobile: Background image only in miniapp area */}
-        {backgroundImageUrl && (
-          <div 
-            className="md:hidden absolute inset-0"
-            style={{ 
-              backgroundImage: `url(${backgroundImageUrl})`,
-              backgroundSize: '100% 100%',
-              backgroundPosition: 'center',
-            }}
-          />
-        )}
-        {/* Mobile: Gradient overlay */}
-        <div className="md:hidden absolute inset-0 bg-gradient-to-b from-black/20 via-black/40 to-black/85" />
-        
-        {/* Content */}
-        <div className="relative z-10 px-4 py-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={handleGoBack}
-            className="text-[#d4ff00] hover:bg-[#d4ff00]/10 bg-black/40 backdrop-blur-sm"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
+
+      <div className="mdet__shell">
+        <div className="mdet__bar">
+          <button type="button" className="mdet__btn" onClick={handleGoBack}>
+            <ArrowLeft className="w-4 h-4" aria-hidden="true" />
             Back
-          </Button>
-          
-          <Button
-            variant="outline"
-            size="sm"
+          </button>
+          <span className="mdet__bar-spacer" />
+          <button
+            type="button"
+            className="mdet__btn"
             onClick={handleShare}
             disabled={isSharing}
-            className="border-[#d4ff00]/30 text-[#d4ff00] hover:bg-[#d4ff00]/10 bg-black/40 backdrop-blur-sm"
           >
-            <Share2 className="w-4 h-4 mr-2" />
-            {isSharing ? 'Sharing...' : 'Share'}
-          </Button>
+            <Share2 className="w-4 h-4" aria-hidden="true" />
+            {isSharing ? "Sharing" : "Share"}
+          </button>
         </div>
 
-        {/* Category & Status Badges */}
-        <div className="flex items-center gap-2 mb-4">
-          <Badge className="bg-[#d4ff00] text-black font-bold">
-            {prediction.category}
-          </Badge>
-          
+        <div className="mdet__tags">
+          {prediction.category && (
+            <span className="mdet__tag">{prediction.category}</span>
+          )}
           {prediction.resolved && (
-            <Badge className={`${prediction.outcome ? 'bg-green-500' : 'bg-red-500'} text-white font-bold`}>
-              {prediction.outcome ? 'YES Won' : 'NO Won'}
-            </Badge>
+            <span
+              className={`mdet__tag ${prediction.outcome ? "mdet__tag--won" : "mdet__tag--lost"}`}
+            >
+              {prediction.outcome ? "Yes won" : "No won"}
+            </span>
+          )}
+          {prediction.cancelled && (
+            <span className="mdet__tag mdet__tag--lost">Cancelled</span>
           )}
         </div>
 
-        {/* Main Card */}
-        <div className="bg-black/50 backdrop-blur-md border border-[#d4ff00]/20 rounded-2xl overflow-hidden">
-          {/* Question */}
-          <div className="p-4">
-            <h1 className="text-xl font-bold text-white mb-2" style={{ fontFamily: '"Spicy Rice", cursive' }}>
-              {prediction.question}
-            </h1>
-            
-            {prediction.description && (
-              <p className="text-gray-400 text-xs mb-3 leading-relaxed" style={{ fontFamily: 'Inter, sans-serif' }}>
-                {prediction.description}
-              </p>
-            )}
+        <h1 className="mdet__question">{prediction.question}</h1>
 
-            {/* Stats Row - Mini Table */}
-            <div className="flex bg-black/30 rounded-lg border border-zinc-700/50 mb-3 divide-x divide-zinc-700/50">
-              <div className="flex-1 py-2 text-center">
-                <Clock className="w-4 h-4 text-[#d4ff00] mx-auto mb-0.5" />
-                <p className="text-[9px] text-gray-400 uppercase">
-                  {isReadOnly && !prediction.resolved ? 'Status' : 'Time Left'}
-                </p>
-                {/* A countdown on an archived market is a lie with a clock on
-                    it: the deadline is real, but nothing can be staked against
-                    it any more. */}
-                <p className="text-xs font-bold text-white">
-                  {isReadOnly && !prediction.resolved
-                    ? 'Archived'
-                    : formatTimeLeft(prediction.deadline)}
-                </p>
-              </div>
-              
-              <div className="flex-1 py-2 text-center">
-                <Users className="w-4 h-4 text-[#d4ff00] mx-auto mb-0.5" />
-                <p className="text-[9px] text-gray-400 uppercase">Participants</p>
-                <p className="text-xs font-bold text-white">{prediction.participants?.length || 0}</p>
-              </div>
-            </div>
+        {prediction.description && (
+          <p className="mdet__lede">{prediction.description}</p>
+        )}
 
-            {/* ETH Pool Section */}
-            <div className="bg-black/40 rounded-lg p-3 mb-3 border border-zinc-700/50">
-              <div className="flex items-center gap-2 mb-2">
-                <img src="/Ethereum-icon-purple.svg" alt="ETH" className="w-4 h-4" />
-                <span className="text-[10px] font-bold text-white uppercase">ETH Pool</span>
-                <span className="text-[10px] text-[#d4ff00] ml-auto font-bold">{totalPoolETH.toFixed(5)} ETH</span>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                <div className="text-center">
-                  <p className="text-[10px] text-gray-400">YES</p>
-                  <p className="text-sm font-bold text-emerald-400">{yesETH.toFixed(5)}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-[10px] text-gray-400">NO</p>
-                  <p className="text-sm font-bold text-rose-400">{noETH.toFixed(5)}</p>
-                </div>
-              </div>
-              
-              {/* ETH Odds Bar */}
-              <div>
-                <div className="flex justify-between text-[10px] mb-0.5">
-                  <span className="text-emerald-400 font-bold">YES {yesPercentage.toFixed(1)}%</span>
-                  <span className="text-rose-400 font-bold">NO {noPercentage.toFixed(1)}%</span>
-                </div>
-                <div className="h-2 bg-rose-500 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-emerald-500 transition-all duration-500"
-                    style={{ width: `${yesPercentage}%` }}
-                  />
-                </div>
-              </div>
-            </div>
+        <div className="mdet__body">
+          <div className="mdet__main">
+            <OddsChart
+              history={history}
+              yesPrice={yesPrice}
+              noPrice={noPrice}
+              totalPool={pools.total}
+              loading={historyLoading}
+            />
 
-            {/* SWIPE Pool Section */}
-            <div className="bg-black/40 rounded-lg p-3 mb-3 border border-[#d4ff00]/30">
-              <div className="flex items-center gap-2 mb-2">
-                <img src="/icon.png" alt="SWIPE" className="w-4 h-4" />
-                <span className="text-[10px] font-bold text-[#d4ff00] uppercase">SWIPE Pool</span>
-                <span className="text-[10px] text-[#d4ff00] ml-auto font-bold">{formatSwipeAmount(totalPoolSWIPE)}</span>
-              </div>
-              
-              {totalPoolSWIPE > 0 ? (
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                  <div className="text-center">
-                    <p className="text-[10px] text-gray-400">YES</p>
-                    <p className="text-sm font-bold text-emerald-400">{formatSwipeAmount(yesSWIPE)}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[10px] text-gray-400">NO</p>
-                    <p className="text-sm font-bold text-rose-400">{formatSwipeAmount(noSWIPE)}</p>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-center text-zinc-500 text-xs py-1 mb-2">No SWIPE stakes yet</p>
-              )}
-              
-              {/* SWIPE Odds Bar - always visible */}
-              <div>
-                <div className="flex justify-between text-[10px] mb-0.5">
-                  <span className="text-emerald-400 font-bold">YES {swipeYesPercentage.toFixed(1)}%</span>
-                  <span className="text-rose-400 font-bold">NO {swipeNoPercentage.toFixed(1)}%</span>
-                </div>
-                <div className="h-2 bg-rose-500 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-emerald-500 transition-all duration-500"
-                    style={{ width: `${swipeYesPercentage}%` }}
-                  />
-                </div>
-              </div>
-            </div>
+            <PriceCards
+              yesPrice={yesPrice}
+              noPrice={noPrice}
+              onPick={handleOpenInApp}
+              disabled={archived || settled}
+              hint={
+                settled
+                  ? "Market settled"
+                  : archived
+                    ? "No new bets"
+                    : "Tap to buy"
+              }
+            />
 
-            {/* CTA.
-
-                On an archived chain there is nothing to stake into, so the
-                button used to send the user to the home screen and leave them
-                there with no explanation. Saying the market is archived is the
-                honest version of the same information. Resolved markets keep
-                their results link either way. */}
-            {isReadOnly && !prediction.resolved ? (
-              <div className="w-full rounded-xl border border-[#ffb020] bg-[#0d0d0d] px-4 py-3">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-[#ffb020]">
-                  Archived market
-                </p>
-                <p className="mt-1 text-xs leading-relaxed text-zinc-400">
-                  Kept for reference — it takes no new bets. We are building V3:
-                  audited contracts that are safer and pay out better for users.
-                </p>
-              </div>
-            ) : (
-              <Button
-                onClick={handleOpenInApp}
-                className="w-full bg-[#d4ff00] text-black font-bold hover:bg-[#c4ef00] py-4 text-base rounded-xl"
-                style={{ fontFamily: '"Spicy Rice", cursive' }}
-              >
-                {prediction.resolved ? 'View Results' : 'Place Your Bet'}
-              </Button>
-            )}
+            <MarketStatsRow
+              totalPool={pools.total}
+              bettors={bettors}
+              deadline={prediction.deadline}
+              decimals={decimals}
+              archived={archived}
+            />
           </div>
-        </div>
 
-        {/* Footer info */}
-        <div className="mt-4 text-center">
-          <p className="text-xs text-white/60">
-            Prediction ID: {prediction.id}
-          </p>
-        </div>
+          <div className="mdet__rail">
+            {archived ? (
+              <section className="mdet-panel mdet-notice">
+                <h2 className="mdet-notice__title">Archived market</h2>
+                <p className="mdet-notice__body">
+                  Kept for reference. It takes no new bets, because this network
+                  has no live contract to stake into.
+                </p>
+              </section>
+            ) : (
+              <button type="button" className="mdet-cta" onClick={handleOpenInApp}>
+                {prediction.resolved ? "View results" : "Place your bet"}
+              </button>
+            )}
+
+            <section className="mdet-panel">
+              <h2 className="mdet-panel__title">How this settles</h2>
+              <dl className="mdet-rules">
+                <div>
+                  <dt>One pot, no counterparty</dt>
+                  <dd>
+                    Everyone backing a side puts money in together. At the
+                    deadline the winning side splits what the losing side
+                    staked, and your own stake comes back whole on top of your
+                    share.
+                  </dd>
+                </div>
+                <div>
+                  <dt>Betting early counts for more</dt>
+                  <dd>
+                    Your stake carries a weight fixed the moment it lands, and
+                    that weight only ever changes how the losing pool is
+                    divided. The earlier it lands, the larger it is.
+                  </dd>
+                </div>
+                <div>
+                  <dt>Fees come off the losing side</dt>
+                  <dd>
+                    The platform cut and the market creator&apos;s cut are taken
+                    from the losing pool only, so a winning stake is never
+                    shaved. The live rates are read from the contract and shown
+                    on the betting screen.
+                  </dd>
+                </div>
+                <div>
+                  <dt>Settled in {sym}</dt>
+                  <dd>
+                    Markets on {chain.label} take and pay {sym}. Each network
+                    runs its own contract and its own pools, and nothing is
+                    shared between them.
+                  </dd>
+                </div>
+              </dl>
+            </section>
+
+            <p className="mdet__id">Market {prediction.id}</p>
+          </div>
         </div>
       </div>
     </div>

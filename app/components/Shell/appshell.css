@@ -46,10 +46,16 @@
 
 /* The wrapper inside still carries its own py-3 and px-4/lg:px-8 for the
    layouts that render without the shell. Inside the shell the gutters are the
-   shell's job, so they are zeroed rather than doubled. */
+   shell's job, so they are zeroed rather than doubled.
+
+   max-width belongs to the shell for the same reason. page.tsx no longer emits
+   a cap here, and this is the belt to that braces: a Tailwind max-w-[…] on this
+   element is one class (0-1-0) against this rule's two (0-2-0), so the column
+   stays the column whichever way the class list moves. */
 .appshell .main-content-wrapper {
   padding-inline: 0;
   padding-block: 0;
+  max-width: none;
 }
 
 /* .grid-shell caps itself at 1440px and centres. The content column is already
@@ -58,6 +64,140 @@
 .appshell .grid-shell {
   max-width: none;
   margin-inline: 0;
+}
+
+/* ---------- dashboard panel ---------- */
+
+/*
+ * Every sidebar row other than Markets renders its panel in here.
+ *
+ * Those panels were drawn for a 424px phone column and most still carry that
+ * cap. Inside the shell's content column that made each one a narrow strip with
+ * bare lime either side: 560px of panel in a 1424px track at a 1920 viewport,
+ * 39 percent of the width, the rest bare background. Lifting the wrapper's cap
+ * alone is not the fix, because five of these panels paint no ground at all and
+ * would still be a dark strip on lime, just a wider one.
+ *
+ * So the panel gets the same surface the markets get. market-sheet in
+ * GridPage.css is the reference: one opaque face on the lime, the same
+ * 16px/20px/20px padding, and the reading column capped inside it rather than
+ * by the page. That is what makes a dashboard read as a page of this app rather
+ * than a phone screen sitting in a frame.
+ *
+ * Opaque on purpose, and the whole point of the block. Every rule below that
+ * clears a child's own background is safe only because this one paints.
+ */
+.appshell__panel {
+  background: var(--sheet-ink-0);
+  border: 1px solid var(--sheet-ink-line);
+  padding: 16px 20px 20px;
+  margin-bottom: 24px;
+  /* A long address or an unbreakable number must wrap, not widen the page. */
+  min-width: 0;
+}
+
+/*
+ * sheet, hf and enhanced-user-dashboard each paint a full-page dark ground
+ * of their own, which is correct when one of them is the whole screen and wrong
+ * here: it puts a second dark face inside the first, 100vh tall, framed by
+ * 20px of a third. The panel above is the opaque face now. Nothing is left
+ * sitting on the lime by these three lines.
+ */
+.appshell__panel .sheet,
+.appshell__panel .hf,
+.appshell__panel .enhanced-user-dashboard {
+  min-height: 0;
+  background: transparent;
+}
+
+/*
+ * The reading column. 1000px centred inside a 1384px track is the narrow-strip
+ * bug again in a milder form, and it leaves the panel's left edge and the
+ * market grid's left edge in two different places. Prose is not at risk from
+ * this: sheet-p caps at 66ch, sheet-hero-lede at 58ch and sheet-hero-title at
+ * 16ch, so only the boards and tables take the extra width.
+ */
+.appshell__panel .sheet-shell,
+.appshell__panel .hf-shell {
+  max-width: none;
+  padding-inline: 0;
+}
+
+/* 72px of air above the title is a landing page opening. In the shell the top
+   bar is already 18px above it and says the same thing. */
+.appshell__panel .sheet-hero,
+.appshell__panel .hf-hero {
+  padding-top: 28px;
+}
+
+/*
+ * The panels with no ground of their own, and no rail layout either. Uncapping
+ * these on its own would be worse than the bug: both are a single flex column
+ * of small cards, so a 1384px cap turns a stats page into a stack of 1384x60
+ * strips. The column becomes a track instead, and the cards fill it.
+ */
+.appshell__panel .compact-stats,
+.appshell__panel .daily-tasks {
+  max-width: none;
+  /* Every one of these panels carries `margin: 0 auto` for the phone layout,
+     and the panel is a flex column, where an auto margin on the cross axis
+     absorbs the free space instead of stretching the item. So lifting the cap
+     alone leaves the panel shrink-to-fit and centred, which is the original
+     bug with the max-width taken off it. Measured: the markets panel stayed
+     457px wide in a 902px column until this line landed. */
+  margin-inline: 0;
+  display: grid;
+  /* auto-fill, not auto-fit. auto-fit collapses the tracks nothing landed in
+     and hands their width to the survivors, so a stats page with one card in it
+     draws that card 902px wide, which is the strip this whole block exists to
+     stop. Measured on the markets panel: auto-fit reported `902px 0px`. */
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 14px;
+  /* Cards are their own height. Without this every card in a row is stretched
+     to the tallest one and the short ones grow a field of empty face. */
+  align-items: start;
+}
+
+/* The opening paragraph is addressed to the whole page, so it runs across it
+   rather than becoming the first card in the track. */
+.appshell__panel .compact-stats > .compact-stats__intro,
+.appshell__panel .daily-tasks > .daily-tasks__head,
+.appshell__panel .daily-tasks > .daily-tasks__notice {
+  grid-column: 1 / -1;
+}
+
+/* One column of market cards at 424px was the miniapp. The cards carry their
+   own faces and their own expanded state, so they tile. */
+.appshell__panel .swipe-markets {
+  max-width: none;
+  margin-inline: 0;
+  min-height: 0;
+  padding: 0;
+}
+
+.appshell__panel .markets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  align-items: start;
+}
+
+/* Reading column, not a strip. $SWIPE is a page of prose and diagrams and it
+   does not tile, so it widens rather than splitting. */
+.appshell__panel .swipe-token-card {
+  /* A definite width rather than a max-width, so the auto margins have
+     something to centre and do not swallow the column instead. */
+  width: min(100%, 1000px);
+  max-width: none;
+  margin-inline: auto;
+  padding-inline: 0;
+}
+
+/* The one dashboard that paints its own face and is not a sheet. Same
+   treatment: the panel is the ground, the content fills the column. */
+.appshell__panel .enhanced-user-dashboard {
+  max-width: none;
+  margin-inline: 0;
+  padding: 28px 0 48px;
 }
 
 /* ---------- sidebar ---------- */
@@ -258,6 +398,14 @@
 
 .appnav__group--utility .appnav__row:hover {
   color: var(--sheet-ink-text);
+}
+
+/* The two rules above are two classes deep and .appnav__row--active is one, so
+   without this the active Help or Activity row loses its lime and reads as a
+   quiet row with an odd background. Same specificity, declared later. */
+.appnav__group--utility .appnav__row--active,
+.appnav__group--utility .appnav__row--active:hover {
+  color: var(--sheet-lime);
 }
 
 /* ---------- sidebar, collapsed ---------- */

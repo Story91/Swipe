@@ -111,12 +111,141 @@
   padding: 14px;
   cursor: pointer;
   transition: transform 140ms ease, border-color 140ms ease;
+  /* The three lines the ground layer needs. `relative` makes the card the
+     containing block, `isolate` makes it a stacking context so the layer's
+     z-index: -1 lands above the card's own fill instead of falling through to
+     the sheet and hiding behind it, and `hidden` clips the blur, which samples
+     well past the box. An element's own outline is not clipped by its own
+     overflow, so the focus ring survives this. */
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+
+  /* Scrim strength, per card. The default pair is for the two drawn grounds,
+     which are dark already; mgcard--photo below raises them for an arbitrary
+     uploaded picture. */
+  --mgcard-scrim-1: 0.35;
+  --mgcard-scrim-2: 0.45;
+  --mgcard-scrim-3: 0.55;
 }
 
+/* ---------- card ground ----------
+
+   Out of flow on purpose. mgcard is a flex column with a 10px gap, so an
+   in-flow layer would take a slot in the stack. z-index: -1 on a positioned
+   child paints above the element's own background and below every in-flow
+   block descendant, which is exactly the slot wanted, and is why nothing else
+   inside the card needs a z-index. */
+
+.mgcard__bg {
+  position: absolute;
+  /* Bigger than the card on every side, so the blur's soft transparent rim
+     falls outside the clip and the border stays crisp. The scrim below is
+     inset by the same 28px, which puts it back on the card box. */
+  inset: -28px;
+  z-index: -1;
+  /* It must never intercept the card's own click or key handler. */
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: inherit;
+  background: var(--mgcard-ground, var(--sheet-ink-2));
+  color: var(--mgcard-mark, var(--sheet-lime));
+}
+
+.mgcard__bg-img {
+  width: 100%;
+  height: 100%;
+  /* Not cosmetic. grid-auto-rows: 1fr stretches every card to the tallest in
+     the grid, so the box this fills has an arbitrary aspect ratio. */
+  object-fit: cover;
+  filter: blur(16px) saturate(0.85);
+  /* Hides the transparent rim the blur leaves at the edges. */
+  transform: scale(1.08);
+  transition: transform 240ms ease;
+}
+
+/*
+ * The scrim, and the contrast argument for the whole feature.
+ *
+ * An uploaded picture can be pure white and the card's text is white, so these
+ * three numbers are what stands between the two. Composited over #ffffff:
+ *
+ *   0.80 -> #565656   white 9.9:1,  #b4b4b4 4.8:1
+ *   0.90 -> #2b2b2b   white 15:1,   rgba(255,255,255,0.5) 4.7:1
+ *   0.95 -> #1d1d1d   everything above that
+ *
+ * The card's quiet text lives in the lower half, which is why the gradient runs
+ * that way rather than the other. The category row is the one line near the top
+ * that is not white, and it is why mgcard__cat-name moved up a step to
+ * --sheet-ink-text-2: at --sheet-ink-text-3 it measures 3.8:1 over a white
+ * photo, below AA, and no scrim that leaves the picture visible fixes it.
+ *
+ * Do not lower the top stop. Do not brighten this on hover either: a 0.10 lime
+ * wash and a brightness(1.18) were both tried and both put the category row
+ * under 3:1 on a white photo.
+ *
+ * rgba(20,20,20,…) rather than black, so a dark photo floors on the same
+ * #141414 face an ordinary card has and the card still lifts off the #070707
+ * sheet instead of sinking into it.
+ */
+.mgcard__bg::after {
+  content: '';
+  position: absolute;
+  inset: 28px;
+  background: linear-gradient(
+    180deg,
+    rgba(20, 20, 20, var(--mgcard-scrim-1)) 0%,
+    rgba(20, 20, 20, var(--mgcard-scrim-2)) 45%,
+    rgba(20, 20, 20, var(--mgcard-scrim-3)) 100%
+  );
+}
+
+.mgcard--photo {
+  --mgcard-scrim-1: 0.8;
+  --mgcard-scrim-2: 0.9;
+  --mgcard-scrim-3: 0.95;
+}
+
+/* The mark on a card with no photo: the chart glyph for an embed URL, the
+   market's initials for everything else. Large and quiet, in the corner, under
+   the scrim like the photo is. Positioned against the oversized layer, so the
+   offsets carry its 28px. */
+.mgcard__bg-mark,
+.mgcard__bg-initials {
+  position: absolute;
+  right: 34px;
+  bottom: 30px;
+}
+
+.mgcard__bg-mark {
+  width: 92px;
+  height: 92px;
+  opacity: 0.5;
+}
+
+.mgcard__bg-initials {
+  font-family: var(--sheet-display);
+  font-size: 72px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: inherit;
+  opacity: 0.3;
+}
+
+/* `background: var(--sheet-ink-3)` in GridPage.css was a third hover signal and
+   the ground now covers it on every card, so the picture pushes in instead.
+   Motion, not light: every version of this that lightened the card also took
+   the category row under 3:1 on a bright photo. */
 .mgcard:hover,
 .mgcard:focus-visible {
   transform: translateY(-2px);
   border-color: var(--sheet-lime);
+}
+
+.mgcard:hover .mgcard__bg-img,
+.mgcard:focus-visible .mgcard__bg-img {
+  transform: scale(1.14);
 }
 
 .mgcard:focus-visible {
@@ -125,41 +254,16 @@
 }
 
 /* ---------- category row ----------
-   The thumbnail used to sit beside the question at 42px, which made the picture
-   the first thing read on a card whose whole job is a sentence. It is now a
-   22px mark on a label row, and that row finally says the category out loud:
-   `prediction.category` has always been on the record and was thrown away. */
+   The thumbnail that used to sit here is gone. It was 42px, then 22px, and at
+   neither size could anyone tell which picture had been uploaded, which is the
+   only reason a market carries one. The picture is the card's ground now and
+   this row is the label it always should have been: prediction.category has
+   been on the record all along and was being thrown away. */
 
 .mgcard__cat {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.mgcard__thumb {
-  flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
-  border-radius: var(--shell-radius);
-  object-fit: cover;
-  background: #1a1a1a;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-}
-
-.mgcard__thumb--chart {
-  background: #16240a;
-  color: var(--sheet-lime);
-}
-
-/* The inline svg asks for 20px, which overflows a 22px tile. */
-.mgcard__thumb--chart svg {
-  width: 14px;
-  height: 14px;
 }
 
 .mgcard__cat-name {
@@ -173,7 +277,12 @@
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--sheet-ink-text-3);
+  /* Was --sheet-ink-text-3, which measured 5.2:1 against a flat #141414 card
+     and 3.8:1 once a bright photo is behind it. This is the only text on the
+     card that is neither white nor a translucent white compositing over the
+     scrim, so it is the only one that had to move. 8.6:1 on a plain card,
+     4.8:1 on the worst photo. */
+  color: var(--sheet-ink-text-2);
 }
 
 /* Amber, not red. A busy market is worth noticing, it is not a warning. */
@@ -476,12 +585,20 @@
 
 @media (prefers-reduced-motion: reduce) {
   .mgcard,
-  .mgcard__bar-yes {
+  .mgcard__bar-yes,
+  .mgcard__bg-img {
     transition: none;
   }
   .mgcard:hover,
   .mgcard:focus-visible {
     transform: none;
+  }
+  /* Not `transform: none`: the 1.08 is what hides the blur's transparent rim,
+     so dropping it entirely puts a pale halo around the picture. Only the
+     hover step goes. */
+  .mgcard:hover .mgcard__bg-img,
+  .mgcard:focus-visible .mgcard__bg-img {
+    transform: scale(1.08);
   }
   .mgcard--skeleton {
     animation: none;

@@ -561,10 +561,13 @@ export default function App() {
 
       <div
         className={`w-full mx-auto py-3 main-content-wrapper ${
-          showGrid
-            // Grid mode: the container is the page, and every block inside it
-            // shares one column via .grid-shell. The flex column is what lets
-            // the browse sheet reach the bottom of the viewport.
+          showShell
+            // Inside the shell the column is already positioned, sized and
+            // gutter'd by .appshell, so the wrapper must not cap itself. This
+            // used to read `showGrid`, which meant every sidebar row other than
+            // Markets fell through to the swipe card's 560px and rendered as a
+            // narrow strip in a 1424px column with bare lime either side. The
+            // flex column is what lets the sheet below reach the floor.
             ? 'max-w-none px-4 lg:px-8 flex flex-col flex-1'
             : isDesktop
               // Desktop swipe mode: one large card, not a phone-width column.
@@ -728,7 +731,19 @@ export default function App() {
         )}
 
         {/* Main Content with Tinder Cards */}
-        <main className={showGrid ? 'flex-1 flex flex-col' : 'flex-1'}>
+        {/* Every dashboard other than the grid gets the same dark sheet the
+            markets get: one opaque face filling the content column, with the
+            grid's own side padding. Without it the panels inside keep their
+            phone-width caps and float on bare lime. */}
+        <main
+          className={
+            showGrid
+              ? 'flex-1 flex flex-col'
+              : showShell
+                ? 'flex-1 flex flex-col appshell__panel'
+                : 'flex-1'
+          }
+        >
           {showGrid && (
             <div className="grid-shell grid-shell--fill">
               <ReadOnlyNotice />

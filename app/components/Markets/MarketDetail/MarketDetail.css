@@ -1,0 +1,512 @@
+/*
+ * The market detail page, /prediction/[id].
+ *
+ * This route is not inside the desktop shell: app/layout.tsx renders only the
+ * providers, and .appshell is mounted by app/page.tsx alone. So the width, the
+ * ground and the gutters are all owned here rather than inherited.
+ *
+ * MOBILE IS THE DEFAULT AND IS THE OLD COLUMN. Every rule outside the 1024px
+ * block keeps the page at the 424px it has always been. 1024 is the app's real
+ * desktop breakpoint, the one lib/hooks/useMediaQuery.ts uses; the page used to
+ * branch at Tailwind's md, 768, which is a tablet and was never this app's line.
+ *
+ * Every face here is opaque. The page ground is a photograph supplied by
+ * whoever made the market, so a translucent panel is a panel whose body text
+ * lands on an arbitrary image. The old version was bg-black/50 with a backdrop
+ * blur and it is the same class of bug as a translucent panel on the lime.
+ */
+
+.mdet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: #0a0a0a;
+  font-family: var(--sheet-body);
+  color: var(--sheet-ink-text);
+}
+
+/* The market's own picture, as the page ground. Fixed so it does not scroll
+   away under a long description, and scrimmed hard enough that it is a texture
+   rather than a competitor. */
+.mdet__bleed {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  pointer-events: none;
+}
+
+.mdet__bleed::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(10, 10, 10, 0.82) 0%,
+    rgba(10, 10, 10, 0.9) 45%,
+    rgba(10, 10, 10, 0.97) 100%
+  );
+}
+
+.mdet__shell {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 424px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1 1 auto;
+}
+
+/* ------------------------------------------------------------------- bar */
+
+.mdet__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mdet__bar-spacer {
+  flex: 1 1 auto;
+}
+
+.mdet__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-family: var(--sheet-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sheet-lime);
+  background: var(--sheet-ink-1);
+  border: 1px solid var(--sheet-lime-line);
+  border-radius: var(--shell-radius);
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.mdet__btn:hover:not(:disabled) {
+  background: var(--sheet-ink-3);
+}
+
+.mdet__btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ------------------------------------------------------------------ head */
+
+.mdet__tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mdet__tag {
+  padding: 4px 10px;
+  font-family: var(--sheet-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: var(--shell-radius);
+  background: var(--sheet-lime);
+  color: #000;
+}
+
+.mdet__tag--won {
+  background: var(--sheet-ink-4);
+  color: var(--sheet-lime);
+  border: 1px solid var(--sheet-lime-line);
+}
+
+.mdet__tag--lost {
+  background: var(--sheet-ink-4);
+  color: #ff8a8a;
+  border: 1px solid var(--sheet-ink-line-3);
+}
+
+.mdet__question {
+  margin: 0;
+  font-family: var(--sheet-display);
+  font-weight: 800;
+  font-size: clamp(22px, 4.4vw, 30px);
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+  color: var(--sheet-ink-text);
+}
+
+.mdet__lede {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--sheet-ink-text-2);
+  max-width: 66ch;
+}
+
+/* ----------------------------------------------------------------- panels */
+
+.mdet-panel {
+  /* Opaque, and the reason the whole file exists. */
+  background: var(--sheet-ink-1);
+  border: 1px solid var(--sheet-ink-line);
+  border-radius: var(--shell-radius);
+  padding: 14px 16px 16px;
+}
+
+.mdet-panel__title {
+  margin: 0 0 12px;
+  font-family: var(--sheet-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sheet-ink-text-3);
+}
+
+/* ------------------------------------------------------------------ chart */
+
+.mdet-chart__plot {
+  height: 200px;
+  width: 100%;
+}
+
+.mdet-chart__state {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--sheet-ink-text-3);
+  text-align: center;
+}
+
+/* ----------------------------------------------------------------- prices */
+
+.mdet-prices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Opaque tinted faces, not a 5 percent wash over white. The USDC screen's
+   .price-box is rgba(16,185,129,0.05) on a white card and its dark values live
+   behind prefers-color-scheme, so on this page they would be a coin flip on the
+   viewer's operating system. */
+.mdet-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 16px;
+  border-radius: var(--shell-radius);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 140ms ease, transform 140ms ease;
+}
+
+.mdet-price:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+.mdet-price:not(:disabled):hover {
+  transform: translateY(-2px);
+}
+
+.mdet-price:focus-visible {
+  outline: 2px solid var(--sheet-lime);
+  outline-offset: 2px;
+}
+
+/* 9.3:1 for the figure on its own face, 5.2:1 for the hint under it. */
+.mdet-price--yes {
+  background: #0e1a14;
+  border: 1px solid #1d3d2e;
+}
+
+.mdet-price--yes:not(:disabled):hover {
+  border-color: #34d399;
+}
+
+.mdet-price--yes .mdet-price__value {
+  color: #34d399;
+}
+
+.mdet-price--no {
+  background: #1a0f0f;
+  border: 1px solid #3d1f1f;
+}
+
+.mdet-price--no:not(:disabled):hover {
+  border-color: #f87171;
+}
+
+.mdet-price--no .mdet-price__value {
+  color: #f87171;
+}
+
+.mdet-price__side {
+  font-family: var(--sheet-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sheet-ink-text);
+}
+
+.mdet-price__value {
+  font-family: var(--sheet-data);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(30px, 7vw, 40px);
+  font-weight: 700;
+  line-height: 1.05;
+}
+
+.mdet-price__hint {
+  font-size: 12px;
+  color: var(--sheet-ink-text-3);
+}
+
+/* ------------------------------------------------------------------ stats */
+
+.mdet-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  background: var(--sheet-ink-line);
+  border: 1px solid var(--sheet-ink-line);
+  border-radius: var(--shell-radius);
+  overflow: hidden;
+}
+
+.mdet-stat {
+  background: var(--sheet-ink-1);
+  padding: 12px 14px;
+  min-width: 0;
+}
+
+.mdet-stat dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 4px;
+  font-family: var(--sheet-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sheet-ink-text-3);
+}
+
+.mdet-stat dd {
+  margin: 0;
+  font-family: var(--sheet-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--sheet-ink-text);
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------------- cta */
+
+.mdet-cta {
+  display: block;
+  width: 100%;
+  padding: 16px;
+  font-family: var(--sheet-display);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #000;
+  background: var(--sheet-lime);
+  border: 0;
+  border-radius: var(--shell-radius);
+  cursor: pointer;
+  transition: filter 140ms ease;
+}
+
+.mdet-cta:hover {
+  filter: brightness(0.92);
+}
+
+.mdet-cta:focus-visible {
+  outline: 2px solid var(--sheet-lime);
+  outline-offset: 3px;
+}
+
+.mdet-notice {
+  border-color: var(--sheet-warn);
+}
+
+.mdet-notice__title {
+  margin: 0 0 6px;
+  font-family: var(--sheet-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sheet-warn);
+}
+
+.mdet-notice__body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--sheet-ink-text-2);
+}
+
+/* ------------------------------------------------------------- settlement */
+
+.mdet-rules {
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.mdet-rules dt {
+  font-family: var(--sheet-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sheet-ink-text);
+  margin: 0 0 4px;
+}
+
+.mdet-rules dd {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--sheet-ink-text-2);
+}
+
+.mdet__id {
+  margin: 0;
+  font-family: var(--sheet-data);
+  font-size: 12px;
+  color: var(--sheet-ink-text-3);
+  text-align: center;
+}
+
+/* ---------------------------------------------------------------- states */
+
+.mdet__state {
+  margin: 48px auto;
+  max-width: 424px;
+  padding: 28px;
+  text-align: center;
+  background: var(--sheet-ink-1);
+  border: 1px solid var(--sheet-ink-line);
+}
+
+.mdet__state h2 {
+  margin: 0 0 8px;
+  font-family: var(--sheet-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--sheet-ink-text);
+}
+
+.mdet__state p {
+  margin: 0 0 18px;
+  font-size: 14px;
+  color: var(--sheet-ink-text-2);
+}
+
+.mdet__spinner {
+  width: 44px;
+  height: 44px;
+  margin: 96px auto;
+  border: 4px solid var(--sheet-ink-line-3);
+  border-top-color: var(--sheet-lime);
+  border-radius: 50%;
+  animation: mdet-spin 900ms linear infinite;
+}
+
+@keyframes mdet-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------------------------------------------------------------- desktop */
+
+/*
+ * 1024px, matching useIsDesktop() in lib/hooks/useMediaQuery.ts. Everything
+ * above this line is the phone column and is unchanged by anything below it.
+ */
+@media (min-width: 1024px) {
+  .mdet__shell {
+    max-width: 1120px;
+    padding: 28px 24px 56px;
+    gap: 18px;
+  }
+
+  /* The reason the page looked unfinished: one 424px box in the middle of a
+     1400px window. The question and the chart take the column, the decision
+     and the rules sit beside them. */
+  .mdet__body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 18px;
+    align-items: start;
+  }
+
+  .mdet__main,
+  .mdet__rail {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-width: 0;
+  }
+
+  /* The rail follows a long description down the page rather than leaving the
+     bet button off the bottom of a tall market. */
+  .mdet__rail {
+    position: sticky;
+    top: 28px;
+  }
+
+  .mdet-chart__plot {
+    height: 320px;
+  }
+
+  .mdet-panel {
+    padding: 18px 20px 20px;
+  }
+
+  .mdet__question {
+    font-size: clamp(30px, 3vw, 42px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mdet-price,
+  .mdet__btn,
+  .mdet-cta {
+    transition: none;
+  }
+
+  .mdet-price:not(:disabled):hover {
+    transform: none;
+  }
+
+  .mdet__spinner {
+    animation: none;
+  }
+}
