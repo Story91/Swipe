@@ -58,40 +58,61 @@ a longer-term governance plan here yet either. More on this later.
 - **Tinder-style interface** — swipe RIGHT for YES, LEFT for NO
 - **Stake amount selection** — pick exactly how much to bet
 - **Real-time odds** — live percentage view of betting pools
-- **Fair proportional payouts** — everyone wins the same % profit, amounts
-  scale with stake
+- **Weighted parimutuel payouts** — the losing pool splits across winners
+  by stake and how early they bet, not a flat % for everyone (see Economic
+  model below)
 - **Manual reward claims** — pull-pattern for claiming winnings
 - **AI-assisted market analysis** ("Swiper") — proprietary, see above
 
-### 💰 Economic model
-- **1% platform fee**, taken only from winners' profit, never from stakes
-- **Proportional distribution** — bigger stakes mean bigger absolute
-  rewards at the same % return
-- **Emergency refund system** — full refunds if a market is cancelled
-- **Dual-pool support** — native ETH markets and a USDC-denominated
-  dual-pool market (`PredictionMarket_USDC_DualPool.sol`)
+### 💰 Economic model (V3, the live generation)
+Verified directly against the deployed contract on Base
+([`0x4753...070E`](https://basescan.org/address/0x4753685Af9b317db5690E036AeBD4337627A070E#code)),
+not just the source:
+- **Parimutuel pools** — YES/NO stakes settle from the losing side's pool;
+  there's no fixed payout table
+- **3% platform fee + 0.5% creator fee**, both taken from the *losing*
+  pool only, never from stakes — earlier versions took 1% from winners'
+  profit instead, V3 changed the model, not just the number
+- **Early-stake weighting** — bets from a market's first quarter get 1.5×
+  weight when the losing pool is split, 1.25× in the second quarter, 1.0×
+  after
+- **No house-takes-all** — a market with no winners refunds everyone
+  instead of handing the whole pool to the platform
+- **Permissionless refund fallback** — any market still unresolved 30 days
+  past its deadline becomes refundable to anyone, no privileged call
+  required, so funds can never be stranded by a lost operational key
+- **Early exit** — sell part of a position back before the deadline for a
+  fee (5% at launch)
 
-### 🛡️ Quality control
-- **Multi-tier creation** — admin / whitelist / public, with community
-  approval for the public tier
-- **Approval workflow** — designated approvers review public markets
-- **Rejection with refunds** — bad markets get rejected, creation fee
-  refunded
+Legacy `PredictionMarket_V2.sol` and `PredictionMarket_USDC_DualPool.sol`
+used the older ETH/USDC dual-pool model with a 1% winners'-profit fee; see
+Architecture below for their current status.
 
-### ⚙️ Administrative powers
-- **Manual outcome resolution** — admins determine whether a prediction
-  came true
-- **Emergency cancellation** — cancel problematic markets with full refunds
-- **Platform configuration** — adjust fees, stake limits, approval
-  requirements
+### ⚙️ Market operations (V3)
+V3 dropped the admin/whitelist/public creation tiers and the community
+approval queue earlier versions had. The model is simpler:
+- **Resolvers** — a role the contract owner grants or revokes
+  (`setResolver`), deliberately separate and revocable from ownership, so
+  day-to-day operations run on a narrow hot key while the owner key stays
+  cold
+- **Registration** — only resolvers (or the owner) can register a market
+  (`registerPrediction` / `registerPredictionsBatch`) — there is no public
+  or community-reviewed submission path on V3
+- **Resolution** — only resolvers can resolve (`resolvePrediction`) or
+  cancel (`cancelPrediction`) a market
+- **Owner powers** — fee rates, minimum bet, resolver grants, and fee
+  withdrawal (`setPlatformFee`, `setCreatorFee`, `setEarlyExitFee`,
+  `setMinBet`, `withdrawPlatformFees`)
 
 ### 🔐 Access control
-- **Role-based dashboards** for different user types
-- **Wallet-based auth** — access driven by connected wallet address
-- **Admin Dashboard** — addresses listed in `NEXT_PUBLIC_ADMIN_1` (and
-  `_2`, etc.)
+- **Role-based dashboards** in the frontend for different user types — this
+  UI concept predates V3 and doesn't map 1:1 onto the roles above; treat it
+  as a frontend permission layer, not the on-chain source of truth
+- **Wallet-based auth** — dashboard access is driven by the connected
+  wallet matching an env-configured address list
+- **Admin Dashboard** — addresses in `NEXT_PUBLIC_ADMIN_1` (and `_2`, etc.)
 - **Approver Dashboard** — addresses in `NEXT_PUBLIC_APPROVER_1..4`, or
-  admins
+  admins — relevant to the legacy V1/V2 markets it still manages, not to V3
 - Unauthorized users are redirected to the User Dashboard automatically
 
 ## 🚀 Quick start
@@ -150,16 +171,22 @@ npm run dev
 
 Four views ship in the app: **Tinder Mode** (the swipe interface), **User
 Dashboard** (portfolio, betting), **Admin Dashboard** (market management),
-**Approver Dashboard** (community moderation).
+**Approver Dashboard** (moderation for the legacy V1/V2 markets it still
+manages — V3 has no approval queue, see Market operations above).
 
 ## 🏗️ Architecture
 
 ### Smart contracts (`contracts/`, BUSL-1.1)
 - **Solidity 0.8.19 / 0.8.20** with OpenZeppelin security primitives
-- **ReentrancyGuard** and **Pausable** throughout
-- **Proportional payout system** with a 1% platform fee
-- **Multi-tier approval system** for market quality control
-- **Emergency controls** and full refund capability
+  (`Ownable2Step`, `ReentrancyGuard`, `SafeERC20`)
+- **V3 is the live generation** — parimutuel, resolver/owner-gated, 3%
+  platform fee + 0.5% creator fee from the losing pool (see Economic model
+  above), USDC on Base / USDG on Robinhood Chain
+- **V1, V2, and the USDC dual-pool contract are archived, read-only legacy
+  markets on Base** — the frontend keeps them browsable but routes no new
+  writes to them
+- **Permissionless refund fallback** on V3 — no market can be stranded by
+  a lost resolver key
 - Multiple deployed generations: `PredictionMarket_V2.sol`,
   `PredictionMarket_V3.sol`, `PredictionMarket_USDC_DualPool.sol`, plus
   `SwipeClaim.sol` and the `SwipeDailyRewards*` series for the Tasks system
@@ -201,37 +228,42 @@ Dashboard** (portfolio, betting), **Admin Dashboard** (market management),
   └── deploy_*.js                       # per-network deploy scripts
 ```
 
-## 🎯 Usage examples
+## 🎯 Usage examples (V3)
 
-### Create a prediction
+### Register a market (resolver-only)
 ```javascript
-await contract.createPrediction(
-  "Will Bitcoin hit $100k in 2026?",
-  "Market analysis shows strong momentum",
-  "Crypto",
-  "https://ipfs.io/ipfs/...",
-  168 // 1 week, in hours
-);
+await contract.registerPrediction(predictionId, creatorAddress, deadlineTimestamp);
 ```
 
 ### Place a bet
 ```javascript
-await contract.placeStake(predictionId, true, {
-  value: ethers.parseEther("1.0") // bet 1 ETH on YES
-});
+await usdc.approve(contractAddress, amount);       // USDC, 6 decimals
+await contract.placeBet(predictionId, true, amount); // true = YES
 ```
 
-### Claim rewards
+### Resolve a market (resolver-only)
 ```javascript
-await contract.claimReward(predictionId);
+await contract.resolvePrediction(predictionId, true); // true = YES won
+```
+
+### Claim winnings
+```javascript
+await contract.claimWinnings(predictionId);
 ```
 
 ## ⚙️ Configuration
 
+Owner-only setters, shown with the values actually live on Base as of
+2026-08-17 (read directly from the deployed contract, not the source
+defaults — the constructor defaults are lower and get overridden at
+deploy time, see `scripts/deploy_v3.js`):
+
 ```solidity
-contract.setPlatformFee(200);                     // 2% (max 10%)
-contract.setStakeLimits(0.001 ether, 50 ether);
-contract.setRequiredApprovals(2);
+contract.setPlatformFee(300);        // 3% of the losing pool
+contract.setCreatorFee(50);          // 0.5% of the losing pool
+contract.setEarlyExitFee(500);       // 5%, charged on early exits
+contract.setMinBet(100_000);         // 0.1 USDC (6 decimals)
+contract.setResolver(address, true); // grant/revoke the resolver role
 ```
 
 ## 📚 Documentation
