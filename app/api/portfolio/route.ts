@@ -13,6 +13,18 @@ interface PortfolioItem {
   profit: number;
   createdAt: number;
   imageUrl: string;
+  /**
+   * The market's real deadline, unix seconds.
+   *
+   * Added because ActiveBets was showing a countdown derived from
+   * `createdAt + 7 days`, a deadline no market actually has. In a betting app
+   * an invented "3d 5h left" is worse than no countdown: it tells someone they
+   * have time to change their mind on a market that may already be closed.
+   */
+  deadline: number;
+  /** Both sides of the pool, so odds can be shown rather than assumed 50/50. */
+  yesPool: number;
+  noPool: number;
 }
 
 interface PortfolioStats {
@@ -123,7 +135,10 @@ export async function GET(request: NextRequest) {
               potentialPayout,
               profit,
               createdAt: userStake.stakedAt,
-              imageUrl: prediction.imageUrl || 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=400&h=300&fit=crop'
+              imageUrl: prediction.imageUrl || 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=400&h=300&fit=crop',
+              deadline: prediction.deadline,
+              yesPool: prediction.yesTotalAmount,
+              noPool: prediction.noTotalAmount
             });
           }
         }
