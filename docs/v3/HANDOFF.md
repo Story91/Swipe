@@ -6,20 +6,18 @@ State at the end of two long sessions. Read this before touching anything.
 
 ## 1. Where the code is
 
-| Branch | Last pushed | Unpushed | Contains |
-|---|---|---|---|
-| `main` | `c30f249` | `869b65e` production fix, `bb22939` + this file, `ab99704` landmine fix | All UI fixes shipped today, all docs, both plans, the spec |
-| `v3-contract` | `48b411a` | `6f0776f` docs correction, `7508ced` boundary-test fix | The whole V3 contract (18 commits). 72 passing / 13 pending |
+| Branch | Head | Contains |
+|---|---|---|
+| `main` | `84c0f1e` | Everything. V3 merged in, all UI fixes, all docs, both plans, the spec, the production fix, the landmine fix |
+| `v3-contract` | `af7f0e1` | The V3 contract branch, now merged into `main`. 72 passing / 13 pending |
 
-Counts go stale; `git status -sb` does not.
+**Both branches are pushed.** `main` is production and Vercel deploys from it; `v3-contract` triggers a Vercel *preview* build, which is how a build break got caught once (see §5).
 
-**`main` is production.** Vercel deploys from it. `v3-contract` is a feature branch; pushing it triggers a Vercel *preview* build, which is how a build break got caught (see §5).
-
-**Nothing has been pushed.** Five commits sit locally across the two branches. Pushing `main` deploys to production; that is the owner's call.
+Today's eight commits were rewritten once, to strip a `Co-Authored-By: Claude` trailer that should never have been there (see `CLAUDE.md`). Trees were verified byte-identical before and after, so only messages changed. Hashes quoted anywhere older than `c30f249` are unaffected; the eight that moved are `0f716d7` `01d9186` `4cc299a` `117da66` `af7f0e1` `883c3e1` `73335a8` `84c0f1e`.
 
 ## 2. The landmine is disarmed — and the mechanism recorded here was wrong
 
-`ab99704` on `main` closes it. Read this section anyway, because the *reason* it was dangerous is not the reason the previous handoff gave, and the wrong version will lead the next person straight back into it.
+`4cc299a` on `main` closes it. Read this section anyway, because the *reason* it was dangerous is not the reason the previous handoff gave, and the wrong version will lead the next person straight back into it.
 
 **What the fix does.** `lib/chains` now exports `isWritableMarket(key, target)`. The swipe-bet path refuses unless the address it is about to write to *is* the selected chain's market contract. `CONTRACTS.V2.address` — Base's V2, a module-load constant that does not follow the switcher — can never equal a chain's pool address, so the swipe bet stays shut until V3 routes both the address **and the ABI** through `lib/chains`. Mutation-proved three ways; see the commit message.
 
@@ -59,7 +57,7 @@ Plus: an `exitEarly` guard against a real exploit — read §4.3 before you rely
 
 ### 4.1 ✅ Done — the TinderCard production fix and the landmine
 
-`869b65e` (chain-aware guard, honest toast) and `ab99704` (address-comparison guard) are both on local `main`, unpushed. What follows is kept as the record of what they fixed.
+`0f716d7` (chain-aware guard, honest toast) and `4cc299a` (address-comparison guard) are both on `main` and pushed. What follows is kept as the record of what they fixed.
 
 Two production bugs, both found by the audit:
 
@@ -70,7 +68,7 @@ Two production bugs, both found by the audit:
 
 ### 4.2 ✅ Done — the bond and the false claim are out of the docs
 
-Fixed on **`v3-contract`** (`6f0776f`), not on `main`, for two reasons: the corrected §4 pointer names `contracts/PredictionMarket_V3.sol`, which only exists on that branch, and both `rules-v3.md` and the spec already had newer content there, so editing `main`'s copies would have meant merging two rewrites of a document that seeds user-facing copy. **They reach `main` with the merge in §4.4 and not before.**
+Fixed on **`v3-contract`** (`117da66`), not on `main`, for two reasons: the corrected §4 pointer names `contracts/PredictionMarket_V3.sol`, which only exists on that branch, and both `rules-v3.md` and the spec already had newer content there, so editing `main`'s copies would have meant merging two rewrites of a document that seeds user-facing copy. They reached `main` with the merge in §4.4, which is done.
 
 What changed: §5.4 removed from `rules-v3.md` and §5.5/§5.6 renumbered; bond rows dropped from the spec's decisions table, rollout phases, risk table and open questions; spec §5.3 rewritten as a record of *why* the bond went; `open-questions.md` items 2–5 closed; a "executed, and partly reversed" banner on the plan, whose body is left intact because it is the record of what was actually done; a line in `worklog.md` saying two of the four adopted rule families did not survive the day.
 
@@ -82,7 +80,7 @@ It still exists, quoted, in `docs/superpowers/plans/2026-08-17-v3-contract.md` �
 
 Three commits: the bond removal + exploit guard (`e8eb4eb`), the narrowing to the final quarter (`48b411a`), and a prototype restyle (`3729959`, cosmetic). Result: **the contract code is sound. One test was not.**
 
-**Fixed (`7508ced`).** `refuses the exit at the three-quarter mark` passed identically against `elapsed * 4 > window * 3` and the `>=` the contract has — the one assertion whose whole purpose was the exact boundary could not see the boundary move. Cause: `openMarket` asks for `DAY` but `registerPrediction` mines its own block, so the real span is 86399, and `ceil(86399 * 3 / 4)` overshoots the boundary by three units, putting the test at a point where both operators agree. Now pinned with `evm_setNextBlockTimestamp` to an exact span of `DAY`, with the mirror assertion one second earlier and an assertion that `span % 4 == 0` so it cannot become unreachable again.
+**Fixed (`af7f0e1`).** `refuses the exit at the three-quarter mark` passed identically against `elapsed * 4 > window * 3` and the `>=` the contract has — the one assertion whose whole purpose was the exact boundary could not see the boundary move. Cause: `openMarket` asks for `DAY` but `registerPrediction` mines its own block, so the real span is 86399, and `ceil(86399 * 3 / 4)` overshoots the boundary by three units, putting the test at a point where both operators agree. Now pinned with `evm_setNextBlockTimestamp` to an exact span of `DAY`, with the mirror assertion one second earlier and an assertion that `span % 4 == 0` so it cannot become unreachable again.
 
 **Mutation proofs, five against the reviewed code:**
 
@@ -90,7 +88,7 @@ Three commits: the bond removal + exploit guard (`e8eb4eb`), the narrowing to th
 |---|---|
 | Guard made unconditional | 3 tests (both before-quarter exits, sole-backer full exit) |
 | Guard removed | 2 tests (both refusals) |
-| `>=` weakened to `>` | **0 before `7508ced`**, 1 after |
+| `>=` weakened to `>` | **0 before `af7f0e1`**, 1 after |
 | `- amount > 0` weakened to `>= 0` | 2 tests (both refusals) |
 | Partial exit wipes the whole weight | 1 test — the lower bound `e8eb4eb` added |
 
@@ -107,13 +105,19 @@ So the guard protects **fee revenue in self-dealt markets**, not user funds — 
 
 Also confirmed: no bond remnant anywhere in `contracts/`, `scripts/deploy_v3.js` or the V3 test file; the deploy script's bond configuration is cleanly removed; the committed artifact matches a fresh compile byte for byte in abi, bytecode and deployedBytecode — which matters because `lib/contract.ts:1677` `require()`s that exact file at build time.
 
-### 4.4 Then merge `v3-contract` → `main`
+### 4.4 ✅ Done — `v3-contract` merged into `main`
 
-Merging will *not* delete `docs/v3/ui-backlog.md` or the WalletConnect fix, despite what `git diff main..v3-contract` suggests — those files were created on `main` after the branch was cut, so a diff shows them as deletions. A merge keeps them.
+Merge commit `84c0f1e`, no conflicts, `docs/v3/open-questions.md` auto-merged. Verified after merging: `npx tsc --noEmit` clean, `npx vitest run` 64/64, `npx hardhat test` 72 passing / 13 pending, `npm run build` exit 0, and `docs/v3/HANDOFF.md` plus `docs/v3/ui-backlog.md` both still present. The build check is not optional here: `lib/contract.ts` `require()`s the V3 artifact, and the rename means the merge is the moment that reference changes.
 
-**The merge is now also how the docs correction reaches production** (§4.2). `rules-v3.md`, the spec and `open-questions.md` were edited only on `v3-contract`; `open-questions.md` was separately edited on `main` (the WalletConnect closure, `88c7aad`) but in a different region, so the three-way merge should be clean. Check it rather than assume it.
+### 4.5 Deploy to Base — in progress
 
-### 4.5 Deploy to Base — the owner's call, not an agent's
+`npm run deploy:v3:base`. Collateral addresses are hardcoded on purpose: searching Robinhood Chain's explorer for "USDC" returns 18-decimal impostors with no liquidity. The script also refuses any token not reporting 6 decimals, and refuses any network it has no vetted address for.
+
+Deployer is `0xD4885A5aa53446843CABcDE1F35DE9b4E906030e`, taken from `PRIVATE_KEY`. It becomes the contract's owner, and it is the same address Vercel now has in `NEXT_PUBLIC_ADMIN_1`. It is **not** the compromised `0xF1fa2002…` that owns the old Base contracts. Local `.env.local` still has the old value in `NEXT_PUBLIC_ADMIN_1`, so local dev disagrees with production until that is fixed.
+
+**A deploy alone does not turn betting on.** The address-comparison guard (§2) refuses every write until Base's V3 address and the V3 ABI both come through `lib/chains`, and Base is still `readOnly: true` in the chain registry because its *old* contracts are archived. Base becomes a chain with one writable contract and two archived ones, which the current per-chain `readOnly` flag cannot express. That is the wiring job, not a config line.
+
+There is deliberately no `deploy:v3:robinhood` **npm script** — but that is all the "Base first" sequencing is made of. `scripts/deploy_v3.js` has a vetted `robinhood` entry in its `COLLATERAL` map and `hardhat.config.js` defines a `robinhood` mainnet network, so `npx hardhat run scripts/deploy_v3.js --network robinhood` would deploy V3 to Robinhood mainnet today. If that ordering is meant to be enforced rather than merely intended, the script has to refuse the network, not just lack an alias.
 
 `npm run deploy:v3:base`. Collateral addresses are hardcoded on purpose: searching Robinhood Chain's explorer for "USDC" returns 18-decimal impostors with no liquidity. The script also refuses any token not reporting 6 decimals, and refuses any network it has no vetted address for.
 
