@@ -2,6 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useActiveChain } from '@/lib/chains/activeChain';
+import { getMarketContract, txUrl } from '@/lib/chains/market';
+import { parseMarketId } from '@/lib/marketId';
 import { CONTRACTS, getV1Contract, getV2Contract, getContractForPrediction, USDC_DUALPOOL_CONTRACT_ADDRESS, USDC_DUALPOOL_ABI } from '../../../lib/contract';
 import { ethers } from 'ethers';
 import { useHybridPredictions } from '../../../lib/hooks/useHybridPredictions';
@@ -93,6 +96,9 @@ interface PredictionWithStakes {
 export function EnhancedUserDashboard() {
   const { address } = useAccount();
   const { writeContract } = useWriteContract();
+  // Claims must reach the contract that holds the market, and the explorer link
+  // stored in history must name the chain it happened on.
+  const { chainKey: claimChainKey } = useActiveChain();
   const { composeCast: minikitComposeCast } = useComposeCast();
   const minikitOpenUrl = useOpenUrl();
   
@@ -1294,13 +1300,29 @@ export function EnhancedUserDashboard() {
           // Determine function: claimWinnings for resolved, claimRefund for cancelled
           const functionName = prediction.cancelled || prediction.usdcCancelled ? 'claimRefund' : 'claimWinnings';
           console.log(`🎯 Claiming USDC reward using function: ${functionName}`);
-          
+
+          // Two contract generations hold positions at once, and a claim has to
+          // go to the one that actually holds this market's money. Sending a V3
+          // claim to the archived pool reverts, and reads to the user as their
+          // winnings being unavailable.
+          const claimRef = parseMarketId(predictionId);
+          const liveMarket = getMarketContract(claimChainKey);
+          const claimTarget =
+            claimRef?.generation === 'v3' && liveMarket
+              ? { address: liveMarket.address, abi: liveMarket.abi, chainId: liveMarket.chainId }
+              : {
+                  address: USDC_DUALPOOL_CONTRACT_ADDRESS as `0x${string}`,
+                  abi: USDC_DUALPOOL_ABI,
+                  chainId: undefined,
+                };
+
           writeContract({
-            address: USDC_DUALPOOL_CONTRACT_ADDRESS as `0x${string}`,
-            abi: USDC_DUALPOOL_ABI,
+            address: claimTarget.address,
+            abi: claimTarget.abi as never,
             functionName: functionName,
             args: [BigInt(numericId)],
-          }, {
+            ...(claimTarget.chainId === undefined ? {} : { chainId: claimTarget.chainId }),
+          } as never, {
             onSuccess: async (txHash: string) => {
               console.log('🎯 USDC Claim transaction sent:', txHash);
               markStakeAsClaimed(predictionId, 'USDC');
@@ -1314,7 +1336,7 @@ export function EnhancedUserDashboard() {
                 predictionId: predictionId,
                 predictionQuestion: prediction.question,
                 txHash: txHash,
-                basescanUrl: generateBasescanUrl(txHash),
+                basescanUrl: txUrl(claimChainKey, txHash),
                 timestamp: Date.now(),
                 status: 'pending' as const,
                 tokenType: 'USDC' as const,
@@ -1337,7 +1359,7 @@ export function EnhancedUserDashboard() {
                 console.error('Failed to save USDC transaction:', e);
               }
               
-              showClaimModal(txHash, generateBasescanUrl(txHash));
+              showClaimModal(txHash, txUrl(claimChainKey, txHash));
               
               try {
                 await fetch('/api/sync', { method: 'POST' });
@@ -1436,7 +1458,7 @@ export function EnhancedUserDashboard() {
               predictionId: predictionId,
               predictionQuestion: prediction.question,
               txHash: txHash,
-              basescanUrl: generateBasescanUrl(txHash),
+              basescanUrl: txUrl(claimChainKey, txHash),
               timestamp: Date.now(),
               status: 'pending',
               tokenType: tokenType || 'ETH',

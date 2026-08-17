@@ -1,19 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { redisHelpers } from '../../../../lib/redis';
 import { requireAdmin } from '../../../../lib/auth/requireAdmin';
+import { parseMarketId } from '@/lib/marketId';
 
 // This endpoint is the sole resolution authority for predictions that live only in
-// Redis and were never registered on-chain. Predictions backed by a contract
-// (pred_v1_* / pred_v2_*) must be resolved through the contract instead — writing
-// their Redis mirror directly would desynchronise it from the chain until the next
-// sync, so those ids are rejected outright.
+// Redis and were never registered on-chain. Anything backed by a contract must be
+// resolved through that contract instead: writing its Redis mirror directly would
+// desynchronise it from the chain until the next sync, and a market that Redis
+// calls resolved while the chain does not is one where the claim button appears
+// and every claim reverts.
+//
+// The list used to be spelled out as v1 and v2, so pred_v3_ fell through it and a
+// V3 market could have been resolved here. Asking the id parser which generation
+// minted it means a future generation cannot be forgotten the same way.
+const CONTRACT_BACKED: ReadonlySet<string> = new Set(['v1', 'v2', 'v3']);
+
 function isPureRedisPrediction(predictionId: string): boolean {
-  return (
-    typeof predictionId === 'string' &&
-    predictionId.startsWith('pred_') &&
-    !predictionId.startsWith('pred_v1_') &&
-    !predictionId.startsWith('pred_v2_')
-  );
+  if (typeof predictionId !== 'string' || !predictionId.startsWith('pred_')) return false;
+  const generation = parseMarketId(predictionId)?.generation;
+  return generation === undefined || !CONTRACT_BACKED.has(generation);
 }
 
 // POST /api/predictions/resolve - Resolve a Redis-based prediction
