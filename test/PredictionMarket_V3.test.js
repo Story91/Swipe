@@ -491,6 +491,27 @@ describe("PredictionMarket_V3", function () {
     });
   });
 
+  describe("creator bond configuration", function () {
+    it("defaults to 10 tokens", async function () {
+      expect(await market.creatorBondAmount()).to.equal(usd(10));
+    });
+
+    it("lets the owner change the bond and exempt an address", async function () {
+      await market.setCreatorBondAmount(usd(25));
+      expect(await market.creatorBondAmount()).to.equal(usd(25));
+
+      await expect(market.setBondExempt(creator.address, true))
+        .to.emit(market, "BondExemptSet")
+        .withArgs(creator.address, true);
+      expect(await market.bondExempt(creator.address)).to.equal(true);
+    });
+
+    it("refuses both setters from a non-owner", async function () {
+      await expect(market.connect(alice).setCreatorBondAmount(usd(1))).to.be.reverted;
+      await expect(market.connect(alice).setBondExempt(alice.address, true)).to.be.reverted;
+    });
+  });
+
   describe("conservation", function () {
     it("never pays out more than the market took in, across random mixes", async function () {
       const HOUR = 60 * 60;

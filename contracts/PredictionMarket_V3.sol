@@ -63,6 +63,10 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
     uint256 public earlyExitFee = 500; // 5%
     uint256 public minBet = 1_000_000; // 1 token at 6 decimals
 
+    /// @notice Refundable deposit a market creator puts at risk. Returned when
+    ///         the market turns out to have been a real market; see _settleBond.
+    uint256 public creatorBondAmount = 10_000_000; // 10 tokens at 6 decimals
+
     uint256 public platformFeeBalance;
 
     mapping(address => bool) public resolvers;
@@ -70,6 +74,10 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
     ///         a creator that cannot receive the token could block resolution
     ///         for everyone in that market.
     mapping(address => uint256) public creatorRewards;
+
+    /// @notice Creators that post no bond. The platform creating its own
+    ///         markets would otherwise be posting a bond to itself.
+    mapping(address => bool) public bondExempt;
 
     struct Prediction {
         bool registered;
@@ -96,6 +104,9 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
         ///         the same reason netLosersPool is.
         uint256 weightedWinnersPool;
         uint256 participantCount;
+        /// @notice Bond held for this market. Zeroed when it is returned or
+        ///         forfeited, so it can never be settled twice.
+        uint256 creatorBond;
     }
 
     struct Position {
@@ -122,6 +133,9 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
     event RefundClaimed(uint256 indexed predictionId, address indexed user, uint256 amount);
     event CreatorRewardClaimed(address indexed creator, uint256 amount);
     event ResolverSet(address indexed resolver, bool enabled);
+    event BondExemptSet(address indexed creator, bool exempt);
+    event CreatorBondReturned(uint256 indexed predictionId, address indexed creator, uint256 amount);
+    event CreatorBondForfeited(uint256 indexed predictionId, address indexed creator, uint256 amount);
 
     // ============ Modifiers ============
 
@@ -517,6 +531,16 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
     function setMinBet(uint256 newMinBet) external onlyOwner {
         require(newMinBet >= MIN_BET_FLOOR, "Below floor");
         minBet = newMinBet;
+    }
+
+    function setCreatorBondAmount(uint256 newBond) external onlyOwner {
+        creatorBondAmount = newBond;
+    }
+
+    function setBondExempt(address creator, bool exempt) external onlyOwner {
+        require(creator != address(0), "Zero address");
+        bondExempt[creator] = exempt;
+        emit BondExemptSet(creator, exempt);
     }
 
     function withdrawPlatformFees(address to) external onlyOwner nonReentrant {
