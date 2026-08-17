@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAccount } from 'wagmi';
 import { useActiveChain } from '@/lib/chains/activeChain';
+import { tokenSymbol, COLLATERAL_LEG, type StakeToken } from '@/lib/userStake';
 import '../../styles/sheet.css';
 import './RecentActivity.css';
 
@@ -17,9 +18,10 @@ import './RecentActivity.css';
  * /api/activity already existed and already built this feed out of real
  * predictions and stakes in Redis. It is simply wired up now.
  *
- * The figures are V2-era and denominated in ETH, because that is what the
- * settled markets in Redis are. The screen says so rather than implying these
- * are live V3 events.
+ * Each row carries the token it happened in, so a bet is one row per token and
+ * the figure beside it is labelled from the data. The markup used to print ETH
+ * next to every number, which on a collateral market named the wrong token and
+ * printed a raw six decimal integer beside it.
  */
 
 interface ActivityItem {
@@ -44,6 +46,8 @@ interface ActivityItem {
   };
   details?: {
     amount?: number;
+    /** What amount and payout are in. The feed printed ETH beside all three. */
+    token?: StakeToken;
     choice?: 'YES' | 'NO';
     outcome?: 'YES' | 'NO';
     payout?: number;
@@ -96,6 +100,13 @@ export function RecentActivity() {
   // other chain, so without this a user on Robinhood sees Base's numbers.
   const { chainKey } = useActiveChain();
   const { address } = useAccount();
+
+  // The collateral leg is stored as 'USDC' on every chain, so the symbol comes
+  // from the chain. Otherwise a Robinhood feed announces bets in the wrong
+  // stablecoin.
+  const symbolFor = (token: StakeToken | undefined) =>
+    tokenSymbol(token ?? COLLATERAL_LEG, chainKey);
+
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
   const [timeRange, setTimeRange] = useState<TimeRange>('24h');
@@ -134,7 +145,7 @@ export function RecentActivity() {
     return () => {
       cancelled = true;
     };
-  }, [filter]);
+  }, [filter, chainKey]);
 
   const shown = useMemo(() => {
     const cutoff = Date.now() - (RANGES.find(r => r.key === timeRange)?.ms ?? 0);
@@ -149,8 +160,11 @@ export function RecentActivity() {
 
   const betCount = shown.filter(a => a.type === 'bet_placed').length;
   const marketCount = shown.filter(a => a.type === 'prediction_created').length;
+  // Collateral payouts only. Adding an ETH payout to a stablecoin one gives a
+  // number in no currency at all, and the row beneath it has to print some
+  // symbol, so it would be labelled wrong whichever one it picked.
   const payouts = shown
-    .filter(a => a.details?.payout)
+    .filter(a => a.details?.payout && (a.details.token ?? COLLATERAL_LEG) === COLLATERAL_LEG)
     .reduce((sum, a) => sum + (a.details?.payout || 0), 0);
 
   const describe = (a: ActivityItem) => {
@@ -169,7 +183,7 @@ export function RecentActivity() {
             </span>
             {a.details?.amount ? (
               <>
-                {' '}with <span className="ra-amount">{a.details.amount} ETH</span>
+                {' '}with <span className="ra-amount">{a.details.amount.toFixed(4)} {symbolFor(a.details.token)}</span>
               </>
             ) : null}
           </>
@@ -187,7 +201,7 @@ export function RecentActivity() {
         return (
           <>
             {actor} claimed{' '}
-            <span className="ra-amount">{(a.details?.payout ?? 0).toFixed(4)} ETH</span>
+            <span className="ra-amount">{(a.details?.payout ?? 0).toFixed(4)} {symbolFor(a.details?.token)}</span>
           </>
         );
       case 'prediction_approved':
@@ -213,8 +227,9 @@ export function RecentActivity() {
           </div>
           <p className="sheet-hero-lede">
             Markets opened, bets taken, outcomes settled and payouts claimed,
-            newest first. Everything here is from the V2 era and denominated in
-            ETH; V3 has nothing settled yet, so nothing from it appears.
+            newest first. Each line says which token it was in. Most of what is
+            here is still from the old ETH markets, because the new contracts
+            have barely been used yet.
           </p>
         </header>
         <main className="sheet-body">{body}</main>
@@ -362,7 +377,7 @@ export function RecentActivity() {
               </div>
               <div className="sheet-settle-row sheet-settle-row--total">
                 <span className="sheet-settle-key">Payouts claimed</span>
-                <span className="sheet-settle-val">{payouts.toFixed(4)} ETH</span>
+                <span className="sheet-settle-val">{payouts.toFixed(4)} {symbolFor(undefined)}</span>
               </div>
             </div>
           </div>

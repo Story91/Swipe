@@ -2,6 +2,31 @@ import { NextRequest, NextResponse } from 'next/server';
 import { redis, redisHelpers, REDIS_KEYS } from '../../../lib/redis';
 import { chainFromBody, chainFromRequest } from '@/lib/chains/requestChain';
 import { RedisUserStake } from '../../../lib/types/redis';
+import { stakeLegs, tokenMarket, legSides, type StakeToken } from '@/lib/userStake';
+
+/**
+ * Positions, read and marked claimed.
+ *
+ * The flattening of a stored record into one entry per token used to appear
+ * three times in this file, written out by hand each time, and all three listed
+ * ETH and SWIPE and stopped there. The collateral leg that V3 and V4 write was
+ * in none of them, so a position on the only contracts that take bets came back
+ * as no position at all. It is stakeLegs now, once, and a fourth token would
+ * arrive here without an edit.
+ */
+
+/** Read a stake record from one key and return its legs. */
+async function legsAt(key: string): Promise<RedisUserStake[]> {
+  try {
+    const data = await redis.get(key);
+    if (!data) return [];
+    const stake = typeof data === 'string' ? JSON.parse(data) : data;
+    return stakeLegs(stake) as RedisUserStake[];
+  } catch (error) {
+    console.error(`Failed to parse stake from key ${key}:`, error);
+    return [];
+  }
+}
 
 // GET /api/stakes - Get stakes for a specific prediction or all user stakes
 export async function GET(request: NextRequest) {
@@ -18,147 +43,37 @@ export async function GET(request: NextRequest) {
     const predictionId = searchParams.get('predictionId');
     const userId = searchParams.get('userId');
     const getAllUserStakes = searchParams.get('getAllUserStakes') === 'true';
-    
+
     // If getAllUserStakes is true, return all stakes for the user
     if (getAllUserStakes && userId) {
-      console.log(`🔍 Getting all stakes for user: ${userId}`);
-      
-      // Get all stake keys for this user
       // Built from REDIS_KEYS so it follows the chain namespace. A literal
       // pattern here would match zero keys the moment a namespace exists, and
       // the route would answer 200 with an empty position list.
       const userStakePattern = REDIS_KEYS.USER_STAKES_PATTERN(userId, chain);
       const stakeKeys = await redis.keys(userStakePattern);
-      
-      console.log(`📊 Found ${stakeKeys.length} stake keys for user ${userId}`);
-      
-      const allUserStakes: RedisUserStake[] = [];
-      
-      // Fetch all stakes in parallel
-      const stakePromises = stakeKeys.map(async (key) => {
-        try {
-          const data = await redis.get(key);
-          if (data) {
-            const stake = typeof data === 'string' ? JSON.parse(data) : data;
-            if (stake && typeof stake === 'object' && 'user' in stake) {
-              // Check if this is a multi-token stake (V2) or single stake (V1)
-              if (stake.ETH || stake.SWIPE) {
-                // Multi-token stake - convert to array format
-                const multiStakes: RedisUserStake[] = [];
-                if (stake.ETH) {
-                  multiStakes.push({
-                    user: stake.user,
-                    predictionId: stake.predictionId,
-                    yesAmount: stake.ETH.yesAmount,
-                    noAmount: stake.ETH.noAmount,
-                    claimed: stake.ETH.claimed,
-                    stakedAt: stake.stakedAt,
-                    contractVersion: stake.contractVersion,
-                    tokenType: 'ETH' as const
-                  });
-                }
-                if (stake.SWIPE) {
-                  multiStakes.push({
-                    user: stake.user,
-                    predictionId: stake.predictionId,
-                    yesAmount: stake.SWIPE.yesAmount,
-                    noAmount: stake.SWIPE.noAmount,
-                    claimed: stake.SWIPE.claimed,
-                    stakedAt: stake.stakedAt,
-                    contractVersion: stake.contractVersion,
-                    tokenType: 'SWIPE' as const
-                  });
-                }
-                return multiStakes;
-              } else {
-                // Single stake (V1) - convert to array format
-                return [{
-                  user: stake.user,
-                  predictionId: stake.predictionId,
-                  yesAmount: stake.yesAmount || 0,
-                  noAmount: stake.noAmount || 0,
-                  claimed: stake.claimed || false,
-                  stakedAt: stake.stakedAt,
-                  contractVersion: stake.contractVersion || 'V1',
-                  tokenType: 'ETH' as const // V1 stakes are always ETH
-                }];
-              }
-            }
-          }
-          return [];
-        } catch (error) {
-          console.error(`Failed to parse stake from key ${key}:`, error);
-          return [];
-        }
-      });
-      
-      const stakeResults = await Promise.all(stakePromises);
-      stakeResults.forEach(stakes => {
-        allUserStakes.push(...stakes);
-      });
-      
-      console.log(`✅ Returning ${allUserStakes.length} total stakes for user ${userId}`);
-      
+
+      const perKey = await Promise.all(stakeKeys.map(legsAt));
+      const allUserStakes = perKey.flat();
+
       return NextResponse.json({
         success: true,
         data: allUserStakes,
         count: allUserStakes.length
       });
     }
-    
+
     if (!predictionId) {
       return NextResponse.json(
         { success: false, error: 'Prediction ID is required' },
         { status: 400 }
       );
     }
-    
+
     let stakes: RedisUserStake[] = [];
-    
+
     if (userId) {
       // Get specific user's stake for this prediction
-      const stakeKey = REDIS_KEYS.USER_STAKES(userId, predictionId, chain);
-      const data = await redis.get(stakeKey);
-
-      
-      if (data) {
-        const stake = typeof data === 'string' ? JSON.parse(data) : data;
-        if (stake && typeof stake === 'object' && 'user' in stake) {
-          // Check if this is a multi-token stake (V2) or single stake (V1)
-          if (stake.ETH || stake.SWIPE) {
-            // Multi-token stake - convert to array format
-            const multiStakes: RedisUserStake[] = [];
-            if (stake.ETH) {
-              multiStakes.push({
-                user: stake.user,
-                predictionId: stake.predictionId,
-                yesAmount: stake.ETH.yesAmount,
-                noAmount: stake.ETH.noAmount,
-                claimed: stake.ETH.claimed,
-                stakedAt: stake.stakedAt,
-                contractVersion: stake.contractVersion,
-                tokenType: 'ETH' as const
-              });
-            }
-            if (stake.SWIPE) {
-              multiStakes.push({
-                user: stake.user,
-                predictionId: stake.predictionId,
-                yesAmount: stake.SWIPE.yesAmount,
-                noAmount: stake.SWIPE.noAmount,
-                claimed: stake.SWIPE.claimed,
-                stakedAt: stake.stakedAt,
-                contractVersion: stake.contractVersion,
-                tokenType: 'SWIPE' as const
-              });
-            }
-            stakes = multiStakes;
-          } else {
-            // Single stake (V1)
-            stakes = [stake as RedisUserStake];
-          }
-        }
-      }
+      stakes = await legsAt(REDIS_KEYS.USER_STAKES(userId, predictionId, chain));
     } else {
       // Get all stakes for this prediction
       stakes = await redisHelpers.getUserStakes(predictionId, chain);
@@ -174,45 +89,42 @@ export async function GET(request: NextRequest) {
     // Calculate canClaim for each stake
     const stakesWithCanClaim = stakes.map(stake => {
       let canClaim = false;
-      
-      if (prediction) {
-        const isResolved = prediction.resolved || prediction.cancelled;
-        
-        if (isResolved && !stake.claimed) {
-          if (prediction.cancelled) {
-            // Can claim refund if cancelled
-            canClaim = stake.yesAmount > 0 || stake.noAmount > 0;
-          } else if (prediction.resolved) {
-            // Can claim if user won
-            const userChoice = stake.yesAmount > stake.noAmount ? 'YES' : 'NO';
-            const userWon = (userChoice === 'YES' && prediction.outcome) || (userChoice === 'NO' && !prediction.outcome);
-            canClaim = userWon;
-          }
-        } else if (stake.claimed) {
-          // Already claimed - cannot claim again
-          canClaim = false;
+
+      if (prediction && !stake.claimed) {
+        // Settlement is asked per token. The collateral contract is a different
+        // contract from the V2 one and settles on its own schedule, so reading
+        // the shared flags for a collateral leg offers a claim on a market that
+        // has not resolved there, and hides one on a market that has.
+        const token = (stake.tokenType ?? 'ETH') as StakeToken;
+        const market = tokenMarket(prediction, token);
+        const { choice, staked } = legSides(stake as never);
+
+        if (market.cancelled) {
+          // Cancelled refunds everyone who is in it.
+          canClaim = staked > 0;
+        } else if (market.resolved) {
+          canClaim = (choice === 'YES') === market.outcome;
         }
       }
-      
+
       return {
         ...stake,
         canClaim
       };
     });
-    
-    
+
     return NextResponse.json({
       success: true,
       data: stakesWithCanClaim,
       count: stakesWithCanClaim.length,
       timestamp: new Date().toISOString()
     });
-    
+
   } catch (error) {
     console.error('❌ Failed to get stakes:', error);
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to fetch stakes',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
@@ -223,7 +135,7 @@ export async function GET(request: NextRequest) {
 
 
 // PUT /api/stakes - Update stake (e.g., mark as claimed)
-// Supports tokenType for partial claims (ETH or SWIPE separately)
+// Supports tokenType for partial claims, so one leg can be claimed alone
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
@@ -248,53 +160,43 @@ export async function PUT(request: NextRequest) {
     // Get existing stake
     const stakeKey = REDIS_KEYS.USER_STAKES(userId, predictionId, chain);
     const existingData = await redis.get(stakeKey);
-    
+
     if (!existingData) {
       return NextResponse.json(
         { success: false, error: 'Stake not found' },
         { status: 404 }
       );
     }
-    
+
     const existingStake = typeof existingData === 'string' ? JSON.parse(existingData) : existingData;
     const updatedStake = { ...existingStake };
-    
-    // If tokenType is specified, update only that token's claimed status
-    if (tokenType && (tokenType === 'ETH' || tokenType === 'SWIPE')) {
-      // Check if this is a multi-token stake (V2 format with ETH/SWIPE nested objects)
-      if (updatedStake.ETH || updatedStake.SWIPE) {
-        // V2 multi-token stake format
-        if (updatedStake[tokenType]) {
-          updatedStake[tokenType] = {
-            ...updatedStake[tokenType],
-            claimed: updates.claimed ?? true
-          };
-        }
-      } else {
-        // V1 single stake format - mark the whole stake as claimed
-        // (V1 stakes are always ETH)
-        if (tokenType === 'ETH') {
-          updatedStake.claimed = updates.claimed ?? true;
-        }
+    const claimed = updates?.claimed ?? true;
+
+    // Which legs this record actually has, rather than a hardcoded pair. USDC
+    // was missing from the list, so claiming a collateral position wrote
+    // nothing and the button stayed live after the money had been collected.
+    const present = (['ETH', 'SWIPE', 'USDC'] as StakeToken[]).filter(
+      (t) => updatedStake[t] && typeof updatedStake[t] === 'object'
+    );
+
+    if (tokenType && present.includes(tokenType)) {
+      updatedStake[tokenType] = { ...updatedStake[tokenType], claimed };
+    } else if (present.length > 0) {
+      // No token named, or one this record does not hold: mark every leg, which
+      // is the behaviour callers relied on before partial claims existed.
+      for (const t of present) {
+        updatedStake[t] = { ...updatedStake[t], claimed };
       }
     } else {
-      // No tokenType specified - mark everything as claimed (legacy behavior)
-      // For V2 format
-      if (updatedStake.ETH) {
-        updatedStake.ETH.claimed = updates.claimed ?? true;
-      }
-      if (updatedStake.SWIPE) {
-        updatedStake.SWIPE.claimed = updates.claimed ?? true;
-      }
-      // For V1 format
-      if (!updatedStake.ETH && !updatedStake.SWIPE) {
-        updatedStake.claimed = updates.claimed ?? true;
+      // The flat V1 shape, which is always ETH and has no legs to pick from.
+      if (!tokenType || tokenType === 'ETH') {
+        updatedStake.claimed = claimed;
       }
     }
-    
+
     // Save updated stake
     await redisHelpers.saveUserStake(updatedStake, chain);
-    
+
     return NextResponse.json({
       success: true,
       data: updatedStake,
@@ -302,12 +204,12 @@ export async function PUT(request: NextRequest) {
       message: `Stake ${tokenType ? tokenType + ' ' : ''}marked as claimed`,
       timestamp: new Date().toISOString()
     });
-    
+
   } catch (error) {
     console.error('❌ Failed to update stake:', error);
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to update stake',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
@@ -315,4 +217,3 @@ export async function PUT(request: NextRequest) {
     );
   }
 }
-

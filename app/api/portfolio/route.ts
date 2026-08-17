@@ -1,13 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { redis, redisHelpers, REDIS_KEYS } from '../../../lib/redis';
 import { chainFromRequest } from '@/lib/chains/requestChain';
-import { RedisUserStake, RedisPrediction } from '../../../lib/types/redis';
+import { RedisPrediction } from '../../../lib/types/redis';
+import {
+  stakeLegs,
+  tokenMarket,
+  legSides,
+  toDisplayUnits,
+  emptyTotals,
+  displayTotals,
+  COLLATERAL_LEG,
+  type StakeToken,
+} from '@/lib/userStake';
 
 interface PortfolioItem {
   id: string;
   question: string;
   category: string;
+  /** In `token`'s own readable units, not raw and not always ETH. */
   stakeAmount: number;
+  /**
+   * Which token this row is denominated in.
+   *
+   * A market can hold a position in more than one, so a user gets one row per
+   * token rather than one per market. Without this the UI has no way to know
+   * whether `stakeAmount: 25` means 25 dollars or 25 ETH.
+   */
+  token: StakeToken;
   choice: 'YES' | 'NO';
   status: 'active' | 'won' | 'lost' | 'pending';
   potentialPayout: number;
@@ -37,10 +56,29 @@ interface PortfolioItem {
   outcome?: 'YES' | 'NO';
 }
 
+/**
+ * Headline numbers.
+ *
+ * The three money fields are the COLLATERAL totals, in readable units, and they
+ * say so rather than being a sum across tokens. Adding tokens together cannot
+ * be done honestly: positions are stored raw, one ETH is 1e18 and one USDC is
+ * 1e6, so a single figure is just the wei leg with a rounding error attached.
+ *
+ * Collateral is the one that gets the headline because it is the live product.
+ * ETH and SWIPE positions live on contracts nobody can settle any more, and
+ * they are still reported, under byToken.
+ *
+ * The counts are deliberately across all tokens: "how many open bets" and "what
+ * share did I call right" are questions about the user, not about a currency.
+ */
 interface PortfolioStats {
   totalInvested: number;
   totalPayout: number;
   totalProfit: number;
+  /** Which token the three figures above are in. */
+  totalsToken: StakeToken;
+  /** Every token's own totals, in readable units. Nothing is summed across. */
+  byToken: ReturnType<typeof displayTotals>;
   activeBets: number;
   wonBets: number;
   lostBets: number;
@@ -71,9 +109,7 @@ export async function GET(request: NextRequest) {
     const allPredictions = await redisHelpers.getAllPredictions(chain);
 
     const portfolioItems: PortfolioItem[] = [];
-    let totalInvested = 0;
-    let totalPayout = 0;
-    let totalProfit = 0;
+    const totals = emptyTotals();
     let activeBets = 0;
     let wonBets = 0;
     let lostBets = 0;
@@ -84,98 +120,93 @@ export async function GET(request: NextRequest) {
       // prefix. A literal here reads Base's stakes whatever chain was asked for.
       const stakeKey = REDIS_KEYS.USER_STAKES(userAddress, prediction.id, chain);
       const stakeData = await redis.get(stakeKey);
+      if (!stakeData) continue;
 
-      if (stakeData) {
-        const stake = typeof stakeData === 'string' ? JSON.parse(stakeData) : stakeData;
-        if (stake && typeof stake === 'object' && 'yesAmount' in stake) {
-          const userStake = stake as RedisUserStake;
-          const stakeAmount = userStake.yesAmount + userStake.noAmount;
+      const stake = typeof stakeData === 'string' ? JSON.parse(stakeData) : stakeData;
 
-          if (stakeAmount > 0) {
-            const choice = userStake.yesAmount > userStake.noAmount ? 'YES' : 'NO';
-            const winningStake = choice === 'YES' ? userStake.yesAmount : userStake.noAmount;
-            const losingStake = choice === 'YES' ? userStake.noAmount : userStake.yesAmount;
+      // One row per token, not one per market.
+      //
+      // This loop used to open with `if ('yesAmount' in stake)`, which only the
+      // flat V1 shape satisfies. Every record written since nests its amounts
+      // under a token key, so the whole of V2 and every collateral position
+      // failed that test and was skipped without a trace. The portfolio was
+      // reporting on V1 records and presenting the result as the user's
+      // holdings.
+      for (const l of stakeLegs(stake)) {
+        const token = l.tokenType;
+        const { choice, staked, backing } = legSides(l);
 
-            // Determine status
-            let status: 'active' | 'won' | 'lost' | 'pending' = 'pending';
-            let potentialPayout = 0;
-            let profit = 0;
+        // The pools and settlement flags for THIS token. Reading a collateral
+        // position against yesTotalAmount, the ETH pool, builds a payout ratio
+        // out of two unrelated markets.
+        const market = tokenMarket(prediction, token);
 
-            if (prediction.resolved && !prediction.cancelled) {
-              // Prediction is resolved
-              if (prediction.outcome === (choice === 'YES')) {
-                // User won
-                status = 'won';
-                wonBets++;
+        let status: 'active' | 'won' | 'lost' | 'pending' = 'pending';
+        let potentialPayout = 0;
+        let profit = 0;
 
-                // Calculate actual payout
-                const losingPool = choice === 'YES' ? prediction.noTotalAmount : prediction.yesTotalAmount;
-                const winningPool = choice === 'YES' ? prediction.yesTotalAmount : prediction.noTotalAmount;
+        /** Parimutuel: your side splits the other side, pro rata. */
+        const payoutOn = () => {
+          const losingPool = choice === 'YES' ? market.noPool : market.yesPool;
+          const winningPool = choice === 'YES' ? market.yesPool : market.noPool;
+          if (winningPool <= 0) return;
+          potentialPayout = backing * (1 + losingPool / winningPool);
+          profit = potentialPayout - staked;
+        };
 
-                if (winningPool > 0) {
-                  const payoutRatio = losingPool / winningPool;
-                  potentialPayout = winningStake * (1 + payoutRatio);
-                  profit = potentialPayout - stakeAmount;
-                }
-              } else {
-                // User lost
-                status = 'lost';
-                lostBets++;
-                potentialPayout = 0;
-                profit = -stakeAmount;
-              }
-            } else if (!prediction.resolved && prediction.deadline > Date.now() / 1000) {
-              // Prediction is still active
-              status = 'active';
-              activeBets++;
-
-              // Calculate potential payout for active predictions
-              const losingPool = choice === 'YES' ? prediction.noTotalAmount : prediction.yesTotalAmount;
-              const winningPool = choice === 'YES' ? prediction.yesTotalAmount : prediction.noTotalAmount;
-
-              if (winningPool > 0) {
-                const payoutRatio = losingPool / winningPool;
-                potentialPayout = winningStake * (1 + payoutRatio);
-                profit = potentialPayout - stakeAmount;
-              }
-            }
-
-            totalInvested += stakeAmount;
-            totalPayout += potentialPayout;
-            totalProfit += profit;
-
-            portfolioItems.push({
-              id: prediction.id,
-              question: prediction.question,
-              category: prediction.category,
-              stakeAmount,
-              choice,
-              status,
-              potentialPayout,
-              profit,
-              createdAt: userStake.stakedAt,
-              imageUrl: prediction.imageUrl || 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=400&h=300&fit=crop',
-              deadline: prediction.deadline,
-              yesPool: prediction.yesTotalAmount,
-              noPool: prediction.noTotalAmount,
-              outcome:
-                prediction.resolved && prediction.outcome !== undefined
-                  ? prediction.outcome
-                    ? 'YES'
-                    : 'NO'
-                  : undefined
-            });
+        if (market.resolved && !market.cancelled) {
+          if (market.outcome === (choice === 'YES')) {
+            status = 'won';
+            wonBets++;
+            payoutOn();
+          } else {
+            status = 'lost';
+            lostBets++;
+            profit = -staked;
           }
+        } else if (!market.resolved && prediction.deadline > Date.now() / 1000) {
+          status = 'active';
+          activeBets++;
+          payoutOn();
         }
+
+        totals[token].invested += staked;
+        totals[token].payout += potentialPayout;
+        totals[token].profit += profit;
+        totals[token].bets += 1;
+
+        portfolioItems.push({
+          id: prediction.id,
+          question: prediction.question,
+          category: prediction.category,
+          // Readable units, per token, so the UI is not left dividing by a
+          // decimal count it would have to guess.
+          stakeAmount: toDisplayUnits(staked, token),
+          token,
+          choice,
+          status,
+          potentialPayout: toDisplayUnits(potentialPayout, token),
+          profit: toDisplayUnits(profit, token),
+          createdAt: l.stakedAt,
+          imageUrl: prediction.imageUrl || 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=400&h=300&fit=crop',
+          deadline: prediction.deadline,
+          yesPool: toDisplayUnits(market.yesPool, token),
+          noPool: toDisplayUnits(market.noPool, token),
+          outcome: market.resolved ? (market.outcome ? 'YES' : 'NO') : undefined,
+        });
       }
     }
 
     const winRate = wonBets + lostBets > 0 ? (wonBets / (wonBets + lostBets)) * 100 : 0;
+    const shown = displayTotals(totals);
 
     const stats: PortfolioStats = {
-      totalInvested,
-      totalPayout,
-      totalProfit,
+      // The collateral leg, named rather than implied. See PortfolioStats.
+      totalInvested: shown[COLLATERAL_LEG].invested,
+      totalPayout: shown[COLLATERAL_LEG].payout,
+      totalProfit: shown[COLLATERAL_LEG].profit,
+      totalsToken: COLLATERAL_LEG,
+      byToken: shown,
       activeBets,
       wonBets,
       lostBets,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { redis, redisHelpers, REDIS_KEYS } from '../../../../lib/redis';
 import { chainFromRequest } from '@/lib/chains/requestChain';
+import { stakeLegs, tokenMarket, legSides, COLLATERAL_LEG } from '@/lib/userStake';
 
 /**
  * GET /api/claims/count?userId=0x...
@@ -83,79 +84,28 @@ export async function GET(request: NextRequest) {
 
           if (!prediction) return null;
 
-          // Must be resolved OR cancelled
-          const isResolvedOrCancelled = (prediction.resolved && !prediction.cancelled) || prediction.cancelled;
-          if (!isResolvedOrCancelled || processedPredictions.has(predictionId)) {
-            return null;
-          }
+          if (processedPredictions.has(predictionId)) return null;
 
-          // Check if user can claim (same logic as EnhancedUserDashboard)
-          const stakes = [];
+          // Which legs of this position are waiting to be collected.
+          //
+          // This was two hand-written blocks, one for ETH and one for SWIPE,
+          // plus a third for the flat V1 shape. There was never a fourth, so a
+          // won position in the chain's collateral did not raise the badge and
+          // the user was never told there was money to collect. It is counted
+          // per leg because settlement is per leg: the collateral contract is a
+          // different contract and resolves on its own schedule.
+          const claimable = stakeLegs(stake).filter((l) => {
+            if (l.claimed) return false;
+            const market = tokenMarket(prediction, l.tokenType);
+            if (market.cancelled) return true;
+            if (!market.resolved) return false;
+            // Refundable means nobody was on the winning side, so everyone is
+            // owed their stake back rather than nobody being owed anything.
+            if (l.tokenType === COLLATERAL_LEG && prediction.usdcRefundable) return true;
+            return (legSides(l).choice === 'YES') === market.outcome;
+          });
 
-          // Handle multi-token stake (V2)
-          if (stake.ETH || stake.SWIPE) {
-            if (stake.ETH && !stake.ETH.claimed) {
-              const yesAmount = Number(stake.ETH.yesAmount) || 0;
-              const noAmount = Number(stake.ETH.noAmount) || 0;
-              const hasStake = yesAmount > 0 || noAmount > 0;
-
-              if (hasStake) {
-                if (prediction.cancelled) {
-                  // For cancelled predictions, user can always claim refund
-                  stakes.push('ETH');
-                } else {
-                  // For resolved predictions, check if user won
-                  const userWon = (yesAmount > 0 && prediction.outcome === true) ||
-                                (noAmount > 0 && prediction.outcome === false);
-                  if (userWon) {
-                    stakes.push('ETH');
-                  }
-                }
-              }
-            }
-            if (stake.SWIPE && !stake.SWIPE.claimed) {
-              const yesAmount = Number(stake.SWIPE.yesAmount) || 0;
-              const noAmount = Number(stake.SWIPE.noAmount) || 0;
-              const hasStake = yesAmount > 0 || noAmount > 0;
-
-              if (hasStake) {
-                if (prediction.cancelled) {
-                  // For cancelled predictions, user can always claim refund
-                  stakes.push('SWIPE');
-                } else {
-                  // For resolved predictions, check if user won
-                  const userWon = (yesAmount > 0 && prediction.outcome === true) ||
-                                (noAmount > 0 && prediction.outcome === false);
-                  if (userWon) {
-                    stakes.push('SWIPE');
-                  }
-                }
-              }
-            }
-          } else {
-            // Single stake (V1) - always ETH
-            if (!stake.claimed) {
-              const yesAmount = Number(stake.yesAmount) || 0;
-              const noAmount = Number(stake.noAmount) || 0;
-              const hasStake = yesAmount > 0 || noAmount > 0;
-
-              if (hasStake) {
-                if (prediction.cancelled) {
-                  // For cancelled predictions, user can always claim refund
-                  stakes.push('ETH');
-                } else {
-                  // For resolved predictions, check if user won
-                  const userWon = (yesAmount > 0 && prediction.outcome === true) ||
-                                (noAmount > 0 && prediction.outcome === false);
-                  if (userWon) {
-                    stakes.push('ETH');
-                  }
-                }
-              }
-            }
-          }
-
-          if (stakes.length > 0) {
+          if (claimable.length > 0) {
             processedPredictions.add(predictionId);
             return predictionId;
           }

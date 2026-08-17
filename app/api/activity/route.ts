@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { redisHelpers, redis, REDIS_KEYS } from '../../../lib/redis';
 import { chainFromRequest } from '@/lib/chains/requestChain';
-import { RedisPrediction, RedisUserStake } from '../../../lib/types/redis';
+import { RedisPrediction } from '../../../lib/types/redis';
+import {
+  stakeLegs,
+  tokenMarket,
+  legSides,
+  toDisplayUnits,
+  type StakeToken,
+} from '@/lib/userStake';
 
 interface ActivityItem {
   id: string;
@@ -18,7 +25,16 @@ interface ActivityItem {
     category: string;
   };
   details?: {
+    /** Readable units of `token`, not raw. The feed used to print wei. */
     amount?: number;
+    /**
+     * What `amount` and `payout` are denominated in.
+     *
+     * The feed hardcoded "ETH" next to every figure. On a collateral market
+     * that label is simply wrong, and a bet of 25 USDG was announced as an ETH
+     * position of twenty five million million million.
+     */
+    token?: StakeToken;
     choice?: 'YES' | 'NO';
     outcome?: 'YES' | 'NO';
     payout?: number;
@@ -120,82 +136,72 @@ export async function GET(request: NextRequest) {
 
         if (stakeData) {
           const stake = typeof stakeData === 'string' ? JSON.parse(stakeData) : stakeData;
-          // Stakes are stored per token: { user, stakedAt, ETH?: {...}, SWIPE?: {...} }.
-          // This branch used to test for a top-level `yesAmount`, which the
-          // multi-token shape does not have, so every bet and payout was
-          // silently dropped from the feed.
-          const legs = stake && typeof stake === 'object'
-            ? [(stake as any).ETH, (stake as any).SWIPE].filter(Boolean)
-            : [];
 
-          if (legs.length > 0) {
-            const yesAmount = legs.reduce((sum: number, leg: any) => sum + (Number(leg.yesAmount) || 0), 0);
-            const noAmount = legs.reduce((sum: number, leg: any) => sum + (Number(leg.noAmount) || 0), 0);
-            const userStake = {
-              ...(stake as any),
-              yesAmount,
-              noAmount,
-              // Claimed only when every leg the user holds has been claimed.
-              claimed: legs.every((leg: any) => leg.claimed),
-            } as RedisUserStake;
-            const totalStake = yesAmount + noAmount;
+          // One entry per token, rather than one entry with the tokens added up.
+          //
+          // This block was fixed once already, when it tested for a top-level
+          // `yesAmount` that the multi-token shape does not have and dropped
+          // every bet from the feed. The fix hardcoded ETH and SWIPE and summed
+          // them, so the collateral leg stayed invisible and two different
+          // currencies were reported as one figure. stakeLegs knows all three
+          // and a new one arrives here without another edit.
+          const who = `${participant.slice(0, 6)}...${participant.slice(-4)}`;
 
-            if (totalStake > 0) {
-              // Bet placed activity
-              activities.push({
-                id: `bet_${participant}_${prediction.id}`,
-                type: 'bet_placed',
-                timestamp: userStake.stakedAt * 1000,
-                user: {
-                  address: participant,
-                  displayName: `${participant.slice(0, 6)}...${participant.slice(-4)}`,
-                  avatar: avatars[Math.floor(Math.random() * avatars.length)]
-                },
-                prediction: {
-                  id: prediction.id,
-                  question: prediction.question,
-                  category: prediction.category
-                },
-                details: {
-                  amount: totalStake,
-                  choice: userStake.yesAmount > userStake.noAmount ? 'YES' : 'NO'
-                }
-              });
+          for (const l of stakeLegs(stake)) {
+            const token = l.tokenType;
+            const { choice, staked, backing } = legSides(l);
+            const market = tokenMarket(prediction, token);
 
-              // Payout claimed activity (if prediction is resolved and stake claimed)
-              if (prediction.resolved && !prediction.cancelled && userStake.claimed) {
-                const userChoice = userStake.yesAmount > userStake.noAmount;
-                const winningStake = userChoice ? userStake.yesAmount : userStake.noAmount;
-
-                if (userChoice === prediction.outcome && winningStake > 0) {
-                  // Calculate payout
-                  const losingPool = userChoice ? prediction.noTotalAmount : prediction.yesTotalAmount;
-                  const winningPool = userChoice ? prediction.yesTotalAmount : prediction.noTotalAmount;
-                  const payoutRatio = losingPool / winningPool;
-                  const payout = winningStake * (1 + payoutRatio);
-
-                  activities.push({
-                    id: `payout_${participant}_${prediction.id}`,
-                    type: 'payout_claimed',
-                    timestamp: (prediction.deadline + 3600) * 1000, // 1 hour after resolution
-                    user: {
-                      address: participant,
-                      displayName: `${participant.slice(0, 6)}...${participant.slice(-4)}`,
-                      avatar: avatars[Math.floor(Math.random() * avatars.length)]
-                    },
-                    prediction: {
-                      id: prediction.id,
-                      question: prediction.question,
-                      category: prediction.category
-                    },
-                    details: {
-                      payout: payout,
-                      stake: winningStake
-                    }
-                  });
-                }
+            activities.push({
+              id: `bet_${participant}_${prediction.id}_${token}`,
+              type: 'bet_placed',
+              timestamp: l.stakedAt * 1000,
+              user: {
+                address: participant,
+                displayName: who,
+                avatar: avatars[Math.floor(Math.random() * avatars.length)]
+              },
+              prediction: {
+                id: prediction.id,
+                question: prediction.question,
+                category: prediction.category
+              },
+              details: {
+                amount: toDisplayUnits(staked, token),
+                token,
+                choice
               }
-            }
+            });
+
+            // Payout claimed activity (if this leg is settled and claimed)
+            if (!market.resolved || market.cancelled || !l.claimed) continue;
+            if ((choice === 'YES') !== market.outcome || backing <= 0) continue;
+
+            const losingPool = choice === 'YES' ? market.noPool : market.yesPool;
+            const winningPool = choice === 'YES' ? market.yesPool : market.noPool;
+            if (winningPool <= 0) continue;
+            const payout = backing * (1 + losingPool / winningPool);
+
+            activities.push({
+              id: `payout_${participant}_${prediction.id}_${token}`,
+              type: 'payout_claimed',
+              timestamp: (prediction.deadline + 3600) * 1000, // 1 hour after resolution
+              user: {
+                address: participant,
+                displayName: who,
+                avatar: avatars[Math.floor(Math.random() * avatars.length)]
+              },
+              prediction: {
+                id: prediction.id,
+                question: prediction.question,
+                category: prediction.category
+              },
+              details: {
+                payout: toDisplayUnits(payout, token),
+                stake: toDisplayUnits(backing, token),
+                token
+              }
+            });
           }
         }
       }

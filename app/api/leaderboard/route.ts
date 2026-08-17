@@ -1,8 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { redis, redisHelpers, REDIS_KEYS } from '../../../lib/redis';
 import { chainFromRequest } from '@/lib/chains/requestChain';
-import { RedisUserStake, RedisPrediction } from '../../../lib/types/redis';
+import { RedisPrediction } from '../../../lib/types/redis';
+import {
+  stakeLegs,
+  tokenMarket,
+  legSides,
+  emptyTotals,
+  displayTotals,
+  COLLATERAL_LEG,
+  type StakeToken,
+} from '@/lib/userStake';
 
+/**
+ * One row of the ranking.
+ *
+ * `totalProfit` and `totalStaked` are the collateral leg, in readable units,
+ * and `totalsToken` says so. They were a sum across every token, which for a
+ * ranking is not a rounding problem but a correctness one: positions are stored
+ * raw, so one wei of ETH counted as much as a whole millionth of a dollar, and
+ * a single dust ETH position outranked every real bet on the board.
+ */
 interface LeaderboardEntry {
   rank: number;
   address: string;
@@ -12,6 +30,10 @@ interface LeaderboardEntry {
   totalBets: number;
   winRate: number;
   totalStaked: number;
+  /** Which token totalProfit and totalStaked are denominated in. */
+  totalsToken: StakeToken;
+  /** Every token's own totals, so the archived legs are still visible. */
+  byToken: ReturnType<typeof displayTotals>;
   predictionsCreated: number;
 }
 
@@ -64,8 +86,7 @@ export async function GET(request: NextRequest) {
       const predictionsCreated = userPredictions.length;
 
       // Get user's stakes across all predictions
-      let totalStaked = 0;
-      let totalProfit = 0;
+      const totals = emptyTotals();
       let wonBets = 0;
       let totalBets = 0;
 
@@ -73,38 +94,36 @@ export async function GET(request: NextRequest) {
         // Get user's stake for this prediction
         const stakeKey = REDIS_KEYS.USER_STAKES(userAddress, prediction.id, chain);
         const stakeData = await redis.get(stakeKey);
+        if (!stakeData) continue;
 
-        if (stakeData) {
-          const stake = typeof stakeData === 'string' ? JSON.parse(stakeData) : stakeData;
-          if (stake && typeof stake === 'object' && 'yesAmount' in stake) {
-            const userStake = stake as RedisUserStake;
-            const stakeAmount = userStake.yesAmount + userStake.noAmount;
-            totalStaked += stakeAmount;
+        const stake = typeof stakeData === 'string' ? JSON.parse(stakeData) : stakeData;
 
-            if (prediction.resolved && !prediction.cancelled) {
-              totalBets++;
+        // Same fault the portfolio had: the guard here was `'yesAmount' in
+        // stake`, which only the flat V1 shape satisfies, so the board ranked
+        // people on their V1 history and ignored every V2 and collateral
+        // position they held.
+        for (const l of stakeLegs(stake)) {
+          const token = l.tokenType;
+          const { choice, staked, backing } = legSides(l);
+          const market = tokenMarket(prediction, token);
 
-              // Check if user won
-              const userChoice = userStake.yesAmount > userStake.noAmount ? true : false;
-              if (userChoice === prediction.outcome) {
-                wonBets++;
+          totals[token].invested += staked;
 
-                // Calculate profit for winning bet
-                const winningStake = userChoice ? userStake.yesAmount : userStake.noAmount;
-                const losingPool = userChoice ? prediction.noTotalAmount : prediction.yesTotalAmount;
-                const totalPool = prediction.yesTotalAmount + prediction.noTotalAmount;
+          if (!market.resolved || market.cancelled) continue;
+          totalBets++;
 
-                if (totalPool > 0) {
-                  const profitRatio = losingPool / (userChoice ? prediction.yesTotalAmount : prediction.noTotalAmount);
-                  const profit = winningStake * profitRatio;
-                  totalProfit += profit;
-                }
-              } else {
-                // Loss - subtract the losing stake amount
-                const losingStake = userChoice ? userStake.yesAmount : userStake.noAmount;
-                totalProfit -= losingStake;
-              }
+          if ((choice === 'YES') === market.outcome) {
+            wonBets++;
+            // Parimutuel: the winning side splits the losing side pro rata, so
+            // profit is the share of the losing pool this stake earned. Both
+            // pools come from tokenMarket, so they are this token's pools.
+            const losingPool = choice === 'YES' ? market.noPool : market.yesPool;
+            const winningPool = choice === 'YES' ? market.yesPool : market.noPool;
+            if (winningPool > 0) {
+              totals[token].profit += backing * (losingPool / winningPool);
             }
+          } else {
+            totals[token].profit -= backing;
           }
         }
       }
@@ -114,15 +133,19 @@ export async function GET(request: NextRequest) {
       // Generate display name from address
       const displayName = `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`;
 
+      const shown = displayTotals(totals);
+
       userStats[userAddress] = {
         rank: 0, // Will be set after sorting
         address: userAddress,
         displayName,
         avatar: getRandomAvatar(),
-        totalProfit,
+        totalProfit: shown[COLLATERAL_LEG].profit,
         totalBets,
         winRate,
-        totalStaked,
+        totalStaked: shown[COLLATERAL_LEG].invested,
+        totalsToken: COLLATERAL_LEG,
+        byToken: shown,
         predictionsCreated
       };
     }

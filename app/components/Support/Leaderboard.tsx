@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import { useActiveChain } from '@/lib/chains/activeChain';
+import { tokenSymbol, COLLATERAL_LEG, type StakeToken } from '@/lib/userStake';
 
 interface LeaderboardUser {
   rank: number;
@@ -13,6 +14,8 @@ interface LeaderboardUser {
   totalBets: number;
   winRate: number;
   totalStaked: number;
+  /** What totalProfit and totalStaked are in. The board hardcoded ETH. */
+  totalsToken?: StakeToken;
   predictionsCreated: number;
   isCurrentUser?: boolean;
 }
@@ -22,6 +25,11 @@ export function Leaderboard() {
   // Base when no chain is sent, which is right for Base and wrong for every
   // other chain, so without this a user on Robinhood sees Base's numbers.
   const { chainKey } = useActiveChain();
+
+  // The collateral leg is stored as 'USDC' on every chain, so the symbol has to
+  // come from the chain rather than from the leg name.
+  const symbolFor = (token: StakeToken | undefined) =>
+    tokenSymbol(token ?? COLLATERAL_LEG, chainKey);
   const { address } = useAccount();
   const [timeframe, setTimeframe] = useState<'7d' | '30d' | 'all'>('30d');
   const [sortBy, setSortBy] = useState<'profit' | 'winRate' | 'bets'>('profit');
@@ -65,7 +73,7 @@ export function Leaderboard() {
     // Auto-refresh every 60 seconds
     const interval = setInterval(fetchLeaderboard, 60000);
     return () => clearInterval(interval);
-  }, [address, timeframe]);
+  }, [address, timeframe, chainKey]);
 
   if (loading) {
     return (
@@ -186,7 +194,7 @@ export function Leaderboard() {
               {user.displayName}
             </div>
             <div className="podium-profit">
-              +{user.totalProfit.toFixed(2)} ETH
+              +{user.totalProfit.toFixed(2)} {symbolFor(user.totalsToken)}
             </div>
             <div className="podium-stats">
               <span>{user.winRate.toFixed(1)}% win rate</span>
@@ -234,10 +242,10 @@ export function Leaderboard() {
 
             <div className="col-profit">
               <div className="profit-amount">
-                +{user.totalProfit.toFixed(3)} ETH
+                +{user.totalProfit.toFixed(3)} {symbolFor(user.totalsToken)}
               </div>
               <div className="profit-staked">
-                {user.totalStaked.toFixed(1)} ETH staked
+                {user.totalStaked.toFixed(1)} {symbolFor(user.totalsToken)} staked
               </div>
             </div>
 
@@ -276,7 +284,7 @@ export function Leaderboard() {
           <div className="summary-icon">💰</div>
           <div className="summary-content">
             <div className="summary-value">
-              {leaderboard.reduce((sum, user) => sum + user.totalProfit, 0).toFixed(2)} ETH
+              {leaderboard.reduce((sum, user) => sum + user.totalProfit, 0).toFixed(2)} {symbolFor(undefined)}
             </div>
             <div className="summary-label">Total Profits</div>
           </div>

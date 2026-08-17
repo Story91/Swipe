@@ -3,20 +3,31 @@
 import React, { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import { useActiveChain } from '@/lib/chains/activeChain';
+import { tokenSymbol, COLLATERAL_LEG, type StakeToken } from '@/lib/userStake';
 import '../../styles/sheet.css';
 import './MyPortfolio.css';
 
 /**
  * Portfolio, on the shared sheet.
  *
- * Data comes from /api/portfolio and is unchanged; this is a presentation
- * rewrite. Figures are V2-era and in ETH, which is what that endpoint returns.
+ * Data comes from /api/portfolio. Every figure carries the token it is in,
+ * because a position can be in ETH, in SWIPE, or in the chain's collateral, and
+ * the three cannot be added together: they are stored raw and one wei of ETH is
+ * a million times finer than one unit of a six decimal stablecoin.
  */
 
 interface PortfolioStats {
   totalInvested: number;
   totalPayout: number;
   totalProfit: number;
+  /**
+   * Which token the three figures above are in.
+   *
+   * They were labelled ETH in the markup, unconditionally. The route now sends
+   * the collateral totals, so the label has to come from the data or the panel
+   * calls a dollar an ether.
+   */
+  totalsToken?: StakeToken;
   activeBets: number;
   wonBets: number;
   lostBets: number;
@@ -28,6 +39,8 @@ interface PortfolioItem {
   question: string;
   category: string;
   stakeAmount: number;
+  /** A market can be held in more than one token, so a row names its own. */
+  token?: StakeToken;
   choice: 'YES' | 'NO';
   status: 'active' | 'won' | 'lost' | 'pending';
   potentialPayout: number;
@@ -56,6 +69,12 @@ export function MyPortfolio() {
   // other chain, so without this a user on Robinhood sees Base's numbers.
   const { chainKey } = useActiveChain();
   const { address } = useAccount();
+
+  // What to print beside a figure. The leg is stored as 'USDC' on every chain,
+  // so on Robinhood the symbol has to come from the chain, not from the leg.
+  const symbolFor = (token: StakeToken | undefined) =>
+    tokenSymbol(token ?? COLLATERAL_LEG, chainKey);
+
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
   const [stats, setStats] = useState<PortfolioStats>({
@@ -107,7 +126,7 @@ export function MyPortfolio() {
     // Auto-refresh every 30 seconds
     const interval = setInterval(fetchPortfolio, 30000);
     return () => clearInterval(interval);
-  }, [address]);
+  }, [address, chainKey]);
 
   const filteredItems = portfolioItems.filter(item => {
     switch (activeTab) {
@@ -140,8 +159,9 @@ export function MyPortfolio() {
           </div>
           <p className="sheet-hero-lede">
             Every position you have taken, what it cost and what it returned.
-            Figures are V2-era and in ETH; profit is what you took out of losing
-            pools, net of your own losing stakes.
+            Each row is one market in one token, so a market you backed twice
+            shows up twice. Profit is what you took out of losing pools, net of
+            your own losing stakes.
           </p>
         </header>
         <main className="sheet-body">{body}</main>
@@ -210,13 +230,13 @@ export function MyPortfolio() {
               <div className="sheet-settle-row">
                 <span className="sheet-settle-key">Staked</span>
                 <span className="sheet-settle-val">
-                  {stats.totalInvested.toFixed(4)} ETH
+                  {stats.totalInvested.toFixed(4)} {symbolFor(stats.totalsToken)}
                 </span>
               </div>
               <div className="sheet-settle-row">
                 <span className="sheet-settle-key">Returned</span>
                 <span className="sheet-settle-val">
-                  {stats.totalPayout.toFixed(4)} ETH
+                  {stats.totalPayout.toFixed(4)} {symbolFor(stats.totalsToken)}
                 </span>
               </div>
               <div className="sheet-settle-row">
@@ -231,7 +251,7 @@ export function MyPortfolio() {
               <div className="sheet-settle-row sheet-settle-row--total">
                 <span className="sheet-settle-key">Profit and loss</span>
                 <span className="sheet-settle-val">
-                  {signed(stats.totalProfit)} ETH
+                  {signed(stats.totalProfit)} {symbolFor(stats.totalsToken)}
                 </span>
               </div>
             </div>
@@ -317,7 +337,7 @@ export function MyPortfolio() {
                     <div className="pf-figures">
                       <div>
                         <span className="pf-figure-label">Stake</span>
-                        <span className="pf-figure">{item.stakeAmount} ETH</span>
+                        <span className="pf-figure">{item.stakeAmount.toFixed(4)} {symbolFor(item.token)}</span>
                       </div>
 
                       <div>
@@ -328,11 +348,11 @@ export function MyPortfolio() {
                           <span
                             className={`pf-figure ${item.profit >= 0 ? 'pf-figure--gain' : 'pf-figure--loss'}`}
                           >
-                            {signed(item.profit)} ETH
+                            {signed(item.profit)} {symbolFor(item.token)}
                           </span>
                         ) : (
                           <span className="pf-figure">
-                            {item.potentialPayout.toFixed(4)} ETH
+                            {item.potentialPayout.toFixed(4)} {symbolFor(item.token)}
                             <span className="pf-figure-sub">if it lands</span>
                           </span>
                         )}

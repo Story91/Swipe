@@ -1,6 +1,7 @@
 import { Redis } from "@upstash/redis";
 import { DEFAULT_CHAIN_KEY } from './chains';
 import type { ChainKey } from './chains/types';
+import { stakeLegs } from './userStake';
 import type {
   RedisPrediction,
   RedisUserStake,
@@ -424,47 +425,18 @@ export const redisHelpers = {
       const keys = await redis.keys(pattern);
       console.log(`🔍 Found keys:`, keys);
       const stakes: RedisUserStake[] = [];
-      
+
       for (const key of keys) {
         const data = await redis.get(key);
-        if (data) {
-          const stake = typeof data === 'string' ? JSON.parse(data) : data;
-          console.log(`🔍 Found stake:`, stake);
-          
-          // Check if this is a multi-token stake (V2) or single stake (V1)
-          if (stake.ETH || stake.SWIPE) {
-            // Multi-token stake - convert to array format
-            if (stake.ETH) {
-              stakes.push({
-                user: stake.user,
-                predictionId: stake.predictionId,
-                yesAmount: stake.ETH.yesAmount,
-                noAmount: stake.ETH.noAmount,
-                claimed: stake.ETH.claimed,
-                stakedAt: stake.stakedAt,
-                contractVersion: stake.contractVersion,
-                tokenType: 'ETH'
-              });
-            }
-            if (stake.SWIPE) {
-              stakes.push({
-                user: stake.user,
-                predictionId: stake.predictionId,
-                yesAmount: stake.SWIPE.yesAmount,
-                noAmount: stake.SWIPE.noAmount,
-                claimed: stake.SWIPE.claimed,
-                stakedAt: stake.stakedAt,
-                contractVersion: stake.contractVersion,
-                tokenType: 'SWIPE'
-              });
-            }
-          } else {
-            // Single stake (V1)
-            stakes.push(stake as RedisUserStake);
-          }
-        }
+        if (!data) continue;
+        const stake = typeof data === 'string' ? JSON.parse(data) : data;
+        // stakeLegs, not a fifth hand-written copy of the same flattening. The
+        // block that stood here listed ETH and SWIPE and stopped, so a position
+        // in the chain's collateral came back as no position at all, on the
+        // only contracts that currently take bets.
+        stakes.push(...(stakeLegs(stake) as RedisUserStake[]));
       }
-      
+
       return stakes;
     } catch (error) {
       console.error(`❌ Failed to get user stakes for prediction ${predictionId}:`, error);
