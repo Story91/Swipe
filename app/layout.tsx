@@ -1,8 +1,48 @@
 import "./theme.css";
 import "@coinbase/onchainkit/styles.css";
 import type { Metadata, Viewport } from "next";
+import { Orbitron, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+
+/**
+ * Orbitron is named in ~40 rules across the app's stylesheets and has never
+ * actually been loaded: no @font-face, no link tag, no font files in the repo.
+ * Every one of those rules has been falling through to the generic sans-serif
+ * fallback in production. Loading it here through next/font self-hosts it at
+ * build time, so there is no request to Google at runtime.
+ *
+ * Exposed as CSS variables and applied by the two stylesheets that ask for it,
+ * not on <body>. next/font generates a scoped family name rather than
+ * registering the literal "Orbitron", so the rest of the app keeps rendering
+ * exactly as it does today. Switching the whole app onto its intended face is a
+ * separate decision with a lot of layout riding on it.
+ */
+const orbitron = Orbitron({
+  subsets: ["latin"],
+  weight: ["500", "600", "700", "800"],
+  variable: "--font-display",
+  display: "swap",
+});
+
+// Orbitron is a display face and unreadable at paragraph length. Plex Sans
+// carries the prose: humanist enough to contrast the squared display, and it
+// holds up at 17px on a dark ground.
+const plexSans = IBM_Plex_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-body",
+  display: "swap",
+});
+
+// Amounts, percentages and addresses. Tabular by construction, so figures in a
+// column line up the way a tote board's do.
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-data",
+  display: "swap",
+});
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -74,7 +114,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${orbitron.variable} ${plexSans.variable} ${plexMono.variable}`}>
       <body className="bg-background" style={{ backgroundColor: '#d4ff00' }}>
         <div className="app-container">
           <Providers>{children}</Providers>

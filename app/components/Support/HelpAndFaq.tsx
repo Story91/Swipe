@@ -41,48 +41,60 @@ export function HelpAndFaq() {
   const faqData: FAQItem[] = [
     {
       id: 1,
-      question: "How long does it take to resolve a prediction?",
-      answer: "After a prediction's deadline passes, administrators have up to 7 days to resolve it. Don't worry - your predictions are safe and visible in your dashboard under the 'Expired' filter while waiting for resolution. Stay calm, the resolution process is in progress!",
-      category: "payouts"
-    },
-    {
-      id: 2,
-      question: "How do I create a prediction?",
-      answer: "To create a prediction, click on 'Create Prediction' in the Actions menu. Fill in the question, description, category, and set a duration. You'll need to pay a small creation fee if you're not an approved creator.",
-      category: "getting-started"
-    },
-    {
-      id: 3,
       question: "What is a prediction market?",
-      answer: "A prediction market is a platform where users can bet on the outcome of future events. Users place ETH on 'YES' or 'NO' for predictions, and winners share the losing pool proportionally to their stake.",
+      answer: "Swipe is a parimutuel prediction market: you back YES or NO on a question with USDC, and at the deadline the winning side splits what the losing side staked. There's no order book and no market maker. The platform holds no position of its own, so it can't win or lose on the outcome, only take a fee.",
       category: "basics"
     },
     {
-      id: 4,
+      id: 2,
+      question: "Which networks does Swipe run on?",
+      answer: "Base today, collateralised in USDC. Robinhood Chain is next, in USDG, but V3 isn't deployed there yet. Each chain runs its own instance of the same audited contract, at its own address, and markets don't share liquidity across chains.",
+      category: "basics"
+    },
+    {
+      id: 3,
       question: "How do I place a bet?",
-      answer: "Browse predictions in Tinder Mode or Market Stats. Choose YES or NO and enter your stake amount in ETH. Confirm the transaction and your bet will be placed immediately.",
+      answer: "Betting is temporarily paused while the app finishes moving onto the new V3 contract, which is live and verified on Base. We'd rather refuse a bet than take one on a contract we can't guarantee settlement for. Once it reopens: approve USDC once, pick a side and an amount (0.1 USDC minimum), and confirm.",
+      category: "betting"
+    },
+    {
+      id: 4,
+      question: "Can I exit a bet before the deadline?",
+      answer: "Yes, part of a position or all of it, for a 5% fee on what the exit is worth. One restriction: in a market's final quarter, you can't exit a side down to exactly zero if you're the only one backing it. That closes off converting a losing bet into a full refund for everyone once the outcome is usually clear.",
       category: "betting"
     },
     {
       id: 5,
       question: "How are payouts calculated?",
-      answer: "Winners share the entire losing pool proportionally to their stake. For example, if you bet 1 ETH on YES and YES wins, you get your 1 ETH back plus a share of the NO pool based on your stake percentage.",
+      answer: "Winners split what the losing side staked, after a 3% platform fee and a 0.5% creator fee, both taken only from the losing pool. Your own stake always comes back in full. How much of the split you get depends on your stake and when you placed it: bets in a market's first quarter count for ×1.50 when the losing pool is divided, ×1.25 in the second quarter, ×1.00 after. See the worked example above.",
       category: "payouts"
     },
     {
       id: 6,
-      question: "How do I claim my winnings?",
-      answer: "After a prediction is resolved, winners can claim their payouts from their dashboard. Look for predictions with 'Claim Reward' buttons in your portfolio.",
+      question: "How long does it take to resolve a prediction?",
+      answer: "A resolver settles the market once its deadline passes; nothing can be resolved while betting is still open. If a market sits unresolved 30 days past its deadline, anyone can open refunds for it, so your stake is never stuck waiting on a single key.",
       category: "payouts"
     },
     {
       id: 7,
-      question: "How does the Tinder-style interface work?",
-      answer: "Swipe right (YES) or left (NO) on predictions to place quick bets. It's designed for fast decision-making on trending predictions.",
-      category: "interface"
+      question: "How do I claim my winnings?",
+      answer: "Open the resolved market from your dashboard and claim. Payouts are pulled by you rather than sent automatically, and nothing expires. If a market becomes refundable instead, claim your stake back the same way.",
+      category: "payouts"
     },
     {
       id: 8,
+      question: "How do I create a prediction?",
+      answer: "Markets are added by the Swipe team rather than through a self-serve form right now. That's part of what's still being rebuilt for V3, with no fixed date yet.",
+      category: "getting-started"
+    },
+    {
+      id: 9,
+      question: "How does the Tinder-style interface work?",
+      answer: "Swipe right for YES or left for NO to place a quick bet from the card stack. The swipe interface is being rebuilt for the new contract along with the rest of betting, so for now it's for browsing markets rather than betting on them.",
+      category: "interface"
+    },
+    {
+      id: 10,
       question: "How do I connect my wallet?",
       answer: "Click the 'Connect Wallet' button in the top-left corner. Choose your preferred wallet (MetaMask, Coinbase Wallet, etc.) and approve the connection.",
       category: "getting-started"
@@ -140,29 +152,25 @@ export function HelpAndFaq() {
         
         <Card className="contract-example-card">
           <CardHeader>
-            <CardTitle className="contract-example-title">Example: Prediction "Bitcoin reaches $100k by end of 2024?"</CardTitle>
+            <CardTitle className="contract-example-title">Example: "Will ETH close above $4,000 on 31 Dec?"</CardTitle>
             <CardDescription className="contract-example-description">
-              Below you'll find a detailed example showing how bets, wins, losses, and platform fees work.
+              The real V3 arithmetic, at the rates deployed on Base: fees come out of the losing pool only, and the winning side splits the rest by weighted stake.
             </CardDescription>
           </CardHeader>
           <CardContent className="contract-example-content">
             <div className="example-scenario">
-              <h4 className="example-title">📊 Initial Situation:</h4>
+              <h4 className="example-title">📊 Initial situation:</h4>
               <div className="example-pools">
                 <div className="pool-yes">
-                  <strong>YES Pool (10 ETH):</strong>
+                  <strong>YES Pool (400 USDC):</strong>
                   <ul>
-                    <li>Alice: 5 ETH</li>
-                    <li>Bob: 3 ETH</li>
-                    <li>Charlie: 2 ETH</li>
+                    <li>Alice: 100 USDC, placed in the first quarter (×1.50)</li>
+                    <li>Ben: 300 USDC, placed after the second quarter (×1.00)</li>
                   </ul>
                 </div>
                 <div className="pool-no">
-                  <strong>NO Pool (6 ETH):</strong>
-                  <ul>
-                    <li>David: 4 ETH</li>
-                    <li>Eve: 2 ETH</li>
-                  </ul>
+                  <strong>NO Pool (1000 USDC):</strong>
+                  <p>This is the pool that gets split among the winners.</p>
                 </div>
               </div>
             </div>
@@ -170,15 +178,19 @@ export function HelpAndFaq() {
             <Separator className="my-6" />
 
             <div className="example-resolution">
-              <h4 className="example-title">✅ Outcome: YES wins!</h4>
+              <h4 className="example-title">✅ Outcome: YES wins</h4>
               <div className="resolution-details">
                 <div className="platform-fee">
-                  <strong>Platform Fee (1%):</strong>
-                  <p>6 ETH × 1% = 0.06 ETH</p>
+                  <strong>Platform fee (3%):</strong>
+                  <p>1000 USDC × 3% = 30 USDC</p>
+                </div>
+                <div className="platform-fee">
+                  <strong>Creator fee (0.5%):</strong>
+                  <p>1000 USDC × 0.5% = 5 USDC</p>
                 </div>
                 <div className="distributable-pool">
-                  <strong>Distributed to Winners:</strong>
-                  <p>6 ETH - 0.06 ETH = 5.94 ETH</p>
+                  <strong>Split between the YES side:</strong>
+                  <p>1000 - 30 - 5 = 965 USDC</p>
                 </div>
               </div>
             </div>
@@ -186,48 +198,34 @@ export function HelpAndFaq() {
             <Separator className="my-6" />
 
             <div className="example-payouts">
-              <h4 className="example-title">💰 Payouts for Winners:</h4>
+              <h4 className="example-title">💰 Payouts for winners:</h4>
               <div className="payouts-list">
                 <div className="payout-item winner">
                   <div className="payout-header">
-                    <strong>Alice</strong> (50% of YES pool)
+                    <strong>Alice</strong> (weighted 150 of 450, 100 × 1.50)
                   </div>
                   <div className="payout-details">
-                    <div>Stake: 5 ETH</div>
-                    <div>Profit: (5/10) × 5.94 ETH = 2.97 ETH</div>
-                    <div className="payout-total"><strong>Total Payout: 7.97 ETH</strong></div>
-                    <div className="payout-profit">Profit: +59.4%</div>
+                    <div>Stake: 100 USDC</div>
+                    <div>Share: (150/450) × 965 USDC = 321.67 USDC</div>
+                    <div className="payout-total"><strong>Total payout: 421.67 USDC</strong></div>
                   </div>
                 </div>
                 <div className="payout-item winner">
                   <div className="payout-header">
-                    <strong>Bob</strong> (30% of YES pool)
+                    <strong>Ben</strong> (weighted 300 of 450, 300 × 1.00)
                   </div>
                   <div className="payout-details">
-                    <div>Stake: 3 ETH</div>
-                    <div>Profit: (3/10) × 5.94 ETH = 1.782 ETH</div>
-                    <div className="payout-total"><strong>Total Payout: 4.782 ETH</strong></div>
-                    <div className="payout-profit">Profit: +59.4%</div>
-                  </div>
-                </div>
-                <div className="payout-item winner">
-                  <div className="payout-header">
-                    <strong>Charlie</strong> (20% of YES pool)
-                  </div>
-                  <div className="payout-details">
-                    <div>Stake: 2 ETH</div>
-                    <div>Profit: (2/10) × 5.94 ETH = 1.188 ETH</div>
-                    <div className="payout-total"><strong>Total Payout: 3.188 ETH</strong></div>
-                    <div className="payout-profit">Profit: +59.4%</div>
+                    <div>Stake: 300 USDC</div>
+                    <div>Share: (300/450) × 965 USDC = 643.33 USDC</div>
+                    <div className="payout-total"><strong>Total payout: 943.33 USDC</strong></div>
                   </div>
                 </div>
                 <div className="payout-item loser">
                   <div className="payout-header">
-                    <strong>David and Eve</strong> (NO pool)
+                    <strong>The NO side</strong>
                   </div>
                   <div className="payout-details">
-                    <div>David: loses 4 ETH</div>
-                    <div>Eve: loses 2 ETH</div>
+                    <div>Loses the full 1000 USDC staked there.</div>
                   </div>
                 </div>
               </div>
@@ -236,13 +234,13 @@ export function HelpAndFaq() {
             <Separator className="my-6" />
 
             <div className="example-summary">
-              <h4 className="example-title">📝 Key Information:</h4>
+              <h4 className="example-title">📝 Key information:</h4>
               <ul className="summary-list">
-                <li>✅ All winners receive the same percentage profit (59.4% in this example)</li>
-                <li>✅ Larger stake = larger absolute profit, but same percentage</li>
-                <li>⚠️ Platform takes 1% from the losing pool</li>
+                <li>✅ A correct prediction never returns less than you staked</li>
+                <li>⚠️ Betting earlier is worth more: it's zero-sum between winners, not free money. Here, weighting moved 80.42 USDC from Ben to Alice; the losing pool stayed 1000 USDC before and after</li>
+                <li>⚠️ Platform takes 3% and the market's creator takes 0.5%, both from the losing pool only</li>
                 <li>⚠️ If you bet on the losing side, you lose your entire stake</li>
-                <li>💡 Always bet responsibly - you can lose your entire stake!</li>
+                <li>💡 Always bet responsibly. You can lose your entire stake</li>
               </ul>
             </div>
           </CardContent>

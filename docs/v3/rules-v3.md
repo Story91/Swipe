@@ -100,7 +100,7 @@ and all are implemented in `contracts/PredictionMarket_V3.sol`.
 |---|---|
 | **Nobody backed the winner → everyone is refunded** | The old contract paid the entire pool to the platform. That paid a dishonest resolver ~99.5% of every pool for picking the empty side. |
 | **A market cannot resolve before its deadline** | The old contract let a resolver settle while betting was still open. |
-| **Anyone can open refunds 30 days after an unresolved deadline** | Stakes must never depend on one key staying available. 33.7M SWIPE is permanently stranded in the old V2 contract for exactly this reason. |
+| **Anyone can open refunds 30 days after an unresolved deadline** | Stakes must never depend on one key staying available — that's exactly what stranded funds in the old V2 contract. |
 | **Ownership transfers in two steps; resolvers are a separate revocable role** | The old contract had no ownership transfer at all — it was the deployer's forever. Automation now runs on a narrow hot key while ownership stays cold. |
 | **Creator rewards are pulled, not pushed** | A creator who could not receive the token used to be able to block resolution for everyone in that market. |
 | **Early exit retains exactly what it does not pay out** | The difference used to go untracked, creating "orphaned" balances — and a drain function written to collect them that could take user stakes. |

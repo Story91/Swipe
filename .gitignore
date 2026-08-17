@@ -38,3 +38,20 @@ next-env.d.ts
 
 # verification build output (see next.config.mjs distDir)
 .next-check/
+
+# internal / sensitive — kept locally, never published (2026-08-17 audit).
+# Files still exist on disk for local tooling; git just stops tracking them.
+CLAUDE.md
+docs/superpowers/specs/2026-08-17-usdc-dualpool-security-audit.md
+docs/v3/HANDOFF.md
+docs/v3/swipe-migration-audit.md
+scripts/audit_compromised_wallet.js
+scripts/audit_ownership.js
+scripts/inspect_staking_manager.js
+scripts/get_users_from_v1_contract.js
+all_betting_users.txt
+docs/swipe_sender_addresses.txt
+docs/swipe-holder-snapshot-*.json
+docs/blacklist.txt
+docs/blacklist_check_results.txt
+docs/export-tokentxns-*.csv

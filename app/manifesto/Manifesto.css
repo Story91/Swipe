@@ -1,601 +1,713 @@
-/* SWIPE Manifesto Styles */
+/*
+ * Manifesto: the tote sheet.
+ *
+ * Parimutuel betting is tote betting, so the page is built like a tote board and
+ * a racecard rather than a stack of feature cards. Two devices carry it: hairline
+ * rules that separate without boxing, and a narrow left rail that holds the label
+ * for each block while the prose sits in the wide column. The eight identical
+ * rounded-card grids that used to be here are gone; they made every section look
+ * like every other one, which is what made the page read as generated.
+ *
+ * Palette is unchanged from the original file: #d4ff00 on the #1a1a1a/#2d2d2d
+ * gradient, white at various alphas, and the same accent tints. Only type,
+ * structure and rhythm changed.
+ *
+ * Type has three roles. Orbitron is the display face the app has always named in
+ * its stylesheets and never loaded, so the page finally speaks in the product's
+ * own voice. Plex Sans carries the prose, because Orbitron is unreadable at
+ * paragraph length. Plex Mono carries every figure, tabular, so columns of
+ * numbers line up like a board's.
+ */
 
-.manifesto-container {
+.mf {
+  --mf-lime: #d4ff00;
+  --mf-paper: rgba(255, 255, 255, 0.92);
+  --mf-paper-2: rgba(255, 255, 255, 0.72);
+  --mf-paper-3: rgba(255, 255, 255, 0.5);
+  --mf-rule: rgba(255, 255, 255, 0.1);
+  --mf-rule-strong: rgba(255, 255, 255, 0.18);
+  --mf-surface: rgba(255, 255, 255, 0.04);
+  --mf-wash: rgba(212, 255, 0, 0.06);
+  --mf-lime-line: rgba(212, 255, 0, 0.22);
+
+  --mf-display: var(--font-display), 'Orbitron', sans-serif;
+  --mf-body: var(--font-body), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mf-data: var(--font-data), 'Monaco', 'Menlo', monospace;
+
+  --mf-gutter: 24px;
+  --mf-rail: 148px;
+
   min-height: 100vh;
   background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
-  color: rgba(255, 255, 255, 0.9);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-  line-height: 1.6;
+  color: var(--mf-paper);
+  font-family: var(--mf-body);
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
 }
 
-.manifesto-header {
-  padding: 60px 24px 40px;
-  text-align: center;
-  border-bottom: 1px solid rgba(212, 255, 0, 0.1);
-  background: linear-gradient(135deg, rgba(212, 255, 0, 0.05), rgba(0, 0, 0, 0.1));
+.mf-shell {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 var(--mf-gutter);
 }
 
-.manifesto-title-section {
-  margin-bottom: 32px;
+/* ---------------------------------------------------------------- eyebrows */
+
+/* Small caps label in the display face. Used for rail labels and board heads,
+   never as decoration on its own. */
+.mf-eyebrow {
+  font-family: var(--mf-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--mf-lime);
+  margin: 0;
 }
 
-.manifesto-main-title {
-  font-size: 48px;
+/* ------------------------------------------------------------------- hero */
+
+.mf-hero {
+  padding: 72px 0 40px;
+  border-bottom: 1px solid var(--mf-rule);
+}
+
+.mf-hero-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 40px;
+}
+
+.mf-hero-title {
+  font-family: var(--mf-display);
   font-weight: 800;
-  color: #d4ff00;
-  letter-spacing: -2px;
-  margin-bottom: 16px;
-  text-shadow: 0 0 20px rgba(212, 255, 0, 0.3);
+  font-size: clamp(34px, 6.2vw, 66px);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  margin: 14px 0 0;
+  max-width: 15ch;
 }
 
-.manifesto-subtitle {
-  font-size: 20px;
-  color: rgba(255, 255, 255, 0.8);
-  font-weight: 500;
-  max-width: 800px;
-  margin: 0 auto;
-  line-height: 1.5;
+/* The one place the accent lands large. Everything else stays white. */
+.mf-hero-title em {
+  font-style: normal;
+  color: var(--mf-lime);
 }
 
-.manifesto-social-links {
+.mf-hero-lede {
+  font-size: 19px;
+  color: var(--mf-paper-2);
+  max-width: 56ch;
+  margin: 24px 0 0;
+}
+
+.mf-social {
   display: flex;
-  gap: 20px;
-  justify-content: center;
-  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding-top: 6px;
 }
 
-.manifesto-social-link {
+.mf-social-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--mf-rule);
+  background: transparent;
+  color: var(--mf-paper-3);
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.mf-social-link:hover,
+.mf-social-link:focus-visible {
+  color: var(--mf-lime);
+  border-color: var(--mf-lime-line);
+}
+
+/* ------------------------------------------------- signature: tote board */
+
+.mf-board {
+  margin: 40px 0 0;
+  border: 1px solid var(--mf-rule-strong);
+  background: var(--mf-surface);
+}
+
+.mf-board-head {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.7);
-  transition: all 0.3s ease;
-  text-decoration: none;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--mf-rule);
 }
 
-.manifesto-social-link:hover {
-  background: rgba(212, 255, 0, 0.1);
-  border-color: #d4ff00;
-  color: #d4ff00;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(212, 255, 0, 0.2);
+.mf-board-q {
+  font-family: var(--mf-display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  margin: 0;
 }
 
-.manifesto-content {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 60px 24px;
+.mf-board-outcome {
+  font-family: var(--mf-data);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mf-lime);
+  margin: 0;
 }
 
-.manifesto-section {
-  margin-bottom: 48px;
+/* Two pools facing each other across the swipe axis: NO reads right to left,
+   YES reads left to right. This is the only place that axis is drawn. */
+.mf-pools {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
 }
 
-.section-title {
-  font-size: 32px;
+.mf-pool {
+  padding: 18px 20px;
+}
+
+.mf-pool + .mf-pool {
+  border-left: 1px solid var(--mf-rule);
+}
+
+.mf-pool-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.mf-pool--no .mf-pool-top {
+  flex-direction: row-reverse;
+}
+
+.mf-pool-side {
+  font-family: var(--mf-display);
+  font-size: 13px;
   font-weight: 700;
-  color: #d4ff00;
-  margin-bottom: 24px;
-  letter-spacing: -1px;
-  position: relative;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mf-paper-3);
 }
 
-.section-title::after {
-  content: '';
-  position: absolute;
-  bottom: -8px;
-  left: 0;
-  width: 60px;
-  height: 3px;
-  background: linear-gradient(90deg, #d4ff00, transparent);
-  border-radius: 2px;
+.mf-pool--yes .mf-pool-side {
+  color: var(--mf-lime);
 }
 
-.section-text {
-  font-size: 18px;
-  color: rgba(255, 255, 255, 0.85);
-  margin-bottom: 20px;
-  line-height: 1.7;
-  font-weight: 400;
+.mf-pool-figure {
+  font-family: var(--mf-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 21px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
 
-.code-block {
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(212, 255, 0, 0.2);
-  border-radius: 12px;
-  padding: 24px;
-  margin: 24px 0;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  position: relative;
+.mf-pool-track {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.07);
   overflow: hidden;
 }
 
-.code-block::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, #d4ff00, transparent);
+.mf-pool-fill {
+  height: 100%;
+  background: var(--mf-lime);
+  transform-origin: left center;
+  transform: scaleX(var(--mf-fill, 0));
+  transition: transform 720ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.code-text {
-  color: #d4ff00;
-  font-size: 16px;
-  margin: 8px 0;
-  font-weight: 500;
+.mf-pool--no .mf-pool-fill {
+  background: rgba(255, 255, 255, 0.28);
+  transform-origin: right center;
 }
 
-.mission-list {
-  margin: 24px 0;
-  padding-left: 0;
-  list-style: none;
+.mf-pool-note {
+  font-size: 13px;
+  color: var(--mf-paper-3);
+  margin: 10px 0 0;
 }
 
-.mission-list li {
-  margin: 16px 0;
-  padding: 16px 20px;
-  background: rgba(212, 255, 0, 0.05);
-  border-left: 4px solid #d4ff00;
-  border-radius: 8px;
-  font-size: 18px;
-  color: rgba(255, 255, 255, 0.9);
-  position: relative;
+.mf-pool--no .mf-pool-top,
+.mf-pool--no .mf-pool-note {
+  text-align: right;
 }
 
-.mission-list li::before {
-  content: '→';
-  position: absolute;
-  left: -12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #d4ff00;
-  font-weight: bold;
-  font-size: 20px;
+/* The settlement ledger. Keys left, figures right, hairline between rows, so a
+   reader can follow the money down the column. */
+.mf-settle {
+  border-top: 1px solid var(--mf-rule);
 }
 
-.manifesto-signature {
-  text-align: center;
-  font-size: 24px;
-  color: #d4ff00;
-  margin-top: 40px;
-  padding: 20px;
-  background: rgba(212, 255, 0, 0.05);
-  border-radius: 12px;
-  border: 1px solid rgba(212, 255, 0, 0.2);
-}
-
-.manifesto-footer {
-  background: rgba(0, 0, 0, 0.3);
-  border-top: 1px solid rgba(212, 255, 0, 0.1);
-  padding: 40px 24px;
-  margin-top: 60px;
-}
-
-.footer-content {
-  max-width: 800px;
-  margin: 0 auto;
-  text-align: center;
-}
-
-.footer-text {
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 14px;
-  margin-bottom: 20px;
-  font-weight: 500;
-}
-
-.footer-links {
+.mf-settle-row {
   display: flex;
-  gap: 24px;
-  justify-content: center;
-  align-items: center;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 20px;
 }
 
-.footer-link {
-  color: #d4ff00;
-  text-decoration: none;
+.mf-settle-row + .mf-settle-row {
+  border-top: 1px solid var(--mf-rule);
+}
+
+.mf-settle-row--total {
+  background: var(--mf-wash);
+}
+
+.mf-settle-key {
+  font-size: 14px;
+  color: var(--mf-paper-2);
+}
+
+.mf-settle-row--total .mf-settle-key {
+  color: var(--mf-paper);
   font-weight: 600;
-  padding: 8px 16px;
-  border: 1px solid rgba(212, 255, 0, 0.3);
-  border-radius: 8px;
-  transition: all 0.3s ease;
-  font-size: 14px;
 }
 
-.footer-link:hover {
-  background: rgba(212, 255, 0, 0.1);
-  border-color: #d4ff00;
-  transform: translateY(-1px);
+.mf-settle-val {
+  font-family: var(--mf-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  white-space: nowrap;
 }
 
-/* Mobile Responsive */
-@media (max-width: 768px) {
-  .manifesto-header {
-    padding: 40px 16px 30px;
-  }
-
-  .manifesto-main-title {
-    font-size: 36px;
-  }
-
-  .manifesto-subtitle {
-    font-size: 18px;
-  }
-
-  .manifesto-content {
-    padding: 40px 16px;
-  }
-
-  .section-title {
-    font-size: 28px;
-  }
-
-  .section-text {
-    font-size: 16px;
-  }
-
-  .code-block {
-    padding: 16px;
-  }
-
-  .code-text {
-    font-size: 14px;
-  }
-
-  .mission-list li {
-    font-size: 16px;
-    padding: 12px 16px;
-  }
-
-  .manifesto-signature {
-    font-size: 20px;
-    padding: 16px;
-  }
-
-  .footer-links {
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .manifesto-social-links {
-    gap: 16px;
-  }
-
-  .manifesto-social-link {
-    width: 44px;
-    height: 44px;
-  }
+.mf-settle-row--total .mf-settle-val {
+  color: var(--mf-lime);
+  font-weight: 600;
 }
 
-/* Print Styles */
-@media print {
-  .manifesto-container {
-    background: white;
-    color: black;
-  }
-
-  .manifesto-main-title {
-    color: #000;
-    text-shadow: none;
-  }
-
-  .section-title {
-    color: #000;
-  }
-
-  .section-text {
-    color: #333;
-  }
-
-  .code-block {
-    background: #f5f5f5;
-    border: 1px solid #ddd;
-  }
-
-  .code-text {
-    color: #000;
-  }
-
-  .manifesto-social-links {
-    display: none;
-  }
-
-  .footer-links {
-    display: none;
-  }
+.mf-settle-sub {
+  display: block;
+  font-family: var(--mf-body);
+  font-size: 12px;
+  color: var(--mf-paper-3);
+  text-align: right;
+  margin-top: 2px;
 }
 
-/* New Guide Sections */
-.subsection-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: #d4ff00;
-  margin: 40px 0 20px 0;
-  padding-bottom: 12px;
-  border-bottom: 2px solid rgba(212, 255, 0, 0.2);
+/* Weight brackets as quarters of a market's life, which is what they are. */
+.mf-weights {
+  border-top: 1px solid var(--mf-rule);
+  padding: 18px 20px 20px;
 }
 
-.guide-steps {
+.mf-weights-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.mf-weights-span {
+  font-family: var(--mf-data);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--mf-paper-3);
+  text-transform: uppercase;
+}
+
+.mf-quarters {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-  margin: 24px 0;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
 }
 
-.step {
+.mf-quarter {
+  padding: 10px 10px 12px;
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  padding: 20px;
-  transition: all 0.3s ease;
+  border-top: 2px solid rgba(255, 255, 255, 0.12);
 }
 
-.step:hover {
-  border-color: rgba(212, 255, 0, 0.3);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
-  transform: translateY(-2px);
+.mf-quarter--x150 { border-top-color: var(--mf-lime); }
+.mf-quarter--x125 { border-top-color: rgba(212, 255, 0, 0.45); }
+
+.mf-quarter-w {
+  font-family: var(--mf-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+  font-weight: 600;
+  display: block;
 }
 
-.step h4 {
-  color: #d4ff00;
-  font-size: 18px;
-  font-weight: 700;
-  margin-bottom: 12px;
+.mf-quarter--x150 .mf-quarter-w { color: var(--mf-lime); }
+
+.mf-quarter-when {
+  font-size: 11px;
+  color: var(--mf-paper-3);
+  display: block;
+  margin-top: 3px;
+  line-height: 1.35;
 }
 
-.step p {
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 14px;
+/* ------------------------------------------------------------ rail layout */
+
+.mf-body {
+  padding: 8px 0 0;
+}
+
+.mf-block {
+  display: grid;
+  grid-template-columns: var(--mf-rail) 1fr;
+  gap: 32px;
+  padding: 40px 0;
+  border-bottom: 1px solid var(--mf-rule);
+}
+
+.mf-block:last-child {
+  border-bottom: 0;
+}
+
+.mf-rail {
+  padding-top: 4px;
+}
+
+.mf-rail-meta {
+  font-family: var(--mf-data);
+  font-size: 12px;
+  color: var(--mf-paper-3);
+  margin: 8px 0 0;
   line-height: 1.5;
+}
+
+.mf-h2 {
+  font-family: var(--mf-display);
+  font-size: clamp(21px, 2.6vw, 28px);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  margin: 0 0 16px;
+}
+
+.mf-p {
+  margin: 0 0 16px;
+  color: var(--mf-paper-2);
+  max-width: 66ch;
+}
+
+.mf-p:last-child {
+  margin-bottom: 0;
+}
+
+.mf-p strong {
+  color: var(--mf-paper);
+  font-weight: 600;
+}
+
+.mf-data {
+  font-family: var(--mf-data);
+  font-variant-numeric: tabular-nums;
+  color: var(--mf-paper);
+}
+
+/* Definition rows for the safety rules. A rule and the reason it exists, which
+   is a pair, so it is set as a pair rather than as a card. */
+.mf-rules {
+  margin: 4px 0 0;
+  border-top: 1px solid var(--mf-rule);
+}
+
+.mf-rule-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: 24px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--mf-rule);
+}
+
+.mf-rule-term {
+  font-family: var(--mf-display);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  color: var(--mf-paper);
   margin: 0;
 }
 
-.category-examples {
+.mf-rule-def {
+  font-size: 15px;
+  color: var(--mf-paper-2);
+  margin: 0;
+}
+
+/* Numbered only because placing a bet genuinely is a sequence. */
+.mf-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: mf-step;
+}
+
+.mf-step {
+  counter-increment: mf-step;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 20px;
-  margin: 24px 0;
+  grid-template-columns: 34px 1fr;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--mf-rule);
 }
 
-.category-example {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  padding: 20px;
-  transition: all 0.3s ease;
+.mf-step:last-child {
+  border-bottom: 0;
 }
 
-.category-example:hover {
-  border-color: rgba(212, 255, 0, 0.3);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
-  transform: translateY(-2px);
+.mf-step::before {
+  content: counter(mf-step, decimal-leading-zero);
+  font-family: var(--mf-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--mf-lime);
+  padding-top: 2px;
 }
 
-.category-example h4 {
-  color: #d4ff00;
-  font-size: 18px;
+.mf-step-text {
+  margin: 0;
+  color: var(--mf-paper-2);
+  font-size: 15px;
+}
+
+.mf-step-text strong {
+  color: var(--mf-paper);
+  font-weight: 600;
+}
+
+/* Chain rows: label, token, address. Monospaced so the two addresses align. */
+.mf-chains {
+  margin: 4px 0 0;
+  border-top: 1px solid var(--mf-rule);
+}
+
+.mf-chain {
+  display: grid;
+  grid-template-columns: 132px 90px 1fr;
+  gap: 16px;
+  align-items: baseline;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--mf-rule);
+}
+
+.mf-chain-name {
+  font-family: var(--mf-display);
+  font-size: 14px;
   font-weight: 700;
-  margin-bottom: 16px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.mf-chain-token,
+.mf-chain-where {
+  font-family: var(--mf-data);
+  font-size: 13px;
+  color: var(--mf-paper-2);
+  word-break: break-all;
+}
+
+.mf-chain-where a {
+  color: var(--mf-lime);
+  text-decoration: none;
+  border-bottom: 1px solid var(--mf-lime-line);
+}
+
+.mf-chain-where a:hover,
+.mf-chain-where a:focus-visible {
+  border-bottom-color: var(--mf-lime);
+}
+
+.mf-chain--pending .mf-chain-name,
+.mf-chain--pending .mf-chain-token {
+  color: var(--mf-paper-3);
+}
+
+/* A single flagged note, for the one thing about today's state that a reader
+   would otherwise get wrong. */
+.mf-note {
+  border-left: 2px solid var(--mf-lime);
+  padding: 2px 0 2px 18px;
+  margin: 4px 0 0;
+}
+
+.mf-note p {
+  margin: 0;
+  font-size: 15px;
+  color: var(--mf-paper-2);
+}
+
+.mf-note p + p {
+  margin-top: 10px;
+}
+
+/* ----------------------------------------------------------------- footer */
+
+.mf-footer {
+  border-top: 1px solid var(--mf-rule);
+  margin-top: 8px;
+  padding: 32px 0 56px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.mf-footer-note {
+  font-family: var(--mf-data);
+  font-size: 12px;
+  color: var(--mf-paper-3);
+  margin: 0;
+}
+
+.mf-footer-links {
+  display: flex;
   gap: 8px;
 }
 
-.category-example ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+.mf-footer-link {
+  font-family: var(--mf-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mf-paper-2);
+  background: transparent;
+  border: 1px solid var(--mf-rule);
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease;
 }
 
-.category-example li {
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 14px;
-  line-height: 1.5;
-  margin-bottom: 8px;
-  padding-left: 16px;
-  position: relative;
+.mf-footer-link:hover,
+.mf-footer-link:focus-visible {
+  color: var(--mf-lime);
+  border-color: var(--mf-lime-line);
 }
 
-.category-example li:before {
-  content: "•";
-  color: #d4ff00;
-  position: absolute;
-  left: 0;
+/* -------------------------------------------------------- quality floor */
+
+.mf :focus-visible {
+  outline: 2px solid var(--mf-lime);
+  outline-offset: 2px;
 }
 
-.creation-guide {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-  margin: 24px 0;
+@media (max-width: 860px) {
+  .mf {
+    --mf-gutter: 18px;
+    font-size: 16px;
+  }
+
+  .mf-hero {
+    padding: 44px 0 32px;
+  }
+
+  .mf-hero-top {
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    gap: 20px;
+    margin-bottom: 28px;
+  }
+
+  .mf-hero-lede {
+    font-size: 17px;
+  }
+
+  /* Rail becomes an eyebrow stacked above the prose. */
+  .mf-block {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 32px 0;
+  }
+
+  .mf-rail {
+    padding-top: 0;
+  }
+
+  .mf-rail-meta {
+    margin-top: 4px;
+  }
+
+  .mf-rule-row,
+  .mf-chain {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .mf-quarters {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .mf-pools {
+    grid-template-columns: 1fr;
+  }
+
+  .mf-pool + .mf-pool {
+    border-left: 0;
+    border-top: 1px solid var(--mf-rule);
+  }
+
+  .mf-pool--no .mf-pool-top {
+    flex-direction: row;
+  }
+
+  .mf-pool--no .mf-pool-top,
+  .mf-pool--no .mf-pool-note {
+    text-align: left;
+  }
+
+  .mf-pool--no .mf-pool-fill {
+    transform-origin: left center;
+  }
 }
 
-.creation-step {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  padding: 20px;
-  transition: all 0.3s ease;
+@media (prefers-reduced-motion: reduce) {
+  .mf-pool-fill {
+    transition: none;
+  }
+
+  .mf * {
+    transition-duration: 1ms !important;
+  }
 }
 
-.creation-step:hover {
-  border-color: rgba(212, 255, 0, 0.3);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
-  transform: translateY(-2px);
-}
+@media print {
+  .mf {
+    background: #fff;
+    color: #111;
+  }
 
-.creation-step h4 {
-  color: #d4ff00;
-  font-size: 18px;
-  font-weight: 700;
-  margin-bottom: 12px;
-}
+  .mf-hero-title em,
+  .mf-eyebrow,
+  .mf-board-outcome,
+  .mf-settle-row--total .mf-settle-val,
+  .mf-quarter--x150 .mf-quarter-w {
+    color: #111;
+  }
 
-.creation-step p {
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 14px;
-  line-height: 1.5;
-  margin: 0;
-}
+  .mf-social,
+  .mf-footer-links {
+    display: none;
+  }
 
-.token-info {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-  margin: 24px 0;
-}
+  .mf-p,
+  .mf-rule-def,
+  .mf-step-text {
+    color: #333;
+  }
 
-.token-details {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  padding: 20px;
-  transition: all 0.3s ease;
-}
-
-.token-details:hover {
-  border-color: rgba(212, 255, 0, 0.3);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
-  transform: translateY(-2px);
-}
-
-.token-details h4 {
-  color: #d4ff00;
-  font-size: 18px;
-  font-weight: 700;
-  margin-bottom: 16px;
-}
-
-.token-details ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.token-details li {
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 14px;
-  line-height: 1.5;
-  margin-bottom: 8px;
-  padding-left: 16px;
-  position: relative;
-}
-
-.token-details li:before {
-  content: "•";
-  color: #d4ff00;
-  position: absolute;
-  left: 0;
-}
-
-.payout-explanation {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-  margin: 24px 0;
-}
-
-.payout-step {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  padding: 20px;
-  transition: all 0.3s ease;
-}
-
-.payout-step:hover {
-  border-color: rgba(212, 255, 0, 0.3);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
-  transform: translateY(-2px);
-}
-
-.payout-step h4 {
-  color: #d4ff00;
-  font-size: 18px;
-  font-weight: 700;
-  margin-bottom: 12px;
-}
-
-.payout-step p {
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 14px;
-  line-height: 1.5;
-  margin: 0;
-}
-
-.features-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-  margin: 24px 0;
-}
-
-.feature {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  padding: 20px;
-  transition: all 0.3s ease;
-}
-
-.feature:hover {
-  border-color: rgba(212, 255, 0, 0.3);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
-  transform: translateY(-2px);
-}
-
-.feature h4 {
-  color: #d4ff00;
-  font-size: 18px;
-  font-weight: 700;
-  margin-bottom: 12px;
-}
-
-.feature p {
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 14px;
-  line-height: 1.5;
-  margin: 0;
-}
-
-.faq-section {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 20px;
-  margin: 24px 0;
-}
-
-.faq-item {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  padding: 20px;
-  transition: all 0.3s ease;
-}
-
-.faq-item:hover {
-  border-color: rgba(212, 255, 0, 0.3);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
-  transform: translateY(-2px);
-}
-
-.faq-item h4 {
-  color: #d4ff00;
-  font-size: 16px;
-  font-weight: 700;
-  margin-bottom: 12px;
-}
-
-.faq-item p {
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 14px;
-  line-height: 1.5;
-  margin: 0;
+  .mf-board,
+  .mf-quarter {
+    background: #f6f6f6;
+    border-color: #ddd;
+  }
 }
