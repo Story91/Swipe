@@ -5,6 +5,8 @@ import { useWriteContract, useAccount, useReadContract, useWaitForTransactionRec
 import { formatEther } from 'viem';
 import { getChainConfig, isWritableMarket } from '@/lib/chains';
 import { useActiveChain } from '@/lib/chains/activeChain';
+import { useMarketWrite } from '@/lib/chains/useMarketWrite';
+import { useAdminRequest } from '@/lib/auth/useAdminRequest';
 import { CONTRACTS, SWIPE_TOKEN } from '../../../lib/contract';
 import { calculateApprovalAmount } from '../../../lib/constants/approval';
 import { uploadToImgBB } from '../../../lib/imgbb';
@@ -54,8 +56,15 @@ const CRYPTO_OPTIONS = [
 
 export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePredictionModalProps) {
   const { address } = useAccount();
-  // The selected chain, not the build-time default: the creation guard gates on it.
+  // The selected chain, not the build-time default.
   const { chainKey } = useActiveChain();
+  // Resolves the V3 market this proposal will eventually be registered against.
+  // Nothing here writes to it; the resolver does that from the admin surface.
+  const marketWrite = useMarketWrite();
+  // Proposing is privileged. V2's spam control was the creation fee and V3 has
+  // none, so the endpoint is signature gated and this signs for it.
+  const signAdminRequest = useAdminRequest();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { writeContract, data: hash, error: writeError, isPending, reset: resetWriteContract } = useWriteContract();
   const { composeCast: minikitComposeCast } = useComposeCast();
   const { context } = useMiniKit();
@@ -469,132 +478,86 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
   const [isApproving, setIsApproving] = useState(false);
 
   // Helper function to execute the actual prediction creation
+  /**
+   * Submits a proposal rather than minting a market.
+   *
+   * V2 minted on chain from here: a public createPrediction, a fee in ETH or
+   * $SWIPE, and the contract's counter for the id. V3 has no public creation and
+   * no fee, and registerPrediction is onlyResolver, so this writes a proposal
+   * and a resolver registers it afterwards from the admin surface.
+   *
+   * Nothing reaches a contract from this component any more. A proposal that is
+   * never registered is inert: it sits in the pending set, out of the feed, and
+   * no user can bet against it.
+   */
   const executeCreatePrediction = async () => {
     const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
-    const durationHours = Math.ceil((endDateTime.getTime() - Date.now()) / (1000 * 60 * 60));
-    
+    const deadline = Math.floor(endDateTime.getTime() / 1000);
+
     const selectedCryptoData = CRYPTO_OPTIONS.find(c => c.symbol === formData.selectedCrypto);
     let finalImageUrl = formData.imageUrl.trim();
-    
+
     if (formData.includeChart && selectedCryptoData) {
       finalImageUrl = `https://www.geckoterminal.com/${selectedCryptoData.chain}/pools/${selectedCryptoData.poolAddress}?embed=1&info=0&swaps=0&light_chart=1&chart_type=price&resolution=1d&bg_color=ffffff`;
     }
 
-    if (formData.paymentToken === 'ETH') {
-      const value = canCreateFree ? BigInt(0) : (ethFee as bigint || BigInt(0));
-      
-      await writeContract({
-        address: CONTRACTS.V2.address as `0x${string}`,
-        abi: CONTRACTS.V2.abi,
-        functionName: 'createPrediction',
-        args: [
-          formData.question.trim(),
-          formData.description.trim(),
-          formData.category,
-          finalImageUrl,
-          BigInt(durationHours)
-        ],
-        value,
-        chainId: ACTIVE_CHAIN_ID
-      });
-    } else {
-      const tokenAmount = canCreateFree ? BigInt(0) : (swipeFee as bigint || BigInt(0));
+    // The id is allocated server-side with an atomic counter. Deriving it here,
+    // or from the highest existing record, gives two proposals in the same
+    // second the same number and points two markets at one on-chain id.
+    const headers = await signAdminRequest('propose');
+    const response = await fetch('/api/predictions/propose', {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question: formData.question.trim(),
+        description: formData.description.trim(),
+        category: formData.category,
+        imageUrl: finalImageUrl,
+        includeChart: formData.includeChart,
+        selectedCrypto: formData.selectedCrypto,
+        deadline,
+        creator: address,
+      }),
+    });
 
-      await writeContract({
-        address: CONTRACTS.V2.address as `0x${string}`,
-        abi: CONTRACTS.V2.abi,
-        functionName: 'createPredictionWithToken',
-        args: [
-          formData.question.trim(),
-          formData.description.trim(),
-          formData.category,
-          finalImageUrl,
-          BigInt(durationHours),
-          SWIPE_TOKEN.address as `0x${string}`,
-          tokenAmount
-        ],
-        chainId: ACTIVE_CHAIN_ID
-      });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result?.success) {
+      throw new Error(result?.error || `Proposal failed (${response.status})`);
     }
+
+    setCreatedQuestion(formData.question.trim());
+    setSuccessTxHash('');
+    setShowSuccessModal(true);
+    onSuccess?.();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // This modal creates markets on CONTRACTS.V2, archived: its owner key is
-    // no longer available, so a market created there could never be resolved.
-    // The guard compares that target address against the selected chain's live
-    // market and refuses anything else.
-    //
-    // It used to ask isReadOnlyChain() with no argument, which held only while
-    // Base itself was unwritable. Base runs V3 now, so that form would have let
-    // this create markets on a dead contract.
-    if (!isWritableMarket(chainKey, CONTRACTS.V2.address)) {
-      alert(
-        'Market creation is moving to V3.\n\n' +
-        'V3 is live on Base with audited contracts, but this form still creates ' +
-        'markets on the old contract, so it is switched off until it is rewired.'
-      );
+    // No contract write happens here any more, so there is no address to guard.
+    // A proposal is inert until a resolver registers it, and registration is
+    // guarded on the admin surface where it belongs. The V3 market this will be
+    // registered against is resolved there too, through isWritableMarket.
+    if (!marketWrite.ready) {
+      alert('This network has no Swipe market yet. Switch networks to propose a market.');
       return;
     }
 
     if (!validateForm() || !canCreate) return;
 
+    // V3 charges no creation fee, so the ETH and $SWIPE payment paths, and the
+    // token approval that went with them, are gone. There is nothing to pay and
+    // nothing to approve.
+    setIsSubmitting(true);
     try {
-      // For SWIPE payment, check if approval is needed first
-      if (formData.paymentToken === 'SWIPE' && !canCreateFree && swipeFee) {
-        const currentAllowance = swipeAllowance as bigint || BigInt(0);
-        const requiredAmount = swipeFee as bigint;
-        
-        if (currentAllowance < requiredAmount) {
-          // Need approval first - do approve then create (like TinderCard)
-          setIsApproving(true);
-          
-          const approvalAmount = calculateApprovalAmount(requiredAmount);
-          
-          writeContract({
-            address: SWIPE_TOKEN.address as `0x${string}`,
-            abi: [{
-              inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }],
-              name: 'approve',
-              outputs: [{ name: '', type: 'bool' }],
-              stateMutability: 'nonpayable',
-              type: 'function'
-            }],
-            functionName: 'approve',
-            args: [CONTRACTS.V2.address as `0x${string}`, approvalAmount],
-            chainId: ACTIVE_CHAIN_ID
-          }, {
-            onSuccess: async () => {
-              console.log('✅ SWIPE approval successful, now creating prediction...');
-              setIsApproving(false);
-              
-              // Wait a moment for approval to be mined, then create prediction
-              setTimeout(async () => {
-                try {
-                  await executeCreatePrediction();
-                } catch (error) {
-                  console.error('Create prediction after approval failed:', error);
-                  setErrors({ submit: 'Failed to create prediction after approval. Please try again.' });
-                }
-              }, 2000);
-            },
-            onError: (error) => {
-              console.error('❌ SWIPE approval failed:', error);
-              setIsApproving(false);
-              setErrors({ submit: 'SWIPE approval failed. Please try again.' });
-            }
-          });
-          
-          return; // Don't proceed yet, wait for approval callback
-        }
-      }
-
-      // ETH payment or SWIPE already approved - create directly
       await executeCreatePrediction();
     } catch (error) {
-      console.error('Create prediction failed:', error);
-      setErrors({ submit: 'Failed to create prediction. Please try again.' });
+      console.error('Proposal failed:', error);
+      setErrors({
+        submit: error instanceof Error ? error.message : 'Failed to propose the market.',
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
