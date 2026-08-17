@@ -38,6 +38,7 @@ import ShinyText from '@/components/ShinyText';
 import GradientText from '@/components/GradientText';
 import TextType from '@/components/TextType';
 import { SharePreviewModal } from '../Modals/SharePreviewModal';
+import { MarketPools } from './MarketPools';
 
 // Just the two entry points the collateral needs. Kept minimal on purpose: the
 // spender and the token address are never literals here, they come from
@@ -716,6 +717,18 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     description: pred.description,
     creator: pred.creator,
     createdAt: pred.deadline - (24 * 60 * 60), // Approximate creation time
+    /**
+     * When the market really opened, or undefined when the record does not say.
+     *
+     * `createdAt` above is invented: deadline minus a day, regardless of the
+     * market's actual window. Harmless where it is used, which is a V1 cutoff
+     * comparison, and wrong for anything that measures how far through its life
+     * a market is. The time weighting is exactly that, so it reads this instead
+     * and shows nothing rather than a multiplier derived from a guess.
+     */
+    openedAt: typeof pred.createdAt === 'number' && pred.createdAt > 0 ? pred.createdAt : undefined,
+    /** The collateral market's own backer count. `participants` is the V2 array. */
+    usdcParticipantCount: (pred as { usdcParticipantCount?: number }).usdcParticipantCount ?? 0,
     hasUserApproved: false, // Will be updated when approval system is implemented
     isRejected: false,
     rejectionReason: "",
@@ -2862,113 +2875,27 @@ KEY USER-FACING CHANGES: V1 → V2
         </table>
            </div>
            
-      {/* ETH Pool - Hacker Style */}
-      <div className="cyber-pool eth-pool mb-4">
-        <div className="pool-header">
-          <img src="/Ethereum-icon-purple.svg" alt="ETH" className="pool-logo" />
-          <span className="pool-title">ETH_POOL</span>
-          <span className="pool-total">
-                   {(() => {
-              const total = ((transformedPredictions[currentIndex]?.yesTotalAmount || 0) + (transformedPredictions[currentIndex]?.noTotalAmount || 0)) / 1e18;
-              return total > 0 ? total.toFixed(5) : '0.00000';
-                   })()} ETH
-                 </span>
-               </div>
-        <div className="pool-grid">
-          <div className="pool-side yes">
-            <div className="side-label">YES</div>
-            <div className="side-amount">
-              {((transformedPredictions[currentIndex]?.yesTotalAmount || 0) / 1e18).toFixed(5)}
-               </div>
-            <div className="side-usd">
-              {formatUsdValue((transformedPredictions[currentIndex]?.yesTotalAmount || 0) / 1e18, 'ETH')}
-             </div>
-                       </div>
-          <div className="pool-side no">
-            <div className="side-label">NO</div>
-            <div className="side-amount">
-              {((transformedPredictions[currentIndex]?.noTotalAmount || 0) / 1e18).toFixed(5)}
-                     </div>
-            <div className="side-usd">
-              {formatUsdValue((transformedPredictions[currentIndex]?.noTotalAmount || 0) / 1e18, 'ETH')}
-            </div>
-          </div>
-        </div>
-        {/* Split Bar */}
-        {(() => {
-          const yesAmount = transformedPredictions[currentIndex]?.yesTotalAmount || 0;
-          const noAmount = transformedPredictions[currentIndex]?.noTotalAmount || 0;
-          const total = yesAmount + noAmount;
-          if (total === 0) return <div className="pool-empty">No ETH stakes yet</div>;
-          const yesPercent = (yesAmount / total) * 100;
-                 return (
-            <div className="pool-bar-container">
-              <div className="pool-bar">
-                <div className="bar-yes" style={{ width: `${yesPercent}%` }}></div>
-                <div className="bar-no" style={{ width: `${100 - yesPercent}%` }}></div>
-                     </div>
-              <div className="bar-labels">
-                <span className="label-yes">{yesPercent.toFixed(1)}%</span>
-                <span className="label-no">{(100 - yesPercent).toFixed(1)}%</span>
-                     </div>
-                   </div>
-                 );
-               })()}
-           </div>
-           
-      {/* SWIPE Pool - Hacker Style */}
-      <div className="cyber-pool swipe-pool mb-4">
-        <div className="pool-header">
-          <img src="/icon.png" alt="SWIPE" className="pool-logo" />
-          <span className="pool-title">SWIPE_POOL</span>
-          <span className="pool-total">
-            {(() => {
-              const total = ((transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0) + (transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0)) / 1e18;
-              return total > 0 ? total.toLocaleString() : '0';
-            })()}
-                 </span>
-               </div>
-        <div className="pool-grid">
-          <div className="pool-side yes">
-            <div className="side-label">YES</div>
-            <div className="side-amount">
-              {((transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0) / 1e18).toLocaleString()}
-               </div>
-            <div className="side-usd">
-              {formatUsdValue((transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0) / 1e18, 'SWIPE')}
-             </div>
-          </div>
-          <div className="pool-side no">
-            <div className="side-label">NO</div>
-            <div className="side-amount">
-              {((transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0) / 1e18).toLocaleString()}
-            </div>
-            <div className="side-usd">
-              {formatUsdValue((transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0) / 1e18, 'SWIPE')}
-            </div>
-          </div>
-        </div>
-        {/* Split Bar */}
-               {(() => {
-                 const yesAmount = transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0;
-                 const noAmount = transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0;
-          const total = yesAmount + noAmount;
-          if (total === 0) return <div className="pool-empty">No SWIPE stakes yet</div>;
-          const yesPercent = (yesAmount / total) * 100;
-                   return (
-            <div className="pool-bar-container">
-              <div className="pool-bar">
-                <div className="bar-yes" style={{ width: `${yesPercent}%` }}></div>
-                <div className="bar-no" style={{ width: `${100 - yesPercent}%` }}></div>
-                       </div>
-              <div className="bar-labels">
-                <span className="label-yes">{yesPercent.toFixed(1)}%</span>
-                <span className="label-no">{(100 - yesPercent).toFixed(1)}%</span>
-                     </div>
-                   </div>
-                 );
-               })()}
-           </div>
+      {/* Pools and rules. Was two panels reading the archived V2 fields, so on
+          every market this app now makes they showed an empty ETH pool and an
+          empty SWIPE pool while the real collateral pool was nowhere on screen.
+          MarketPools renders the leg the market actually has, and the archived
+          legs only when they hold something. */}
+      <MarketPools
+        yes={transformedPredictions[currentIndex]?.usdcYesTotalAmount || 0}
+        no={transformedPredictions[currentIndex]?.usdcNoTotalAmount || 0}
+        decimals={collateralDecimals}
+        symbol={collateralSymbol || 'USDC'}
+        createdAt={transformedPredictions[currentIndex]?.openedAt}
+        deadline={transformedPredictions[currentIndex]?.deadline || 0}
+        platformFeeBps={platformFeeBps}
+        creatorFeeBps={creatorFeeBps}
+        minBet={minBetDisplay}
+        participants={transformedPredictions[currentIndex]?.usdcParticipantCount || 0}
+        ethYes={transformedPredictions[currentIndex]?.yesTotalAmount || 0}
+        ethNo={transformedPredictions[currentIndex]?.noTotalAmount || 0}
+        swipeYes={transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0}
+        swipeNo={transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0}
+      />
 
       {/* Active Swipers - Hacker Style */}
       <div className="cyber-swipers">
