@@ -1,32 +1,58 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import '../../styles/sheet.css';
 import './PlatformAnalytics.css';
 
-interface AnalyticsData {
+/**
+ * Platform analytics, on the shared sheet.
+ *
+ * Three fabrications are gone, which matters more here than on most screens
+ * because these are the numbers an operator makes decisions on.
+ *
+ * `dailyStats` was a hardcoded week of 2024-08-20 to 2024-08-26, rendered as
+ * recent activity. Deleted. /api/market/stats does carry a genuine last-seven-
+ * days block, so that is shown instead and labelled for what it is.
+ *
+ * Category volume was `Math.random() * 100 + 50`, so the bar chart reshuffled
+ * itself on every 60s refresh. Categories now show the count they actually
+ * have, which is the only figure the endpoint reports per category.
+ *
+ * The hardcoded fallback list (Crypto 45, Sports 23, ...) that stood in when
+ * the API returned no categories is gone too; an empty breakdown now says so.
+ *
+ * Also fixed: `resolutionRate` arrives from the API already multiplied to a
+ * percentage, and the component multiplied it by 100 again, so a 45%
+ * resolution rate displayed as 4500%.
+ *
+ * The time-range selector was removed rather than restyled. It set state that
+ * nothing read: the fetch had an empty dependency array and never sent the
+ * range, so all three options showed identical numbers.
+ */
+
+interface Analytics {
   totalPredictions: number;
   activePredictions: number;
   totalVolume: number;
   totalParticipants: number;
   averageStake: number;
   platformFees: number;
-  successRate: number;
-  topCategories: Array<{
-    name: string;
-    count: number;
-    volume: number;
-  }>;
-  dailyStats: Array<{
-    date: string;
+  resolutionRate: number;
+  topCategories: Array<{ name: string; count: number }>;
+  last7Days: {
     predictions: number;
-    volume: number;
-    participants: number;
-  }>;
+    stakes: number;
+    newParticipants: number;
+  };
+  endingSoon: number;
+  lastUpdated: string | null;
 }
 
+const num = (n: number | undefined) => (n ?? 0).toLocaleString('en-US');
+const eth = (n: number | undefined, dp = 4) => `${(n ?? 0).toFixed(dp)} ETH`;
+
 export function PlatformAnalytics() {
-  const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
-  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+  const [data, setData] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,43 +68,33 @@ export function PlatformAnalytics() {
         }
 
         const result = await response.json();
-        if (result.success) {
-          const stats = result.data;
-
-          // Transform API data to match component format
-          const transformedData: AnalyticsData = {
-            totalPredictions: stats.totalPredictions || 0,
-            activePredictions: stats.activePredictions || 0,
-            totalVolume: stats.totalVolume || 0,
-            totalParticipants: stats.totalParticipants || 0,
-            averageStake: stats.performance?.averageStakeSize || 0,
-            platformFees: stats.collectedFees || 0,
-            successRate: stats.performance?.resolutionRate ? stats.performance.resolutionRate * 100 : 0,
-            topCategories: stats.categories?.topCategories?.map((cat: any) => ({
-              name: cat.category,
-              count: cat.count,
-              volume: Math.random() * 100 + 50 // Mock volume for now
-            })) || [
-              { name: 'Crypto', count: 45, volume: 234.56 },
-              { name: 'Sports', count: 23, volume: 89.12 },
-              { name: 'Politics', count: 12, volume: 67.89 },
-              { name: 'Entertainment', count: 9, volume: 65.21 }
-            ],
-            dailyStats: [
-              { date: '2024-08-20', predictions: 12, volume: 45.67, participants: 89 },
-              { date: '2024-08-21', predictions: 15, volume: 52.34, participants: 102 },
-              { date: '2024-08-22', predictions: 8, volume: 28.91, participants: 67 },
-              { date: '2024-08-23', predictions: 18, volume: 67.23, participants: 124 },
-              { date: '2024-08-24', predictions: 22, volume: 78.45, participants: 156 },
-              { date: '2024-08-25', predictions: 19, volume: 71.12, participants: 134 },
-              { date: '2024-08-26', predictions: 25, volume: 89.67, participants: 178 }
-            ] // Keep mock daily stats for now
-          };
-
-          setAnalyticsData(transformedData);
-        } else {
+        if (!result.success) {
           throw new Error(result.error || 'Failed to fetch analytics');
         }
+
+        const s = result.data;
+        setData({
+          totalPredictions: s.totalPredictions ?? 0,
+          activePredictions: s.activePredictions ?? 0,
+          totalVolume: s.totalVolume ?? 0,
+          totalParticipants: s.totalParticipants ?? 0,
+          averageStake: s.performance?.averageStakeSize ?? 0,
+          platformFees: s.collectedFees ?? 0,
+          // Already a percentage on the way out of the API. Do not scale again.
+          resolutionRate: s.performance?.resolutionRate ?? 0,
+          topCategories:
+            s.categories?.topCategories?.map((c: { category: string; count: number }) => ({
+              name: c.category,
+              count: c.count,
+            })) ?? [],
+          last7Days: {
+            predictions: s.recentActivity?.predictionsLast7Days ?? 0,
+            stakes: s.recentActivity?.totalStakesLast7Days ?? 0,
+            newParticipants: s.recentActivity?.newParticipantsLast7Days ?? 0,
+          },
+          endingSoon: s.timeBased?.predictionsEndingSoon ?? 0,
+          lastUpdated: result.lastUpdated ?? null,
+        });
       } catch (err) {
         console.error('❌ Failed to fetch analytics:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch analytics data');
@@ -94,178 +110,201 @@ export function PlatformAnalytics() {
     return () => clearInterval(interval);
   }, []);
 
-  if (loading) {
-    return (
-      <div className="platform-analytics">
-        <div className="analytics-header">
-          <h2>📈 Platform Analytics</h2>
-          <p>Loading analytics data...</p>
-        </div>
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <div>Loading...</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="platform-analytics">
-        <div className="analytics-header">
-          <h2>📈 Platform Analytics</h2>
-          <p>Real-time platform analytics</p>
-        </div>
-        <div style={{ textAlign: 'center', padding: '40px', color: 'red' }}>
-          <div>❌ Failed to load analytics</div>
-          <div style={{ fontSize: '14px', marginTop: '10px' }}>{error}</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!analyticsData) {
-    return (
-      <div className="platform-analytics">
-        <div className="analytics-header">
-          <h2>📈 Platform Analytics</h2>
-          <p>No analytics data available</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="platform-analytics">
-      <div className="analytics-header">
-        <h2>📈 Platform Analytics</h2>
-        <div className="time-range-selector">
-          <button
-            className={timeRange === '7d' ? 'active' : ''}
-            onClick={() => setTimeRange('7d')}
-          >
-            7 Days
-          </button>
-          <button
-            className={timeRange === '30d' ? 'active' : ''}
-            onClick={() => setTimeRange('30d')}
-          >
-            30 Days
-          </button>
-          <button
-            className={timeRange === '90d' ? 'active' : ''}
-            onClick={() => setTimeRange('90d')}
-          >
-            90 Days
-          </button>
-        </div>
-      </div>
-
-      {/* Key Metrics */}
-      <div className="metrics-grid">
-        <div className="metric-card">
-          <div className="metric-icon">📊</div>
-          <div className="metric-content">
-            <div className="metric-value">{analyticsData.totalPredictions.toLocaleString()}</div>
-            <div className="metric-label">Total Predictions</div>
-            <div className="metric-change positive">+12.5%</div>
-          </div>
-        </div>
-
-        <div className="metric-card">
-          <div className="metric-icon">💰</div>
-          <div className="metric-content">
-            <div className="metric-value">{analyticsData.totalVolume.toFixed(2)} ETH</div>
-            <div className="metric-label">Total Volume</div>
-            <div className="metric-change positive">+18.3%</div>
-          </div>
-        </div>
-
-        <div className="metric-card">
-          <div className="metric-icon">👥</div>
-          <div className="metric-content">
-            <div className="metric-value">{analyticsData.totalParticipants.toLocaleString()}</div>
-            <div className="metric-label">Total Participants</div>
-            <div className="metric-change positive">+24.7%</div>
-          </div>
-        </div>
-
-        <div className="metric-card">
-          <div className="metric-icon">🎯</div>
-          <div className="metric-content">
-            <div className="metric-value">{analyticsData.successRate}%</div>
-            <div className="metric-label">Prediction Success Rate</div>
-            <div className="metric-change neutral">±2.1%</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Charts Section */}
-      <div className="charts-section">
-        <div className="chart-container">
-          <h3>📈 Daily Activity</h3>
-          <div className="daily-chart">
-            {analyticsData.dailyStats.map((day) => (
-              <div key={day.date} className="chart-bar">
-                <div
-                  className="bar-fill"
-                  style={{ height: `${(day.volume / 100) * 100}%` }}
-                  title={`${day.date}: ${day.predictions} predictions, ${day.volume.toFixed(2)} ETH, ${day.participants} participants`}
-                ></div>
-                <div className="bar-label">{new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' })}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="chart-container">
-          <h3>📊 Top Categories</h3>
-          <div className="categories-chart">
-            {analyticsData.topCategories.map((category) => (
-              <div key={category.name} className="category-item">
-                <div className="category-info">
-                  <span className="category-name">{category.name}</span>
-                  <span className="category-stats">{category.count} predictions</span>
-                </div>
-                <div className="category-bar">
-                  <div
-                    className="category-fill"
-                    style={{
-                      width: `${(category.volume / analyticsData.topCategories[0].volume) * 100}%`,
-                      backgroundColor: `hsl(${analyticsData.topCategories.indexOf(category) * 90}, 70%, 60%)`
-                    }}
-                  ></div>
-                  <span className="category-volume">{category.volume.toFixed(2)} ETH</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Additional Stats */}
-      <div className="additional-stats">
-        <div className="stat-card">
-          <h4>💰 Financial Overview</h4>
-          <div className="stat-grid">
-            <div className="stat-item">
-              <span className="stat-label">Platform Fees Collected</span>
-              <span className="stat-value">{analyticsData.platformFees.toFixed(2)} ETH</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-label">Average Stake</span>
-              <span className="stat-value">{analyticsData.averageStake.toFixed(2)} ETH</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-label">Active Predictions</span>
-              <span className="stat-value">{analyticsData.activePredictions}</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-label">Avg. Participants/Prediction</span>
-              <span className="stat-value">{Math.round(analyticsData.totalParticipants / analyticsData.totalPredictions)}</span>
+  const shell = (body: React.ReactNode) => (
+    <div className="sheet">
+      <div className="sheet-shell">
+        <header className="sheet-hero">
+          <div className="sheet-hero-top">
+            <div>
+              <p className="sheet-eyebrow">Analytics</p>
+              <h1 className="sheet-hero-title">
+                The platform, <em>counted</em>
+              </h1>
             </div>
           </div>
-        </div>
+          <p className="sheet-hero-lede">
+            Everything here is read from the markets themselves. Where a figure
+            is not collected, this page says so rather than estimating it.
+          </p>
+        </header>
+        <main className="sheet-body">{body}</main>
       </div>
     </div>
+  );
+
+  if (loading) {
+    return shell(
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">Totals</p>
+        </div>
+        <div>
+          <div className="sheet-empty">
+            <strong>Counting</strong>
+            Aggregating markets, stakes and participants.
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (error || !data) {
+    return shell(
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">Totals</p>
+        </div>
+        <div>
+          <div className="sheet-empty">
+            <strong>Could not load analytics</strong>
+            {error ?? 'No data returned.'}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  const largestCategory = data.topCategories[0]?.count ?? 0;
+
+  return shell(
+    <>
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">All time</p>
+          <p className="sheet-rail-meta">{`Every market\never opened`}</p>
+        </div>
+        <div>
+          <div className="sheet-board">
+            <div className="sheet-settle">
+              <div className="sheet-settle-row">
+                <span className="sheet-settle-key">Markets</span>
+                <span className="sheet-settle-val">
+                  {num(data.totalPredictions)}
+                  <span className="sheet-settle-sub">
+                    {num(data.activePredictions)} still open
+                  </span>
+                </span>
+              </div>
+              <div className="sheet-settle-row">
+                <span className="sheet-settle-key">Participants</span>
+                <span className="sheet-settle-val">{num(data.totalParticipants)}</span>
+              </div>
+              <div className="sheet-settle-row">
+                <span className="sheet-settle-key">Average stake</span>
+                <span className="sheet-settle-val">{eth(data.averageStake)}</span>
+              </div>
+              <div className="sheet-settle-row">
+                <span className="sheet-settle-key">Resolved</span>
+                <span className="sheet-settle-val">{data.resolutionRate.toFixed(1)}%</span>
+              </div>
+              <div className="sheet-settle-row sheet-settle-row--total">
+                <span className="sheet-settle-key">Volume</span>
+                <span className="sheet-settle-val">{eth(data.totalVolume)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">Last 7 days</p>
+          <p className="sheet-rail-meta">{`Rolling window,\nnot a fixed week`}</p>
+        </div>
+        <div>
+          <div className="sheet-board">
+            <div className="sheet-settle">
+              <div className="sheet-settle-row">
+                <span className="sheet-settle-key">Markets opened</span>
+                <span className="sheet-settle-val">{num(data.last7Days.predictions)}</span>
+              </div>
+              <div className="sheet-settle-row">
+                <span className="sheet-settle-key">New participants</span>
+                <span className="sheet-settle-val">{num(data.last7Days.newParticipants)}</span>
+              </div>
+              <div className="sheet-settle-row">
+                <span className="sheet-settle-key">Closing within a day</span>
+                <span className="sheet-settle-val">{num(data.endingSoon)}</span>
+              </div>
+              <div className="sheet-settle-row sheet-settle-row--total">
+                <span className="sheet-settle-key">Staked</span>
+                <span className="sheet-settle-val">{eth(data.last7Days.stakes)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="sheet-note">
+            <p>
+              There is no day-by-day trend here because none is recorded. The
+              chart that used to sit in this spot was a fixed week of{' '}
+              <strong>hardcoded 2024 figures</strong> that never changed.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">Categories</p>
+          <p className="sheet-rail-meta">{`By market count,\nlargest first`}</p>
+        </div>
+        <div>
+          {data.topCategories.length === 0 ? (
+            <div className="sheet-empty">
+              <strong>No categories reported</strong>
+              Markets carry no category data in this snapshot.
+            </div>
+          ) : (
+            <div className="pa-cats">
+              {data.topCategories.map(cat => (
+                <div className="pa-cat" key={cat.name}>
+                  <div className="pa-cat-top">
+                    <span className="pa-cat-name">{cat.name}</span>
+                    <span className="pa-cat-count">
+                      {num(cat.count)} market{cat.count === 1 ? '' : 's'}
+                    </span>
+                  </div>
+                  <div className="pa-cat-track">
+                    <div
+                      className="pa-cat-fill"
+                      style={{
+                        ['--pa-share' as string]:
+                          largestCategory > 0 ? cat.count / largestCategory : 0,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="sheet-note">
+            <p>
+              Bars compare market <strong>count</strong>, not volume. Per-category
+              volume is not collected; the figure that used to appear here was
+              randomly generated and reshuffled on every refresh.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {data.lastUpdated && (
+        <section className="sheet-block">
+          <div className="sheet-rail">
+            <p className="sheet-eyebrow">Freshness</p>
+          </div>
+          <div>
+            <p className="sheet-p">
+              Snapshot last written{' '}
+              <span className="sheet-data">
+                {new Date(data.lastUpdated).toLocaleString()}
+              </span>
+              . These figures come from that snapshot rather than a live chain
+              read, so they lag it by however long ago it ran.
+            </p>
+          </div>
+        </section>
+      )}
+    </>
   );
 }
