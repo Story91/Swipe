@@ -6,7 +6,8 @@ import { formatEther } from 'viem';
 import { getChainConfig, isWritableMarket } from '@/lib/chains';
 import { useActiveChain } from '@/lib/chains/activeChain';
 import { useMarketWrite } from '@/lib/chains/useMarketWrite';
-import { useAdminRequest } from '@/lib/auth/useAdminRequest';
+import { useSignMessage } from 'wagmi';
+import { PROPOSAL_HEADERS, buildProposalMessage } from '@/lib/auth/proposalMessage';
 import { CONTRACTS, SWIPE_TOKEN } from '../../../lib/contract';
 import { calculateApprovalAmount } from '../../../lib/constants/approval';
 import { uploadToImgBB } from '../../../lib/imgbb';
@@ -61,9 +62,11 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
   // Resolves the V3 market this proposal will eventually be registered against.
   // Nothing here writes to it; the resolver does that from the admin surface.
   const marketWrite = useMarketWrite();
-  // Proposing is privileged. V2's spam control was the creation fee and V3 has
-  // none, so the endpoint is signature gated and this signs for it.
-  const signAdminRequest = useAdminRequest();
+  // The creator signs their own proposal. This proves the address being
+  // credited belongs to them and nothing more: anyone with a wallet may
+  // propose, which is the point of the product. It matters because that
+  // address earns 0.5% of every losing pool in the market.
+  const { signMessageAsync } = useSignMessage();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { writeContract, data: hash, error: writeError, isPending, reset: resetWriteContract } = useWriteContract();
   const { composeCast: minikitComposeCast } = useComposeCast();
@@ -226,7 +229,20 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
   const isEnvAdmin = address && process.env.NEXT_PUBLIC_ADMIN_1?.toLowerCase() === address.toLowerCase();
   const canCreateFree = Boolean(isOwner || isApprovedCreator || isEnvAdmin);
   const publicCreationEnabled = requiredApprovals !== undefined && Number(requiredApprovals) === 0;
-  const canCreate = Boolean(publicCreationEnabled || canCreateFree);
+  /**
+   * Anyone with a connected wallet may propose a market. That is the product.
+   *
+   * The old gate read `requiredApprovals` off the archived V2 contract and let
+   * the public through only when it happened to be zero, which is a condition
+   * about a contract nobody writes to any more. V3 has no creation fee and no
+   * on-chain creation at all, so nothing here is decided on chain: a proposal
+   * is inert until a resolver registers it, and what bounds the volume is the
+   * per-address rate limit in the propose endpoint.
+   *
+   * The fee labels below still read from V2 and are dead. Left in place for now
+   * because removing them touches the whole form; nothing charges anyone.
+   */
+  const canCreate = Boolean(address);
 
   // Format fees for display
   const formatFee = (fee: bigint | undefined, isSwipe: boolean = false): string => {
@@ -504,10 +520,25 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
     // The id is allocated server-side with an atomic counter. Deriving it here,
     // or from the highest existing record, gives two proposals in the same
     // second the same number and points two markets at one on-chain id.
-    const headers = await signAdminRequest('propose');
+    // The question and deadline are inside the signed string, so a captured
+    // header cannot be replayed with a different question against this address.
+    const timestamp = Date.now();
+    const signature = await signMessageAsync({
+      message: buildProposalMessage({
+        question: formData.question.trim(),
+        deadline,
+        timestamp,
+      }),
+    });
+
     const response = await fetch('/api/predictions/propose', {
       method: 'POST',
-      headers: { ...headers, 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        [PROPOSAL_HEADERS.address]: address ?? '',
+        [PROPOSAL_HEADERS.signature]: signature,
+        [PROPOSAL_HEADERS.timestamp]: String(timestamp),
+      },
       body: JSON.stringify({
         question: formData.question.trim(),
         description: formData.description.trim(),
