@@ -29,6 +29,9 @@
   --sheet-body: var(--font-body, -apple-system), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --sheet-data: var(--font-data, 'Monaco'), 'Monaco', 'Menlo', monospace;
 
+  /* The dashboard carries its own dark face because it sits on the lime
+     ground, and everything inside it is hairline-ruled rather than boxed. */
+  background: #14140f;
   padding: 32px 24px 64px;
   max-width: 1000px;
   margin: 0 auto;
@@ -85,7 +88,10 @@
    shadow are gone - a border that shouts competes with the figures inside it. */
 .stats-table-container {
   margin-bottom: 32px;
-  background: var(--sheet-surface);
+  /* Opaque on purpose. This panel sits directly on the lime ground, and the
+     translucent surface token let the accent through under the figures, which
+     is what made this table unreadable. */
+  background: #0d0d0a;
   border-radius: 0;
   padding: 0;
   border: 1px solid var(--sheet-rule-strong);
