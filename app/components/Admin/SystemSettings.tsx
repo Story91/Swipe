@@ -1,314 +1,208 @@
 "use client";
 
-import React, { useState } from 'react';
-import { useAccount, useWriteContract } from 'wagmi';
-import { CONTRACTS, getV2Contract } from '../../../lib/contract';
+import React from 'react';
+import { useAccount, useReadContract } from 'wagmi';
+import { formatEther } from 'viem';
+import { CONTRACTS } from '../../../lib/contract';
+import { getChainConfig } from '@/lib/chains';
+import '../../styles/sheet.css';
 import './SystemSettings.css';
+
+/**
+ * System settings, on the shared sheet.
+ *
+ * This screen used to be a form. It presented seven editable settings with
+ * hardcoded starting values - 1% fee, 0.001/100 ETH stake limits, 3 required
+ * approvals - none of which were ever read from a contract, and each with a
+ * button that wrote to PredictionMarketV2.
+ *
+ * V2 is archived: its owner key is no longer available, and every one of those
+ * setters is onlyOwner. So each button asked an admin to sign a transaction
+ * that could only revert, after showing them a "current value" that was really
+ * just a default someone typed into useState.
+ *
+ * It is now a read-only ledger of what the contract actually says, with the
+ * reason the controls are gone stated at the top. Writing is not disabled
+ * behind a tooltip; it is absent, because there is no key that could perform
+ * it. Reads still work, so the figures below are real.
+ */
+
+const explorer = getChainConfig().explorer;
+const V2 = CONTRACTS.V2.address as `0x${string}`;
+
+/** A contract read that renders honestly while pending or unavailable. */
+function useV2<T = bigint>(functionName: string) {
+  const { data, isLoading } = useReadContract({
+    address: V2,
+    abi: CONTRACTS.V2.abi,
+    functionName,
+  });
+  return { value: data as T | undefined, isLoading };
+}
 
 export function SystemSettings() {
   const { address } = useAccount();
-  const { writeContract } = useWriteContract();
 
-  const [settings, setSettings] = useState({
-    platformFee: 1, // percentage
-    minStake: 0.001, // ETH
-    maxStake: 100, // ETH
-    requiredApprovals: 3,
-    maxResolutionTime: 30, // days
-    publicCreation: true,
-    paused: false
-  });
+  const isAdmin =
+    address && process.env.NEXT_PUBLIC_ADMIN_1?.toLowerCase() === address.toLowerCase();
 
-  const [isLoading, setIsLoading] = useState<string | null>(null);
+  const fee = useV2<bigint>('getPlatformFee');
+  const minEth = useV2<bigint>('ethMinimumStake');
+  const maxEth = useV2<bigint>('ethMaximumStake');
+  const approvals = useV2<bigint>('requiredApprovals');
+  const resolutionTime = useV2<bigint>('maxResolutionTime');
+  const owner = useV2<string>('owner');
 
-  // Check if user is admin
-  const isAdmin = address && process.env.NEXT_PUBLIC_ADMIN_1?.toLowerCase() === address.toLowerCase();
-
-  const handleSettingChange = (key: string, value: string | number | boolean) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
+  const show = (
+    read: { value: bigint | undefined; isLoading: boolean },
+    format: (v: bigint) => string
+  ) => {
+    if (read.isLoading) return <span className="ss-unread">reading…</span>;
+    if (read.value === undefined) return <span className="ss-unread">unavailable</span>;
+    return format(read.value);
   };
 
-  const updatePlatformFee = async () => {
-    if (!isAdmin) return;
-    setIsLoading('platformFee');
-    try {
-      await writeContract({
-        address: CONTRACTS.V2.address as `0x${string}`,
-        abi: CONTRACTS.V2.abi,
-        functionName: 'setPlatformFee',
-        args: [BigInt(settings.platformFee * 100)], // Convert to basis points
-      });
-      console.log('✅ Platform fee updated successfully');
-    } catch (error) {
-      console.error('❌ Failed to update platform fee:', error);
-    } finally {
-      setIsLoading(null);
-    }
-  };
-
-  const updateStakeLimits = async () => {
-    if (!isAdmin) return;
-    setIsLoading('stakeLimits');
-    try {
-      await writeContract({
-        address: CONTRACTS.V2.address as `0x${string}`,
-        abi: CONTRACTS.V2.abi,
-        functionName: 'setStakeLimits',
-        args: [
-          BigInt(settings.minStake * 10**18), // Convert to wei
-          BigInt(settings.maxStake * 10**18)  // Convert to wei
-        ],
-      });
-      console.log('✅ Stake limits updated successfully');
-    } catch (error) {
-      console.error('❌ Failed to update stake limits:', error);
-    } finally {
-      setIsLoading(null);
-    }
-  };
-
-  const updateRequiredApprovals = async () => {
-    if (!isAdmin) return;
-    setIsLoading('approvals');
-    try {
-      await writeContract({
-        address: CONTRACTS.V2.address as `0x${string}`,
-        abi: CONTRACTS.V2.abi,
-        functionName: 'setRequiredApprovals',
-        args: [BigInt(settings.requiredApprovals)],
-      });
-      console.log('✅ Required approvals updated successfully');
-    } catch (error) {
-      console.error('❌ Failed to update required approvals:', error);
-    } finally {
-      setIsLoading(null);
-    }
-  };
-
-  const togglePublicCreation = async () => {
-    if (!isAdmin) return;
-    setIsLoading('publicCreation');
-    try {
-      await writeContract({
-        address: CONTRACTS.V2.address as `0x${string}`,
-        abi: CONTRACTS.V2.abi,
-        functionName: 'setPublicCreation',
-        args: [!settings.publicCreation],
-      });
-      setSettings(prev => ({ ...prev, publicCreation: !prev.publicCreation }));
-      console.log('✅ Public creation setting updated successfully');
-    } catch (error) {
-      console.error('❌ Failed to update public creation setting:', error);
-    } finally {
-      setIsLoading(null);
-    }
-  };
-
-  const toggleContractPause = async () => {
-    if (!isAdmin) return;
-    setIsLoading('pause');
-    try {
-      const functionName = settings.paused ? 'unpause' : 'pause';
-      await writeContract({
-        address: CONTRACTS.V2.address as `0x${string}`,
-        abi: CONTRACTS.V2.abi,
-        functionName,
-        args: []
-      });
-      setSettings(prev => ({ ...prev, paused: !prev.paused }));
-      console.log(`✅ Contract ${settings.paused ? 'unpaused' : 'paused'} successfully`);
-    } catch (error) {
-      console.error(`❌ Failed to ${settings.paused ? 'unpause' : 'pause'} contract:`, error);
-    } finally {
-      setIsLoading(null);
-    }
-  };
+  const shell = (body: React.ReactNode) => (
+    <div className="sheet">
+      <div className="sheet-shell">
+        <header className="sheet-hero">
+          <div className="sheet-hero-top">
+            <div>
+              <p className="sheet-eyebrow">System</p>
+              <h1 className="sheet-hero-title">
+                What the contract <em>says</em>
+              </h1>
+            </div>
+          </div>
+          <p className="sheet-hero-lede">
+            The live configuration of the archived V2 market, read from the
+            chain. Read-only, because the key that could change any of it is no
+            longer available.
+          </p>
+        </header>
+        <main className="sheet-body">{body}</main>
+      </div>
+    </div>
+  );
 
   if (!isAdmin) {
-    return (
-      <div className="system-settings">
-        <div className="access-denied">
-          <h2>🔒 Access Denied</h2>
-          <p>Only administrators can access system settings.</p>
+    return shell(
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">Settings</p>
         </div>
-      </div>
+        <div>
+          <div className="sheet-empty">
+            <strong>Admins only</strong>
+            System configuration is visible to administrators.
+          </div>
+        </div>
+      </section>
     );
   }
 
-  return (
-    <div className="system-settings">
-      <div className="settings-header">
-        <h2>⚙️ System Settings</h2>
-        <p>Configure platform parameters and system behavior</p>
-      </div>
-
-      <div className="settings-sections">
-        {/* Financial Settings */}
-        <div className="settings-section">
-          <h3>💰 Financial Settings</h3>
-
-          <div className="setting-item">
-            <div className="setting-info">
-              <label>Platform Fee Percentage</label>
-              <p>Fee charged on each prediction resolution</p>
-            </div>
-            <div className="setting-control">
-              <input
-                type="number"
-                value={settings.platformFee}
-                onChange={(e) => handleSettingChange('platformFee', parseFloat(e.target.value))}
-                min="0"
-                max="10"
-                step="0.1"
-              />
-              <span className="unit">%</span>
-              <button
-                className="update-btn"
-                onClick={updatePlatformFee}
-                disabled={isLoading === 'platformFee'}
-              >
-                {isLoading === 'platformFee' ? 'Updating...' : 'Update'}
-              </button>
-            </div>
+  return shell(
+    <>
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">Why read-only</p>
+        </div>
+        <div>
+          <div className="ss-warning">
+            <p className="ss-warning-title">These settings cannot be changed</p>
+            <p>
+              Every setter on this contract is <strong>onlyOwner</strong>, and
+              its owner key is no longer available. A transaction sent from any
+              other wallet reverts and costs gas for nothing, so the controls
+              that used to be here have been removed rather than disabled.
+            </p>
+            <p>
+              The values that used to appear alongside them were{' '}
+              <strong>never read from the chain</strong>. They were defaults
+              typed into component state, which is why this page showed a 1%
+              platform fee regardless of what the contract held.
+            </p>
           </div>
 
-          <div className="setting-item">
-            <div className="setting-info">
-              <label>Stake Limits</label>
-              <p>Minimum and maximum stake amounts</p>
-            </div>
-            <div className="setting-control-group">
-              <div className="input-group">
-                <input
-                  type="number"
-                  value={settings.minStake}
-                  onChange={(e) => handleSettingChange('minStake', parseFloat(e.target.value))}
-                  min="0.001"
-                  step="0.001"
-                />
-                <span className="unit">ETH min</span>
+          <p className="sheet-p ss-address">
+            V2 market:{' '}
+            <a
+              href={`${explorer}/address/${V2}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {V2}
+            </a>
+          </p>
+          <p className="sheet-p ss-address">
+            Owner:{' '}
+            {owner.isLoading ? (
+              <span className="ss-unread">reading…</span>
+            ) : owner.value ? (
+              <a
+                href={`${explorer}/address/${owner.value}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {owner.value}
+              </a>
+            ) : (
+              <span className="ss-unread">unavailable</span>
+            )}
+          </p>
+        </div>
+      </section>
+
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">Live values</p>
+          <p className="sheet-rail-meta">{`Read from\nthe contract`}</p>
+        </div>
+        <div>
+          <div className="sheet-board">
+            <div className="sheet-settle">
+              <div className="sheet-settle-row">
+                <span className="sheet-settle-key">Platform fee</span>
+                <span className="sheet-settle-val">
+                  {show(fee, v => `${(Number(v) / 100).toFixed(2)}%`)}
+                </span>
               </div>
-              <div className="input-group">
-                <input
-                  type="number"
-                  value={settings.maxStake}
-                  onChange={(e) => handleSettingChange('maxStake', parseFloat(e.target.value))}
-                  min="1"
-                  step="1"
-                />
-                <span className="unit">ETH max</span>
+              <div className="sheet-settle-row">
+                <span className="sheet-settle-key">Minimum stake</span>
+                <span className="sheet-settle-val">
+                  {show(minEth, v => `${formatEther(v)} ETH`)}
+                </span>
               </div>
-              <button
-                className="update-btn"
-                onClick={updateStakeLimits}
-                disabled={isLoading === 'stakeLimits'}
-              >
-                {isLoading === 'stakeLimits' ? 'Updating...' : 'Update'}
-              </button>
+              <div className="sheet-settle-row">
+                <span className="sheet-settle-key">Maximum stake</span>
+                <span className="sheet-settle-val">
+                  {show(maxEth, v => `${formatEther(v)} ETH`)}
+                </span>
+              </div>
+              <div className="sheet-settle-row">
+                <span className="sheet-settle-key">Required approvals</span>
+                <span className="sheet-settle-val">
+                  {show(approvals, v => String(v))}
+                </span>
+              </div>
+              <div className="sheet-settle-row sheet-settle-row--total">
+                <span className="sheet-settle-key">Resolution window</span>
+                <span className="sheet-settle-val">
+                  {show(resolutionTime, v => `${Number(v) / 86400} days`)}
+                </span>
+              </div>
             </div>
+          </div>
+
+          <div className="sheet-note">
+            <p>
+              V3 runs its own configuration and is unaffected by anything here.
+              Its rates are set at deploy time by <strong>scripts/deploy_v3.js</strong>{' '}
+              and changed by its own owner, on its own contract.
+            </p>
           </div>
         </div>
-
-        {/* Approval Settings */}
-        <div className="settings-section">
-          <h3>✅ Approval Settings</h3>
-
-          <div className="setting-item">
-            <div className="setting-info">
-              <label>Required Approvals</label>
-              <p>Number of approvals needed before prediction goes live</p>
-            </div>
-            <div className="setting-control">
-              <input
-                type="number"
-                value={settings.requiredApprovals}
-                onChange={(e) => handleSettingChange('requiredApprovals', parseInt(e.target.value))}
-                min="1"
-                max="10"
-              />
-              <button
-                className="update-btn"
-                onClick={updateRequiredApprovals}
-                disabled={isLoading === 'approvals'}
-              >
-                {isLoading === 'approvals' ? 'Updating...' : 'Update'}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* System Controls */}
-        <div className="settings-section">
-          <h3>🔧 System Controls</h3>
-
-          <div className="setting-item">
-            <div className="setting-info">
-              <label>Public Prediction Creation</label>
-              <p>Allow anyone to create predictions or require approval</p>
-            </div>
-            <div className="setting-control">
-              <label className="toggle">
-                <input
-                  type="checkbox"
-                  checked={settings.publicCreation}
-                  onChange={() => handleSettingChange('publicCreation', !settings.publicCreation)}
-                />
-                <span className="toggle-slider"></span>
-              </label>
-              <button
-                className="update-btn"
-                onClick={togglePublicCreation}
-                disabled={isLoading === 'publicCreation'}
-              >
-                {isLoading === 'publicCreation' ? 'Updating...' : 'Update'}
-              </button>
-            </div>
-          </div>
-
-          <div className="setting-item">
-            <div className="setting-info">
-              <label>Contract Status</label>
-              <p>Emergency pause/unpause the entire contract</p>
-            </div>
-            <div className="setting-control">
-              <label className="toggle">
-                <input
-                  type="checkbox"
-                  checked={!settings.paused}
-                  onChange={() => handleSettingChange('paused', !settings.paused)}
-                />
-                <span className="toggle-slider"></span>
-              </label>
-              <span className="status-text">
-                {settings.paused ? '🚫 Paused' : '✅ Active'}
-              </span>
-              <button
-                className="update-btn danger"
-                onClick={toggleContractPause}
-                disabled={isLoading === 'pause'}
-              >
-                {isLoading === 'pause' ? 'Processing...' : (settings.paused ? 'Unpause' : 'Pause')}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Danger Zone */}
-        <div className="settings-section danger-zone">
-          <h3>⚠️ Danger Zone</h3>
-          <p className="warning-text">These actions are irreversible. Proceed with caution.</p>
-
-          <div className="setting-item">
-            <div className="setting-info">
-              <label>Emergency Withdraw</label>
-              <p>Withdraw all funds from contract (owner only)</p>
-            </div>
-            <button className="danger-btn">
-              🚨 Emergency Withdraw
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+      </section>
+    </>
   );
 }
