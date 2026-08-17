@@ -137,35 +137,69 @@ html, body {
   justify-content: center;
 }
 
-/* Modern Glass Card */
+/*
+ * THE CARD IS THE ONE OBJECT IN THIS APP.
+ *
+ * Every other screen is the sheet: flat, quiet, hairline-ruled, dense. That is
+ * correct for paper you read. This is the one thing you hold and throw, so it
+ * is the one thing with weight, and that contrast is the system rather than an
+ * inconsistency in it. Ten screens without a corner radius is monotony if
+ * nothing ever breaks it; it is a background if one object does.
+ *
+ * Weight comes from a hard-edged shadow, not a soft blur. A blurred shadow
+ * floats, which is what the glassmorphism here did: 24px radius, 20px backdrop
+ * blur, white at 95% over a dark app it had nothing to do with. An offset
+ * shadow with no blur sits, the way a printed slip sits on a counter. That is
+ * the right metaphor: parimutuel is tote betting, and a tote bet is a slip.
+ *
+ * It is dark now, which is the deliberate risk. The card no longer separates
+ * itself by brightness, so it has to hold the eye with its edge and its shadow
+ * instead. If that fails on a phone, the fix is a lighter face, not a return
+ * to glass.
+ */
 .card {
   width: 100%;
   max-width: 330px;
   height: 528px;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 
-    0 25px 50px rgba(0, 0, 0, 0.1),
-    0 0 0 1px rgba(255, 255, 255, 0.2) inset;
+  background: #14140f;
+  border-radius: 0;
+  border: 1px solid var(--sheet-rule-strong);
+  /* Hard, offset, unblurred: an object resting on a surface. */
+  box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.5);
   overflow: hidden;
   position: relative;
   cursor: grab;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: box-shadow 160ms ease, border-color 160ms ease;
   z-index: 20;
 }
 
+/* Pressed: the card comes down onto the surface and its shadow closes up. The
+   whole travel is 3px, which is enough to feel and not enough to nudge layout. */
 .card:active {
   cursor: grabbing;
-  transform: scale(0.98);
+  transform: translate(3px, 3px);
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.5);
 }
 
 .card:hover {
-  transform: translateY(-8px);
-  box-shadow: 
-    0 35px 70px rgba(0, 0, 0, 0.15),
-    0 0 0 1px rgba(255, 255, 255, 0.3) inset;
+  border-color: var(--sheet-lime-line);
+  box-shadow: 8px 8px 0 rgba(0, 0, 0, 0.55);
+}
+
+/* The gesture owns the transform while a drag is live. Anything transitioning
+   transform here would fight the engine for the same property and lose in a
+   way that reads as lag. */
+.card.dragging-live,
+.card.dragging-live:active,
+.card.dragging-live:hover {
+  transition: none;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
 }
 
 /* Card Image with Overlay */
@@ -209,9 +243,9 @@ html, body {
 }
 
 .category-badge {
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(10px);
-  color: #1e293b;
+  color: var(--sheet-paper-2);
   padding: 8px 16px;
   border-radius: 20px;
   font-size: 12px;
@@ -273,43 +307,51 @@ html, body {
 
 /* Card Content */
 .card-content {
-  padding: 24px 24px 80px 24px;
+  padding: 20px 20px 58px 20px;
   text-align: left;
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(10px);
+  background: transparent;
+  backdrop-filter: none;
 }
 
+/* The question is the card. It is the only thing set large, and the only thing
+   in the display face; everything else on the card steps back so a reader
+   makes the judgement on the question rather than on the furniture around it.
+   The old colour was #1e293b, a near-black chosen for the white glass face
+   that is gone. */
 .card-title {
   margin: 0 0 12px 0;
-  font-size: 20px;
+  font-size: 21px;
   font-weight: 700;
-  color: #1e293b;
-  line-height: 1.3;
-  letter-spacing: -0.025em;
-  font-family: "Exo 2", sans-serif;
+  color: var(--sheet-paper);
+  line-height: 1.22;
+  letter-spacing: -0.01em;
+  font-family: var(--sheet-display);
 }
 
 .prediction-text {
   margin: 0 0 16px 0;
   font-size: 16px;
   font-weight: 500;
-  color: #475569;
+  color: var(--sheet-paper-2);
   line-height: 1.5;
 }
 
 /* Simple Countdown Line */
+/* The clock is metadata, so it is set as metadata: a line, not a pill. It was
+   a white rounded box with its own border and shadow, which gave a timestamp
+   the same visual weight as the question it sat under. */
 .countdown-line {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin: 12px 0;
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  text-align: center;
+  justify-content: flex-start;
+  gap: 7px;
+  margin: 10px 0 0;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  border: 0;
+  box-shadow: none;
+  text-align: left;
 }
 
 .countdown-icon {
@@ -381,7 +423,7 @@ html, body {
 .timeframe, .confidence {
   font-size: 13px;
   font-weight: 500;
-  color: #64748b;
+  color: var(--sheet-paper-3);
   padding: 6px 12px;
   background: rgba(148, 163, 184, 0.1);
   border-radius: 12px;
@@ -393,51 +435,89 @@ html, body {
   margin-top: 12px;
 }
 
+/*
+ * THE SIGNATURE: the pool bar is the swipe axis.
+ *
+ * The two pools already sit left and right, sized by their share, on exactly
+ * the axis the finger travels: left is no, right is yes, spatially and
+ * literally. Nothing had to be added to the markup for that to be true; it was
+ * being drawn as a red-and-green progress bar instead, which threw the one
+ * honest spatial fact on the card away.
+ *
+ * So: no red and green. Red and green say right and wrong, and a prediction
+ * market has no opinion about which side you take before it settles. The side
+ * carries the accent, the other side stays white, and the reader learns "how
+ * much money is on my side" from weight rather than from a colour that has
+ * already judged them.
+ *
+ * The bar sits flush on the card's bottom edge, full bleed, no radius and no
+ * inset. It is the card's foot, not a widget resting near it.
+ */
 .voting-section-fixed {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 16px;
-  background: linear-gradient(to top, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.8));
-  backdrop-filter: blur(10px);
-  border-top: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 0;
+  background: transparent;
+  backdrop-filter: none;
+  border-top: 1px solid var(--sheet-rule);
 }
 
 .voting-bar {
   width: 100%;
-  height: 20px;
-  background: rgba(239, 68, 68, 0.2);
-  border-radius: 10px;
+  height: 34px;
+  background: transparent;
+  border-radius: 0;
   overflow: hidden;
   display: flex;
   position: relative;
 }
 
+/* Yes reads outward to the right, no reads outward to the left, so each side
+   grows toward the direction you would swipe to back it. */
 .voting-yes {
   height: 100%;
-  background: linear-gradient(90deg, #10b981, #34d399);
+  background: rgba(212, 255, 0, 0.16);
+  border-top: 2px solid var(--sheet-lime);
   display: flex;
   align-items: center;
-  justify-content: center;
-  transition: width 0.6s ease;
+  justify-content: flex-end;
+  padding-right: 12px;
+  transition: width 480ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .voting-no {
   height: 100%;
-  background: linear-gradient(90deg, #ef4444, #f87171);
+  background: rgba(255, 255, 255, 0.06);
+  border-top: 2px solid rgba(255, 255, 255, 0.35);
   display: flex;
   align-items: center;
-  justify-content: center;
-  transition: width 0.6s ease;
+  justify-content: flex-start;
+  padding-left: 12px;
+  transition: width 480ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .voting-text {
-  font-size: 10px;
+  font-family: var(--sheet-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
   font-weight: 600;
-  color: white;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  letter-spacing: 0.04em;
+  color: var(--sheet-paper-2);
+  text-shadow: none;
   white-space: nowrap;
+}
+
+.voting-yes .voting-text {
+  color: var(--sheet-lime);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voting-yes,
+  .voting-no {
+    transition: none;
+  }
 }
 
 /* Dynamic YES/NO Text Overlay */
@@ -549,7 +629,7 @@ html, body {
 }
 
 .chart-loading p {
-  color: #64748b;
+  color: var(--sheet-paper-3);
   font-size: 14px;
   font-weight: 500;
   margin: 0;
@@ -590,7 +670,7 @@ html, body {
   margin: 0;
   font-size: 18px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--sheet-paper);
   font-family: "Exo 2", sans-serif;
   letter-spacing: -0.025em;
   background: linear-gradient(135deg, #1e293b, #3b82f6, #8b5cf6);
@@ -618,7 +698,7 @@ html, body {
 .card-number {
   font-size: 12px;
   font-weight: 500;
-  color: #64748b;
+  color: var(--sheet-paper-3);
   padding: 4px 8px;
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
   border-radius: 8px;
@@ -647,7 +727,7 @@ html, body {
   margin: 0 0 16px 0;
   font-size: 15px;
   line-height: 1.8;
-  color: #1e293b;
+  color: var(--sheet-paper);
   text-align: left;
   white-space: pre-wrap;
   word-wrap: break-word;
@@ -714,7 +794,7 @@ html, body {
 .stat-value {
   font-size: 12px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--sheet-paper);
   padding: 4px 8px;
   background: rgba(255, 255, 255, 0.2);
   border-radius: 6px;
@@ -749,7 +829,7 @@ html, body {
   height: auto !important;
   font-family: "Exo 2", sans-serif !important;
   background: rgba(255, 255, 255, 0.2) !important;
-  color: #1e293b !important;
+  color: var(--sheet-paper) !important;
   border: 1px solid rgba(255, 255, 255, 0.2) !important;
   word-break: break-word !important;
   overflow-wrap: break-word !important;
@@ -789,7 +869,7 @@ html, body {
 .chart-title {
   font-size: 9px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--sheet-paper-3);
   text-transform: uppercase;
   letter-spacing: 0.3px;
   margin-bottom: 4px;
@@ -798,7 +878,7 @@ html, body {
 .chart-value {
   font-size: 14px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--sheet-paper);
   margin-bottom: 4px;
   font-family: "Exo 2", sans-serif;
 }
@@ -821,7 +901,7 @@ html, body {
 .risk-level {
   font-size: 14px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--sheet-paper);
   font-family: "Exo 2", sans-serif;
 }
 
@@ -834,7 +914,7 @@ html, body {
 
 .risk-breakdown {
   font-size: 7px;
-  color: #64748b;
+  color: var(--sheet-paper-3);
   font-family: "Source Code Pro", monospace;
   line-height: 1.2;
   word-break: break-all;
