@@ -17,6 +17,11 @@
      settled cards nowhere to put their result. The cap is what makes the card
      wide enough to carry its own numbers. */
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  /* Every row the same height, not just the cards within one row. A settled
+     card carries a result block and an open one does not, so without this the
+     rows that happen to contain a settled market are tall and the rest are
+     short, and the grid reads as broken rather than as varied. */
+  grid-auto-rows: 1fr;
   max-width: 1440px;
   margin-inline: auto;
   gap: 14px;
