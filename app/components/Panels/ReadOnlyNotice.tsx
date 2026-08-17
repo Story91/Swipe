@@ -8,13 +8,20 @@ import './ReadOnlyNotice.css';
  * Explains what a user is looking at when a chain shows markets they cannot bet
  * on. Two different situations, and they need two different sentences.
  *
- * Base runs V3 and also carries the old V1, V2 and USDC markets, whose owner key
- * is gone. Saying "Base markets are archived" was true while nothing on Base was
- * live and became a lie the moment V3 deployed there, so the copy now separates
- * the old markets from the chain.
+ * Base runs the live contract and also carries the old V1, V2 and USDC markets,
+ * whose owner key is gone. Saying "Base markets are archived" was true while
+ * nothing on Base was live and became a lie the moment a live contract deployed
+ * there, so the copy separates the old markets from the chain.
  *
- * A chain with no market contract at all, which is Robinhood today, gets the
- * plainer version: nothing has launched here yet.
+ * Neither branch names a contract generation any more. The archived text said
+ * "runs on V3 now" and went stale the day V4 replaced it, which is the same
+ * failure the routing gates had: a version number written into a sentence is a
+ * fact with an expiry date on it. It also promised audited contracts, and no
+ * audit covers what is deployed.
+ *
+ * The read-only branch is for a chain with no market contract at all. Both live
+ * chains have one today, so it does not currently fire, and it stays because a
+ * third chain starts out exactly there.
  *
  * Reads the switcher rather than the build-time default. A banner about "this
  * network" that always described Base regardless of what the user selected was
@@ -40,10 +47,11 @@ export function ReadOnlyNotice() {
       <aside className="readonly-notice" role="status">
         <p className="readonly-notice__title">Older {chain.label} markets are archived</p>
         <p className="readonly-notice__body">
-          Betting on {chain.label} runs on V3 now, with audited contracts, fairer
-          payouts and fees taken only from the losing side. Markets created before
-          V3 stay here for reference and take no new bets. Your past positions and
-          results remain visible.
+          New markets on {chain.label} run on a new contract, where fees come out
+          of the losing side only and betting early counts for more. The older
+          ones stay here for reference and take no new bets. Nobody holds the key
+          to those any more, so anything still open on them cannot be settled and
+          a stake left in one cannot be claimed.
         </p>
       </aside>
     );

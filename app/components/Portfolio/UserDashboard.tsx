@@ -200,9 +200,9 @@ export function UserDashboard({ predictions, onClaimReward }: UserDashboardProps
     // no placeStake and takes USDC, not ETH: there is nothing here to port.
     if (!isWritableMarket(chainKey, CONTRACTS.V2.address)) {
       alert(
-        'Betting moved to V3.\n\n' +
+        'Betting moved to a new contract.\n\n' +
         'These ETH markets are archived and take no new stakes. Use the markets ' +
-        'view to bet with USDC.'
+        'view to bet with the stablecoin your network runs on.'
       );
       return;
     }

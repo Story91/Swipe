@@ -196,9 +196,10 @@ export function SystemSettings() {
 
           <div className="sheet-note">
             <p>
-              V3 runs its own configuration and is unaffected by anything here.
-              Its rates are set at deploy time by <strong>scripts/deploy_v3.js</strong>{' '}
-              and changed by its own owner, on its own contract.
+              The live market contract runs its own configuration and is
+              unaffected by anything here. Its rates are set at deploy time by{' '}
+              <strong>scripts/deploy_v4.js</strong> and changed by its own owner,
+              on its own contract, one deployment per chain.
             </p>
           </div>
         </div>

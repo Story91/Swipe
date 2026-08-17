@@ -3547,7 +3547,7 @@ KEY USER-FACING CHANGES: V1 → V2
                       </div>
                     )}
                     <p className="text-[9px] text-slate-500 mt-2 leading-snug">
-                      An estimate on the pools as they stand. V3 also weights your share of the losing pool by how early you bet, which this does not model.
+                      An estimate on the pools as they stand. Your share of the losing pool is also weighted by how early you bet, which this does not model.
                     </p>
                   </CardContent>
                 </Card>

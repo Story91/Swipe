@@ -513,10 +513,10 @@ export default function ManifestoPage() {
               </div>
               <p className="mf-p" style={{ marginTop: 20 }}>
                 A contract lives at one address on one chain, so each chain runs
-                its own deployment of the same audited source, holding its own
-                collateral. The token is fixed when the contract is deployed and
-                can never be changed afterwards. Markets belong to their chain and
-                the pools are never shared.
+                its own deployment of the same source, holding its own collateral.
+                The token is fixed when the contract is deployed and can never be
+                changed afterwards. Markets belong to their chain and the pools
+                are never shared.
               </p>
             </div>
           </section>
