@@ -47,6 +47,21 @@ export const THRESHOLD = 110;
  * to commit or cancel. 0.55 => 60.5px.
  */
 export const COMMIT_RATIO = 0.55;
+
+/**
+ * Floors that apply to COMMIT only, and exist because commit opens a
+ * real-money dialog.
+ *
+ * Momentum projection contributes `0.499 * velocity`, so without these a ~30px
+ * twitch at ~200px/s arms and a second ~30px twitch commits: about 60px of
+ * total finger travel to stake, against 120px before this engine. The
+ * prototype never had to care, because nothing there touched money.
+ *
+ * Cancel deliberately has no equivalent floor. Cancelling must stay the easier
+ * of the two.
+ */
+export const COMMIT_DWELL_MS = 150;
+export const COMMIT_MIN_RAW_PX = 24;
 /** Degrees of tilt per px of horizontal travel is 1/this. */
 export const ROTATE_DIVISOR = 22;
 export const MAX_ROTATE_DEG = 10;
@@ -208,13 +223,40 @@ export type Geometry = {
  * are. Derived rather than hardcoded because the card is 330px on a wide
  * desktop and 260px on a small phone, and a fixed dock would sit off-card at
  * one end of that range.
+ *
+ * THE DOCK IS CAPPED, and this is the one number in here that was not simply
+ * ported. The prototype docks at 0.46*cardWidth inside a stage at least 560px
+ * wide, where the armed card stays visible. The real clip box is
+ * `.tinder-container`, which has `overflow: hidden` and is 335px of content on
+ * a 375px phone. An uncapped 128.8px dock there puts the card's outer edge
+ * 268.8px from centre against a 167.5px half-container: about 101px of the
+ * armed card, including part of its own armed pill, is simply cut off.
+ *
+ * So the dock is allowed to hang the card off the edge by at most
+ * ALLOWED_CLIP_RATIO of its width. On desktop the cap is not reached and the
+ * feel is the approved one exactly; on a phone the dock shortens rather than
+ * the card disappearing.
+ *
+ * The alternative was keeping the card fully on screen, which collapses the
+ * dock to ~20px on a phone and is a materially different gesture from the one
+ * that was approved. This needs confirming on a real handset; it is the one
+ * question the prototype cannot answer, because it was only ever run wide.
  */
+export const ALLOWED_CLIP_RATIO = 0.15;
+
 export function geometry(
   cardWidth: number,
   stageWidth: number,
   threshold = THRESHOLD
 ): Geometry {
-  const dock = cardWidth * DOCK_RATIO;
+  const preferredDock = cardWidth * DOCK_RATIO;
+  const maxDock =
+    stageWidth / 2 - cardWidth / 2 + cardWidth * ALLOWED_CLIP_RATIO;
+
+  // Never negative: a stage narrower than its own card would otherwise dock
+  // the card on the wrong side of centre.
+  const dock = Math.max(0, Math.min(preferredDock, maxDock));
+
   return {
     dock,
     edgeBoundary: Math.max(dock + 20, stageWidth / 2 - cardWidth / 2 - EDGE_MARGIN),
@@ -278,15 +320,40 @@ export function decideArmedRelease(
   vx: number,
   dir: Direction,
   dock: number,
-  threshold = THRESHOLD,
-  d = PROJECTION_D
+  opts: {
+    threshold?: number;
+    d?: number;
+    /** ms between arming and this release. Guards the two-flick shortcut. */
+    msSinceArm?: number;
+    /**
+     * Post-deadzone finger travel outward from the dock, BEFORE the rubber-band
+     * wall compresses it. Displayed position understates real travel past the
+     * wall, so the floor has to be measured on the finger, not the card.
+     */
+    rawOutward?: number;
+  } = {}
 ): ArmedRelease {
+  const {
+    threshold = THRESHOLD,
+    d = PROJECTION_D,
+    msSinceArm = Number.POSITIVE_INFINITY,
+    rawOutward = Number.POSITIVE_INFINITY,
+  } = opts;
+
   const extra = threshold * COMMIT_RATIO;
   // Positive = further out from centre, on whichever side is armed.
   const outward = (x - dir * dock) * dir + project(vx, d) * dir;
 
-  if (outward > extra) return { kind: 'commit' };
+  // Cancel first, and with no floors: a user pulling back has already decided,
+  // and making that harder than committing would be exactly backwards.
   if (outward < -extra) return { kind: 'cancel' };
+
+  if (outward > extra) {
+    if (msSinceArm < COMMIT_DWELL_MS) return { kind: 'settle' };
+    if (rawOutward < COMMIT_MIN_RAW_PX) return { kind: 'settle' };
+    return { kind: 'commit' };
+  }
+
   return { kind: 'settle' };
 }
 

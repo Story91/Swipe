@@ -1,0 +1,205 @@
+/* Development harness only. Never rendered in production. */
+
+.hz {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+  color: rgba(255, 255, 255, 0.92);
+  font-family: var(--font-body), -apple-system, sans-serif;
+  padding: 32px 24px 64px;
+}
+
+.hz-head h1 {
+  font-family: var(--font-display), 'Orbitron', sans-serif;
+  font-size: 24px;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  margin: 0 0 8px;
+}
+
+.hz-head p {
+  color: rgba(255, 255, 255, 0.72);
+  max-width: 70ch;
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+
+.hz-note {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+}
+
+.hz-head code {
+  font-family: var(--font-data), monospace;
+  font-size: 12px;
+  color: #d4ff00;
+}
+
+.hz-controls {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+  font-size: 14px;
+}
+
+.hz-controls button,
+.hz-buttons button {
+  font-family: var(--font-display), 'Orbitron', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.hz-controls button:hover,
+.hz-buttons button:hover {
+  color: #d4ff00;
+  border-color: rgba(212, 255, 0, 0.4);
+}
+
+.hz-row {
+  display: flex;
+  gap: 40px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  margin-top: 24px;
+}
+
+/*
+ * The stage clips, exactly as .tinder-container does in the real app. Without
+ * overflow:hidden here the harness would hide the very problem it exists to
+ * expose: an armed card being swallowed on a narrow screen.
+ */
+.hz-stage {
+  position: relative;
+  overflow: hidden;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.hz-wrapper {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: pan-y pinch-zoom;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  cursor: grab;
+}
+
+.hz-wrapper:active {
+  cursor: grabbing;
+}
+
+.hz-card {
+  position: relative;
+  width: 86%;
+  height: 88%;
+  border-radius: 18px;
+  background: #101010;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hz-tint {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hz-tint--yes {
+  background: linear-gradient(270deg, rgba(212, 255, 0, 0.55), transparent 70%);
+}
+
+.hz-tint--no {
+  background: linear-gradient(90deg, rgba(255, 92, 92, 0.55), transparent 70%);
+}
+
+.hz-card-body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.hz-card-w {
+  font-family: var(--font-data), monospace;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.hz-hint {
+  font-family: var(--font-display), 'Orbitron', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.hz-armed {
+  font-family: var(--font-display), 'Orbitron', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 8px 14px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+}
+
+.hz-armed--right { color: #d4ff00; }
+.hz-armed--left { color: #ff5c5c; }
+
+.hz-buttons {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 10px;
+  z-index: 2;
+}
+
+.hz-log {
+  margin-top: 40px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 16px;
+}
+
+.hz-log h2 {
+  font-family: var(--font-display), 'Orbitron', sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #d4ff00;
+  margin: 0 0 10px;
+}
+
+.hz-log ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-data), monospace;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.hz-log li {
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
