@@ -1,32 +1,6 @@
 /* Dashboard Styles */
-.dashboard-selector {
-  text-align: center;
-  padding: 20px;
-  background: var(--sheet-rule);
-  backdrop-filter: blur(10px);
-  margin-bottom: 20px;
-  border-radius: 0;
-}
 
-.dashboard-tabs {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 20px;
-  flex-wrap: wrap;
-}
 
-.tab-btn {
-  padding: 12px 30px;
-  background: var(--sheet-rule-strong);
-  border: none;
-  border-radius: 0;
-  color: white;
-  cursor: pointer;
-  font-weight: bold;
-  transition: all 0.3s;
-  font-size: 14px;
-}
 
 .tab-btn.active, .tab-btn:hover {
   background: var(--sheet-surface);
@@ -45,20 +19,7 @@
   display: block;
 }
 
-.dashboard-header {
-  text-align: center;
-  margin-bottom: 30px;
-}
 
-.dashboard-title {
-  font-size: 2.5em;
-  margin-bottom: 10px;
-  background: var(--sheet-surface);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  font-weight: bold;
-}
 
 .stats-grid {
   display: grid;
@@ -571,26 +532,7 @@
   font-weight: 600;
 }
 
-.modal-close-btn {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: rgba(0, 0, 0, 0.6);
-  padding: 5px;
-  border-radius: 0;
-  width: 35px;
-  height: 35px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-}
 
-.modal-close-btn:hover {
-  background: rgba(0, 0, 0, 0.1);
-  color: rgba(0, 0, 0, 0.8);
-}
 
 .stake-modal-content {
   padding: 25px;
@@ -612,13 +554,6 @@
   margin-bottom: 20px;
 }
 
-.choice-indicator {
-  font-size: 1.2em;
-  font-weight: 600;
-  padding: 10px 20px;
-  border-radius: 0;
-  display: inline-block;
-}
 
 .choice-indicator.yes {
   background: var(--sheet-surface);
@@ -729,27 +664,8 @@
   border-color: rgba(0, 0, 0, 0.3);
 }
 
-.btn-confirm {
-  padding: 15px;
-  border: none;
-  border-radius: 0;
-  background: var(--sheet-surface);
-  color: white;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s;
-  font-size: 1em;
-  box-shadow: none;
-}
 
-.btn-confirm:hover {
-  transform: translateY(-2px);
-  box-shadow: none;
-}
 
-.btn-confirm:active {
-  transform: translateY(0);
-}
 
 .btn-confirm.loading {
   pointer-events: none;

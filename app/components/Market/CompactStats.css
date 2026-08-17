@@ -104,33 +104,9 @@
 }
 
 /* Header Card */
-.stats-header-card {
-  background: var(--sheet-surface) !important;
-  border: 2px solid rgba(212, 255, 0, 0.4) !important;
-  border-radius: 0;
-  overflow: hidden;
-}
 
-.stats-header-inner {
-  padding: 16px !important;
-  text-align: center;
-}
 
-.stats-main-title {
-  font-size: 22px !important;
-  color: var(--sheet-lime) !important;
-  font-weight: 800 !important;
-  font-family: var(--sheet-display) !important;
-  letter-spacing: 1px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
 
-.stats-icon {
-  font-size: 24px;
-}
 
 /* Metrics Grid - New Style */
 .metrics-grid {

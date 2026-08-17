@@ -32,17 +32,19 @@
 .markets-title-text {
   font-size: 18px;
   font-weight: 700;
-  color: var(--sheet-paper);
+  color: #000;
 }
 
 /* Premium USDC Header */
 .usdc-header-card {
-  background: var(--sheet-surface) !important;
+  background: linear-gradient(135deg, #0a1628 0%, #1a2744 50%, #0d1929 100%) !important;
   border: 1px solid rgba(39, 117, 202, 0.3) !important;
-  border-radius: 0;
+  border-radius: 16px !important;
   padding: 12px 16px !important;
   margin-bottom: 12px;
-  box-shadow: none;
+  box-shadow: 
+    0 4px 20px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
   position: relative;
   overflow: hidden;
 }
@@ -54,7 +56,7 @@
   left: 0;
   right: 0;
   height: 1px;
-  background: var(--sheet-surface);
+  background: linear-gradient(90deg, transparent, rgba(39, 117, 202, 0.5), transparent);
 }
 
 .usdc-header-content {
@@ -79,7 +81,7 @@
 .usdc-logo {
   width: 40px;
   height: 40px;
-  border-radius: 0;
+  border-radius: 50%;
   position: relative;
   z-index: 1;
 }
@@ -92,7 +94,7 @@
   width: 50px;
   height: 50px;
   background: radial-gradient(circle, rgba(39, 117, 202, 0.4) 0%, transparent 70%);
-  border-radius: 0;
+  border-radius: 50%;
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
@@ -112,14 +114,14 @@
   font-weight: 700;
   color: #fff;
   margin: 0;
-  font-family: var(--sheet-body);
+  font-family: "Exo 2", sans-serif;
   text-shadow: 0 2px 10px rgba(39, 117, 202, 0.3);
 }
 
 .contract-icon {
   width: 12px;
   height: 12px;
-  border-radius: 0;
+  border-radius: 2px;
 }
 
 .contract-icon-link {
@@ -128,11 +130,11 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  border-radius: 0;
+  border-radius: 8px;
   text-decoration: none;
   transition: all 0.2s ease;
-  background: var(--sheet-surface);
-  border: 1px solid var(--sheet-rule);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .contract-icon-link:hover {
@@ -150,9 +152,9 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  background: var(--sheet-surface);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05));
   border: 1px solid rgba(16, 185, 129, 0.3);
-  border-radius: 0;
+  border-radius: 20px;
   padding: 6px 12px;
   color: #10b981;
 }
@@ -160,7 +162,7 @@
 .balance-amount {
   font-weight: 600;
   font-size: 14px;
-  font-family: var(--sheet-body);
+  font-family: "Exo 2", sans-serif;
 }
 
 .usdc-action-buttons {
@@ -171,22 +173,22 @@
 .action-btn {
   width: 32px !important;
   height: 32px !important;
-  border-radius: 0;
-  background: var(--sheet-surface) !important;
-  border: 1px solid var(--sheet-rule) !important;
+  border-radius: 8px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
   color: #94a3b8 !important;
   transition: all 0.2s ease !important;
 }
 
 .action-btn:hover {
-  background: var(--sheet-rule) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
   color: #fff !important;
-  border-color: var(--sheet-rule-strong) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
 }
 
 .usdc-separator {
   margin-top: 12px !important;
-  background: var(--sheet-surface) !important;
+  background: linear-gradient(90deg, transparent, rgba(39, 117, 202, 0.3), transparent) !important;
 }
 
 .wallet-balance-compact {
@@ -195,7 +197,7 @@
   gap: 4px;
   padding: 6px 10px;
   background: rgba(16, 185, 129, 0.1);
-  border-radius: 0;
+  border-radius: 6px;
   font-size: 13px;
   font-weight: 600;
   color: #10b981;
@@ -204,7 +206,7 @@
 .refresh-btn-mini {
   width: 28px;
   height: 28px;
-  border-radius: 0;
+  border-radius: 6px;
   border: 1px solid #e5e5e5;
   background: #fff;
   display: flex;
@@ -236,7 +238,7 @@
   align-items: center;
   gap: 8px;
   background: #f5f5f5;
-  border-radius: 0;
+  border-radius: 8px;
   padding: 8px 12px;
   width: 100%;
 }
@@ -251,7 +253,7 @@
 }
 
 .search-input-compact:focus {
-  box-shadow: none;
+  box-shadow: none !important;
   outline: none !important;
 }
 
@@ -267,7 +269,7 @@
 .sort-tag {
   padding: 5px 12px;
   font-size: 12px;
-  border-radius: 0;
+  border-radius: 16px;
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
@@ -302,7 +304,7 @@
   position: relative;
   overflow: visible;
   background: #fff;
-  border-radius: 0;
+  border-radius: 14px;
   padding: 12px;
   transition: all 0.2s;
   overflow: hidden;
@@ -317,9 +319,16 @@
   left: 0;
   right: 0;
   bottom: 0;
-  border-radius: 0;
+  border-radius: 14px;
   padding: 2px;
-  background: var(--sheet-surface);
+  background: linear-gradient(
+    90deg,
+    #1a1a1a,
+    #d4ff00,
+    #10b981,
+    #d4ff00,
+    #1a1a1a
+  );
   background-size: 300% 100%;
   animation: border-gradient 6s linear infinite;
   -webkit-mask: 
@@ -339,13 +348,20 @@
 }
 
 .market-card:hover {
-  box-shadow: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
   transform: translateY(-2px);
 }
 
 .market-card:hover::before {
   animation-duration: 3s;
-  background: var(--sheet-surface);
+  background: linear-gradient(
+    90deg,
+    #1a1a1a,
+    #d4ff00,
+    #10b981,
+    #d4ff00,
+    #1a1a1a
+  );
   background-size: 300% 100%;
 }
 
@@ -358,7 +374,7 @@
 .market-image {
   width: 56px;
   height: 56px;
-  border-radius: 0;
+  border-radius: 10px;
   overflow: hidden;
   flex-shrink: 0;
   background: #f5f5f5;
@@ -384,8 +400,8 @@
 }
 
 .market-category {
-  font-size: 12px;
-  color: var(--sheet-paper-3);
+  font-size: 10px;
+  color: #666;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   font-weight: 500;
@@ -410,13 +426,13 @@
   font-size: 9px !important;
   background: rgba(156, 163, 175, 0.2) !important;
   border-color: rgba(156, 163, 175, 0.3) !important;
-  color: var(--sheet-paper-3) !important;
+  color: #6b7280 !important;
 }
 
 .market-title {
   font-size: 14px;
   font-weight: 600;
-  color: var(--sheet-paper);
+  color: #000;
   margin-top: 2px;
   line-height: 1.3;
   display: -webkit-box;
@@ -429,8 +445,8 @@
 }
 
 .market-description {
-  font-size: 12px;
-  color: var(--sheet-paper-3);
+  font-size: 8px;
+  color: #666;
   margin: 0 0 4px 0;
   line-height: 1.2;
 }
@@ -439,7 +455,7 @@
   background: none;
   border: none;
   padding: 0;
-  font-size: 12px;
+  font-size: 8px;
   font-weight: 400;
   color: #2563eb;
   cursor: pointer;
@@ -465,7 +481,7 @@
   align-items: center;
   justify-content: center;
   padding: 10px;
-  border-radius: 0;
+  border-radius: 10px;
   border: 2px solid;
   cursor: pointer;
   transition: all 0.2s;
@@ -473,9 +489,9 @@
 }
 
 .price-button.yes {
-  border-color: var(--sheet-paper);
+  border-color: #000;
   background: #fff;
-  color: #14140f;
+  color: #000;
 }
 
 .price-button.yes:hover,
@@ -485,7 +501,7 @@
 }
 
 .price-button.no {
-  border-color: var(--sheet-paper);
+  border-color: #000;
   background: #1a1a1a;
   color: #fff;
 }
@@ -497,7 +513,7 @@
 }
 
 .side-label {
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -505,7 +521,7 @@
 }
 
 .price-button.yes .side-label {
-  color: var(--sheet-paper-3);
+  color: #666;
 }
 
 .price-button.no .side-label {
@@ -518,7 +534,7 @@
 }
 
 .price-button.yes .price-value {
-  color: var(--sheet-lime);
+  color: #d4ff00;
 }
 
 .price-button.no .price-value {
@@ -539,7 +555,7 @@
   justify-content: center;
   gap: 4px;
   font-size: 13px;
-  color: var(--sheet-paper-3);
+  color: #666;
 }
 
 .payout-yes {
@@ -575,17 +591,17 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  border-radius: 0;
+  border-radius: 8px;
   background: rgba(0, 0, 0, 0.05);
   border: 1px solid rgba(0, 0, 0, 0.1);
-  color: var(--sheet-paper-3);
+  color: #666;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .share-btn:hover {
   background: rgba(0, 0, 0, 0.1);
-  color: var(--sheet-paper);
+  color: #000;
   border-color: rgba(0, 0, 0, 0.2);
 }
 
@@ -595,7 +611,7 @@
   gap: 3px;
   background: #ef4444 !important;
   color: white !important;
-  font-size: 12px;
+  font-size: 9px;
   padding: 3px 6px;
 }
 
@@ -606,7 +622,7 @@
   background: rgba(212, 255, 0, 0.1) !important;
   border-color: rgba(212, 255, 0, 0.3) !important;
   color: #7cb800 !important;
-  font-size: 12px;
+  font-size: 11px;
   padding: 4px 10px;
   font-weight: 600;
 }
@@ -617,8 +633,8 @@
   gap: 4px;
   background: rgba(100, 116, 139, 0.1) !important;
   border-color: rgba(100, 116, 139, 0.3) !important;
-  color: var(--sheet-paper-3) !important;
-  font-size: 12px;
+  color: #64748b !important;
+  font-size: 11px;
   padding: 4px 10px;
   font-weight: 500;
 }
@@ -634,14 +650,14 @@
   display: flex;
   align-items: center;
   gap: 3px;
-  font-size: 12px;
-  color: var(--sheet-paper-3);
+  font-size: 11px;
+  color: #666;
 }
 
 .expand-btn {
   width: 32px;
   height: 32px;
-  border-radius: 0;
+  border-radius: 50%;
   border: 1px solid #cfcfcf;
   background: #f9fafb;
   display: flex;
@@ -680,12 +696,12 @@
   position: absolute;
   top: 42px;
   right: 0;
-  background: var(--sheet-surface);
-  border: 1px solid var(--sheet-lime);
-  border-radius: 0;
+  background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
+  border: 1px solid #d4ff00;
+  border-radius: 10px;
   padding: 6px;
   min-width: 140px;
-  box-shadow: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 20px rgba(212, 255, 0, 0.1);
   z-index: 101;
 }
 
@@ -695,7 +711,7 @@
   padding: 10px 12px;
   background: transparent;
   border: none;
-  border-radius: 0;
+  border-radius: 6px;
   color: #fff;
   font-size: 13px;
   font-weight: 500;
@@ -707,13 +723,13 @@
 
 .share-dropdown-item:hover {
   background: rgba(212, 255, 0, 0.15);
-  color: var(--sheet-lime);
+  color: #d4ff00;
 }
 
 .share-stats-divider {
   height: 1px;
   margin: 6px 0;
-  background: var(--sheet-surface);
+  background: linear-gradient(90deg, transparent, rgba(212, 255, 0, 0.5), transparent);
 }
 
 .share-btn-farcaster-split {
@@ -722,9 +738,9 @@
   align-items: center;
   justify-content: center;
   height: 36px;
-  border-radius: 0;
+  border-radius: 6px;
   overflow: hidden;
-  border: 1px solid var(--sheet-rule-strong) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
   padding: 0 !important;
 }
 
@@ -762,7 +778,7 @@
 
 .share-btn-farcaster-split:hover {
   transform: scale(1.02);
-  box-shadow: none;
+  box-shadow: 0 4px 12px rgba(138, 99, 210, 0.3);
 }
 
 .share-btn-twitter {
@@ -772,8 +788,8 @@
   justify-content: center;
   height: 36px;
   background: #000 !important;
-  border: 1px solid var(--sheet-rule-strong) !important;
-  border-radius: 0;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 6px;
   margin-top: 0;
 }
 
@@ -794,9 +810,9 @@
   padding: 8px 12px;
   background: transparent;
   border: none;
-  border-bottom: 1px solid var(--sheet-rule);
-  color: var(--sheet-paper-2);
-  font-size: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
   font-weight: 500;
   text-align: left;
   cursor: pointer;
@@ -811,20 +827,20 @@
 .share-stats-badge {
   width: 36px;
   height: 36px;
-  border-radius: 0;
-  background: var(--sheet-surface);
+  border-radius: 50%;
+  background: linear-gradient(135deg, #d4ff00, #c8f000);
   border: 3px solid #0a0a0a;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: none;
+  box-shadow: 0 2px 12px rgba(212, 255, 0, 0.4);
 }
 
 .share-stats-badge:hover {
   transform: scale(1.1);
-  box-shadow: none;
+  box-shadow: 0 4px 16px rgba(212, 255, 0, 0.5);
 }
 
 .share-stats-badge:active {
@@ -832,7 +848,7 @@
 }
 
 .share-stats-badge svg {
-  color: var(--sheet-paper);
+  color: #000;
   stroke-width: 2.5;
 }
 
@@ -845,7 +861,7 @@
   justify-content: center;
   gap: 10px;
   padding: 40px 16px;
-  color: var(--sheet-paper-3);
+  color: #666;
   font-size: 14px;
 }
 
@@ -854,7 +870,7 @@
   height: 32px;
   border: 3px solid #e5e5e5;
   border-top-color: #10b981;
-  border-radius: 0;
+  border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
 
@@ -876,7 +892,7 @@
 
 .bet-modal {
   background: white;
-  border-radius: 0;
+  border-radius: 20px 20px 0 0;
   padding: 20px 16px;
   max-width: 424px;
   width: 100%;
@@ -891,7 +907,7 @@
 }
 
 .modal-subtitle {
-  color: var(--sheet-paper-3);
+  color: #666;
   font-size: 13px;
   margin-bottom: 16px;
   line-height: 1.3;
@@ -903,9 +919,9 @@
 
 .amount-input-section label {
   display: block;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  color: var(--sheet-paper-3);
+  color: #666;
   margin-bottom: 6px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -922,7 +938,7 @@
 .amount-btn {
   padding: 10px 4px;
   border: 1px solid #e5e5e5;
-  border-radius: 0;
+  border-radius: 8px;
   background: white;
   font-weight: 600;
   font-size: 13px;
@@ -991,9 +1007,9 @@
 
 .side-badge {
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  border-radius: 0;
+  border-radius: 6px;
 }
 
 .side-badge.yes {
@@ -1008,8 +1024,8 @@
 
 /* Balance Info */
 .balance-info {
-  font-size: 12px;
-  color: var(--sheet-paper-3);
+  font-size: 11px;
+  color: #666;
   text-align: center;
   margin-top: 6px;
 }
@@ -1017,7 +1033,7 @@
 /* Payout Preview */
 .payout-preview {
   background: #f8f8f8;
-  border-radius: 0;
+  border-radius: 10px;
   padding: 12px;
   margin-bottom: 12px;
 }
@@ -1040,7 +1056,7 @@
   gap: 6px;
   padding: 10px;
   background: rgba(239, 68, 68, 0.1);
-  border-radius: 0;
+  border-radius: 8px;
   color: #ef4444;
   font-size: 13px;
   margin-bottom: 12px;
@@ -1054,7 +1070,7 @@
   gap: 8px;
   padding: 12px;
   background: #f8f8f8;
-  border-radius: 0;
+  border-radius: 10px;
   margin-bottom: 12px;
   font-size: 13px;
   font-weight: 500;
@@ -1101,12 +1117,19 @@
   }
   
   .market-card::before {
-    background: var(--sheet-surface);
+    background: linear-gradient(
+      90deg,
+      #333,
+      #d4ff00,
+      #10b981,
+      #d4ff00,
+      #333
+    );
     background-size: 300% 100%;
   }
   
   .market-card:hover {
-    box-shadow: none;
+    box-shadow: 0 4px 25px rgba(212, 255, 0, 0.15);
   }
   
   .market-title {
@@ -1147,7 +1170,7 @@
   }
   
   .search-input-compact::placeholder {
-    color: var(--sheet-paper-3);
+    color: #666;
   }
   
   .sort-tag {
@@ -1259,7 +1282,7 @@
   
   .market-card {
     padding: 12px;
-    border-radius: 0;
+    border-radius: 12px;
   }
   
   .market-card-header {
@@ -1287,7 +1310,7 @@
 .back-btn {
   width: 32px;
   height: 32px;
-  border-radius: 0;
+  border-radius: 50%;
   border: 1px solid #e5e5e5;
   background: #fff;
   display: flex;
@@ -1306,7 +1329,7 @@
 .expanded-title {
   font-size: 14px;
   font-weight: 600;
-  color: var(--sheet-paper);
+  color: #000;
   line-height: 1.3;
   flex: 1;
 }
@@ -1314,7 +1337,7 @@
 /* Chart Section */
 .chart-section {
   background: #f8f9fa;
-  border-radius: 0;
+  border-radius: 10px;
   padding: 12px;
   height: 160px;
   min-height: 160px;
@@ -1353,7 +1376,7 @@
   align-items: center;
   justify-content: center;
   padding: 12px;
-  border-radius: 0;
+  border-radius: 10px;
   border: 2px solid;
 }
 
@@ -1368,7 +1391,7 @@
 }
 
 .price-box .label {
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -1407,7 +1430,7 @@
 }
 
 .tap-hint {
-  font-size: 12px;
+  font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   opacity: 0.6;
@@ -1430,8 +1453,8 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
-  color: var(--sheet-paper-3);
+  font-size: 11px;
+  color: #666;
 }
 
 .stat-item svg {
@@ -1446,7 +1469,7 @@
   padding: 10px 12px;
   margin-top: 8px;
   background: rgba(16, 185, 129, 0.08);
-  border-radius: 0;
+  border-radius: 10px;
   border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
@@ -1455,7 +1478,7 @@
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: var(--sheet-paper-3);
+  color: #666;
 }
 
 .position-info svg {
@@ -1475,18 +1498,18 @@
   align-items: center;
   gap: 4px;
   padding: 6px 10px;
-  background: var(--sheet-surface);
+  background: linear-gradient(135deg, #f59e0b, #d97706);
   color: white;
   border: none;
-  border-radius: 0;
-  font-size: 12px;
+  border-radius: 6px;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .early-exit-btn:hover {
-  background: var(--sheet-surface);
+  background: linear-gradient(135deg, #d97706, #b45309);
   transform: translateY(-1px);
 }
 
@@ -1511,7 +1534,7 @@
   padding: 10px 20px;
   background: rgba(212, 255, 0, 0.1);
   border: 1px solid rgba(212, 255, 0, 0.3);
-  border-radius: 0;
+  border-radius: 8px;
   color: #7cb800;
   font-weight: 600;
   font-size: 14px;
@@ -1536,7 +1559,7 @@
   margin: 0;
   font-size: 13px;
   line-height: 1.5;
-  color: var(--sheet-paper-3);
+  color: #666;
 }
 
 /* Exit Modal Styles */
@@ -1546,7 +1569,7 @@
   gap: 8px;
   padding: 12px;
   background: rgba(0, 0, 0, 0.02);
-  border-radius: 0;
+  border-radius: 8px;
   margin-bottom: 12px;
 }
 
@@ -1558,7 +1581,7 @@
 }
 
 .exit-info .label {
-  color: var(--sheet-paper-3);
+  color: #666;
 }
 
 .exit-info .value {
@@ -1594,7 +1617,7 @@
   color: #ef4444;
   background: rgba(239, 68, 68, 0.1);
   padding: 8px;
-  border-radius: 0;
+  border-radius: 6px;
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
@@ -1606,8 +1629,8 @@
   background: rgba(239, 68, 68, 0.1);
   color: #ef4444;
   border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 0;
-  font-size: 12px;
+  border-radius: 6px;
+  font-size: 10px;
   font-weight: 500;
 }
 
@@ -1623,17 +1646,17 @@
   justify-content: center;
   gap: 8px;
   padding: 12px;
-  background: var(--sheet-surface);
+  background: linear-gradient(135deg, #f59e0b, #d97706);
   color: white;
   border: none;
-  border-radius: 0;
+  border-radius: 10px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .exit-confirm-btn:hover:not(:disabled) {
-  background: var(--sheet-surface);
+  background: linear-gradient(135deg, #d97706, #b45309);
 }
 
 .exit-confirm-btn:disabled {
@@ -1650,7 +1673,7 @@
 
 .action-btn {
   padding: 12px;
-  border-radius: 0;
+  border-radius: 10px;
   border: none;
   font-size: 13px;
   font-weight: 600;
@@ -1698,7 +1721,7 @@
   
   .chart-loading,
   .chart-empty {
-    color: var(--sheet-paper-3);
+    color: #666;
   }
   
   .price-box.yes {
@@ -1737,7 +1760,7 @@
   }
   
   .exit-summary {
-    background: var(--sheet-surface);
+    background: rgba(255, 255, 255, 0.05);
   }
   
   .exit-info .label {
@@ -1757,7 +1780,7 @@
 .help-btn-mini {
   width: 28px;
   height: 28px;
-  border-radius: 0;
+  border-radius: 6px;
   border: 1px solid #e5e5e5;
   background: #fff;
   display: flex;
@@ -1789,16 +1812,19 @@
 }
 
 .help-modal-content {
-  background: var(--sheet-surface);
+  background: linear-gradient(135deg, #0a1628 0%, #1a2744 50%, #0d1929 100%);
   border: 1px solid rgba(212, 255, 0, 0.2);
-  border-radius: 0;
+  border-radius: 20px;
   max-width: 420px;
   width: 100%;
   max-height: 85vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: none;
+  box-shadow: 
+    0 25px 50px -12px rgba(0, 0, 0, 0.5),
+    0 0 40px rgba(212, 255, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .help-modal-header {
@@ -1807,7 +1833,7 @@
   align-items: center;
   padding: 18px 24px;
   border-bottom: 1px solid rgba(212, 255, 0, 0.15);
-  background: var(--sheet-surface);
+  background: linear-gradient(135deg, rgba(212, 255, 0, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%);
   position: relative;
 }
 
@@ -1818,24 +1844,24 @@
   left: 0;
   right: 0;
   height: 1px;
-  background: var(--sheet-surface);
+  background: linear-gradient(90deg, transparent, rgba(212, 255, 0, 0.5), transparent);
 }
 
 .help-modal-header h2 {
   font-size: 18px;
   font-weight: 700;
-  color: var(--sheet-lime);
+  color: #d4ff00;
   margin: 0;
-  font-family: var(--sheet-body);
+  font-family: "Exo 2", sans-serif;
   text-shadow: 0 0 20px rgba(212, 255, 0, 0.3);
 }
 
 .help-close-btn {
   width: 36px;
   height: 36px;
-  border-radius: 0;
-  border: 1px solid var(--sheet-rule);
-  background: var(--sheet-surface);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
   color: #94a3b8;
   cursor: pointer;
   display: flex;
@@ -1845,9 +1871,9 @@
 }
 
 .help-close-btn:hover {
-  background: var(--sheet-rule);
+  background: rgba(255, 255, 255, 0.1);
   color: #fff;
-  border-color: var(--sheet-rule-strong);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .help-modal-body {
@@ -1867,9 +1893,9 @@
 .help-section h3 {
   font-size: 14px;
   font-weight: 700;
-  color: var(--sheet-lime);
+  color: #d4ff00;
   margin: 0 0 10px 0;
-  font-family: var(--sheet-body);
+  font-family: "Exo 2", sans-serif;
 }
 
 .help-section p {
@@ -1889,9 +1915,9 @@
   display: flex;
   justify-content: space-between;
   padding: 10px 14px;
-  background: var(--sheet-surface);
-  border: 1px solid var(--sheet-surface);
-  border-radius: 0;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
   font-size: 12px;
 }
 
@@ -1903,7 +1929,7 @@
 .comparison-item .label {
   font-weight: 600;
   color: #e2e8f0;
-  font-family: var(--sheet-body);
+  font-family: "Exo 2", sans-serif;
 }
 
 .comparison-item .value {
@@ -1928,17 +1954,17 @@
 .help-formula code {
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(212, 255, 0, 0.15);
-  color: var(--sheet-lime);
+  color: #d4ff00;
   padding: 10px 14px;
-  border-radius: 0;
+  border-radius: 10px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
+  font-size: 11px;
   font-family: monospace;
 }
 
 .help-example {
   background: rgba(212, 255, 0, 0.05);
-  border-left: 3px solid var(--sheet-lime);
+  border-left: 3px solid #d4ff00;
   padding: 12px 14px;
   border-radius: 0 10px 10px 0;
   font-size: 12px;
@@ -1958,9 +1984,9 @@
   gap: 8px;
   align-items: center;
   padding: 10px 14px;
-  background: var(--sheet-surface);
-  border: 1px solid var(--sheet-surface);
-  border-radius: 0;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
   font-size: 12px;
 }
 
@@ -1972,12 +1998,12 @@
 .fee-name {
   font-weight: 600;
   color: #e2e8f0;
-  font-family: var(--sheet-body);
+  font-family: "Exo 2", sans-serif;
 }
 
 .fee-value {
   font-weight: 700;
-  color: var(--sheet-lime);
+  color: #d4ff00;
 }
 
 .fee-item.exit .fee-value {
@@ -1986,7 +2012,7 @@
 
 .fee-note {
   color: #64748b;
-  font-size: 12px;
+  font-size: 10px;
 }
 
 .help-payout-example {
@@ -1996,10 +2022,10 @@
 }
 
 .payout-scenario {
-  background: var(--sheet-surface);
-  border: 1px solid var(--sheet-surface);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   padding: 12px 14px;
-  border-radius: 0;
+  border-radius: 10px;
   font-size: 12px;
   color: #e2e8f0;
   line-height: 1.7;
@@ -2007,7 +2033,7 @@
 
 .payout-result {
   padding: 12px 14px;
-  border-radius: 0;
+  border-radius: 10px;
   font-size: 12px;
   line-height: 1.7;
   color: #e2e8f0;
@@ -2025,11 +2051,11 @@
 
 .payout-result .amount {
   font-weight: 700;
-  font-family: var(--sheet-body);
+  font-family: "Exo 2", sans-serif;
 }
 
 .payout-result.win .amount {
-  color: var(--sheet-lime);
+  color: #d4ff00;
 }
 
 .payout-result.lose .amount {
@@ -2038,7 +2064,7 @@
 
 .payout-result .profit {
   font-weight: 700;
-  color: var(--sheet-lime);
+  color: #d4ff00;
 }
 
 .help-section.tips ul {
@@ -2051,7 +2077,7 @@
   font-size: 12px;
   color: #e2e8f0;
   padding: 10px 0;
-  border-bottom: 1px solid var(--sheet-surface);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -2063,224 +2089,6 @@
 
 .help-section.tips li::before {
   content: '→';
-  color: var(--sheet-lime);
+  color: #d4ff00;
   font-weight: bold;
-}
-
-/* ============================================================================
- * BET MODAL
- *
- * This is the last thing a person sees before money leaves their wallet, so it
- * is the one screen that has to be unambiguous about two things: how much, and
- * which side.
- *
- * It was none of that. A purple gradient header leaking in from TinderCard.css
- * (mounted globally, so its .modal-header reached this one), a white body on a
- * dark app, and a lime Cancel button sitting next to a washed-out confirm -
- * the button that does nothing was the loudest thing in the dialog.
- *
- * These rules come last in the file and name the modal explicitly so it owns
- * its own appearance rather than inheriting whatever is mounted elsewhere.
- * ==========================================================================*/
-
-.bet-modal-overlay {
-  background: rgba(0, 0, 0, 0.72);
-  align-items: center;
-  padding: 20px;
-}
-
-.bet-modal {
-  background: #14140f;
-  border: 1px solid var(--sheet-rule-strong);
-  border-radius: 0;
-  box-shadow: 8px 8px 0 rgba(0, 0, 0, 0.5);
-  padding: 0;
-  max-width: 420px;
-}
-
-/* The header states the side, because that is the fact most worth getting
-   wrong. No gradient: a bar of colour behind a title tells a reader nothing. */
-.bet-modal .modal-header {
-  background: transparent;
-  border-bottom: 1px solid var(--sheet-rule);
-  padding: 18px 20px;
-  margin: 0;
-}
-
-.bet-modal .modal-header h3 {
-  font-family: var(--sheet-display);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--sheet-paper-3);
-}
-
-.bet-modal .side-badge {
-  font-family: var(--sheet-display);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  border-radius: 0;
-  padding: 5px 12px;
-  background: transparent !important;
-  border: 1px solid var(--sheet-rule-strong);
-}
-
-.bet-modal .side-badge.yes {
-  color: var(--sheet-lime) !important;
-  border-color: var(--sheet-lime-line);
-}
-
-.bet-modal .side-badge.no {
-  color: var(--sheet-paper) !important;
-}
-
-/* The question is what is being bet on, so it is set as the subject, not as a
-   caption under the dialog's own name. */
-.bet-modal .modal-subtitle {
-  font-family: var(--sheet-display);
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 1.3;
-  letter-spacing: -0.01em;
-  color: var(--sheet-paper);
-  text-transform: none;
-  padding: 18px 20px 0;
-  margin: 0;
-}
-
-.bet-modal .amount-input-section {
-  padding: 18px 20px 0;
-  margin: 0;
-}
-
-.bet-modal .amount-input-section label {
-  font-family: var(--sheet-display);
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  color: var(--sheet-paper-3);
-}
-
-.bet-modal .amount-btn {
-  background: transparent;
-  border: 1px solid var(--sheet-rule);
-  border-radius: 0;
-  color: var(--sheet-paper-2);
-  font-family: var(--sheet-data);
-  font-variant-numeric: tabular-nums;
-  font-size: 13px;
-  transition: color 140ms ease, border-color 140ms ease;
-}
-
-.bet-modal .amount-btn:hover {
-  border-color: var(--sheet-lime-line);
-  color: var(--sheet-paper);
-}
-
-.bet-modal .amount-btn.active {
-  background: var(--sheet-wash);
-  border-color: var(--sheet-lime);
-  color: var(--sheet-lime);
-}
-
-.bet-modal .custom-amount {
-  background: transparent;
-  border: 1px solid var(--sheet-rule);
-  border-radius: 0;
-  color: var(--sheet-paper);
-  font-family: var(--sheet-data);
-  font-variant-numeric: tabular-nums;
-  padding: 12px;
-}
-
-.bet-modal .balance-info {
-  font-family: var(--sheet-data);
-  font-size: 12px;
-  color: var(--sheet-paper-3);
-  text-align: left;
-  margin-top: 8px;
-}
-
-/* The payout table is the reason to read the dialog at all, so it is set as a
-   ledger: keys left, figures right, hairline between rows. */
-.bet-modal .payout-preview {
-  margin: 18px 0 0;
-  padding: 0;
-  background: transparent;
-  border-top: 1px solid var(--sheet-rule);
-  border-radius: 0;
-}
-
-.bet-modal .payout-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 11px 20px;
-  border-bottom: 1px solid var(--sheet-rule);
-  font-size: 13px;
-  color: var(--sheet-paper-2);
-}
-
-.bet-modal .payout-row span:last-child {
-  font-family: var(--sheet-data);
-  font-variant-numeric: tabular-nums;
-  color: var(--sheet-paper);
-  text-align: right;
-}
-
-.bet-modal .modal-actions {
-  padding: 18px 20px 20px;
-  gap: 10px;
-}
-
-/* Confirm carries the accent because it is the action; Cancel is a border and
-   nothing else. It was the other way round, which put the loudest button in
-   the dialog on the control that does nothing. */
-.bet-modal .modal-actions > *:first-child button,
-.bet-modal .modal-actions > button:first-child {
-  background: transparent !important;
-  border: 1px solid var(--sheet-rule) !important;
-  border-radius: 0 !important;
-  color: var(--sheet-paper-3) !important;
-  font-family: var(--sheet-display);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.bet-modal .confirm-btn {
-  background: var(--sheet-lime) !important;
-  border: 1px solid var(--sheet-lime) !important;
-  border-radius: 0 !important;
-  color: #14140f !important;
-  font-family: var(--sheet-display);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.bet-modal .confirm-btn.yes,
-.bet-modal .confirm-btn.no,
-.bet-modal .confirm-btn.approve {
-  background: var(--sheet-lime) !important;
-  color: #14140f !important;
-}
-
-.bet-modal .confirm-btn:disabled {
-  opacity: 0.4;
-}
-
-.bet-modal .tx-status,
-.bet-modal .error-message {
-  margin: 0 20px;
-  padding: 11px 0;
-  border-top: 1px solid var(--sheet-rule);
-  border-radius: 0;
-  background: transparent;
-  font-size: 13px;
-  color: var(--sheet-paper-2);
 }

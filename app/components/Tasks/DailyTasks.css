@@ -441,16 +441,7 @@
   gap: 12px;
 }
 
-.banned-icon {
-  font-size: 32px;
-}
 
-.banned-message {
-  color: #ef4444;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.4;
-}
 
 .cooldown-label {
   display: block;
@@ -575,12 +566,6 @@
   color: rgba(255, 255, 255, 0.4);
 }
 
-.task-reward {
-  font-family: 'Spicy Rice', cursive;
-  font-size: 14px;
-  color: #d4ff00;
-  white-space: nowrap;
-}
 
 .task-item.completed .task-reward {
   color: #4ade80;
@@ -1299,12 +1284,6 @@
   }
 }
 
-.achievement-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 8px;
-}
 
 .achievement-follow-btn {
   padding: 4px 10px;

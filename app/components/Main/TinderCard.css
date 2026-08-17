@@ -85,7 +85,7 @@ html, body {
   left: -50%;
   width: 200%;
   height: 200%;
-  background: radial-gradient(circle, var(--sheet-rule) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
   animation: float 20s ease-in-out infinite;
   pointer-events: none;
 }
@@ -137,75 +137,41 @@ html, body {
   justify-content: center;
 }
 
-/*
- * THE CARD IS THE ONE OBJECT IN THIS APP.
- *
- * Every other screen is the sheet: flat, quiet, hairline-ruled, dense. That is
- * correct for paper you read. This is the one thing you hold and throw, so it
- * is the one thing with weight, and that contrast is the system rather than an
- * inconsistency in it. Ten screens without a corner radius is monotony if
- * nothing ever breaks it; it is a background if one object does.
- *
- * Weight comes from a hard-edged shadow, not a soft blur. A blurred shadow
- * floats, which is what the glassmorphism here did: 24px radius, 20px backdrop
- * blur, white at 95% over a dark app it had nothing to do with. An offset
- * shadow with no blur sits, the way a printed slip sits on a counter. That is
- * the right metaphor: parimutuel is tote betting, and a tote bet is a slip.
- *
- * It is dark now, which is the deliberate risk. The card no longer separates
- * itself by brightness, so it has to hold the eye with its edge and its shadow
- * instead. If that fails on a phone, the fix is a lighter face, not a return
- * to glass.
- */
+/* Modern Glass Card */
 .card {
   width: 100%;
   max-width: 330px;
   height: 528px;
-  background: #14140f;
-  border-radius: 20px;
-  border: 1px solid var(--sheet-rule-strong);
-  /* Hard, offset, unblurred: an object resting on a surface. */
-  box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.5);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 
+    0 25px 50px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(255, 255, 255, 0.2) inset;
   overflow: hidden;
   position: relative;
   cursor: grab;
-  transition: box-shadow 160ms ease, border-color 160ms ease;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 20;
 }
 
-/* Pressed: the card comes down onto the surface and its shadow closes up. The
-   whole travel is 3px, which is enough to feel and not enough to nudge layout. */
 .card:active {
   cursor: grabbing;
-  transform: translate(3px, 3px);
-  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.5);
+  transform: scale(0.98);
 }
 
 .card:hover {
-  border-color: var(--sheet-lime-line);
-  box-shadow: 8px 8px 0 rgba(0, 0, 0, 0.55);
-}
-
-/* The gesture owns the transform while a drag is live. Anything transitioning
-   transform here would fight the engine for the same property and lose in a
-   way that reads as lag. */
-.card.dragging-live,
-.card.dragging-live:active,
-.card.dragging-live:hover {
-  transition: none;
-  transform: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .card {
-    transition: none;
-  }
+  transform: translateY(-8px);
+  box-shadow: 
+    0 35px 70px rgba(0, 0, 0, 0.15),
+    0 0 0 1px rgba(255, 255, 255, 0.3) inset;
 }
 
 /* Card Image with Overlay */
 .card-image {
   width: 100%;
-  height: 52%;
+  height: 65%;
   overflow: hidden;
   position: relative;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -243,9 +209,9 @@ html, body {
 }
 
 .category-badge {
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
-  color: var(--sheet-paper-2);
+  color: #1e293b;
   padding: 8px 16px;
   border-radius: 20px;
   font-size: 12px;
@@ -253,7 +219,7 @@ html, body {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   align-self: flex-start;
-  border: 1px solid var(--sheet-paper-3);
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .price-info {
@@ -271,17 +237,17 @@ html, body {
   font-size: 18px;
   font-weight: 700;
   backdrop-filter: blur(10px);
-  font-family: var(--sheet-data);
+  font-family: "Source Code Pro", monospace;
 }
 
 .change {
-  background: var(--sheet-paper);
+  background: rgba(255, 255, 255, 0.95);
   padding: 6px 12px;
   border-radius: 12px;
   font-size: 14px;
   font-weight: 600;
   backdrop-filter: blur(10px);
-  font-family: var(--sheet-data);
+  font-family: "Source Code Pro", monospace;
 }
 
 .change.positive {
@@ -307,51 +273,43 @@ html, body {
 
 /* Card Content */
 .card-content {
-  padding: 20px 20px 58px 20px;
+  padding: 24px 24px 80px 24px;
   text-align: left;
-  background: transparent;
-  backdrop-filter: none;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
 }
 
-/* The question is the card. It is the only thing set large, and the only thing
-   in the display face; everything else on the card steps back so a reader
-   makes the judgement on the question rather than on the furniture around it.
-   The old colour was #1e293b, a near-black chosen for the white glass face
-   that is gone. */
 .card-title {
   margin: 0 0 12px 0;
-  font-size: 21px;
+  font-size: 20px;
   font-weight: 700;
-  color: var(--sheet-paper);
-  line-height: 1.22;
-  letter-spacing: -0.01em;
-  font-family: var(--sheet-display);
+  color: #1e293b;
+  line-height: 1.3;
+  letter-spacing: -0.025em;
+  font-family: "Exo 2", sans-serif;
 }
 
 .prediction-text {
   margin: 0 0 16px 0;
   font-size: 16px;
   font-weight: 500;
-  color: var(--sheet-paper-2);
+  color: #475569;
   line-height: 1.5;
 }
 
 /* Simple Countdown Line */
-/* The clock is metadata, so it is set as metadata: a line, not a pill. It was
-   a white rounded box with its own border and shadow, which gave a timestamp
-   the same visual weight as the question it sat under. */
 .countdown-line {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 7px;
-  margin: 10px 0 0;
-  padding: 0;
-  background: transparent;
-  border-radius: 0;
-  border: 0;
-  box-shadow: none;
-  text-align: left;
+  justify-content: center;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
 }
 
 .countdown-icon {
@@ -423,7 +381,7 @@ html, body {
 .timeframe, .confidence {
   font-size: 13px;
   font-weight: 500;
-  color: var(--sheet-paper-3);
+  color: #64748b;
   padding: 6px 12px;
   background: rgba(148, 163, 184, 0.1);
   border-radius: 12px;
@@ -435,89 +393,51 @@ html, body {
   margin-top: 12px;
 }
 
-/*
- * THE SIGNATURE: the pool bar is the swipe axis.
- *
- * The two pools already sit left and right, sized by their share, on exactly
- * the axis the finger travels: left is no, right is yes, spatially and
- * literally. Nothing had to be added to the markup for that to be true; it was
- * being drawn as a red-and-green progress bar instead, which threw the one
- * honest spatial fact on the card away.
- *
- * So: no red and green. Red and green say right and wrong, and a prediction
- * market has no opinion about which side you take before it settles. The side
- * carries the accent, the other side stays white, and the reader learns "how
- * much money is on my side" from weight rather than from a colour that has
- * already judged them.
- *
- * The bar sits flush on the card's bottom edge, full bleed, no radius and no
- * inset. It is the card's foot, not a widget resting near it.
- */
 .voting-section-fixed {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 0;
-  background: transparent;
-  backdrop-filter: none;
-  border-top: 1px solid var(--sheet-rule);
+  padding: 16px;
+  background: linear-gradient(to top, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.8));
+  backdrop-filter: blur(10px);
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .voting-bar {
   width: 100%;
-  height: 34px;
-  background: transparent;
-  border-radius: 0;
+  height: 20px;
+  background: rgba(239, 68, 68, 0.2);
+  border-radius: 10px;
   overflow: hidden;
   display: flex;
   position: relative;
 }
 
-/* Yes reads outward to the right, no reads outward to the left, so each side
-   grows toward the direction you would swipe to back it. */
 .voting-yes {
   height: 100%;
-  background: rgba(212, 255, 0, 0.16);
-  border-top: 2px solid var(--sheet-lime);
+  background: linear-gradient(90deg, #10b981, #34d399);
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  padding-right: 12px;
-  transition: width 480ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  justify-content: center;
+  transition: width 0.6s ease;
 }
 
 .voting-no {
   height: 100%;
-  background: var(--sheet-surface);
-  border-top: 2px solid var(--sheet-paper-3);
+  background: linear-gradient(90deg, #ef4444, #f87171);
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  padding-left: 12px;
-  transition: width 480ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  justify-content: center;
+  transition: width 0.6s ease;
 }
 
 .voting-text {
-  font-family: var(--sheet-data);
-  font-variant-numeric: tabular-nums;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--sheet-paper-2);
-  text-shadow: none;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   white-space: nowrap;
-}
-
-.voting-yes .voting-text {
-  color: var(--sheet-lime);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .voting-yes,
-  .voting-no {
-    transition: none;
-  }
 }
 
 /* Dynamic YES/NO Text Overlay */
@@ -532,7 +452,7 @@ html, body {
   justify-content: center;
   pointer-events: none;
   z-index: 30;
-  background: var(--sheet-rule);
+  background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
 }
 
@@ -551,11 +471,11 @@ html, body {
   letter-spacing: 3px;
   padding: 24px 48px;
   border-radius: 20px;
-  background: var(--sheet-paper);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(20px);
   box-shadow: 
     0 20px 40px rgba(0, 0, 0, 0.1),
-    0 0 0 1px var(--sheet-paper-3) inset;
+    0 0 0 1px rgba(255, 255, 255, 0.3) inset;
   transform: rotate(-15deg);
   animation: textAppear 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -592,7 +512,7 @@ html, body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: var(--sheet-paper);
+  background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(10px);
   border-radius: 16px;
   z-index: 10;
@@ -629,7 +549,7 @@ html, body {
 }
 
 .chart-loading p {
-  color: var(--sheet-paper-3);
+  color: #64748b;
   font-size: 14px;
   font-weight: 500;
   margin: 0;
@@ -646,14 +566,14 @@ html, body {
   margin: 20px auto 40px auto;
   width: 95%;
   max-width: 600px;
-  background: var(--sheet-paper);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(20px);
   border-radius: 20px;
   padding: 16px;
   box-shadow: 
     0 20px 40px rgba(0, 0, 0, 0.1),
-    0 0 0 1px var(--sheet-paper-3) inset;
-  border: 1px solid var(--sheet-paper-3);
+    0 0 0 1px rgba(255, 255, 255, 0.3) inset;
+  border: 1px solid rgba(255, 255, 255, 0.3);
   z-index: 15;
 }
 
@@ -663,15 +583,15 @@ html, body {
   align-items: center;
   margin-bottom: 16px;
   padding-bottom: 12px;
-  border-bottom: 2px solid var(--sheet-rule-strong);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
 }
 
 .details-header h4 {
   margin: 0;
   font-size: 18px;
   font-weight: 700;
-  color: var(--sheet-paper);
-  font-family: var(--sheet-body);
+  color: #1e293b;
+  font-family: "Exo 2", sans-serif;
   letter-spacing: -0.025em;
   background: linear-gradient(135deg, #1e293b, #3b82f6, #8b5cf6);
   background-clip: text;
@@ -698,7 +618,7 @@ html, body {
 .card-number {
   font-size: 12px;
   font-weight: 500;
-  color: var(--sheet-paper-3);
+  color: #64748b;
   padding: 4px 8px;
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
   border-radius: 8px;
@@ -715,7 +635,7 @@ html, body {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, var(--sheet-rule-strong), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
   transition: left 2s ease;
 }
 
@@ -727,7 +647,7 @@ html, body {
   margin: 0 0 16px 0;
   font-size: 15px;
   line-height: 1.8;
-  color: var(--sheet-paper);
+  color: #1e293b;
   text-align: left;
   white-space: pre-wrap;
   word-wrap: break-word;
@@ -738,7 +658,7 @@ html, body {
   border-radius: 12px;
   border: 1px solid rgba(0, 0, 0, 0.05);
   font-weight: 600;
-  font-family: var(--sheet-display);
+  font-family: "Orbitron", sans-serif;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
@@ -764,10 +684,10 @@ html, body {
   gap: 12px;
   margin-bottom: 16px;
   padding: 12px;
-  background: var(--sheet-rule);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   backdrop-filter: blur(10px);
-  border: 1px solid var(--sheet-rule-strong);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .stat {
@@ -781,25 +701,25 @@ html, body {
 }
 
 .stat-label {
-  font-size: 12px;
+  font-size: 6px;
   font-weight: 600;
   color: #6b7280;
   text-transform: uppercase;
   letter-spacing: 0.2px;
-  font-family: var(--sheet-display);
-  text-shadow: 0 1px 1px var(--sheet-paper-2);
+  font-family: "Orbitron", sans-serif;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.6);
   opacity: 0.8;
 }
 
 .stat-value {
   font-size: 12px;
   font-weight: 700;
-  color: var(--sheet-paper);
+  color: #1e293b;
   padding: 4px 8px;
-  background: var(--sheet-rule-strong);
+  background: rgba(255, 255, 255, 0.2);
   border-radius: 6px;
   backdrop-filter: blur(10px);
-  font-family: var(--sheet-body);
+  font-family: "Exo 2", sans-serif;
   word-break: break-word;
   overflow-wrap: break-word;
   white-space: nowrap;
@@ -814,11 +734,11 @@ html, body {
   font-weight: 600 !important;
   padding: 2px 6px !important;
   height: auto !important;
-  font-family: var(--sheet-display) !important;
+  font-family: "Orbitron", sans-serif !important;
   text-transform: uppercase !important;
   letter-spacing: 0.3px !important;
-  border: 1px solid var(--sheet-paper-3) !important;
-  background: var(--sheet-rule) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
   color: #6b7280 !important;
 }
 
@@ -827,10 +747,10 @@ html, body {
   font-weight: 700 !important;
   padding: 4px 8px !important;
   height: auto !important;
-  font-family: var(--sheet-body) !important;
-  background: var(--sheet-rule-strong) !important;
-  color: var(--sheet-paper) !important;
-  border: 1px solid var(--sheet-rule-strong) !important;
+  font-family: "Exo 2", sans-serif !important;
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: #1e293b !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
   word-break: break-word !important;
   overflow-wrap: break-word !important;
   white-space: nowrap !important;
@@ -846,18 +766,18 @@ html, body {
   gap: 8px !important;
   margin-top: 16px !important;
   padding: 12px !important;
-  background: var(--sheet-rule) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
   border-radius: 12px !important;
   backdrop-filter: blur(10px) !important;
-  border: 1px solid var(--sheet-rule-strong) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
 }
 
 .chart-item {
-  background: var(--sheet-rule-strong) !important;
+  background: rgba(255, 255, 255, 0.2) !important;
   backdrop-filter: blur(10px) !important;
   border-radius: 8px !important;
   padding: 8px 12px !important;
-  border: 1px solid var(--sheet-paper-3) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
   text-align: center !important;
   min-height: 50px !important;
   display: flex !important;
@@ -867,9 +787,9 @@ html, body {
 }
 
 .chart-title {
-  font-size: 12px;
+  font-size: 9px;
   font-weight: 600;
-  color: var(--sheet-paper-3);
+  color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.3px;
   margin-bottom: 4px;
@@ -878,13 +798,13 @@ html, body {
 .chart-value {
   font-size: 14px;
   font-weight: 700;
-  color: var(--sheet-paper);
+  color: #1e293b;
   margin-bottom: 4px;
-  font-family: var(--sheet-body);
+  font-family: "Exo 2", sans-serif;
 }
 
 .chart-subtitle {
-  font-size: 12px;
+  font-size: 8px;
   color: #3b82f6;
   text-transform: uppercase;
   font-weight: 600;
@@ -901,21 +821,21 @@ html, body {
 .risk-level {
   font-size: 14px;
   font-weight: 700;
-  color: var(--sheet-paper);
-  font-family: var(--sheet-body);
+  color: #1e293b;
+  font-family: "Exo 2", sans-serif;
 }
 
 .risk-score {
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 600;
   color: #ef4444;
-  font-family: var(--sheet-body);
+  font-family: "Exo 2", sans-serif;
 }
 
 .risk-breakdown {
-  font-size: 12px;
-  color: var(--sheet-paper-3);
-  font-family: var(--sheet-data);
+  font-size: 7px;
+  color: #64748b;
+  font-family: "Source Code Pro", monospace;
   line-height: 1.2;
   word-break: break-all;
 }
@@ -1029,7 +949,7 @@ html, body {
   }
 
   .voting-text {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
   }
 
@@ -1120,7 +1040,7 @@ html, body {
   }
 
   .voting-text {
-    font-size: 12px;
+    font-size: 8px;
     font-weight: 600;
   }
 
@@ -1185,7 +1105,7 @@ html, body {
   .quick-amount-btn {
     padding: 8px 10px;
     min-width: 44px;
-    font-size: 12px;
+    font-size: 11px;
   }
 }
 
@@ -1296,7 +1216,7 @@ html, body {
 .loading-spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid var(--sheet-paper-3);
+  border: 4px solid rgba(255, 255, 255, 0.3);
   border-radius: 50%;
   border-top-color: #4ecdc4;
   animation: spin 1s linear infinite;
@@ -1320,9 +1240,9 @@ html, body {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: var(--sheet-paper);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(20px);
-  border: 1px solid var(--sheet-rule-strong);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 16px;
   padding: 12px 20px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
@@ -1359,7 +1279,7 @@ html, body {
 }
 
 .feedback-prediction {
-  font-size: 12px;
+  font-size: 11px;
   color: #a0aec0;
   font-weight: 500;
 }
@@ -1504,7 +1424,7 @@ html, body {
   border: 2px solid #3b82f6;
   border-radius: 18px;
   padding: 7px 10px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   cursor: not-allowed;
   transition: all 0.3s ease;
@@ -1791,14 +1711,14 @@ html, body {
   
   .skip-button {
     padding: 5px 10px;
-    font-size: 12px;
+    font-size: 10px;
     min-width: 85px;
     height: 30px;
   }
   
   .tutorial-button {
     padding: 5px 8px;
-    font-size: 12px;
+    font-size: 9px;
     min-width: 105px;
     height: 30px;
   }
@@ -1814,7 +1734,7 @@ html, body {
   .ai-analyze-button {
     min-width: 85px;
     height: 30px;
-    font-size: 12px;
+    font-size: 10px;
     padding: 5px 10px;
     gap: 4px;
   }
@@ -1874,15 +1794,15 @@ html, body {
 
 .modal-subtitle {
   font-size: 14px;
-  color: var(--sheet-paper-2);
+  color: rgba(255, 255, 255, 0.6);
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 1px;
 }
 
 .modern-close-btn {
-  background: var(--sheet-rule);
-  border: 1px solid var(--sheet-rule-strong);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 12px;
   width: 40px;
   height: 40px;
@@ -1890,13 +1810,13 @@ html, body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: var(--sheet-paper-2);
+  color: rgba(255, 255, 255, 0.7);
   transition: all 0.3s ease;
 }
 
 .modern-close-btn:hover {
-  background: var(--sheet-rule);
-  color: var(--sheet-paper);
+  background: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.9);
   border-color: rgba(212, 255, 0, 0.3);
 }
 
@@ -1965,12 +1885,12 @@ html, body {
 .modern-modal .amount-currency {
   font-size: 18px;
   font-weight: 600;
-  color: var(--sheet-paper);
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .amount-description {
   font-size: 14px;
-  color: var(--sheet-paper-3);
+  color: rgba(255, 255, 255, 0.5);
   font-weight: 500;
 }
 
@@ -1985,10 +1905,10 @@ html, body {
 
 .modern-cancel-btn {
   padding: 16px 24px;
-  border: 2px solid var(--sheet-rule-strong);
+  border: 2px solid rgba(255, 255, 255, 0.2);
   border-radius: 16px;
-  background: var(--sheet-surface);
-  color: var(--sheet-paper);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.8);
   font-weight: 600;
   font-size: 16px;
   cursor: pointer;
@@ -1996,9 +1916,9 @@ html, body {
 }
 
 .modern-cancel-btn:hover {
-  background: var(--sheet-rule);
-  border-color: var(--sheet-paper-3);
-  color: var(--sheet-paper);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .modern-confirm-btn {
@@ -2093,7 +2013,7 @@ html, body {
 }
 
 .amount-value {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: #1f2937;
   line-height: 1.2;
@@ -2108,7 +2028,7 @@ html, body {
 }
 
 .no-stakes-text {
-  font-size: 12px;
+  font-size: 11px;
   color: #9ca3af;
   margin-bottom: 4px;
 }
@@ -2154,7 +2074,7 @@ html, body {
   right: 0;
   width: 1px;
   height: 100%;
-  background: var(--sheet-paper-3);
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .split-no {
@@ -2165,7 +2085,7 @@ html, body {
 .split-percentages {
   display: flex;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 600;
 }
 
@@ -2200,7 +2120,7 @@ html, body {
   }
   
   .chart-title {
-    font-size: 12px;
+    font-size: 11px;
     margin-bottom: 4px;
   }
   
@@ -2210,7 +2130,7 @@ html, body {
   }
   
   .chart-subtitle {
-    font-size: 12px;
+    font-size: 9px;
   }
   
   .amount-value {
@@ -2218,7 +2138,7 @@ html, body {
   }
   
   .amount-label {
-    font-size: 12px;
+    font-size: 10px;
   }
   
   .split-bar {
@@ -2226,7 +2146,7 @@ html, body {
   }
   
   .split-percentages {
-    font-size: 12px;
+    font-size: 9px;
   }
 }
 
@@ -2240,7 +2160,7 @@ html, body {
 }
 
 .no-swipers-text {
-  font-size: 12px;
+  font-size: 11px;
   color: #9ca3af;
   margin-bottom: 4px;
 }
@@ -2351,7 +2271,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--sheet-paper);
+  border: 2px solid rgba(255, 255, 255, 0.8);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   transition: all 0.3s ease;
   overflow: hidden;
@@ -2375,11 +2295,11 @@ html, body {
 }
 
 .avatar-initials {
-  font-size: 12px;
+  font-size: 8px;
   font-weight: 700;
   color: white;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  font-family: var(--sheet-data);
+  font-family: "Source Code Pro", monospace;
   letter-spacing: 0.5px;
 }
 
@@ -2392,7 +2312,7 @@ html, body {
   color: white;
   padding: 8px 12px;
   border-radius: 8px;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 500;
   white-space: nowrap;
   opacity: 0;
@@ -2401,7 +2321,7 @@ html, body {
   z-index: 30;
   min-width: 200px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--sheet-rule);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .swiper-avatar:hover .avatar-tooltip {
@@ -2409,22 +2329,22 @@ html, body {
 }
 
 .tooltip-header {
-  border-bottom: 1px solid var(--sheet-rule-strong);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
   padding-bottom: 4px;
   margin-bottom: 6px;
 }
 
 .tooltip-title {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   color: #d4ff00;
   margin-bottom: 2px;
 }
 
 .tooltip-address {
-  font-size: 12px;
-  color: var(--sheet-paper);
-  font-family: var(--sheet-data);
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.8);
+  font-family: "Source Code Pro", monospace;
 }
 
 .tooltip-content {
@@ -2441,23 +2361,23 @@ html, body {
 }
 
 .tooltip-label {
-  font-size: 12px;
-  color: var(--sheet-paper-2);
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.6);
   font-weight: 500;
 }
 
 .tooltip-value {
-  font-size: 12px;
+  font-size: 9px;
   color: white;
   font-weight: 600;
-  font-family: var(--sheet-data);
+  font-family: "Source Code Pro", monospace;
   max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .tooltip-action {
-  font-size: 12px;
+  font-size: 8px;
   color: #d4ff00;
   font-weight: 600;
   text-align: center;
@@ -2473,10 +2393,10 @@ html, body {
   right: 0;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 12px;
+  font-size: 10px;
   color: #6b7280;
   font-weight: 600;
-  background: var(--sheet-paper);
+  background: rgba(255, 255, 255, 0.8);
   padding: 2px 6px;
   border-radius: 10px;
   border: 1px solid #e5e7eb;
@@ -2503,7 +2423,7 @@ html, body {
 }
 
 .loading-swipers .loading-text {
-  font-size: 12px;
+  font-size: 8px;
   color: #6b7280;
   font-weight: 500;
 }
@@ -2579,10 +2499,10 @@ html, body {
 }
 
 .vote-indicator.vote-none {
-  border: 2px solid var(--sheet-rule-strong);
+  border: 2px solid rgba(255, 255, 255, 0.2);
   border-radius: 50%;
   padding: 2px;
-  background: var(--sheet-surface);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .vote-badge {
@@ -2671,7 +2591,7 @@ html, body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, var(--sheet-rule), var(--sheet-surface));
+  background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
   border-radius: 10px;
 }
 
@@ -2843,7 +2763,7 @@ html, body {
   box-shadow: 
     0 0 40px rgba(212, 255, 0, 0.15),
     0 20px 60px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 var(--sheet-surface);
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
   animation: slideUp 0.4s ease-out;
   position: relative;
 }
@@ -2855,8 +2775,8 @@ html, body {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--sheet-rule);
-  border: 1px solid var(--sheet-rule-strong);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   color: #888;
   font-size: 14px;
   cursor: pointer;
@@ -2867,7 +2787,7 @@ html, body {
 }
 
 .share-close-btn:hover {
-  background: var(--sheet-rule-strong);
+  background: rgba(255, 255, 255, 0.2);
   color: #fff;
 }
 
@@ -2924,7 +2844,7 @@ html, body {
 }
 
 .share-title {
-  font-family: var(--sheet-display);
+  font-family: 'Orbitron', sans-serif;
   font-weight: 700;
   font-size: 24px;
   color: #fff;
@@ -2932,7 +2852,7 @@ html, body {
 }
 
 .share-subtitle {
-  font-family: var(--sheet-data);
+  font-family: 'Source Code Pro', monospace;
   font-size: 14px;
   color: #888;
   margin: 0 0 20px 0;
@@ -2947,7 +2867,7 @@ html, body {
 }
 
 .share-bet-question {
-  font-family: var(--sheet-data);
+  font-family: 'Source Code Pro', monospace;
   font-size: 14px;
   color: #fff;
   line-height: 1.5;
@@ -2964,20 +2884,20 @@ html, body {
 }
 
 .share-bet-label {
-  font-family: var(--sheet-data);
+  font-family: 'Source Code Pro', monospace;
   font-size: 12px;
   color: #666;
 }
 
 .share-bet-value {
-  font-family: var(--sheet-display);
+  font-family: 'Orbitron', sans-serif;
   font-size: 16px;
   font-weight: 700;
   color: #d4ff00;
 }
 
 .share-description {
-  font-family: var(--sheet-data);
+  font-family: 'Source Code Pro', monospace;
   font-size: 13px;
   color: #888;
   margin: 0 0 20px 0;
@@ -2990,7 +2910,7 @@ html, body {
   border: none;
   border-radius: 16px;
   background: linear-gradient(135deg, #d4ff00 0%, #a8cc00 100%);
-  font-family: var(--sheet-display);
+  font-family: 'Orbitron', sans-serif;
   font-weight: 700;
   font-size: 15px;
   color: #000;
@@ -3020,7 +2940,7 @@ html, body {
 .share-skip-link {
   background: none;
   border: none;
-  font-family: var(--sheet-data);
+  font-family: 'Source Code Pro', monospace;
   font-size: 13px;
   color: #666;
   cursor: pointer;
@@ -3035,7 +2955,7 @@ html, body {
 
 /* Legacy styles - keep for backward compatibility */
 .share-prompt-content {
-  background: linear-gradient(135deg, var(--sheet-paper) 0%, var(--sheet-paper) 100%);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.9) 100%);
   backdrop-filter: blur(20px);
   border-radius: 24px;
   padding: 32px;
@@ -3044,7 +2964,7 @@ html, body {
   text-align: center;
   box-shadow: 
     0 20px 40px rgba(0, 0, 0, 0.1),
-    0 0 0 1px var(--sheet-rule-strong);
+    0 0 0 1px rgba(255, 255, 255, 0.2);
   animation: slideUp 0.4s ease-out;
 }
 
@@ -3059,7 +2979,7 @@ html, body {
 }
 
 .share-prompt-header h3 {
-  font-family: var(--sheet-display);
+  font-family: 'Orbitron', sans-serif;
   font-weight: 700;
   font-size: 24px;
   color: #1a1a1a;
@@ -3067,7 +2987,7 @@ html, body {
 }
 
 .share-prompt-header p {
-  font-family: var(--sheet-data);
+  font-family: 'Source Code Pro', monospace;
   font-size: 14px;
   color: #666;
   margin: 0;
@@ -3078,7 +2998,7 @@ html, body {
 }
 
 .share-prompt-body p {
-  font-family: var(--sheet-data);
+  font-family: 'Source Code Pro', monospace;
   font-size: 16px;
   color: #333;
   line-height: 1.5;
@@ -3095,7 +3015,7 @@ html, body {
   padding: 16px 24px;
   border: none;
   border-radius: 16px;
-  font-family: var(--sheet-display);
+  font-family: 'Orbitron', sans-serif;
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
@@ -3111,7 +3031,7 @@ html, body {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, var(--sheet-paper-3), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
   transition: left 0.5s ease;
 }
 
@@ -3548,7 +3468,7 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 .cyber-label {
   padding: 12px 16px;
   color: #333 !important;
-  font-size: 12px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 1px;
   font-weight: 600 !important;
@@ -3586,7 +3506,7 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 
 .risk-label-main {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: #333 !important;
   text-transform: uppercase;
@@ -3608,7 +3528,7 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 
 .risk-pts {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 12px;
+  font-size: 11px;
   color: #1a1a1a !important;
   font-weight: 600;
   background: rgba(0, 0, 0, 0.1);
@@ -3630,14 +3550,14 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 
 .risk-detail {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 12px;
+  font-size: 10px;
   color: #1a1a1a !important;
   font-weight: 600;
 }
 
 .risk-divider {
   color: #666 !important;
-  font-size: 12px;
+  font-size: 10px;
 }
 
 /* Cyber Progress Bar - Dark on SWIPE Yellow */
@@ -3659,22 +3579,22 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 
 .cyber-progress-fill.confidence {
   background: linear-gradient(90deg, #1a1a1a, #333);
-  box-shadow: inset 0 1px 2px var(--sheet-rule);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1);
 }
 
 .cyber-progress-fill.safe {
   background: linear-gradient(90deg, #059669, #10b981);
-  box-shadow: inset 0 1px 2px var(--sheet-rule-strong);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.2);
 }
 
 .cyber-progress-fill.warning {
   background: linear-gradient(90deg, #d97706, #f59e0b);
-  box-shadow: inset 0 1px 2px var(--sheet-rule-strong);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.2);
 }
 
 .cyber-progress-fill.danger {
   background: linear-gradient(90deg, #dc2626, #ef4444);
-  box-shadow: inset 0 1px 2px var(--sheet-rule-strong);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.2);
 }
 
 /* Cyber Pool */
@@ -3745,7 +3665,7 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 .swipe-pool .pool-title { color: #7c3aed !important; }
 
 .pool-total {
-  font-size: 12px;
+  font-size: 11px;
   color: #333 !important;
   font-weight: 600;
 }
@@ -3760,7 +3680,7 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 .pool-side {
   padding: 16px;
   text-align: center;
-  background: var(--sheet-paper-3) !important;
+  background: rgba(255, 255, 255, 0.3) !important;
 }
 
 .pool-side.yes {
@@ -3768,7 +3688,7 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 }
 
 .side-label {
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 2px;
   margin-bottom: 8px;
@@ -3796,13 +3716,13 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
   padding: 16px;
   text-align: center;
   color: #666;
-  font-size: 12px;
+  font-size: 11px;
   font-style: italic;
 }
 
 .pool-bar-container {
   padding: 12px 16px 16px;
-  background: var(--sheet-rule-strong);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .pool-bar {
@@ -3828,7 +3748,7 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
   display: flex;
   justify-content: space-between;
   margin-top: 8px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -3863,7 +3783,7 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 .swipers-footer {
   text-align: center;
   padding: 8px;
-  font-size: 12px;
+  font-size: 10px;
   color: #555 !important;
   border-top: 1px solid rgba(0, 0, 0, 0.1);
   background: transparent !important;
@@ -3894,10 +3814,10 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
   padding: 8px 12px;
   border-radius: 20px;
   background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--sheet-rule-strong);
-  color: var(--sheet-paper);
-  font-family: var(--sheet-display);
-  font-size: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.8);
+  font-family: 'Orbitron', sans-serif;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -3909,7 +3829,7 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 
 .category-filter-btn:hover {
   background: rgba(0, 0, 0, 0.5);
-  border-color: var(--sheet-paper-3);
+  border-color: rgba(255, 255, 255, 0.4);
   color: #ffffff;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
