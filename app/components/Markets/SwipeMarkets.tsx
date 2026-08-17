@@ -599,12 +599,48 @@ export default function SwipeMarkets() {
   const { predictions, loading, refresh } = useHybridPredictions();
   const { address, isConnected } = useAccount();
   // The chain the user actually selected, not the build-time default.
-  const { chainKey } = useActiveChain();
+  const { chainKey, chain } = useActiveChain();
   // One resolution of this chain's market: address, ABI, chain id, collateral
   // and explorer together. Every read and write below comes from it, so no call
   // can take the address from one chain and the token from another.
   const marketWrite = useMarketWrite();
   const market = marketWrite.market;
+
+  /**
+   * What this network settles in. USDC on Base, Paxos USDG on Robinhood.
+   *
+   * Every user-facing figure on this screen said USDC, written into the markup.
+   * On Robinhood that names a token the contract does not hold and cannot hold,
+   * so the network switcher changed the address, the balance and the approval
+   * while the word next to the number stayed wrong.
+   */
+  const sym = market?.collateral.symbol ?? 'USDC';
+
+  /**
+   * The live minimum, not a number in the copy.
+   *
+   * The help panel claimed a $1 minimum. The contract's floor is 0.1, and the
+   * owner can move minBet after deploy, so the only honest source is the
+   * contract. MIN_BET_FLOOR is what it can never go below, used until the read
+   * answers.
+   */
+  const { data: feeConfig } = useReadContract({
+    address: market?.address,
+    abi: market?.abi,
+    functionName: 'getFeeConfig',
+    query: { enabled: !!market },
+  });
+  const minBetUnits = feeConfig ? (feeConfig as readonly bigint[])[3] : BigInt(100000);
+  const minBetDisplay = formatUnits(minBetUnits, market?.collateral.decimals ?? 6);
+  // Percentages, from the same read. The help panel had the platform fee at 1%,
+  // which is the contract's constructor default and not the launch rate; the
+  // deploy script sets 3% afterwards. Written down, it was wrong by triple.
+  const pct = (i: number, fallback: number) =>
+    feeConfig ? Number((feeConfig as readonly bigint[])[i]) / 100 : fallback;
+  const platformPct = pct(0, 3);
+  const creatorPct = pct(1, 0.5);
+  const exitPct = pct(2, 5);
+
   const [txState, setTxState] = useState<TxState>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -1274,11 +1310,12 @@ export default function SwipeMarkets() {
           {/* Left: Logo & Title */}
           <div className="usdc-header-left">
             <div className="usdc-logo-container">
-              <img src="/usdc.png" alt="USDC" className="usdc-logo" />
+              <img src="/usdc.png" alt="" className="usdc-logo" />
               <div className="usdc-logo-glow"></div>
             </div>
             <div className="usdc-title-group">
-              <h1 className="usdc-main-title">USDC Markets</h1>
+              {/* The token this network settles in, not the word USDC. */}
+              <h1 className="usdc-main-title">{sym} markets</h1>
             </div>
           </div>
           
@@ -1291,15 +1328,22 @@ export default function SwipeMarkets() {
               </div>
             )}
             <div className="usdc-action-buttons">
-              <a 
-                href="https://basescan.org/address/0xf5Fa6206c2a7d5473ae7468082c9D260DFF83205"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="contract-icon-link"
-                aria-label="USDC DualPool contract on Basescan"
-              >
-                <img src="/Base_square_blue.png" alt="Base" className="contract-icon" />
-              </a>
+              {/* The contract holding this chain's money, on this chain's own
+                  explorer. It was a hardcoded Basescan link to
+                  0xf5Fa6206..., the archived dual pool whose owner key is
+                  gone, so the bets page offered a dead contract as the place
+                  your stake goes, and offered it to Robinhood users too. */}
+              {market && (
+                <a
+                  href={`${market.explorer}/address/${market.address}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="contract-icon-link"
+                  aria-label={`Market contract on ${chain.label}`}
+                >
+                  <img src="/Base_square_blue.png" alt="" className="contract-icon" />
+                </a>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -1338,8 +1382,8 @@ export default function SwipeMarkets() {
         ) : markets.length === 0 ? (
           <div className="empty-state">
             <BarChart3 className="w-12 h-12 text-gray-400" />
-            <span>No active USDC markets</span>
-            <p className="text-sm text-gray-500">Markets will appear here once USDC betting is enabled</p>
+            <span>No open {sym} markets</span>
+            <p className="text-sm text-gray-500">Nothing is open on {chain.label} right now. Propose one, or switch networks.</p>
           </div>
         ) : (
           markets.map(market => (
@@ -1443,7 +1487,7 @@ export default function SwipeMarkets() {
             >
               {/* Modal Header */}
               <div className="modal-header">
-                <h3>Place USDC Bet</h3>
+                <h3>Place a bet</h3>
                 <Badge className={`side-badge ${betModal.side}`}>
                   {betModal.side?.toUpperCase()}
                 </Badge>
@@ -1455,7 +1499,7 @@ export default function SwipeMarkets() {
               
               {/* Amount Selection */}
               <div className="amount-input-section">
-                <label>Amount (USDC)</label>
+                <label>Amount in {sym}</label>
                 <div className="amount-buttons">
                   {[5, 10, 25, 50, 100].map(amt => (
                     <button
@@ -1477,7 +1521,7 @@ export default function SwipeMarkets() {
                   min={1}
                 />
                 <p className="balance-info">
-                  Balance: {parseFloat(formattedBalance).toFixed(2)} USDC
+                  Balance: {parseFloat(formattedBalance).toFixed(2)} {sym}
                 </p>
               </div>
 
@@ -1486,7 +1530,7 @@ export default function SwipeMarkets() {
                 <div className="payout-preview">
                   <div className="payout-row">
                     <span>Your bet</span>
-                    <span>${betModal.amount} USDC</span>
+                    <span>{betModal.amount} {sym}</span>
                   </div>
                   {(() => {
                     // Convert from raw USDC (6 decimals) to USD
@@ -1544,13 +1588,13 @@ export default function SwipeMarkets() {
                   {txState === 'approving' && (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>Approving USDC...</span>
+                      <span>Approving {sym}</span>
                     </>
                   )}
                   {txState === 'approved' && (
                     <>
                       <CheckCircle className="w-5 h-5 text-green-500" />
-                      <span>USDC Approved! Ready to bet.</span>
+                      <span>{sym} approved, ready to bet.</span>
                     </>
                   )}
                   {txState === 'betting' && (
@@ -1599,7 +1643,7 @@ export default function SwipeMarkets() {
                     ) : (
                       <>
                         <ArrowRightLeft className="w-4 h-4 mr-2" />
-                        Approve USDC
+                        Approve {sym}
                       </>
                     )}
                   </Button>
@@ -1683,8 +1727,9 @@ export default function SwipeMarkets() {
                   </p>
                 ) : (
                   <p className="exit-warning">
-                    Exit value based on current market prices (AMM). 
-                    This action cannot be undone.
+                    Priced off the two pools as they stand right now, so the
+                    figure moves as other people bet. Leaving also gives up the
+                    weight this stake carried, and it cannot be undone.
                   </p>
                 )}
                 
@@ -1752,101 +1797,87 @@ export default function SwipeMarkets() {
               </div>
               
               <div className="help-modal-body">
-                {/* Key Differences */}
                 <section className="help-section">
-                  <h3>💡 What are USDC Markets?</h3>
-                  <p>Bet with stablecoins! No crypto volatility - your $100 stays $100.</p>
-                  
-                  <div className="help-comparison">
-                    <div className="comparison-item">
-                      <span className="label">ETH/SWIPE Pool</span>
-                      <span className="value">❌ No early exit</span>
-                    </div>
-                    <div className="comparison-item highlight">
-                      <span className="label">USDC Pool</span>
-                      <span className="value">✅ Exit anytime (5% fee)</span>
-                    </div>
-                  </div>
+                  <h3>How a market pays</h3>
+                  <p>
+                    This is a parimutuel market, not an order book and not an
+                    AMM. There are no shares and no counterparty. Everyone
+                    backing one side puts money in a pot, and at the deadline
+                    the winning side splits what the losing side staked.
+                  </p>
+                  <p>
+                    Win and your own stake comes back whole, on top of your
+                    share. Lose and it goes to the other side.
+                  </p>
                 </section>
 
-                {/* AMM Pricing */}
                 <section className="help-section">
-                  <h3>📊 How Prices Work (AMM)</h3>
-                  <p>Prices change dynamically based on pool sizes:</p>
+                  <h3>Betting early counts for more</h3>
+                  <p>
+                    Your stake is multiplied by when it lands, and that
+                    multiplier only ever changes how the losing pool is divided.
+                    It is fixed the moment you bet.
+                  </p>
                   <div className="help-formula">
-                    <code>YES Price = NO Pool ÷ Total Pool</code>
-                    <code>NO Price = YES Pool ÷ Total Pool</code>
+                    <code>First quarter of the market&apos;s life: 1.50</code>
+                    <code>Second quarter: 1.25</code>
+                    <code>The whole second half: 1.00</code>
                   </div>
-                  <div className="help-example">
-                    <strong>Example:</strong> YES Pool: $1,000 | NO Pool: $500
-                    <br/>→ YES costs $0.33, NO costs $0.67
-                    <br/>→ If YES wins, you get $1.00 per share!
-                  </div>
+                  <p>
+                    That last one is a half, not a quarter. The third and fourth
+                    quarters pay the same.
+                  </p>
                 </section>
 
-                {/* Fee Structure */}
                 <section className="help-section">
-                  <h3>💰 Fee Structure</h3>
+                  <h3>Fees</h3>
                   <div className="help-fees">
                     <div className="fee-item">
-                      <span className="fee-name">Platform Fee</span>
-                      <span className="fee-value">1%</span>
-                      <span className="fee-note">from losers pool</span>
+                      <span className="fee-name">Platform</span>
+                      <span className="fee-value">{platformPct}%</span>
+                      <span className="fee-note">of the losing pool</span>
                     </div>
                     <div className="fee-item">
-                      <span className="fee-name">Creator Reward</span>
-                      <span className="fee-value">0.5%</span>
-                      <span className="fee-note">from losers pool</span>
+                      <span className="fee-name">Whoever opened it</span>
+                      <span className="fee-value">{creatorPct}%</span>
+                      <span className="fee-note">of the losing pool</span>
                     </div>
                     <div className="fee-item exit">
-                      <span className="fee-name">Early Exit</span>
-                      <span className="fee-value">5%</span>
-                      <span className="fee-note">from your position</span>
+                      <span className="fee-name">Leaving early</span>
+                      <span className="fee-value">{exitPct}%</span>
+                      <span className="fee-note">of what the exit is worth</span>
                     </div>
                   </div>
+                  <p>
+                    The first two come out of the losing side only, so a winning
+                    stake is never shaved. These are read from the contract, not
+                    written here, because the owner can change them.
+                  </p>
                 </section>
 
-                {/* Example Payout */}
                 <section className="help-section">
-                  <h3>🏆 Payout Example</h3>
-                  <div className="help-payout-example">
-                    <div className="payout-scenario">
-                      <strong>Prediction:</strong> "ETH reaches $5,000?"
-                      <br/><strong>You bet:</strong> $100 on YES
-                      <br/><strong>YES Pool:</strong> $1,000 (your share: 10%)
-                      <br/><strong>NO Pool:</strong> $600
-                    </div>
-                    <div className="payout-result win">
-                      <strong>✅ If YES wins:</strong>
-                      <br/>You get: $100 + (10% × $591) = <span className="amount">$159.10</span>
-                      <br/>Profit: <span className="profit">+$59.10 (+59%)</span>
-                    </div>
-                    <div className="payout-result lose">
-                      <strong>❌ If NO wins:</strong>
-                      <br/>You lose: <span className="amount">-$100</span>
-                    </div>
-                  </div>
+                  <h3>Leaving before the deadline</h3>
+                  <p>
+                    You can take out part of a position or all of it. The price
+                    comes off the two pools as they stand, so leaving a side
+                    that is winning returns close to your stake and leaving a
+                    losing side returns little. Exiting gives up the weight that
+                    stake carried.
+                  </p>
+                  <p>
+                    One restriction. In the final quarter you cannot take a side
+                    down to exactly zero, so in a thin market the only backer of
+                    a side has to leave before that quarter starts.
+                  </p>
                 </section>
 
-                {/* Early Exit */}
-                <section className="help-section">
-                  <h3>🚪 Early Exit</h3>
-                  <p>Changed your mind? Exit before the deadline!</p>
-                  <div className="help-example">
-                    <strong>Example:</strong> Position worth $150
-                    <br/>Exit fee (5%): -$7.50
-                    <br/>You receive: <strong>$142.50</strong>
-                  </div>
-                </section>
-
-                {/* Quick Tips */}
                 <section className="help-section tips">
-                  <h3>💎 Quick Tips</h3>
+                  <h3>Worth knowing</h3>
                   <ul>
-                    <li>✅ Minimum bet: $1 USDC</li>
-                    <li>✅ Same prediction can have ETH + USDC pools</li>
-                    <li>✅ Pools resolve with the same outcome</li>
-                    <li>⚠️ Large bets move the price significantly</li>
+                    <li>Minimum bet is {minBetDisplay} {sym}, and there is no maximum.</li>
+                    <li>Expect two signatures on your first bet, one to approve the token and one to place it.</li>
+                    <li>Each network runs its own contract and its own pools. Nothing is shared between them.</li>
+                    <li>A market nobody settles becomes refundable 30 days past its deadline, and anyone can open that.</li>
                   </ul>
                 </section>
               </div>

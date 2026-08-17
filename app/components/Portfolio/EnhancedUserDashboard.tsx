@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useActiveChain } from '@/lib/chains/activeChain';
+import { tokenSymbol, COLLATERAL_LEG } from '@/lib/userStake';
 import { getMarketContract, txUrl } from '@/lib/chains/market';
 import { parseMarketId, CURRENT_GENERATION } from '@/lib/marketId';
 import { CONTRACTS, getV1Contract, getV2Contract, getContractForPrediction, USDC_DUALPOOL_CONTRACT_ADDRESS, USDC_DUALPOOL_ABI } from '../../../lib/contract';
@@ -103,6 +104,14 @@ export function EnhancedUserDashboard() {
   // Claims must reach the contract that holds the market, and the explorer link
   // stored in history must name the chain it happened on.
   const { chainKey: claimChainKey } = useActiveChain();
+  /**
+   * What this network settles in, for every collateral figure on the screen.
+   *
+   * The stake leg is stored under the key 'USDC' on every chain, including
+   * Robinhood where the token is Paxos USDG, so printing the leg name tells a
+   * Robinhood user they hold the wrong stablecoin.
+   */
+  const collateralSymbol = tokenSymbol(COLLATERAL_LEG, claimChainKey);
   const { composeCast: minikitComposeCast } = useComposeCast();
   const minikitOpenUrl = useOpenUrl();
   
@@ -1846,7 +1855,7 @@ export function EnhancedUserDashboard() {
     return (
       <div className="enhanced-user-dashboard">
         <div className="error-container">
-          <h3>❌ Error Loading Predictions</h3>
+          <h3>Could not load your positions</h3>
           <p>Error: {predictionsError}</p>
           <p>Connected wallet: {address}</p>
           <button onClick={() => fetchUserStakes(true)}>Retry</button>
@@ -2032,42 +2041,15 @@ export function EnhancedUserDashboard() {
             </tr>
           </thead>
           <tbody>
-            <tr className="eth-row">
-              <td className="token-cell">
-                <img src="/Ethereum-icon-purple.svg" alt="ETH" className="token-logo" />
-              </td>
-              <td className="value-cell">
-                <span className="stat-value-total">{formatEth(ethTotalStaked)}</span>
-              </td>
-              <td className="value-cell">
-                <span className="stat-value-payout">{formatEth(ethTotalPotentialPayout)}</span>
-              </td>
-              <td className="value-cell">
-                <span className={`stat-value-profit ${ethTotalPotentialProfit >= 0 ? 'profit' : 'loss'}`}>
-                  {ethTotalPotentialProfit >= 0 ? '+' : ''}{formatEth(ethTotalPotentialProfit)}
-                </span>
-              </td>
-            </tr>
-            <tr className="swipe-row">
-              <td className="token-cell">
-                <img src="/splash.png" alt="SWIPE" className="token-logo" />
-              </td>
-              <td className="value-cell">
-                <span className="stat-value-total">{formatSwipe(swipeTotalStaked)}</span>
-              </td>
-              <td className="value-cell">
-                <span className="stat-value-payout">{formatSwipe(swipeTotalPotentialPayout)}</span>
-              </td>
-              <td className="value-cell">
-                <span className={`stat-value-profit ${swipeTotalPotentialProfit >= 0 ? 'profit' : 'loss'}`}>
-                  {swipeTotalPotentialProfit >= 0 ? '+' : ''}{formatSwipe(swipeTotalPotentialProfit)}
-                </span>
-              </td>
-            </tr>
-            {/* USDC Row - always visible */}
+            {/* The collateral row comes first and is always shown, because it
+                is the only one that can still take a bet. ETH and SWIPE sat
+                above it reading zero on every account that only ever used the
+                current contracts, which made a live portfolio look empty. They
+                are archived history now and appear when they hold something. */}
             <tr className="usdc-row">
               <td className="token-cell">
-                <img src="/usdc.png" alt="USDC" className="token-logo" />
+                <img src="/usdc.png" alt="" className="token-logo" />
+                <span className="token-cell-symbol">{collateralSymbol}</span>
               </td>
               <td className="value-cell">
                 <span className="stat-value-total">{formatUsdc(usdcTotalStaked)}</span>
@@ -2081,6 +2063,44 @@ export function EnhancedUserDashboard() {
                 </span>
               </td>
             </tr>
+            {ethTotalStaked > 0 && (
+              <tr className="eth-row">
+                <td className="token-cell">
+                  <img src="/Ethereum-icon-purple.svg" alt="" className="token-logo" />
+                  <span className="token-cell-symbol">ETH</span>
+                </td>
+                <td className="value-cell">
+                  <span className="stat-value-total">{formatEth(ethTotalStaked)}</span>
+                </td>
+                <td className="value-cell">
+                  <span className="stat-value-payout">{formatEth(ethTotalPotentialPayout)}</span>
+                </td>
+                <td className="value-cell">
+                  <span className={`stat-value-profit ${ethTotalPotentialProfit >= 0 ? 'profit' : 'loss'}`}>
+                    {ethTotalPotentialProfit >= 0 ? '+' : ''}{formatEth(ethTotalPotentialProfit)}
+                  </span>
+                </td>
+              </tr>
+            )}
+            {swipeTotalStaked > 0 && (
+              <tr className="swipe-row">
+                <td className="token-cell">
+                  <img src="/splash.png" alt="" className="token-logo" />
+                  <span className="token-cell-symbol">SWIPE</span>
+                </td>
+                <td className="value-cell">
+                  <span className="stat-value-total">{formatSwipe(swipeTotalStaked)}</span>
+                </td>
+                <td className="value-cell">
+                  <span className="stat-value-payout">{formatSwipe(swipeTotalPotentialPayout)}</span>
+                </td>
+                <td className="value-cell">
+                  <span className={`stat-value-profit ${swipeTotalPotentialProfit >= 0 ? 'profit' : 'loss'}`}>
+                    {swipeTotalPotentialProfit >= 0 ? '+' : ''}{formatSwipe(swipeTotalPotentialProfit)}
+                  </span>
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
         
@@ -2163,51 +2183,43 @@ export function EnhancedUserDashboard() {
         <div className="no-predictions-inline">
           {selectedFilter === 'ready-to-claim' ? (
             <>
-              <h3>🎉 No Rewards to Claim</h3>
-              <p>You don't have any predictions ready to claim right now.</p>
-              <p className="cta-text">Win some predictions to earn rewards!</p>
+              <h3>Nothing to claim</h3>
+              <p>A win shows up here once the market it was on has been settled.</p>
             </>
           ) : selectedFilter === 'active' ? (
             <>
-              <h3>⏳ No Active Predictions</h3>
-              <p>There are no active predictions at the moment.</p>
-              <p className="cta-text">Check back soon for new predictions!</p>
+              <h3>No open positions</h3>
+              <p>Nothing you have backed is still running.</p>
             </>
           ) : selectedFilter === 'won' ? (
             <>
-              <h3>🏆 No Wins Yet</h3>
-              <p>You haven't won any predictions yet.</p>
-              <p className="cta-text">Keep predicting to score your first win!</p>
+              <h3>No wins yet</h3>
+              <p>Markets you called right will collect here.</p>
             </>
           ) : selectedFilter === 'lost' ? (
             <>
-              <h3>💔 No Losses</h3>
-              <p>Great news! You haven't lost any predictions.</p>
-              <p className="cta-text">Keep up the winning streak!</p>
+              <h3>Nothing lost</h3>
+              <p>No position of yours has settled against you.</p>
             </>
           ) : selectedFilter === 'expired' ? (
             <>
-              <h3>⏰ No Predictions In Waiting</h3>
-              <p>You don't have any predictions waiting for resolution.</p>
-              <p className="cta-text">All your predictions have been resolved!</p>
+              <h3>Nothing waiting</h3>
+              <p>Every market you are in has been settled.</p>
             </>
           ) : selectedFilter === 'cancelled' ? (
             <>
-              <h3>❌ No Cancelled Predictions</h3>
-              <p>You don't have any cancelled predictions.</p>
-              <p className="cta-text">All your predictions are active or resolved!</p>
+              <h3>Nothing cancelled</h3>
+              <p>No market you backed was called off.</p>
             </>
           ) : selectedFilter === 'claimed' ? (
             <>
-              <h3>✅ No Claimed Rewards</h3>
-              <p>You haven't claimed any rewards yet.</p>
-              <p className="cta-text">Win predictions and claim your rewards!</p>
+              <h3>Nothing collected yet</h3>
+              <p>Payouts you have taken stay listed here.</p>
             </>
           ) : (
             <>
-              <h3>📝 No Predictions Found</h3>
-              <p>You haven't participated in any predictions yet.</p>
-              <p className="cta-text">Start by swiping on some predictions to place your stakes!</p>
+              <h3>No positions</h3>
+              <p>You have not backed a market yet. Swipe on one to place a stake.</p>
             </>
           )}
         </div>
@@ -2217,14 +2229,14 @@ export function EnhancedUserDashboard() {
       {filteredPredictions.length > 0 && (
         <div className="section">
           <h3>
-            {selectedFilter === 'ready-to-claim' && '🎉 Ready to Claim'}
-            {selectedFilter === 'active' && '⏳ Active Predictions'}
-            {selectedFilter === 'won' && '🏆 Won Predictions'}
-            {selectedFilter === 'lost' && '💔 Lost Predictions'}
-            {selectedFilter === 'expired' && '⏰ In Waiting Predictions'}
-            {selectedFilter === 'cancelled' && '❌ Cancelled Predictions'}
-            {selectedFilter === 'claimed' && '✅ Claimed Predictions'}
-            {selectedFilter === 'all' && '📊 All Predictions'}
+            {selectedFilter === 'ready-to-claim' && 'Ready to claim'}
+            {selectedFilter === 'active' && 'Open positions'}
+            {selectedFilter === 'won' && 'Won'}
+            {selectedFilter === 'lost' && 'Lost'}
+            {selectedFilter === 'expired' && 'Waiting to settle'}
+            {selectedFilter === 'cancelled' && 'Cancelled'}
+            {selectedFilter === 'claimed' && 'Collected'}
+            {selectedFilter === 'all' && 'Everything'}
           </h3>
           <div className="predictions-grid">
             {filteredPredictions
@@ -2318,14 +2330,14 @@ export function EnhancedUserDashboard() {
       {/* Transaction History */}
       <div className="section">
         <div className="section-header-with-action">
-          <h3>🔄 Transaction History</h3>
+          <h3>Transaction history</h3>
           <button
             onClick={syncFromBlockchain}
             disabled={syncingBlockchain}
             className="sync-blockchain-btn"
             title="Recover historical transactions from blockchain"
           >
-            {syncingBlockchain ? '⏳ Syncing...' : '⛓️ Sync from Chain'}
+            {syncingBlockchain ? 'Reading the chain' : 'Read from chain'}
           </button>
         </div>
         {loadingTransactions ? (
@@ -2340,40 +2352,41 @@ export function EnhancedUserDashboard() {
                 .sort((a, b) => b.timestamp - a.timestamp) // Sort by newest first
                 .slice((transactionPage - 1) * transactionsPerPage, transactionPage * transactionsPerPage)
                 .map((transaction, index) => {
-                  // Determine the actual status to display
-                  let displayStatus = transaction.status;
-                  if (transaction.txHash && transaction.txHash !== 'undefined' && transaction.txHash.length > 10) {
-                    // If we have a valid transaction hash, assume it's successful
-                    displayStatus = 'success';
-                  }
+                  /**
+                   * The status we actually recorded, not one inferred from a
+                   * hash.
+                   *
+                   * This used to read: if there is a hash longer than ten
+                   * characters, call it a success. A hash means the transaction
+                   * was submitted. It says nothing about whether it mined, and
+                   * a reverted transaction has a hash like any other, so every
+                   * failed claim in this list was displayed with a green tick.
+                   */
+                  const displayStatus = transaction.status;
                   
                   // Create unique key combining index, id, and hash to avoid React duplicate key warnings
                   const uniqueKey = `${transaction.id}_${index}_${transaction.txHash || transaction.timestamp || ''}`;
                   
-                  // Determine token type
-                  // If tokenType is not set, try to guess based on amount
-                  // ETH stakes are typically small (< 1 ETH), SWIPE stakes are large (1000+)
-                  let tokenType = transaction.tokenType || 'ETH';
-                  
-                  // Auto-detect SWIPE for old transactions without tokenType
-                  // If amount is already converted (not in wei) and > 100, it's likely SWIPE
-                  if (!transaction.tokenType && transaction.amount) {
-                    const amountValue = transaction.amount;
-                    // If amount is small (likely already in ETH units) but > 100, it's SWIPE
-                    if (amountValue > 100 && amountValue < 1000000) {
-                      tokenType = 'SWIPE';
-                    }
-                    // If amount is huge (in wei) and when converted > 100, it's SWIPE
-                    if (amountValue > 1000000) {
-                      const converted = amountValue / Math.pow(10, 18);
-                      if (converted > 100) {
-                        tokenType = 'SWIPE';
-                      }
-                    }
-                  }
-                  
+                  /**
+                   * The token the record says, or nothing.
+                   *
+                   * What stood here guessed. If no tokenType was stored it
+                   * assumed ETH, then overrode that to SWIPE when the amount
+                   * was "large", on the theory that ETH stakes are small and
+                   * SWIPE stakes are in the thousands. A 150 USDC bet is large
+                   * by that test, so it was labelled SWIPE and given the SWIPE
+                   * logo. Older ETH rows in wei tripped the second branch too.
+                   *
+                   * A row that does not know its token now says so. An unknown
+                   * is not a defect worth hiding: it is one archived record
+                   * without a field, and inventing an answer to avoid an empty
+                   * badge is how a history ends up describing money that was
+                   * never staked.
+                   */
+                  const tokenType = transaction.tokenType;
                   const isSwipe = tokenType === 'SWIPE';
                   const isUsdc = tokenType === 'USDC';
+                  const isEth = tokenType === 'ETH';
                   
                   return (
                     <div key={uniqueKey} className="transaction-card-compact">
@@ -2387,15 +2400,17 @@ export function EnhancedUserDashboard() {
                             {transaction.type === 'exit_early' && '🚪'}
                             {transaction.type === 'stake' ? 'BET' : (transaction.type === 'exit_early' ? 'EXIT' : transaction.type.toUpperCase())}
                           </span>
-                          <span className={`token-type-badge-compact ${tokenType.toLowerCase()}`}>
+                          <span className={`token-type-badge-compact ${(tokenType ?? 'unknown').toLowerCase()}`}>
                             {isUsdc ? (
                               <span className="usdc-icon-tx">$</span>
                             ) : isSwipe ? (
-                              <img src="/splash.png" alt="SWIPE" className="token-badge-icon-compact" />
-                            ) : (
-                              <img src="/Ethereum-icon-purple.svg" alt="ETH" className="token-badge-icon-compact eth-icon-no-bg" />
-                            )}
-                            {tokenType}
+                              <img src="/splash.png" alt="" className="token-badge-icon-compact" />
+                            ) : isEth ? (
+                              <img src="/Ethereum-icon-purple.svg" alt="" className="token-badge-icon-compact eth-icon-no-bg" />
+                            ) : null}
+                            {/* Collateral rows carry the chain's own symbol, so a
+                                Robinhood row does not claim to be in USDC. */}
+                            {isUsdc ? collateralSymbol : tokenType ?? 'Token not recorded'}
                           </span>
                           <span className={`status-badge-compact ${displayStatus}`}>
                             {displayStatus === 'pending' && '⏳'}
@@ -2428,9 +2443,7 @@ export function EnhancedUserDashboard() {
                               target="_blank" 
                               rel="noopener noreferrer"
                               className="basescan-link-compact"
-                            >
-                              Basescan
-                              <svg className="basescan-icon" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            >Explorer<svg className="basescan-icon" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M10 2L2 10M10 2H6M10 2V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                               </svg>
                             </a>
@@ -2441,20 +2454,26 @@ export function EnhancedUserDashboard() {
                         {transaction.amount && transaction.amount > 0 && (
                           <p className="transaction-amount-compact">
                             <span className="label">Amount:</span>
-                            <span className={`amount-value-compact ${tokenType.toLowerCase()}`}>
+                            <span className={`amount-value-compact ${(tokenType ?? 'unknown').toLowerCase()}`}>
                               {(() => {
                                 if (isUsdc) {
-                                  // USDC is stored with 6 decimals
-                                  const usdcAmount = transaction.amount / 1e6;
-                                  return `$${usdcAmount.toFixed(2)}`;
+                                  // The collateral leg is stored raw at 6 decimals.
+                                  return `${(transaction.amount / 1e6).toFixed(2)} ${collateralSymbol}`;
                                 }
+                                // Older records stored the amount either raw or
+                                // already converted, so this reads the scale.
+                                // That is a question about the storage format,
+                                // not a guess about which token it was: the
+                                // token comes from the record or is not shown.
                                 const isWei = transaction.amount > 1000000;
                                 if (isSwipe) {
-                                  return isWei ? formatSwipe(transaction.amount) : `${transaction.amount.toLocaleString()}`;
-                                } else {
-                                  return isWei ? formatEth(transaction.amount) : transaction.amount.toFixed(6);
+                                  return `${isWei ? formatSwipe(transaction.amount) : transaction.amount.toLocaleString()} SWIPE`;
                                 }
-                              })()} {!isUsdc && tokenType}
+                                if (isEth) {
+                                  return `${isWei ? formatEth(transaction.amount) : transaction.amount.toFixed(6)} ETH`;
+                                }
+                                return `${transaction.amount.toLocaleString()}, unit not recorded`;
+                              })()}
                             </span>
                           </p>
                         )}
@@ -2530,8 +2549,8 @@ export function EnhancedUserDashboard() {
                   <div className="claim-modal-spinner"></div>
                 </div>
                 
-                <h2 className="claim-modal-title">Processing Claim...</h2>
-                <p className="claim-modal-subtitle">Waiting for blockchain confirmation</p>
+                <h2 className="claim-modal-title">Claim sent</h2>
+                <p className="claim-modal-subtitle">Waiting for it to mine. Nothing has moved until it does.</p>
                 
                 <div className="claim-modal-tx-info">
                   <span className="claim-modal-tx-label">Transaction:</span>
@@ -2551,7 +2570,7 @@ export function EnhancedUserDashboard() {
                   rel="noopener noreferrer"
                   className="claim-modal-basescan-btn"
                 >
-                  🔗 View on Basescan
+                  View the transaction
                 </a>
               </>
             )}
@@ -2566,8 +2585,8 @@ export function EnhancedUserDashboard() {
                   </div>
                 </div>
                 
-                <h2 className="claim-modal-title">Congratulations!</h2>
-                <p className="claim-modal-subtitle">Your reward has been claimed!</p>
+                <h2 className="claim-modal-title">Claimed</h2>
+                <p className="claim-modal-subtitle">The payout is in your wallet.</p>
                 
                 {/* Amount claimed */}
                 {modalData.amount && modalData.tokenType && (
@@ -2605,7 +2624,7 @@ export function EnhancedUserDashboard() {
                   rel="noopener noreferrer"
                   className="claim-modal-basescan-link"
                 >
-                  🔗 View transaction on Basescan
+                  View the transaction
                 </a>
                 
                 {/* Close link */}
