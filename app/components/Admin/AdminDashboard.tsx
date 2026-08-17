@@ -5,7 +5,8 @@ import { useReadContract, usePublicClient, useWriteContract } from 'wagmi';
 import { CONTRACTS, getV2Contract, USDC_DUALPOOL_CONTRACT_ADDRESS, USDC_DUALPOOL_ABI } from '../../../lib/contract';
 import { useAdminPredictions } from '../../../lib/hooks/useAdminPredictions';
 import { useAdminRequest } from '../../../lib/auth/useAdminRequest';
-import { marketNumber } from '@/lib/marketId';
+import { marketNumber, parseMarketId } from '@/lib/marketId';
+import { useMarketWrite } from '@/lib/chains/useMarketWrite';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 
 interface Prediction {
@@ -49,6 +50,9 @@ export function AdminDashboard({
 
   const publicClient = usePublicClient();
   const { writeContract } = useWriteContract();
+  // Every market write here goes through this: it checks the address is really
+  // this chain's market, switches the wallet chain, and pins chainId.
+  const marketWrite = useMarketWrite();
   
   // Filter state
   // Signs each admin action; the server verifies it rather than trusting the UI.
@@ -389,41 +393,61 @@ export function AdminDashboard({
       return;
     }
     
-    if (!confirm(`Register prediction ${numericId} on USDC DualPool contract?\n\nQuestion: ${pred.question?.substring(0, 50)}...`)) {
+    const ref = parseMarketId(pred.id);
+    if (!ref) {
+      alert('❌ Cannot read this market\'s id');
       return;
     }
-    
+
+    if (!marketWrite.ready) {
+      alert('❌ The selected network has no Swipe market deployed.');
+      return;
+    }
+
+    if (!confirm(
+      `Register market ${numericId} on ${marketWrite.market!.address}?\n\n` +
+      `Question: ${pred.question?.substring(0, 50)}...`
+    )) {
+      return;
+    }
+
     try {
-      writeContract({
-        address: USDC_DUALPOOL_CONTRACT_ADDRESS as `0x${string}`,
-        abi: USDC_DUALPOOL_ABI,
+      // useMarketWrite resolves the address, checks it really is this chain's
+      // market, moves the wallet to the matching chain and pins chainId. It
+      // used to write to the archived pool's address unconditionally.
+      const hash = await marketWrite.write({
         functionName: 'registerPrediction',
         args: [BigInt(numericId), pred.creator as `0x${string}`, BigInt(pred.deadline)],
-      }, {
-        onSuccess: async (tx) => {
-          console.log(`✅ Prediction ${numericId} registered on USDC DualPool:`, tx);
-          alert(`✅ Prediction registered on USDC!\nTransaction: ${tx}\n\nUsers can now bet with USDC.`);
-          
-          // Sync USDC data to Redis
-          try {
-            await fetch('/api/sync/usdc', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ predictionIds: [numericId] })
-            });
-            handleRefresh();
-          } catch (e) {
-            console.warn('USDC sync after registration failed:', e);
-          }
-        },
-        onError: (error) => {
-          console.error('❌ USDC registration failed:', error);
-          alert(`❌ Failed: ${error.message}`);
-        }
       });
-    } catch (error) {
-      console.error('Failed to register USDC prediction:', error);
-      alert(`❌ Failed: ${error}`);
+
+      // Wait for the receipt, not the hash. The old onSuccess fired the moment
+      // the wallet returned a hash, so it announced success and wrote Redis
+      // before the transaction was mined. A revert left Redis saying registered
+      // and the chain saying otherwise, and betting on that market then fails
+      // at every wallet with "Prediction not registered".
+      const receipt = await publicClient?.waitForTransactionReceipt({ hash });
+      if (receipt && receipt.status !== 'success') {
+        alert(`❌ Registration reverted on chain.\nTransaction: ${hash}`);
+        return;
+      }
+
+      alert(`✅ Market registered.\nTransaction: ${hash}\n\nUsers can now bet on it.`);
+
+      try {
+        await fetch('/api/sync/usdc', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          // The canonical id, so the sync route knows which contract holds it.
+          body: JSON.stringify({ predictionIds: [ref.redisId] })
+        });
+        handleRefresh();
+      } catch (e) {
+        console.warn('Sync after registration failed:', e);
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('❌ Registration failed:', error);
+      alert(`❌ Failed: ${message}`);
     }
   };
 

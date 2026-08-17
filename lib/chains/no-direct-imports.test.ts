@@ -56,16 +56,24 @@ describe('chain abstraction is not bypassed', () => {
     ['app', 'components', 'Main', 'TinderCard.tsx'],
     ['app', 'components', 'Markets', 'SwipeMarkets.tsx'],
     ['app', 'components', 'Modals', 'CreatePredictionModal.tsx'],
+    // The one surface that registers markets on a new chain, and it was absent
+    // from this list while carrying four unguarded writes to the archived pool.
+    ['app', 'components', 'Admin', 'AdminDashboard.tsx'],
   ];
 
   it.each(WRITE_PATHS)('gates on the address it writes to: %s', (...segments) => {
     const rel = path.join(...segments);
     const src = readFileSync(path.join(ROOT, rel), 'utf8');
 
+    // Two acceptable gates. Either compare the address directly, or go through
+    // useMarketWrite, which compares it at send time and additionally moves the
+    // wallet to the matching chain and pins chainId.
+    const gated = src.includes('isWritableMarket(') || src.includes('useMarketWrite(');
+    expect(gated, `${rel} must gate its writes on isWritableMarket or useMarketWrite`).toBe(true);
+
     // Matched in the shape of a guard, not anywhere in the file: these comments
     // name the banned forms in order to explain them, and a bare substring
     // search flags its own documentation.
-    expect(src, `${rel} must gate its writes on isWritableMarket`).toContain('isWritableMarket(');
     expect(src, `${rel} must not gate a write on the chain alone`)
       .not.toMatch(/if\s*\(\s*!\s*getWritableMarket\s*\(/);
     expect(src, `${rel} must not gate a write on the build-time default chain`)
