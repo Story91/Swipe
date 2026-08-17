@@ -53,7 +53,7 @@ thin margin, effectively no margin.
 | `minBet` | **Lower to 0.1 USDC** (the contract floor) | Effectively "whatever you want", while still preventing the unbounded participant list that dust bets would create. |
 | Cap on open markets | **12, enforced off-chain** | `registerPrediction` is already `onlyResolver`, so the backend physically controls how many exist. An on-chain counter adds a storage write per resolution and guarantees nothing extra. |
 | Platform fee | **1% → 3%** of the losing pool | See §6. No contract change: `setPlatformFee` allows up to 5%. |
-| Creator bond | **Posted by the creator, pulled at registration** | See §5.3. |
+| Creator bond | **Designed, built, then removed** | It widened what the hot resolver key could reach and was defeated for one cent. See §5.3. |
 | Rebate hook in contract | **No** | An unspecified extension point added to a freshly audited contract is exactly where the next audit finding comes from. A separate distributor pays rebates once the reward currency is known. |
 | ETH **or** USDC markets | **Yes — by deploying the same contract twice** | See §5.4. No new contract code, no new audit surface. |
 | Deployment order | **Base first**, Robinhood after | The users are on Base. Robinhood's dual-pool waits for the new token. |
@@ -133,41 +133,78 @@ pool and late backers a smaller one. **It must never be presented to users as
 "everyone earns more"** — it is a redistribution, someone will do the arithmetic,
 and being caught overstating it costs more than the feature is worth.
 
+#### `exitEarly` guard: only in the final quarter
+
+The final security review before mainnet found that `exitEarly` could be used
+to dodge a certain loss: stake 500 on NO and 1 on YES as the sole YES holder,
+watch YES become certain, exit that single YES unit for pennies, `yesPool`
+hits zero, resolution finds no winners, the market becomes refundable, and the
+500 that was certainly lost comes back in full. The first fix made this
+unconditional — no exit may reduce a non-empty pool to zero — but that also
+blocks the sole backer of a side from exiting **at all**, and in this
+product's markets (245 markets averaging nought to two players each) that is
+the normal case, not an edge case. An unconditional guard removes early exit
+for exactly the early users §5.1's ×1.50 bonus exists to attract.
+
+The guard now applies **only in the final quarter of a market's lifetime**
+(`elapsed * 4 >= window * 3`, the same multiply-not-divide comparison
+`weightBpsAt` uses for its brackets). Earlier than that, anyone may exit,
+including a sole backer, and a full exit can take a pool to zero. The exploit
+depends on acting once the outcome is knowable, which is overwhelmingly late
+in a market's life, so scoping the guard to the final quarter closes it in
+practice while leaving early exit intact for the common case.
+
+**Accepted residual risk.** An outcome that becomes certain early — a price
+crossing its threshold with days still to run — can still be escaped before
+the final quarter, recovering a stake that would otherwise have been forfeit.
+This is a knowing trade against the alternative of stranding every sole
+backer for a side's entire life, not an oversight.
+
 ### 5.2 Fee change
 
 `setPlatformFee(300)`. Configuration, not code.
 
-### 5.3 Creator bond
+### 5.3 Creator bond — built, then removed
 
-`registerPrediction` is `onlyResolver` — the backend registers, and the creator
-is a parameter, not `msg.sender`. So the bond is pulled from the creator's
-address, which requires their approval first:
+A refundable deposit, pulled from the creator when the market was registered.
+It was designed here, implemented across three commits, and then removed in
+full. The section stays because both reasons it failed are reusable.
 
-1. User fills in the market form.
-2. User approves the bond to the contract.
-3. Backend validates the question and checks the 12-market cap.
-4. Backend calls `registerPrediction`, which pulls the bond from the creator.
+**Why it went.**
 
-The platform still decides what markets exist — necessary, because every market
-is an obligation to resolve it — while the creator has capital at risk.
+1. **It widened what the hot key could reach.** `registerPrediction` is
+   `onlyResolver` and the creator is a parameter, not `msg.sender`, so the bond
+   had to be pulled with `safeTransferFrom` from an address that had only
+   granted the contract an allowance. Every bettor grants that allowance. The
+   resolver key could therefore move tokens out of any wallet holding one,
+   without that address consenting to *that* transfer — which is the shape
+   audit finding 8 is about. A hot key used by automation is the wrong place to
+   add reach.
+2. **It did not deter what it existed to deter.** The bond was forfeited only
+   when a side stayed empty, so a creator who wash-bet the minimum on both
+   sides — one cent — always got it back.
 
-**New state.** `Prediction.creatorBond`; `bondAmount` (owner-settable, default 10
-USDC); `bondExempt` mapping, so the platform does not post bonds to itself.
+Blast radius bought for a mechanic that did not work.
 
-**When the bond comes back.** A market that resolves and pays out necessarily had
-stake on both sides — if either pool were empty, the winning side could be empty
-and the market would be refundable instead. So one rule covers it:
+**A false claim this design rested on, written down so it is not derived a
+second time:**
 
-| Outcome | Bond |
-|---|---|
-| Resolved and paid out | Returned, via `creatorRewards` (pull) |
-| Refundable — one side empty | **Forfeited** to `platformFeeBalance` |
-| Cancelled by a resolver | Returned — the platform's decision, not the creator's failure |
-| Abandoned past the grace period | Returned — the platform's failure |
+> *"A market that pays out necessarily had stake on both sides."*
 
-**Batch registration.** `registerPredictionsBatch` reverts on any entry whose
-creator has not approved. That matches the contract's existing "revert rather
-than silently skip" choice; the backend must pre-check allowances.
+It is not true, and the bond's whole "one rule, not four" table was built on
+it. With `yesPool = 100` and `noPool = 0`, resolving YES gives
+`winnersPool > 0` and the paying path runs — on a market that only ever had one
+side. Refunds need the *winning* side empty, not either side. So the table's
+"one side stayed empty → forfeited" row would simply not have fired whenever
+the empty side was the losing one, and the bond would have come back from a
+market that was never a market.
+
+The claim survived two per-task reviews because it sounds right, and because
+the only test written against it (`forfeits the bond when one side stayed
+empty`) staked YES and resolved NO — the sub-case where the empty side *wins*,
+which is exactly the sub-case in which the claim happens to hold. Any future
+rule that infers "this was a real market" from "it paid out" is inferring it
+from a falsehood.
 
 ### 5.4 Betting in ETH or in USDC
 
@@ -275,8 +312,8 @@ what they gain by entering now, and how alive the market is.
 
 ### 7.3 Create-market modal
 
-The bond must be disclosed before the approval, not after: how much is locked,
-when it returns, and the single condition under which it does not.
+Nothing to add. With the bond removed (§5.3) creation asks for no approval and
+locks no capital, so there is no disclosure the modal owes the creator.
 
 ### 7.4 Desktop shell — the swipe view
 
@@ -416,11 +453,11 @@ into mediocrity.*
 
 | Phase | Deliverable | Gate |
 |---|---|---|
-| 1 | Weighted stakes + creator bond in the contract, with tests | Full suite green, including the boundary cases in §9 |
+| 1 | Weighted stakes in the contract, with tests | Full suite green, including the boundary cases in §9 |
 | 2 | Redis key namespacing | **Precondition for two live chains**, which is where this ends up |
 | 3 | Deploy V3-USDC to Robinhood testnet, then **Base mainnet** | Verified on each explorer |
 | 4 | Fee to 3%, `minBet` to 0.1, cap of 12 in the creation path | — |
-| 5 | Card status strip, detail weight, bond disclosure | — |
+| 5 | Card status strip, detail weight | — |
 | 6 | Prediction detail page: chart, materials | — |
 | 7 | Swipe gesture | Interactive prototype approved first |
 | 8 | Desktop shell | Own mockup pass first |
@@ -453,9 +490,10 @@ netLosersPool`. Worth driving with random inputs rather than hand-picked cases.
 weight is proportional and rounding favoured the pool; full exit zeroing weight
 exactly; exit followed by a fresh bet at a later bracket.
 
-**Bond:** returned on payout; forfeited when one side is empty; returned on
-cancellation and past the grace period; batch registration reverting when one
-creator has not approved; exempt creators posting nothing.
+**One-sided markets, both ways round:** the empty side wins (no winners,
+refundable) *and* the empty side loses (the paying path runs on a market that
+only ever had one side). The second is the case §5.3's false claim hid, and it
+is easy to leave untested because the first one feels like it covers it.
 
 **Refunds:** raw stake returned, never weighted — for every refundable path.
 
@@ -470,7 +508,6 @@ creator has not approved; exempt creators posting nothing.
 | Redis namespacing corrupts production | Dual-read, backfill, verify, retire. Own phase, own rollback |
 | 3% deters users at launch | Rate is settable to 5% or back to 1% with no redeploy |
 | Users read weighting as "everyone earns more" | Copy states the redistribution plainly. §5.1 |
-| Bond blocks genuine creators | Exempt list for platform-created markets; size is owner-settable |
 | Replacing the swipe library regresses the one thing that works | Prototype before replacing; buttons remain a full path throughout, so the gesture is never the only way to bet |
 | Two collateral deployments halve liquidity per market | Launch USDC-only; WETH waits for evidence that one market fills (§5.4) |
 | Two-stage swipe reads as friction, not safety | The second stage is a gesture on the same axis, never a dialog. If testing says otherwise, arming can become opt-in above a stake size |
@@ -482,13 +519,8 @@ creator has not approved; exempt creators posting nothing.
 1. **The new $SWIPE token** — blocks the fee rebate and every screen currently
    behind a "coming soon" overlay. A holder snapshot exists at
    `docs/swipe-holder-snapshot-50065584.json`.
-2. **Bond size.** 10 USDC is a starting proposal, not a researched number.
-3. **Does the creator bond survive contact with reality?** It adds an approval
-   step to market creation. If creation stays effectively platform-only, the
-   bond protects against a problem that the `onlyResolver` gate already prevents,
-   and could be dropped for simplicity.
-4. **Desktop shell** needs a mockup pass before anyone writes CSS.
-5. **The swipe gesture needs an interactive prototype**, not a written spec, as
+2. **Desktop shell** needs a mockup pass before anyone writes CSS.
+3. **The swipe gesture needs an interactive prototype**, not a written spec, as
    its real approval gate. §7.6 fixes the mechanics; whether the two-stage
    gesture feels good can only be judged by using it.
 6. **Can ETH betting hide the WETH wrap?** If wrapping cannot be folded into the

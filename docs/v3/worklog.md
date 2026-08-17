@@ -59,6 +59,10 @@ records successes is not worth keeping.
   every market and a rewrite of audited code.
 - Four new rule families adopted: minimum pool threshold, cap on open markets,
   early-entry bonus, creator bond. Plus a fee rebate, blocked on the token.
+  **Two of those four did not survive the same day.** The minimum pool was
+  dropped in design, and the creator bond was built across three commits and
+  then removed — it widened what the hot resolver key could reach and was
+  defeated for one cent. Only the early-entry bonus and the market cap shipped.
 - Early-entry bonus uses **three brackets** (×1.50 / ×1.25 / ×1.00) rather than a
   linear curve — a user can compute it mentally and the UI can count down to the
   next step.

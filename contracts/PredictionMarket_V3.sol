@@ -7,9 +7,9 @@ import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
- * @title PredictionMarket_USDG_DualPool
+ * @title PredictionMarket_V3
  * @notice Parimutuel YES/NO prediction market collateralised by a 6-decimal
- *         stablecoin (USDG on Robinhood Chain, USDC on Base).
+ *         stablecoin (USDC on Base, USDG on Robinhood Chain).
  *
  * Successor to PredictionMarket_USDC_DualPool. Every change from that contract
  * is a fix for a finding in
@@ -34,7 +34,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  *  8. Resolvers are a separate, revocable role from the owner, so automation
  *     runs on a narrow hot key while ownership stays cold.
  */
-contract PredictionMarket_USDG_DualPool is Ownable2Step, ReentrancyGuard {
+contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     // ============ Constants ============
@@ -46,6 +46,13 @@ contract PredictionMarket_USDG_DualPool is Ownable2Step, ReentrancyGuard {
     ///         refundable to anyone who asks. Long enough for honest operational
     ///         delay, short enough that funds are never stranded for good.
     uint256 public constant REFUND_GRACE_PERIOD = 30 days;
+
+    /// @notice Stake weight by how early in a market's life the bet was placed.
+    ///         Brackets are fractions of the market's own window, not fixed
+    ///         hours, so a two-hour market and a seven-day one follow one rule.
+    uint256 public constant WEIGHT_EARLY = 15000; // x1.50, first quarter
+    uint256 public constant WEIGHT_MID = 12500;   // x1.25, second quarter
+    uint256 public constant WEIGHT_LATE = 10000;  // x1.00, second half
 
     // ============ Storage ============
 
@@ -70,6 +77,10 @@ contract PredictionMarket_USDG_DualPool is Ownable2Step, ReentrancyGuard {
         uint256 deadline;
         uint256 yesPool;
         uint256 noPool;
+        /// @notice Stake times its entry weight. Decides how the losing pool is
+        ///         split; the raw pools still decide odds and refunds.
+        uint256 weightedYesPool;
+        uint256 weightedNoPool;
         bool resolved;
         bool cancelled;
         bool outcome;
@@ -81,12 +92,17 @@ contract PredictionMarket_USDG_DualPool is Ownable2Step, ReentrancyGuard {
         /// @notice Losers' pool net of fees, fixed at resolution. Claims read
         ///         this rather than recomputing from mutable fee rates.
         uint256 netLosersPool;
+        /// @notice Weighted pool of the winning side, fixed at resolution for
+        ///         the same reason netLosersPool is.
+        uint256 weightedWinnersPool;
         uint256 participantCount;
     }
 
     struct Position {
         uint256 yesAmount;
         uint256 noAmount;
+        uint256 weightedYes;
+        uint256 weightedNo;
         bool claimed;
     }
 
@@ -189,12 +205,18 @@ contract PredictionMarket_USDG_DualPool is Ownable2Step, ReentrancyGuard {
 
         collateral.safeTransferFrom(msg.sender, address(this), amount);
 
+        uint256 weighted = (amount * weightBpsAt(predictionId, block.timestamp)) / BASIS_POINTS;
+
         if (isYes) {
             pos.yesAmount += amount;
             pred.yesPool += amount;
+            pos.weightedYes += weighted;
+            pred.weightedYesPool += weighted;
         } else {
             pos.noAmount += amount;
             pred.noPool += amount;
+            pos.weightedNo += weighted;
+            pred.weightedNoPool += weighted;
         }
 
         if (!isParticipant[predictionId][msg.sender]) {
@@ -222,7 +244,23 @@ contract PredictionMarket_USDG_DualPool is Ownable2Step, ReentrancyGuard {
         Position storage pos = positions[predictionId][msg.sender];
 
         uint256 held = isYes ? pos.yesAmount : pos.noAmount;
+        uint256 heldWeighted = isYes ? pos.weightedYes : pos.weightedNo;
         require(amount > 0 && amount <= held, "Invalid amount");
+
+        // Emptying a side turns resolution into a no-winners refund, which is
+        // how a bettor holding a large losing position and a token-sized
+        // winning one converts a certain loss into a full refund. Guarding
+        // only the final quarter keeps that shut when the outcome is knowable,
+        // without stranding the sole backer of a side in a thin market — which
+        // here is the common case, not the exception.
+        uint256 window = pred.deadline - pred.createdAt;
+        uint256 elapsed = block.timestamp - pred.createdAt;
+        if (elapsed * 4 >= window * 3) {
+            require(
+                (isYes ? pred.yesPool : pred.noPool) - amount > 0,
+                "Would empty the pool"
+            );
+        }
 
         uint256 totalPool = pred.yesPool + pred.noPool;
         require(totalPool > 0, "Empty pool");
@@ -241,12 +279,22 @@ contract PredictionMarket_USDG_DualPool is Ownable2Step, ReentrancyGuard {
         uint256 netValue = grossValue - fee;
         require(netValue > 0, "Exit value too small");
 
+        // Rounded UP, against the exiting user. Rounding down would leave them
+        // holding weight their remaining stake does not back — a slow leak paid
+        // for by every other winner in this market. A full exit still lands on
+        // exactly heldWeighted.
+        uint256 weightedRemoved = (heldWeighted * amount + held - 1) / held;
+
         if (isYes) {
             pos.yesAmount -= amount;
             pred.yesPool -= amount;
+            pos.weightedYes -= weightedRemoved;
+            pred.weightedYesPool -= weightedRemoved;
         } else {
             pos.noAmount -= amount;
             pred.noPool -= amount;
+            pos.weightedNo -= weightedRemoved;
+            pred.weightedNoPool -= weightedRemoved;
         }
 
         // Everything the pool gave up that the user did not receive.
@@ -296,6 +344,7 @@ contract PredictionMarket_USDG_DualPool is Ownable2Step, ReentrancyGuard {
 
         // Fixed here, so later fee changes cannot alter what this market pays.
         pred.netLosersPool = losersPool - platformFeeAmount - creatorReward;
+        pred.weightedWinnersPool = outcome ? pred.weightedYesPool : pred.weightedNoPool;
 
         emit PredictionResolved(predictionId, outcome, platformFeeAmount, creatorReward, pred.netLosersPool);
     }
@@ -340,8 +389,12 @@ contract PredictionMarket_USDG_DualPool is Ownable2Step, ReentrancyGuard {
         uint256 winningStake = pred.outcome ? pos.yesAmount : pos.noAmount;
         require(winningStake > 0, "No winning position");
 
-        uint256 winnersPool = pred.outcome ? pred.yesPool : pred.noPool;
-        uint256 payout = winningStake + (winningStake * pred.netLosersPool) / winnersPool;
+        uint256 weightedStake = pred.outcome ? pos.weightedYes : pos.weightedNo;
+        // Stake returns raw; only the share of the losing pool is weighted.
+        // Summed over winners the second term is exactly netLosersPool, minus
+        // integer dust that stays in the contract as it always has.
+        uint256 payout = winningStake
+            + (weightedStake * pred.netLosersPool) / pred.weightedWinnersPool;
 
         pos.claimed = true;
         collateral.safeTransfer(msg.sender, payout);
@@ -413,6 +466,32 @@ contract PredictionMarket_USDG_DualPool is Ownable2Step, ReentrancyGuard {
         uint256 total = pred.yesPool + pred.noPool;
         if (total == 0) return (BASIS_POINTS / 2, BASIS_POINTS / 2);
         return ((pred.noPool * BASIS_POINTS) / total, (pred.yesPool * BASIS_POINTS) / total);
+    }
+
+    /**
+     * @notice The weight a bet placed at `timestamp` would carry.
+     * @dev Public because the UI shows the live multiplier and counts down to
+     *      the next bracket. Comparisons multiply rather than divide, so no
+     *      integer division decides a bracket.
+     */
+    function weightBpsAt(uint256 predictionId, uint256 timestamp)
+        public
+        view
+        predictionExists(predictionId)
+        returns (uint256)
+    {
+        Prediction storage pred = predictions[predictionId];
+        if (timestamp <= pred.createdAt) return WEIGHT_EARLY;
+        if (timestamp >= pred.deadline) return WEIGHT_LATE;
+
+        // _register requires deadline > block.timestamp and sets createdAt to
+        // block.timestamp, so this window is always positive.
+        uint256 window = pred.deadline - pred.createdAt;
+        uint256 elapsed = timestamp - pred.createdAt;
+
+        if (elapsed * 4 < window) return WEIGHT_EARLY;
+        if (elapsed * 2 < window) return WEIGHT_MID;
+        return WEIGHT_LATE;
     }
 
     function getParticipants(uint256 predictionId) external view returns (address[] memory) {

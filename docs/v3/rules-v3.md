@@ -24,11 +24,18 @@ risk in every market.
 
 | Chain | Collateral | Status |
 |---|---|---|
-| Base | USDC (6 dec) | V3 target — the user base is here |
-| Robinhood Chain | USDG (6 dec) `0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168` | V3 target — deployed and verified on testnet |
+| Base | USDC (6 dec) | V3 target, and first — the user base is here |
+| Robinhood Chain | USDG (6 dec) `0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168` | V3 target, after Base |
 
-Both chains run the same contract and the same rules. The app has a network
-switcher; markets are per-chain and do not share liquidity.
+**V3 is not deployed on any chain yet.** What is live is V3's predecessor: the
+archived contracts on Base (§8), and the audited USDG dual pool on the
+Robinhood *testnet*. Verified on-chain 2026-08-17 — none of the deployed
+contracts carries `weightBpsAt`, which only V3 has, and Robinhood mainnet has
+no market contract at all. Both chains will run the same contract and the same
+rules once V3 lands.
+
+The app has a network switcher; markets are per-chain and do not share
+liquidity.
 
 Base is not abandoned. The old Base contracts are archived (see §8), but V3
 returns to Base as a first-class chain.
@@ -63,7 +70,7 @@ change cannot alter what an already-settled market pays out.
 
 Every one of these is a fix for a finding in the
 [security audit](../superpowers/specs/2026-08-17-usdc-dualpool-security-audit.md),
-and all are implemented in `contracts/PredictionMarket_USDG_DualPool.sol`.
+and all are implemented in `contracts/PredictionMarket_V3.sol`.
 
 | Rule | Why it exists |
 |---|---|
@@ -73,6 +80,7 @@ and all are implemented in `contracts/PredictionMarket_USDG_DualPool.sol`.
 | **Ownership transfers in two steps; resolvers are a separate revocable role** | The old contract had no ownership transfer at all — it was the deployer's forever. Automation now runs on a narrow hot key while ownership stays cold. |
 | **Creator rewards are pulled, not pushed** | A creator who could not receive the token used to be able to block resolution for everyone in that market. |
 | **Early exit retains exactly what it does not pay out** | The difference used to go untracked, creating "orphaned" balances — and a drain function written to collect them that could take user stakes. |
+| **In a market's final quarter, an exit cannot take a side's pool to zero** | Once the last cent of a side is withdrawn, resolution finds no winners and refunds everyone — including the stake on the other side that had already lost. Late in a market's life the outcome is usually knowable, so this closes the path to converting a certain loss into a full refund. See §5.5. |
 
 ## 5. Market lifecycle rules 🟡
 
@@ -125,27 +133,7 @@ be described to users as "everyone earns more".
 Weight is frozen at the moment the bet is placed. Refunds always return the raw
 stake, never the weighted amount.
 
-### 5.4 Creator bond 🟡
-
-Creating a market locks a bond from the creator's wallet. Because registration
-is `onlyResolver`, the creator approves the bond first and the backend pulls it
-when it registers the market — so the platform still decides what markets
-exist, which it must, since every market is an obligation to resolve it.
-
-| Outcome | Bond |
-|---|---|
-| Market resolved and paid out | Returned, plus the 0.5% creator fee |
-| One side of the market stayed empty | **Forfeited** |
-| Cancelled by the platform | Returned — not the creator's failure |
-| Abandoned past the grace period | Returned — the platform's failure |
-
-A market that pays out necessarily had stake on both sides, so this is one rule,
-not four: **the bond comes back whenever the market was a real market.**
-
-*Open: bond size (10 USDC is a proposal, not a researched number), and whether
-the bond earns its place at all while creation stays platform-gated.*
-
-### 5.5 Betting in ETH or USDC 🟡
+### 5.4 Betting in ETH or USDC 🟡
 
 Supported by deploying the same audited contract twice — once with USDC as
 collateral, once with WETH — rather than by teaching one contract two
@@ -158,6 +146,31 @@ built around. WETH follows once a single market reliably fills.
 *Open: whether the WETH wrap can be hidden inside the existing approval
 sequence. If not, ETH betting should not ship — someone who asks to bet ETH must
 not be handed a lesson about wrapped tokens.*
+
+### 5.5 Exiting early 🔒
+
+You can sell part or all of a position back before the deadline, for a fee (see
+§3). **For most of a market's life this works exactly like that** — you can
+exit any amount, up to and including everything you hold, even if you are the
+only person on your side of the question.
+
+**In the last quarter of the market's life, you can no longer exit a side down
+to exactly zero.** You can still reduce your position, and you can still exit
+in full if someone else is backing the same side as you — the rule only bites
+if your exit would leave that side with nothing staked on it at all.
+
+**Why:** if a side's pool ever hits zero, the market resolves with no winners
+and refunds every stake on both sides — including bets on the other side that
+had already lost. Late in a market's life, once the likely outcome is usually
+clear, that would let someone holding a losing bet buy a token-sized position
+on the side about to win, exit it down to zero, and turn a stake they were
+about to lose into a full refund instead. Restricting the rule to the final
+quarter closes that off in the situation where it matters — when the outcome
+is knowable — without stopping the ordinary case of a single early backer
+walking away from a position that hasn't resolved yet.
+
+If you are the only backer of a side and want to be certain you can exit in
+full, do it before the market enters its final quarter.
 
 ## 6. Rewards ⬜
 
