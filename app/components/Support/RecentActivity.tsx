@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAccount } from 'wagmi';
+import { useActiveChain } from '@/lib/chains/activeChain';
 import '../../styles/sheet.css';
 import './RecentActivity.css';
 
@@ -90,6 +91,10 @@ function timeAgo(timestamp: number) {
 }
 
 export function RecentActivity() {
+  // The active chain travels with every read below. The server defaults to
+  // Base when no chain is sent, which is right for Base and wrong for every
+  // other chain, so without this a user on Robinhood sees Base's numbers.
+  const { chainKey } = useActiveChain();
   const { address } = useAccount();
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
@@ -108,7 +113,7 @@ export function RecentActivity() {
         // 'me' has no server-side equivalent, so it fetches everything and
         // narrows below. The other two map straight onto the API's own filter.
         const type = filter === 'predictions' || filter === 'bets' ? filter : 'all';
-        const response = await fetch(`/api/activity?limit=50&type=${type}`);
+        const response = await fetch(`/api/activity?limit=50&type=${type}&chain=${chainKey}`);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const result = await response.json();

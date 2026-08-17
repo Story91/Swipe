@@ -1661,7 +1661,7 @@ export const USDC_DUALPOOL_ABI = [
 ] as const;
 
 /**
- * PredictionMarket_V3 — the audited successor to the USDC pool.
+ * PredictionMarket_V4 — the audited successor to the USDC pool.
  *
  * The ABI is read from the compiled artifact rather than hand-written, so it
  * cannot drift from the deployed bytecode. The hand-written USDC ABI above
@@ -1674,7 +1674,7 @@ export const USDC_DUALPOOL_ABI = [
  *  - creator rewards are pull-based via claimCreatorReward()
  *  - a market with no winners is refundable, so claimRefund covers that case
  */
-const USDG_ABI_DATA = require('../artifacts/contracts/PredictionMarket_V3.sol/PredictionMarket_V3.json');
+const USDG_ABI_DATA = require('../artifacts/contracts/PredictionMarket_V4.sol/PredictionMarket_V4.json');
 export const USDG_DUALPOOL_ABI = USDG_ABI_DATA.abi;
 
 /**

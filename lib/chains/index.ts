@@ -25,7 +25,7 @@ export const CHAINS: Record<ChainKey, ChainConfig> = {
         || '0x2bA339Df34B98099a9047d9442075F7B3a792f74') as `0x${string}`,
       dualPool: (process.env.NEXT_PUBLIC_USDC_DUALPOOL_CONTRACT
         || '0xf5Fa6206c2a7d5473ae7468082c9D260DFF83205') as `0x${string}`,
-      // PredictionMarket_V3, deployed and verified on Base mainnet 2026-08-17,
+      // PredictionMarket_V4, deployed and verified on Base mainnet 2026-08-17,
       // collateralised in the USDC below. Owned by a fresh operational key,
       // unrelated to the archived contracts above.
       //
@@ -34,8 +34,8 @@ export const CHAINS: Record<ChainKey, ChainConfig> = {
       // address while the server sees the real one. That is safe here only
       // because isWritableMarket compares the address a caller is about to
       // write to; a reachable address is not on its own permission to write.
-      market: (process.env.NEXT_PUBLIC_BASE_V3_CONTRACT
-        || '0x5C4078BB24f352809B93FF395cA7655835D1CA4a') as `0x${string}`,
+      market: (process.env.NEXT_PUBLIC_BASE_V4_CONTRACT
+        || '0x4129d706c283e6bAC749CFe9221AD322981917E6') as `0x${string}`,
       swipeClaim: (process.env.NEXT_PUBLIC_SWIPE_CLAIM_CONTRACT || ZERO) as `0x${string}`,
     },
     stable: {
@@ -85,7 +85,7 @@ export const CHAINS: Record<ChainKey, ChainConfig> = {
     rpcUrl: process.env.ROBINHOOD_RPC_URL || 'https://rpc.mainnet.chain.robinhood.com',
     explorer: 'https://robinhoodchain.blockscout.com',
     contracts: {
-      // PredictionMarket_V3, deployed and configured on Robinhood mainnet
+      // PredictionMarket_V4, deployed and configured on Robinhood mainnet
       // 2026-08-17, collateralised in the USDG below. Same owner and first
       // resolver as Base.
       //
@@ -99,8 +99,8 @@ export const CHAINS: Record<ChainKey, ChainConfig> = {
       // market write goes through useMarketWrite, which compares the address it
       // is about to write to against this chain's market at send time, moves
       // the wallet onto the matching chain and pins chainId.
-      market: (process.env.NEXT_PUBLIC_ROBINHOOD_V3_CONTRACT
-        || '0x1AD8DD99C31EA51c1bCE99fB10d609485937C7DA') as `0x${string}`,
+      market: (process.env.NEXT_PUBLIC_ROBINHOOD_V4_CONTRACT
+        || '0x41a6Fd3d35C0F9DD13773A763358E35B5216eEe4') as `0x${string}`,
     },
     stable: {
       // Paxos USDG. Verified on-chain: symbol() == "USDG", decimals() == 6.

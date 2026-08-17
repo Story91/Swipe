@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { redis, redisHelpers } from '../../../lib/redis';
+import { redis, redisHelpers, REDIS_KEYS } from '../../../lib/redis';
+import { chainFromRequest } from '@/lib/chains/requestChain';
 import { RedisUserStake, RedisPrediction } from '../../../lib/types/redis';
 
 interface LeaderboardEntry {
@@ -21,8 +22,16 @@ export async function GET(request: NextRequest) {
     const timeframe = searchParams.get('timeframe') || '30d';
     const limit = parseInt(searchParams.get('limit') || '20');
 
+    // Profit is computed from one chain's pools, so the ranking is per chain.
+    // Absent ?chain= means Base.
+    const requested = chainFromRequest(request);
+    if (!requested.ok) {
+      return NextResponse.json({ success: false, error: requested.error }, { status: 400 });
+    }
+    const chain = requested.chain;
+
     // Get all predictions
-    const allPredictions = await redisHelpers.getAllPredictions();
+    const allPredictions = await redisHelpers.getAllPredictions(chain);
 
     // Filter by timeframe if needed
     let filteredPredictions = allPredictions;
@@ -62,7 +71,7 @@ export async function GET(request: NextRequest) {
 
       for (const prediction of filteredPredictions) {
         // Get user's stake for this prediction
-        const stakeKey = `user_stakes:${userAddress}:${prediction.id}`;
+        const stakeKey = REDIS_KEYS.USER_STAKES(userAddress, prediction.id, chain);
         const stakeData = await redis.get(stakeKey);
 
         if (stakeData) {
@@ -132,6 +141,7 @@ export async function GET(request: NextRequest) {
       data: sortedUsers,
       count: sortedUsers.length,
       timeframe,
+      chain,
       timestamp: new Date().toISOString()
     });
 

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { redis } from "@/lib/redis";
+import { redis, REDIS_KEYS } from "@/lib/redis";
 import type { RedisPrediction } from "@/lib/types/redis";
 
 interface Props {
@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   
   try {
     // Fetch prediction data from Redis
-    const predictionData = await redis.get(`prediction:${id}`);
+    const predictionData = await redis.get(REDIS_KEYS.PREDICTION(id, 'base'));
     
     if (!predictionData) {
       return getDefaultMetadata(URL);

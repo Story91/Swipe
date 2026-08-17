@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { redis } from '../../../../lib/redis';
+import { redis, REDIS_KEYS } from '../../../../lib/redis';
 
 // GET /api/debug/user-stakes?userId=ADDRESS
 export async function GET(request: NextRequest) {
@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     
     if (!userId) {
       // List all user_stakes keys
-      const allKeys = await redis.keys('user_stakes:*');
+      const allKeys = await redis.keys(REDIS_KEYS.USER_STAKES_PATTERN('*', 'base'));
       
       // Group by user
       const userCounts: { [key: string]: number } = {};
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     
     // Get all stakes for specific user
     const userIdLower = userId.toLowerCase();
-    const pattern = `user_stakes:${userIdLower}:*`;
+    const pattern = REDIS_KEYS.USER_STAKES_PATTERN(userIdLower, 'base');
     const keys = await redis.keys(pattern);
     
     console.log(`🔍 Debug: Searching for pattern: ${pattern}`);
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     }
     
     // Also try with original case
-    const patternOriginal = `user_stakes:${userId}:*`;
+    const patternOriginal = REDIS_KEYS.USER_STAKES_PATTERN(userId, 'base');
     const keysOriginal = await redis.keys(patternOriginal);
     
     return NextResponse.json({

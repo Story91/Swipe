@@ -168,14 +168,25 @@ describe('the address a write is actually addressed to', () => {
   const POOL = '0xAbCdEf0123456789aBcDeF0123456789AbCdEf01';
 
   // CHAINS is built from process.env at module load, so overriding a market
-  // means re-importing under a stubbed environment. Note the variable renamed
-  // with the arming: NEXT_PUBLIC_ROBINHOOD_V3_CONTRACT. Stubbing the old name
-  // would set something nothing reads, and these tests would pass against the
-  // literal fallback while proving nothing.
+  // means re-importing under a stubbed environment. The variable is renamed
+  // whenever the contract generation moves, and stubbing a name nothing reads
+  // sets nothing: the config falls back to its literal and the assertions below
+  // measure the fallback instead of the stub.
+  //
+  // That already happened once. This helper stubbed the V3 name after the config
+  // had moved to V4, and the case-insensitivity test went red for a reason that
+  // had nothing to do with case. So the helper now checks that the stub took
+  // effect before handing the module back, and says so plainly when it has not.
   async function withRobinhoodMarket(value: string) {
-    vi.stubEnv('NEXT_PUBLIC_ROBINHOOD_V3_CONTRACT', value);
+    vi.stubEnv('NEXT_PUBLIC_ROBINHOOD_V4_CONTRACT', value);
     vi.resetModules();
-    return import('./index');
+    const chains = await import('./index');
+    expect(
+      chains.getWritableMarket('robinhood'),
+      'the stubbed env var is not the one lib/chains/index.ts reads, so this ' +
+        'test would be measuring the literal fallback'
+    ).toBe(value);
+    return chains;
   }
 
   afterEach(() => {

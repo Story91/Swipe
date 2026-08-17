@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { redis } from '../../../../lib/redis';
+import { redis, REDIS_KEYS } from '../../../../lib/redis';
 
 // GET /api/debug/predictions-breakdown - Detailed breakdown of all predictions
 export async function GET(request: NextRequest) {
   try {
-    const predictionsSet = await redis.smembers('predictions');
+    const predictionsSet = await redis.smembers(REDIS_KEYS.PREDICTIONS('base'));
     
     let active = 0, resolved = 0, expired = 0, cancelled = 0, needsApproval = 0;
     const now = Date.now() / 1000;
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     for (const predictionId of predictionsSet) {
       try {
-        const predictionData = await redis.get(`prediction:${predictionId}`);
+        const predictionData = await redis.get(REDIS_KEYS.PREDICTION(predictionId, 'base'));
         if (!predictionData) continue;
 
         const pred = typeof predictionData === 'string' ? JSON.parse(predictionData) : predictionData;

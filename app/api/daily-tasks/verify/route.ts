@@ -361,7 +361,9 @@ async function verifyPredictionCreated(address: string): Promise<boolean> {
     const { redisHelpers } = await import('../../../../lib/redis');
     
     // Get all predictions from Redis using the proper helper
-    const predictions = await redisHelpers.getAllPredictions();
+    // Daily tasks are scored against Base, which is where every task that has
+    // ever been verified was completed.
+    const predictions = await redisHelpers.getAllPredictions('base');
     
     if (!predictions || predictions.length === 0) {
       console.log('❌ No predictions found in Redis');

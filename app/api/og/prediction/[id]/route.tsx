@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { NextRequest } from 'next/server';
 import { redisHelpers } from '@/lib/redis';
+import { chainFromRequest } from '@/lib/chains/requestChain';
 
 export const runtime = 'edge';
 
@@ -140,9 +141,17 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    
+
+    // The share card has to be of the market that was actually shared. Market 1
+    // exists on both chains, so an unnamed chain would draw the wrong question.
+    // A chain we do not have falls back to the default card rather than a 400:
+    // this endpoint answers with an image, and a crawler will show whatever it
+    // gets, so a broken JSON body would render as a broken preview.
+    const requested = chainFromRequest(request);
+    const chain = requested.ok ? requested.chain : 'base';
+
     // Fetch prediction data
-    const prediction = await redisHelpers.getPrediction(id);
+    const prediction = requested.ok ? await redisHelpers.getPrediction(id, chain) : null;
     
     if (!prediction) {
       // Return default image if prediction not found

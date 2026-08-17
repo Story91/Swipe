@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { redis } from '../../../../lib/redis';
+import { redis, REDIS_KEYS } from '../../../../lib/redis';
 import { redisHelpers } from '../../../../lib/redis';
+import { chainFromRequest } from '@/lib/chains/requestChain';
 import { RedisUserStake, RedisPrediction } from '../../../../lib/types/redis';
 
 interface LargestStakesUser {
@@ -15,10 +16,18 @@ interface LargestStakesUser {
 // POST /api/admin/refresh-largest-stakes - Force refresh largest stakes cache
 export async function POST(request: NextRequest) {
   try {
-    console.log('🔄 Admin: Force refreshing largest stakes cache');
+    // This writes the cache that /api/market/largest-stakes reads, so it has to
+    // agree with that route about which chain it is caching. Absent means Base.
+    const requested = chainFromRequest(request);
+    if (!requested.ok) {
+      return NextResponse.json({ success: false, error: requested.error }, { status: 400 });
+    }
+    const chain = requested.chain;
+
+    console.log(`🔄 Admin: Force refreshing largest stakes cache (${chain})`);
 
     // Get all predictions
-    const allPredictions = await redisHelpers.getAllPredictions();
+    const allPredictions = await redisHelpers.getAllPredictions(chain);
     console.log(`📊 Processing ${allPredictions.length} predictions for cache refresh`);
 
     // Refresh cache for different timeframes
@@ -54,7 +63,7 @@ export async function POST(request: NextRequest) {
 
         for (const prediction of filteredPredictions) {
           // Get user's stake for this prediction
-          const stakeKey = `user_stakes:${userAddress}:${prediction.id}`;
+          const stakeKey = REDIS_KEYS.USER_STAKES(userAddress, prediction.id, chain);
           const stakeData = await redis.get(stakeKey);
 
           if (stakeData) {
@@ -108,7 +117,7 @@ export async function POST(request: NextRequest) {
         }));
 
       // Cache the results for 1 hour (3600 seconds)
-      const cacheKey = `largest_stakes:${timeframe}:${limit}`;
+      const cacheKey = REDIS_KEYS.LARGEST_STAKES(timeframe, limit, chain);
       await redis.setex(cacheKey, 3600, JSON.stringify(sortedUsers));
       console.log(`💾 Cached ${sortedUsers.length} users for ${timeframe} with key: ${cacheKey}`);
     }
@@ -116,6 +125,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'Largest stakes cache refreshed successfully',
+      chain,
       refreshedTimeframes: timeframes,
       timestamp: new Date().toISOString()
     });

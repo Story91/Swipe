@@ -6,6 +6,15 @@ import { redisHelpers } from '../../../../../lib/redis';
 // Initialize public client for Base network
 const publicClient = createChainPublicClient();
 
+/**
+ * Every read below goes to CONTRACTS.V2, which is a Base address, so the Redis
+ * records written from it are Base's. Named rather than left to the default: a
+ * sync route that inherits its chain is one config change away from writing one
+ * chain's contract state into another chain's keyspace, and the value would be
+ * right either way today, which is exactly what makes it worth pinning.
+ */
+const SYNC_CHAIN = 'base' as const;
+
 // Helper function for retry with backoff
 async function retryWithBackoff<T>(
   fn: () => Promise<T>,
@@ -34,7 +43,7 @@ async function retryWithBackoff<T>(
 // Helper function to find highest V2 prediction ID in Redis
 async function findHighestV2PredictionId(): Promise<number> {
   try {
-    const allPredictions = await redisHelpers.getAllPredictions();
+    const allPredictions = await redisHelpers.getAllPredictions(SYNC_CHAIN);
     const v2Predictions = allPredictions.filter(p => p.id.startsWith('pred_v2_'));
     
     if (v2Predictions.length === 0) {
@@ -158,7 +167,7 @@ export async function GET(request: NextRequest) {
         }) as readonly `0x${string}`[];
 
         // Get existing prediction from Redis to preserve non-blockchain fields
-        const existingPrediction = await redisHelpers.getPrediction(predictionId);
+        const existingPrediction = await redisHelpers.getPrediction(predictionId, SYNC_CHAIN);
 
         // Convert contract data to Redis format - preserve existing non-blockchain fields
         const redisPrediction = {
@@ -192,7 +201,7 @@ export async function GET(request: NextRequest) {
         };
 
         // Save to Redis
-        await redisHelpers.savePrediction(redisPrediction);
+        await redisHelpers.savePrediction(redisPrediction, SYNC_CHAIN);
         syncedPredictions++;
 
         // Sync user stakes for each participant (V2 has no getPredictionStakes;
@@ -256,7 +265,7 @@ export async function GET(request: NextRequest) {
             }
 
             if (userStake.ETH || userStake.SWIPE) {
-              await redisHelpers.saveUserStake(userStake);
+              await redisHelpers.saveUserStake(userStake, SYNC_CHAIN);
             }
           } catch (stakeError) {
             console.error(`❌ Failed to sync stake for participant ${participant}:`, stakeError);

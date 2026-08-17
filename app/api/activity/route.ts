@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { redisHelpers, redis } from '../../../lib/redis';
+import { redisHelpers, redis, REDIS_KEYS } from '../../../lib/redis';
+import { chainFromRequest } from '@/lib/chains/requestChain';
 import { RedisPrediction, RedisUserStake } from '../../../lib/types/redis';
 
 interface ActivityItem {
@@ -28,6 +29,13 @@ interface ActivityItem {
 // GET /api/activity - Get recent activity
 export async function GET(request: NextRequest) {
   try {
+    // The feed is one chain's activity. Absent ?chain= means Base.
+    const requested = chainFromRequest(request);
+    if (!requested.ok) {
+      return NextResponse.json({ success: false, error: requested.error }, { status: 400 });
+    }
+    const chain = requested.chain;
+
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '20');
     const type = searchParams.get('type'); // 'all', 'predictions', 'bets'
@@ -36,7 +44,7 @@ export async function GET(request: NextRequest) {
     const avatars = ['🐋', '🎯', '🔮', '🐂', '👑', '🍀', '📈', '🤖', '⚽', '💻', '🚀', '💎'];
 
     // Get all predictions
-    const allPredictions = await redisHelpers.getAllPredictions();
+    const allPredictions = await redisHelpers.getAllPredictions(chain);
     const consideredPredictions = allPredictions.slice(-100); // Last 100 for performance
 
     // Batch-read every stake up front. This used to be one redis.get per
@@ -45,7 +53,9 @@ export async function GET(request: NextRequest) {
     const stakeKeys: string[] = [];
     for (const prediction of consideredPredictions) {
       for (const participant of prediction.participants || []) {
-        stakeKeys.push(`user_stakes:${participant}:${prediction.id}`);
+        // From REDIS_KEYS, so the key carries the chain prefix and matches the
+        // one the lookup below builds.
+        stakeKeys.push(REDIS_KEYS.USER_STAKES(participant, prediction.id, chain));
       }
     }
 
@@ -105,7 +115,7 @@ export async function GET(request: NextRequest) {
 
       // Process stakes for this prediction
       for (const participant of prediction.participants) {
-        const stakeKey = `user_stakes:${participant}:${prediction.id}`;
+        const stakeKey = REDIS_KEYS.USER_STAKES(participant, prediction.id, chain);
         const stakeData = stakesByKey.get(stakeKey);
 
         if (stakeData) {

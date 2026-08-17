@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { redis } from '../../../../lib/redis';
+import { redis, REDIS_KEYS } from '../../../../lib/redis';
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,20 +15,20 @@ export async function GET(request: NextRequest) {
     }
     
     // Get all prediction IDs
-    const predictionKeys = await redis.keys('prediction:*');
+    const predictionKeys = await redis.keys(REDIS_KEYS.PREDICTION_PATTERN('base'));
     const predictionIds = predictionKeys.map(key => key.replace('prediction:', ''));
     
     const allResults = [];
     
     for (const predictionId of predictionIds) {
       // Get prediction data first
-      const predictionData = await redis.get(`prediction:${predictionId}`);
+      const predictionData = await redis.get(REDIS_KEYS.PREDICTION(predictionId, 'base'));
       if (!predictionData) continue;
       
       const prediction = typeof predictionData === 'string' ? JSON.parse(predictionData) : predictionData;
       
       // Get all stakes for this prediction
-      const pattern = `user_stakes:*:${predictionId}`;
+      const pattern = REDIS_KEYS.PREDICTION_STAKES_PATTERN(predictionId, 'base');
       const keys = await redis.keys(pattern);
       
       if (keys.length === 0) continue;

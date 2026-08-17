@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createChainPublicClient } from '@/lib/chains';
-import { redisHelpers, redis } from '../../../../lib/redis';
+import { redisHelpers, redis, REDIS_KEYS } from '../../../../lib/redis';
 import { CONTRACTS } from '../../../../lib/contract';
 import { RedisUserStake } from '../../../../lib/types/redis';
 
@@ -14,7 +14,9 @@ export async function POST(request: NextRequest) {
     console.log('🔄 Starting V2 contract rescan for leaderboard...');
 
     // Get all predictions from Redis
-    const allPredictions = await redisHelpers.getAllPredictions();
+    // The V2 contract rescanned below is a Base contract, so this is Base's
+    // leaderboard and nothing else. Pinned rather than defaulted.
+    const allPredictions = await redisHelpers.getAllPredictions('base');
     console.log(`📊 Found ${allPredictions.length} predictions in Redis`);
 
     // Filter only V2 predictions
@@ -133,7 +135,7 @@ export async function POST(request: NextRequest) {
               }
 
               // Update Redis stake data (for SwipeClaim to use)
-              const stakeKey = `user_stakes:${userId}:${predictionId}`;
+              const stakeKey = REDIS_KEYS.USER_STAKES(userId, predictionId, 'base');
               const stakeData = {
                 ETH: {
                   yesAmount: ethYes,
@@ -218,7 +220,7 @@ export async function POST(request: NextRequest) {
     };
 
     // Save to Redis cache (24 hours) - use same key as getRealLeaderboardData()
-    const cacheKey = 'leaderboard:real_data';
+    const cacheKey = REDIS_KEYS.REAL_LEADERBOARD('base');
     await redis.setex(cacheKey, 86400, JSON.stringify(result)); // 24 hours instead of 1 hour
     console.log('💾 Saved updated leaderboard data to Redis (24h cache)');
 

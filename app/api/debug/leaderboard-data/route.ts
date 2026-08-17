@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createChainPublicClient } from '@/lib/chains';
-import { redisHelpers, redis } from '../../../../lib/redis';
+import { redisHelpers, redis, REDIS_KEYS } from '../../../../lib/redis';
 import { http } from 'viem';
 import { CONTRACTS } from '../../../../lib/contract';
 
@@ -9,7 +9,8 @@ export async function POST(request: NextRequest) {
     console.log('🔍 Starting leaderboard data collection...');
 
     // Check cache first - use same key as getRealLeaderboardData()
-    const cacheKey = 'leaderboard:real_data';
+    // Same key the rescan writes and getRealLeaderboardData reads, on Base.
+    const cacheKey = REDIS_KEYS.REAL_LEADERBOARD('base');
     const cachedData = await redis.get(cacheKey);
     
     if (cachedData) {
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
     console.log('🔄 No cache found, generating real leaderboard data...');
 
     // Get all predictions from Redis
-    const allPredictions = await redisHelpers.getAllPredictions();
+    const allPredictions = await redisHelpers.getAllPredictions('base');
     console.log(`📊 Found ${allPredictions.length} predictions`);
 
     // Aggregate user stakes data

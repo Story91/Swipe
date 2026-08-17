@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useActiveChain } from '@/lib/chains/activeChain';
 import '../../styles/sheet.css';
 import './PlatformAnalytics.css';
 
@@ -52,6 +53,10 @@ const num = (n: number | undefined) => (n ?? 0).toLocaleString('en-US');
 const eth = (n: number | undefined, dp = 4) => `${(n ?? 0).toFixed(dp)} ETH`;
 
 export function PlatformAnalytics() {
+  // The active chain travels with every read below. The server defaults to
+  // Base when no chain is sent, which is right for Base and wrong for every
+  // other chain, so without this a user on Robinhood sees Base's numbers.
+  const { chainKey } = useActiveChain();
   const [data, setData] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +67,7 @@ export function PlatformAnalytics() {
         setLoading(true);
         setError(null);
 
-        const response = await fetch('/api/market/stats');
+        const response = await fetch(`/api/market/stats?chain=${chainKey}`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }

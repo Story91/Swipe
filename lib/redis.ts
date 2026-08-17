@@ -53,6 +53,8 @@ export function chainNamespace(chain: ChainKey = DEFAULT_CHAIN_KEY): string {
 export const REDIS_KEYS = {
   PREDICTIONS: (chain?: ChainKey) => `${chainNamespace(chain)}predictions`,
   PREDICTION: (id: string, chain?: ChainKey) => `${chainNamespace(chain)}prediction:${id}`,
+  /** Every prediction record on one chain, for the few routes that scan. */
+  PREDICTION_PATTERN: (chain?: ChainKey) => `${chainNamespace(chain)}prediction:*`,
   PREDICTIONS_BY_CATEGORY: (category: string, chain?: ChainKey) =>
     `${chainNamespace(chain)}predictions:category:${category}`,
   PREDICTIONS_BY_CREATOR: (creator: string, chain?: ChainKey) =>
@@ -72,10 +74,29 @@ export const REDIS_KEYS = {
    */
   USER_STAKES_PATTERN: (userId: string, chain?: ChainKey) =>
     `${chainNamespace(chain)}user_stakes:${userId}:*`,
+  /**
+   * Every stake on one market on one chain.
+   *
+   * This one has a `*` in the middle, where the user id goes, which is exactly
+   * the shape the leading prefix makes safe. Without the prefix the glob would
+   * read `user_stakes:*:pred_v3_1`, and because `*` matches ':' it would sweep
+   * up `robinhood:user_stakes:0xabc:pred_v3_1` as well and add a different
+   * chain's money to the answer.
+   */
+  PREDICTION_STAKES_PATTERN: (predictionId: string, chain?: ChainKey) =>
+    `${chainNamespace(chain)}user_stakes:*:${predictionId}`,
   USER_TRANSACTIONS: (userId: string) => `user_transactions:${userId}`,
   MARKET_STATS: (chain?: ChainKey) => `${chainNamespace(chain)}market:stats`,
   COMPACT_STATS: (chain?: ChainKey) => `${chainNamespace(chain)}market:compact_stats`,
-  REAL_LEADERBOARD: 'leaderboard:real_data',
+  /**
+   * Cached leaderboard. Takes a chain because it is computed from one chain's
+   * markets and nothing else: two chains sharing this key means whichever
+   * rebuild ran last decides who the whole app thinks is winning.
+   */
+  REAL_LEADERBOARD: (chain?: ChainKey) => `${chainNamespace(chain)}leaderboard:real_data`,
+  /** Same reasoning as the leaderboard: an aggregate of one chain's stakes. */
+  LARGEST_STAKES: (timeframe: string, limit: number, chain?: ChainKey) =>
+    `${chainNamespace(chain)}largest_stakes:${timeframe}:${limit}`,
   USER_PORTFOLIO: (userId: string) => `user:portfolio:${userId}`,
   SWIPE_CLAIM_HISTORY: (userId: string) => `swipe_claim_history:${userId}`,
   // Farcaster profile cache (TTL: 7 days)
@@ -208,33 +229,40 @@ async function getPredictionsByIds(ids: string[], chain: ChainKey = DEFAULT_CHAI
   return out;
 }
 
-// Helper functions for Redis operations
+// Helper functions for Redis operations.
+//
+// Every method that touches a market takes the chain that market lives on. The
+// parameter is last and defaults to Base, so a caller that has not been updated
+// reads and writes exactly the keys it read and wrote before namespacing
+// existed. That default is the reason no live record needs migrating, and it is
+// also the reason a caller that genuinely knows its chain has to say so: a
+// silent default is correct for Base and wrong for everything else.
 export const redisHelpers = {
   // Save prediction to Redis
-  async savePrediction(prediction: RedisPrediction): Promise<void> {
+  async savePrediction(prediction: RedisPrediction, chain: ChainKey = DEFAULT_CHAIN_KEY): Promise<void> {
     try {
-      const predictionKey = REDIS_KEYS.PREDICTION(prediction.id);
+      const predictionKey = REDIS_KEYS.PREDICTION(prediction.id, chain);
 
       // Save individual prediction
       await redis.set(predictionKey, JSON.stringify(prediction));
-      
+
       // Add to predictions list. sadd returns the number of NEW members, so a
       // non-zero result means this is a first-time insert rather than a re-sync.
-      const addedCount = await redis.sadd(REDIS_KEYS.PREDICTIONS(), prediction.id);
+      const addedCount = await redis.sadd(REDIS_KEYS.PREDICTIONS(chain), prediction.id);
 
       // Add to category index
-      await redis.sadd(REDIS_KEYS.PREDICTIONS_BY_CATEGORY(prediction.category), prediction.id);
+      await redis.sadd(REDIS_KEYS.PREDICTIONS_BY_CATEGORY(prediction.category, chain), prediction.id);
 
       // Add to creator index
-      await redis.sadd(REDIS_KEYS.PREDICTIONS_BY_CREATOR(prediction.creator), prediction.id);
+      await redis.sadd(REDIS_KEYS.PREDICTIONS_BY_CREATOR(prediction.creator, chain), prediction.id);
 
       // Move into exactly one status index. A prediction changes status over its
       // lifetime (pending -> active -> resolved), so the stale memberships must be
       // removed, otherwise it lingers in every set it has ever been in.
       const statusSets = {
-        pending: REDIS_KEYS.PREDICTIONS_PENDING_APPROVAL(),
-        resolved: REDIS_KEYS.PREDICTIONS_RESOLVED(),
-        active: REDIS_KEYS.PREDICTIONS_ACTIVE(),
+        pending: REDIS_KEYS.PREDICTIONS_PENDING_APPROVAL(chain),
+        resolved: REDIS_KEYS.PREDICTIONS_RESOLVED(chain),
+        active: REDIS_KEYS.PREDICTIONS_ACTIVE(chain),
       };
       const targetSet = prediction.needsApproval
         ? statusSets.pending
@@ -252,15 +280,17 @@ export const redisHelpers = {
       // Update count only on first insert; savePrediction is also the update path
       // and re-syncs would otherwise inflate this forever.
       if (addedCount) {
-        await redis.incr(REDIS_KEYS.PREDICTIONS_COUNT());
+        await redis.incr(REDIS_KEYS.PREDICTIONS_COUNT(chain));
       }
 
       // Invalidate last, once the record and its indexes are all in place.
       // Dropping the snapshot first would let a concurrent read rebuild it from
-      // the pre-write state and cache that.
-      invalidatePredictionsCache();
+      // the pre-write state and cache that. Only this chain's snapshot: clearing
+      // every chain would throw away work that this write did not touch, and
+      // clearing the wrong one would leave the stale list serving.
+      invalidatePredictionsCache(chain);
 
-      console.log(`✅ Prediction ${prediction.id} saved to Redis`);
+      console.log(`✅ Prediction ${prediction.id} saved to Redis (${chain})`);
     } catch (error) {
       console.error('❌ Failed to save prediction to Redis:', error);
       throw error;
@@ -268,9 +298,9 @@ export const redisHelpers = {
   },
 
   // Get prediction by ID with live data
-  async getPrediction(id: string): Promise<RedisPrediction | null> {
+  async getPrediction(id: string, chain: ChainKey = DEFAULT_CHAIN_KEY): Promise<RedisPrediction | null> {
     try {
-      const predictionKey = REDIS_KEYS.PREDICTION(id);
+      const predictionKey = REDIS_KEYS.PREDICTION(id, chain);
       const data = await redis.get(predictionKey);
       
       if (!data) return null;
@@ -324,13 +354,15 @@ export const redisHelpers = {
   },
 
   // Get active predictions (only live/real predictions, exclude test data)
-  async getActivePredictions(): Promise<RedisPrediction[]> {
+  async getActivePredictions(chain: ChainKey = DEFAULT_CHAIN_KEY): Promise<RedisPrediction[]> {
     try {
-      const activeIds = await redis.smembers(REDIS_KEYS.PREDICTIONS_ACTIVE());
+      const activeIds = await redis.smembers(REDIS_KEYS.PREDICTIONS_ACTIVE(chain));
       const currentTime = Math.floor(Date.now() / 1000);
 
-      // getPredictionsByIds already drops test predictions.
-      const predictions = (await getPredictionsByIds(activeIds)).filter(
+      // The chain travels with the ids, for the same reason it does in
+      // getAllPredictions: ids collected from one namespace and read out of
+      // another is the collision the prefix exists to prevent.
+      const predictions = (await getPredictionsByIds(activeIds, chain)).filter(
         (p) => !p.resolved && !p.cancelled && p.deadline > currentTime
       );
 
@@ -342,13 +374,13 @@ export const redisHelpers = {
   },
 
   // Get predictions by category (only live/real predictions, exclude test data)
-  async getPredictionsByCategory(category: string): Promise<RedisPrediction[]> {
+  async getPredictionsByCategory(category: string, chain: ChainKey = DEFAULT_CHAIN_KEY): Promise<RedisPrediction[]> {
     try {
-      const categoryIds = await redis.smembers(REDIS_KEYS.PREDICTIONS_BY_CATEGORY(category));
+      const categoryIds = await redis.smembers(REDIS_KEYS.PREDICTIONS_BY_CATEGORY(category, chain));
       const predictions: RedisPrediction[] = [];
 
       for (const id of categoryIds) {
-        const prediction = await this.getPrediction(id);
+        const prediction = await this.getPrediction(id, chain);
         if (prediction) {
           // Filter out test predictions
           const isTestPrediction = id.startsWith('test_') ||
@@ -369,11 +401,11 @@ export const redisHelpers = {
   },
 
   // Save user stake (supports both single stake and multi-token stakes)
-  async saveUserStake(stake: RedisUserStake | any): Promise<void> {
+  async saveUserStake(stake: RedisUserStake | any, chain: ChainKey = DEFAULT_CHAIN_KEY): Promise<void> {
     try {
-      const stakeKey = REDIS_KEYS.USER_STAKES(stake.user, stake.predictionId);
+      const stakeKey = REDIS_KEYS.USER_STAKES(stake.user, stake.predictionId, chain);
       await redis.set(stakeKey, JSON.stringify(stake));
-      console.log(`✅ User stake saved to Redis: ${stake.user} on ${stake.predictionId}`, stake);
+      console.log(`✅ User stake saved to Redis (${chain}): ${stake.user} on ${stake.predictionId}`, stake);
     } catch (error) {
       console.error('❌ Failed to save user stake to Redis:', error);
       throw error;
@@ -387,7 +419,7 @@ export const redisHelpers = {
       // Built from REDIS_KEYS so it carries the chain prefix. A literal here
       // matches nothing once a namespace exists, and the caller reads that as
       // "no stakes" rather than as an error.
-      const pattern = `${chainNamespace(chain)}user_stakes:*:${predictionId}`;
+      const pattern = REDIS_KEYS.PREDICTION_STAKES_PATTERN(predictionId, chain);
       console.log(`🔍 Searching for stakes with pattern: ${pattern}`);
       const keys = await redis.keys(pattern);
       console.log(`🔍 Found keys:`, keys);
@@ -441,11 +473,11 @@ export const redisHelpers = {
   },
 
   // Update market stats
-  async updateMarketStats(): Promise<void> {
+  async updateMarketStats(chain: ChainKey = DEFAULT_CHAIN_KEY): Promise<void> {
     try {
       // One scan, not two: active markets are a subset of all of them, so
       // deriving the subset in memory saves a second full read of Redis.
-      const allPredictions = await this.getAllPredictions();
+      const allPredictions = await this.getAllPredictions(chain);
       const currentTime = Math.floor(Date.now() / 1000);
       const activePredictions = allPredictions.filter(
         (p) => !p.resolved && !p.cancelled && p.deadline > currentTime
@@ -460,20 +492,20 @@ export const redisHelpers = {
         lastUpdated: Date.now()
       };
       
-      await redis.set(REDIS_KEYS.MARKET_STATS(), JSON.stringify(stats));
-      console.log('✅ Market stats updated in Redis');
-      
+      await redis.set(REDIS_KEYS.MARKET_STATS(chain), JSON.stringify(stats));
+      console.log(`✅ Market stats updated in Redis (${chain})`);
+
       // Also update compact stats cache
-      await this.updateCompactStats();
+      await this.updateCompactStats(chain);
     } catch (error) {
       console.error('❌ Failed to update market stats in Redis:', error);
     }
   },
 
   // Get market stats
-  async getMarketStats(): Promise<RedisMarketStats | null> {
+  async getMarketStats(chain: ChainKey = DEFAULT_CHAIN_KEY): Promise<RedisMarketStats | null> {
     try {
-      const data = await redis.get(REDIS_KEYS.MARKET_STATS());
+      const data = await redis.get(REDIS_KEYS.MARKET_STATS(chain));
       
       if (!data) return null;
       
@@ -492,16 +524,16 @@ export const redisHelpers = {
   },
 
   // Save real leaderboard data
-  async saveRealLeaderboardData(data: any): Promise<void> {
+  async saveRealLeaderboardData(data: any, chain: ChainKey = DEFAULT_CHAIN_KEY): Promise<void> {
     try {
       const leaderboardData = {
         ...data,
         lastUpdated: Date.now(),
         timestamp: new Date().toISOString()
       };
-      
-      await redis.set(REDIS_KEYS.REAL_LEADERBOARD, JSON.stringify(leaderboardData));
-      console.log('💾 Real leaderboard data saved to Redis');
+
+      await redis.set(REDIS_KEYS.REAL_LEADERBOARD(chain), JSON.stringify(leaderboardData));
+      console.log(`💾 Real leaderboard data saved to Redis (${chain})`);
     } catch (error) {
       console.error('❌ Failed to save real leaderboard data to Redis:', error);
       throw error;
@@ -509,9 +541,9 @@ export const redisHelpers = {
   },
 
   // Get real leaderboard data
-  async getRealLeaderboardData(): Promise<any | null> {
+  async getRealLeaderboardData(chain: ChainKey = DEFAULT_CHAIN_KEY): Promise<any | null> {
     try {
-      const data = await redis.get(REDIS_KEYS.REAL_LEADERBOARD);
+      const data = await redis.get(REDIS_KEYS.REAL_LEADERBOARD(chain));
       if (!data) return null;
       
       const parsed = typeof data === 'string' ? JSON.parse(data) : data;
@@ -523,27 +555,27 @@ export const redisHelpers = {
   },
 
   // Delete prediction (for cleanup)
-  async deletePrediction(id: string): Promise<void> {
+  async deletePrediction(id: string, chain: ChainKey = DEFAULT_CHAIN_KEY): Promise<void> {
     try {
-      const prediction = await this.getPrediction(id);
+      const prediction = await this.getPrediction(id, chain);
       if (!prediction) return;
 
       // Remove from all indexes
-      await redis.srem(REDIS_KEYS.PREDICTIONS(), id);
-      await redis.srem(REDIS_KEYS.PREDICTIONS_BY_CATEGORY(prediction.category), id);
-      await redis.srem(REDIS_KEYS.PREDICTIONS_BY_CREATOR(prediction.creator), id);
-      await redis.srem(REDIS_KEYS.PREDICTIONS_ACTIVE(), id);
-      await redis.srem(REDIS_KEYS.PREDICTIONS_RESOLVED(), id);
-      await redis.srem(REDIS_KEYS.PREDICTIONS_PENDING_APPROVAL(), id);
-      
+      await redis.srem(REDIS_KEYS.PREDICTIONS(chain), id);
+      await redis.srem(REDIS_KEYS.PREDICTIONS_BY_CATEGORY(prediction.category, chain), id);
+      await redis.srem(REDIS_KEYS.PREDICTIONS_BY_CREATOR(prediction.creator, chain), id);
+      await redis.srem(REDIS_KEYS.PREDICTIONS_ACTIVE(chain), id);
+      await redis.srem(REDIS_KEYS.PREDICTIONS_RESOLVED(chain), id);
+      await redis.srem(REDIS_KEYS.PREDICTIONS_PENDING_APPROVAL(chain), id);
+
       // Delete individual prediction
-      await redis.del(REDIS_KEYS.PREDICTION(id));
-      
+      await redis.del(REDIS_KEYS.PREDICTION(id, chain));
+
       // Update count
-      await redis.decr(REDIS_KEYS.PREDICTIONS_COUNT());
+      await redis.decr(REDIS_KEYS.PREDICTIONS_COUNT(chain));
 
       // Invalidate last, so a concurrent read cannot cache the pre-delete state.
-      invalidatePredictionsCache();
+      invalidatePredictionsCache(chain);
 
       console.log(`✅ Prediction ${id} deleted from Redis`);
     } catch (error) {
@@ -632,11 +664,11 @@ export const redisHelpers = {
   },
 
   // Update compact stats cache
-  async updateCompactStats(): Promise<void> {
+  async updateCompactStats(chain: ChainKey = DEFAULT_CHAIN_KEY): Promise<void> {
     try {
       const [marketStats, allPredictions] = await Promise.all([
-        this.getMarketStats(),
-        this.getAllPredictions()
+        this.getMarketStats(chain),
+        this.getAllPredictions(chain)
       ]);
 
       if (!marketStats) return;
@@ -651,7 +683,7 @@ export const redisHelpers = {
       });
 
       // Get active predictions for additional metrics
-      const activePredictions = await this.getActivePredictions();
+      const activePredictions = await this.getActivePredictions(chain);
       
       // Calculate additional metrics
       const now = Math.floor(Date.now() / 1000);
@@ -701,28 +733,28 @@ export const redisHelpers = {
         lastUpdated: Date.now()
       };
 
-      await redis.set(REDIS_KEYS.COMPACT_STATS(), JSON.stringify(compactStats));
-      console.log('✅ Compact stats updated in Redis');
+      await redis.set(REDIS_KEYS.COMPACT_STATS(chain), JSON.stringify(compactStats));
+      console.log(`✅ Compact stats updated in Redis (${chain})`);
     } catch (error) {
       console.error('❌ Failed to update compact stats in Redis:', error);
     }
   },
 
   // Get compact stats from cache
-  async getCompactStats(): Promise<any | null> {
+  async getCompactStats(chain: ChainKey = DEFAULT_CHAIN_KEY): Promise<any | null> {
     try {
-      const data = await redis.get(REDIS_KEYS.COMPACT_STATS());
-      
+      const data = await redis.get(REDIS_KEYS.COMPACT_STATS(chain));
+
       if (!data) return null;
-      
+
       const parsed = typeof data === 'string' ? JSON.parse(data) : data;
-      
+
       // Check if cache is fresh (less than 2 minutes old)
       const twoMinutesAgo = Date.now() - (2 * 60 * 1000);
       if (parsed.lastUpdated && parsed.lastUpdated < twoMinutesAgo) {
         console.log('🔄 Compact stats cache expired, updating...');
-        await this.updateCompactStats();
-        return await this.getCompactStats();
+        await this.updateCompactStats(chain);
+        return await this.getCompactStats(chain);
       }
       
       return parsed;

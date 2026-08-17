@@ -1,22 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { redisHelpers } from '../../../../lib/redis';
+import { chainFromRequest } from '@/lib/chains/requestChain';
 import { RedisMarketStats } from '../../../../lib/types/redis';
 
 // GET /api/market/stats - Get market statistics
 export async function GET(request: NextRequest) {
   try {
+    // Volume, participants and resolution rate are per chain. Absent ?chain=
+    // means Base, which is the only chain these numbers described until now.
+    const requested = chainFromRequest(request);
+    if (!requested.ok) {
+      return NextResponse.json({ success: false, error: requested.error }, { status: 400 });
+    }
+    const chain = requested.chain;
+
     // Get current market stats
-    let stats = await redisHelpers.getMarketStats();
-    
+    let stats = await redisHelpers.getMarketStats(chain);
+
     // If no stats exist, generate them
     if (!stats) {
-      await redisHelpers.updateMarketStats();
-      stats = await redisHelpers.getMarketStats();
+      await redisHelpers.updateMarketStats(chain);
+      stats = await redisHelpers.getMarketStats(chain);
     }
-    
+
     // Get additional real-time data
-    const activePredictions = await redisHelpers.getActivePredictions();
-    const allPredictions = await redisHelpers.getAllPredictions();
+    const activePredictions = await redisHelpers.getActivePredictions(chain);
+    const allPredictions = await redisHelpers.getAllPredictions(chain);
     
     // Calculate additional metrics
     const now = Math.floor(Date.now() / 1000);
@@ -85,6 +94,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: enhancedStats,
+      chain,
       timestamp: new Date().toISOString(),
       lastUpdated: stats?.lastUpdated ? new Date(stats.lastUpdated * 1000).toISOString() : null
     });

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { redis, redisHelpers } from '../../../../lib/redis';
+import { redis, redisHelpers, REDIS_KEYS } from '../../../../lib/redis';
 import { RedisUserStake } from '../../../../lib/types/redis';
 
 /**
@@ -26,7 +26,8 @@ export async function GET(request: NextRequest) {
     const normalizedAddress = userAddress.toLowerCase();
 
     // Get all predictions from Redis (same as leaderboard)
-    const allPredictions = await redisHelpers.getAllPredictions();
+    // $SWIPE only exists on Base, so this feature is Base's by construction.
+    const allPredictions = await redisHelpers.getAllPredictions('base');
 
     // Filter only V2 predictions (pred_v2_*)
     const v2Predictions = allPredictions.filter(p => p.id.startsWith('pred_v2_'));
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
 
     for (const prediction of v2Predictions) {
       // Get user's stake for this prediction (same key format as leaderboard)
-      const stakeKey = `user_stakes:${normalizedAddress}:${prediction.id}`;
+      const stakeKey = REDIS_KEYS.USER_STAKES(normalizedAddress, prediction.id, 'base');
       const stakeData = await redis.get(stakeKey);
 
       if (stakeData) {

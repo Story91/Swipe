@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     console.log('📋 Full prediction ID:', fullPredictionId);
     
     // Get prediction details first
-    const pred = await redisHelpers.getPrediction(fullPredictionId);
+    const pred = await redisHelpers.getPrediction(fullPredictionId, 'base');
     if (!pred) {
       console.log('❌ Prediction not found:', fullPredictionId);
       return NextResponse.json(
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     
     // Get all stakes for this prediction
     console.log('🔍 Getting stakes for prediction:', fullPredictionId);
-    const stakes = await redisHelpers.getUserStakes(fullPredictionId);
+    const stakes = await redisHelpers.getUserStakes(fullPredictionId, 'base');
     console.log('📋 Found stakes:', stakes.length);
     
     const claimed = [];

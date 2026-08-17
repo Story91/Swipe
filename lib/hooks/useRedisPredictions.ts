@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useActiveChain } from '../chains/activeChain';
+import type { ChainKey } from '../chains/types';
 import { RedisPrediction, RedisUserStake } from '../types/redis';
 
 // API endpoints
@@ -8,12 +10,26 @@ const API_ENDPOINTS = {
   MARKET_STATS: '/api/market/stats',
 } as const;
 
+/**
+ * Adds the active chain to a request.
+ *
+ * Every endpoint below reads a market keyspace, and the server defaults to Base
+ * when nothing is sent. That default is correct for Base and wrong everywhere
+ * else, so the switcher's chain has to travel with the request: without it a
+ * user on Robinhood is shown Base's markets, Base's pools and Base's positions,
+ * and nothing in the response says so.
+ */
+function withChain(url: string, chain: ChainKey): string {
+  return `${url}${url.includes('?') ? '&' : '?'}chain=${encodeURIComponent(chain)}`;
+}
+
 // Hook for managing Redis predictions
 export function useRedisPredictions() {
   const [predictions, setPredictions] = useState<RedisPrediction[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [marketStats, setMarketStats] = useState<any>(null);
+  const { chainKey } = useActiveChain();
 
   // Fetch all predictions
   const fetchPredictions = useCallback(async (filters?: {
@@ -31,7 +47,7 @@ export function useRedisPredictions() {
       if (filters?.creator) params.append('creator', filters.creator);
       
       const url = `${API_ENDPOINTS.PREDICTIONS}${params.toString() ? `?${params.toString()}` : ''}`;
-      const response = await fetch(url);
+      const response = await fetch(withChain(url, chainKey));
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -51,7 +67,9 @@ export function useRedisPredictions() {
     } finally {
       setLoading(false);
     }
-  }, []);
+    // chainKey is a real dependency: without it the callback keeps the chain it
+    // was created with and switching networks refetches the old one.
+  }, [chainKey]);
 
   // Create new prediction
   const createPrediction = useCallback(async (predictionData: {
@@ -226,7 +244,7 @@ export function useRedisPredictions() {
       if (userId) params.append('userId', userId);
       
       const url = `${API_ENDPOINTS.STAKES}?${params.toString()}`;
-      const response = await fetch(url);
+      const response = await fetch(withChain(url, chainKey));
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -243,12 +261,12 @@ export function useRedisPredictions() {
       console.error('❌ Failed to fetch user stakes:', err);
       return [];
     }
-  }, []);
+  }, [chainKey]);
 
   // Fetch market statistics
   const fetchMarketStats = useCallback(async () => {
     try {
-      const response = await fetch(API_ENDPOINTS.MARKET_STATS);
+      const response = await fetch(withChain(API_ENDPOINTS.MARKET_STATS, chainKey));
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -266,7 +284,7 @@ export function useRedisPredictions() {
       console.error('❌ Failed to fetch market stats:', err);
       return null;
     }
-  }, []);
+  }, [chainKey]);
 
   // Get prediction by ID
   const getPredictionById = useCallback((id: string) => {
@@ -333,16 +351,17 @@ export function useRedisPrediction(predictionId: string) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userStakes, setUserStakes] = useState<RedisUserStake[]>([]);
+  const { chainKey } = useActiveChain();
 
   // Fetch single prediction
   const fetchPrediction = useCallback(async () => {
     if (!predictionId) return;
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
-      const response = await fetch(`${API_ENDPOINTS.PREDICTIONS}?id=${predictionId}`);
+      const response = await fetch(withChain(`${API_ENDPOINTS.PREDICTIONS}?id=${predictionId}`, chainKey));
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -362,14 +381,14 @@ export function useRedisPrediction(predictionId: string) {
     } finally {
       setLoading(false);
     }
-  }, [predictionId]);
+  }, [predictionId, chainKey]);
 
   // Fetch user stakes for this prediction
   const fetchUserStakes = useCallback(async () => {
     if (!predictionId) return;
-    
+
     try {
-      const response = await fetch(`${API_ENDPOINTS.STAKES}?predictionId=${predictionId}`);
+      const response = await fetch(withChain(`${API_ENDPOINTS.STAKES}?predictionId=${predictionId}`, chainKey));
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -385,7 +404,7 @@ export function useRedisPrediction(predictionId: string) {
     } catch (err) {
       console.error('❌ Failed to fetch user stakes:', err);
     }
-  }, [predictionId]);
+  }, [predictionId, chainKey]);
 
   // Place stake on this prediction
   const placeStake = useCallback(async (stakeData: {

@@ -24,7 +24,9 @@ interface SharePreviewModalProps {
   onShare: () => Promise<void>;
   stakeInfo?: {
     amount: number;
-    token: 'ETH' | 'SWIPE';
+    // Collateral symbol, USDC on Base and USDG on Robinhood. Widened from
+    // 'ETH' | 'SWIPE' when bets stopped being able to pick their token.
+    token: string;
     isYes: boolean;
   };
 }

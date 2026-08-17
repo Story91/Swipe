@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createChainPublicClient } from '@/lib/chains';
-import { redis, redisHelpers } from '../../../../../lib/redis';
+import { redis, redisHelpers, REDIS_KEYS } from '../../../../../lib/redis';
 import { CONTRACTS } from '../../../../../lib/contract';
+
+/**
+ * Every read below goes to CONTRACTS.V2, which is a Base address, so the Redis
+ * records written from it are Base's. Named rather than left to the default: a
+ * sync route that inherits its chain is one config change away from writing one
+ * chain's contract state into another chain's keyspace, and the value would be
+ * right either way today, which is exactly what makes it worth pinning.
+ */
+const SYNC_CHAIN = 'base' as const;
 
 // Retry function with exponential backoff
 async function retryWithBackoff<T>(
@@ -121,7 +130,7 @@ export async function GET(request: NextRequest) {
         const endTimeStr = deadlineDate.toISOString().split('T')[1].split('.')[0];
 
         // Get existing prediction from Redis to preserve non-blockchain fields
-        const existingPrediction = await redisHelpers.getPrediction(predictionId);
+        const existingPrediction = await redisHelpers.getPrediction(predictionId, SYNC_CHAIN);
 
         // Create Redis prediction object - preserve existing non-blockchain fields
         const redisPrediction = {
@@ -154,7 +163,7 @@ export async function GET(request: NextRequest) {
         };
 
         // Save prediction to Redis
-        await redisHelpers.savePrediction(redisPrediction);
+        await redisHelpers.savePrediction(redisPrediction, SYNC_CHAIN);
         resolvedPredictions++;
 
         // Sync user stakes for each participant
@@ -211,7 +220,7 @@ export async function GET(request: NextRequest) {
               };
 
               // Save stake to Redis
-              const stakeKey = `user_stakes:${participant.toLowerCase()}:${predictionId}`;
+              const stakeKey = REDIS_KEYS.USER_STAKES(participant.toLowerCase(), predictionId, SYNC_CHAIN);
               await redis.set(stakeKey, JSON.stringify(stakeData));
               stakesCount++;
               

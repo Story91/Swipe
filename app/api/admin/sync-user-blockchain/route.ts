@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createChainPublicClient } from '@/lib/chains';
 import { CONTRACTS } from '../../../../lib/contract';
-import { redis, redisHelpers } from '../../../../lib/redis';
+import { redis, redisHelpers, REDIS_KEYS } from '../../../../lib/redis';
 
 // Initialize public client for Base network
 const publicClient = createChainPublicClient();
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
           allBlockchainStakes.push(blockchainStake);
 
           // Check if this stake exists in Redis
-          const stakeKey = `user_stakes:${userId.toLowerCase()}:${predictionId}`;
+          const stakeKey = REDIS_KEYS.USER_STAKES(userId.toLowerCase(), predictionId, 'base');
           const redisStakeData = await redis.get(stakeKey);
 
           if (!redisStakeData) {

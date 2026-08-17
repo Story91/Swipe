@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { redis, redisHelpers } from '../../../../lib/redis';
+import { redis, redisHelpers, REDIS_KEYS } from '../../../../lib/redis';
+import { chainFromRequest } from '@/lib/chains/requestChain';
 import { RedisUserStake, RedisPrediction } from '../../../../lib/types/redis';
 
 interface LargestStakesUser {
@@ -19,11 +20,20 @@ export async function GET(request: NextRequest) {
     const timeframe = searchParams.get('timeframe') || 'all';
     const forceRefresh = searchParams.get('forceRefresh') === 'true';
 
-    console.log(`🔍 Fetching largest stakes users (limit: ${limit}, timeframe: ${timeframe}, forceRefresh: ${forceRefresh})`);
+    // Absent ?chain= means Base, the identity namespace.
+    const requested = chainFromRequest(request);
+    if (!requested.ok) {
+      return NextResponse.json({ success: false, error: requested.error }, { status: 400 });
+    }
+    const chain = requested.chain;
 
-    // Check cache first (unless force refresh)
-    const cacheKey = `largest_stakes:${timeframe}:${limit}`;
-    
+    console.log(`🔍 Fetching largest stakes users (chain: ${chain}, limit: ${limit}, timeframe: ${timeframe}, forceRefresh: ${forceRefresh})`);
+
+    // Check cache first (unless force refresh). The cache key carries the chain
+    // too: this is an aggregate of one chain's stakes, and a shared key would
+    // let whichever chain was computed last answer for both.
+    const cacheKey = REDIS_KEYS.LARGEST_STAKES(timeframe, limit, chain);
+
     if (!forceRefresh) {
       const cachedData = await redis.get(cacheKey);
       if (cachedData) {
@@ -43,7 +53,7 @@ export async function GET(request: NextRequest) {
     console.log(`🔄 Computing largest stakes data for ${timeframe} (cache miss or force refresh)`);
 
     // Get all predictions
-    const allPredictions = await redisHelpers.getAllPredictions();
+    const allPredictions = await redisHelpers.getAllPredictions(chain);
 
     // Filter by timeframe if needed
     let filteredPredictions = allPredictions;
@@ -73,7 +83,7 @@ export async function GET(request: NextRequest) {
 
       for (const prediction of filteredPredictions) {
         // Get user's stake for this prediction
-        const stakeKey = `user_stakes:${userAddress}:${prediction.id}`;
+        const stakeKey = REDIS_KEYS.USER_STAKES(userAddress, prediction.id, chain);
         const stakeData = await redis.get(stakeKey);
 
         if (stakeData) {
@@ -137,6 +147,7 @@ export async function GET(request: NextRequest) {
       data: sortedUsers,
       count: sortedUsers.length,
       timeframe,
+      chain,
       cached: false,
       timestamp: new Date().toISOString()
     });

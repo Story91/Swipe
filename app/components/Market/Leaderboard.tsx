@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useActiveChain } from '@/lib/chains/activeChain';
 import { Avatar, AvatarFallback, AvatarImage } from '../../../components/ui/avatar';
 import { useFarcasterProfiles } from '../../../lib/hooks/useFarcasterProfiles';
 import '../../styles/sheet.css';
@@ -60,6 +61,10 @@ const compact = (amount: number) => {
 };
 
 export function Leaderboard() {
+  // The active chain travels with every read below. The server defaults to
+  // Base when no chain is sent, which is right for Base and wrong for every
+  // other chain, so without this a user on Robinhood sees Base's numbers.
+  const { chainKey } = useActiveChain();
   const [selectedPool, setSelectedPool] = useState<Pool>('eth');
   const [loading, setLoading] = useState(true);
   const [realData, setRealData] = useState<RealLeaderboardData | null>(null);
@@ -68,7 +73,7 @@ export function Leaderboard() {
     const loadRealData = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/leaderboard/real-data');
+        const response = await fetch(`/api/leaderboard/real-data?chain=${chainKey}`);
 
         if (response.ok) {
           const data = await response.json();

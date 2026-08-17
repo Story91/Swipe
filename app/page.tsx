@@ -42,6 +42,7 @@ import { ReadOnlyNotice } from "./components/Panels/ReadOnlyNotice";
 import { ComingSoonOverlay } from "./components/Panels/ComingSoonOverlay";
 import { ChainSwitcher } from "./components/Wallet/ChainSwitcher";
 import { WalletPicker } from "./components/Wallet/WalletPicker";
+import "./components/Markets/GridPage.css";
 
 /**
  * Everything below renders behind a dashboard switch or a modal, so at most one
@@ -389,19 +390,25 @@ export default function App() {
       <div
         className={`w-full mx-auto py-3 main-content-wrapper ${
           showGrid
-            // Grid mode: the container IS the page. Header blocks below cap
-            // themselves so they stay readable while the grid uses the width.
-            ? 'max-w-none px-4 lg:px-8'
+            // Grid mode: the container is the page, and every block inside it
+            // shares one column via .grid-shell. The flex column is what lets
+            // the browse sheet reach the bottom of the viewport.
+            ? 'max-w-none px-4 lg:px-8 flex flex-col flex-1'
             : isDesktop
               // Desktop swipe mode: one large card, not a phone-width column.
               ? 'max-w-[560px] px-2 sm:px-4 overflow-x-hidden'
               : 'max-w-[424px] px-2 sm:px-4 overflow-x-hidden'
         }`}
       >
+        {/* In grid mode the nav and the wallet controls share one header row;
+            `contents` keeps this wrapper out of the layout everywhere else, so
+            the swipe and mobile stacks are untouched. */}
+        <div className={showGrid ? 'grid-shell grid-topbar' : 'contents'}>
+
         {/* Wallet Connection and Admin/Help - Top */}
         <div
-          className={`flex justify-between items-center mb-3 ${
-            showGrid ? 'max-w-[1100px] w-full mx-auto' : ''
+          className={`flex justify-between items-center ${
+            showGrid ? 'grid-topbar__wallet' : 'mb-3'
           }`}
         >
           {/*
@@ -550,7 +557,7 @@ export default function App() {
 
         {/* Menu Bar - Right after Wallet */}
         <div
-          className={`mb-4 relative ${showGrid ? 'max-w-[1100px] w-full mx-auto' : ''}`}
+          className={`relative ${showGrid ? 'grid-topbar__nav' : 'mb-4'}`}
           style={{ overflow: 'visible' }}
         >
           <Menubar className="mini-app-menu">
@@ -626,6 +633,8 @@ export default function App() {
           </Menubar>
         </div>
 
+        </div>
+
         {/* Swipe mode only ever offers markets you can still bet on, so when
             none are open it is a dead end. This is the way out to the full
             history, which lives in grid mode. */}
@@ -640,13 +649,19 @@ export default function App() {
         )}
 
         {/* Main Content with Tinder Cards */}
-        <main className="flex-1">
+        <main className={showGrid ? 'flex-1 flex flex-col' : 'flex-1'}>
           {showGrid && (
-            <>
+            <div className="grid-shell grid-shell--fill">
               <ReadOnlyNotice />
               <ProductPanels layout="bar" />
-              <MarketGrid />
-            </>
+              {/* The filter bar, the cards and the pagination are three
+                  siblings out of MarketGrid; the sheet is what makes them one
+                  surface, and it is here rather than in that component because
+                  it is page layout, not grid layout. */}
+              <section className="market-sheet">
+                <MarketGrid />
+              </section>
+            </div>
           )}
 
           {activeDashboard === 'tinder' && !showGrid && (

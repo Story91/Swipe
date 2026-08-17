@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { redis } from '../../../../lib/redis';
+import { redis, REDIS_KEYS } from '../../../../lib/redis';
 
 // GET /api/debug/active-swipers - Check how many active swipers in active predictions
 export async function GET(request: NextRequest) {
@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
     console.log('🔍 Checking active swipers...');
 
     // Get all predictions
-    const predictionsSet = await redis.smembers('predictions');
+    const predictionsSet = await redis.smembers(REDIS_KEYS.PREDICTIONS('base'));
     console.log(`📊 Total predictions in Redis: ${predictionsSet.length}`);
 
     let activePredictions = 0;
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
     for (const predictionId of predictionsSet) {
       try {
-        const predictionData = await redis.get(`prediction:${predictionId}`);
+        const predictionData = await redis.get(REDIS_KEYS.PREDICTION(predictionId, 'base'));
         if (!predictionData) continue;
 
         const prediction = typeof predictionData === 'string' ? JSON.parse(predictionData) : predictionData;

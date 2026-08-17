@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { redis, redisHelpers } from '../../../lib/redis';
+import { redis, redisHelpers, REDIS_KEYS } from '../../../lib/redis';
+import { chainFromRequest } from '@/lib/chains/requestChain';
 import { RedisUserStake, RedisPrediction } from '../../../lib/types/redis';
 
 interface PortfolioItem {
@@ -59,8 +60,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // A portfolio is one chain's positions. Absent ?chain= means Base.
+    const requested = chainFromRequest(request);
+    if (!requested.ok) {
+      return NextResponse.json({ success: false, error: requested.error }, { status: 400 });
+    }
+    const chain = requested.chain;
+
     // Get all predictions
-    const allPredictions = await redisHelpers.getAllPredictions();
+    const allPredictions = await redisHelpers.getAllPredictions(chain);
 
     const portfolioItems: PortfolioItem[] = [];
     let totalInvested = 0;
@@ -72,7 +80,9 @@ export async function GET(request: NextRequest) {
 
     // Process each prediction to find user's stakes
     for (const prediction of allPredictions) {
-      const stakeKey = `user_stakes:${userAddress}:${prediction.id}`;
+      // Built from REDIS_KEYS rather than spelled out, so it carries the chain
+      // prefix. A literal here reads Base's stakes whatever chain was asked for.
+      const stakeKey = REDIS_KEYS.USER_STAKES(userAddress, prediction.id, chain);
       const stakeData = await redis.get(stakeKey);
 
       if (stakeData) {

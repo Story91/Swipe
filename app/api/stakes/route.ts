@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { redis, redisHelpers, REDIS_KEYS } from '../../../lib/redis';
+import { chainFromBody, chainFromRequest } from '@/lib/chains/requestChain';
 import { RedisUserStake } from '../../../lib/types/redis';
 
 // GET /api/stakes - Get stakes for a specific prediction or all user stakes
 export async function GET(request: NextRequest) {
   try {
+    // Positions are per chain. Absent ?chain= means Base, which is where every
+    // stake written before namespacing lives.
+    const requested = chainFromRequest(request);
+    if (!requested.ok) {
+      return NextResponse.json({ success: false, error: requested.error }, { status: 400 });
+    }
+    const chain = requested.chain;
+
     const { searchParams } = new URL(request.url);
     const predictionId = searchParams.get('predictionId');
     const userId = searchParams.get('userId');
@@ -18,7 +27,7 @@ export async function GET(request: NextRequest) {
       // Built from REDIS_KEYS so it follows the chain namespace. A literal
       // pattern here would match zero keys the moment a namespace exists, and
       // the route would answer 200 with an empty position list.
-      const userStakePattern = REDIS_KEYS.USER_STAKES_PATTERN(userId);
+      const userStakePattern = REDIS_KEYS.USER_STAKES_PATTERN(userId, chain);
       const stakeKeys = await redis.keys(userStakePattern);
       
       console.log(`📊 Found ${stakeKeys.length} stake keys for user ${userId}`);
@@ -108,9 +117,9 @@ export async function GET(request: NextRequest) {
     
     if (userId) {
       // Get specific user's stake for this prediction
-      const stakeKey = REDIS_KEYS.USER_STAKES(userId, predictionId);
+      const stakeKey = REDIS_KEYS.USER_STAKES(userId, predictionId, chain);
       const data = await redis.get(stakeKey);
-      
+
       
       if (data) {
         const stake = typeof data === 'string' ? JSON.parse(data) : data;
@@ -152,11 +161,11 @@ export async function GET(request: NextRequest) {
       }
     } else {
       // Get all stakes for this prediction
-      stakes = await redisHelpers.getUserStakes(predictionId);
+      stakes = await redisHelpers.getUserStakes(predictionId, chain);
     }
 
     // Get prediction data to calculate canClaim
-    const predictionData = await redis.get(REDIS_KEYS.PREDICTION(predictionId));
+    const predictionData = await redis.get(REDIS_KEYS.PREDICTION(predictionId, chain));
     let prediction: any = null;
     if (predictionData) {
       prediction = typeof predictionData === 'string' ? JSON.parse(predictionData) : predictionData;
@@ -219,16 +228,25 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
     const { userId, predictionId, updates, tokenType } = body;
-    
+
     if (!userId || !predictionId) {
       return NextResponse.json(
         { success: false, error: 'User ID and Prediction ID are required' },
         { status: 400 }
       );
     }
-    
+
+    // A claim marks one chain's position claimed. Getting this wrong would mark
+    // the other chain's position on the same market number instead, and that
+    // one is still unclaimed money.
+    const requested = chainFromBody(body);
+    if (!requested.ok) {
+      return NextResponse.json({ success: false, error: requested.error }, { status: 400 });
+    }
+    const chain = requested.chain;
+
     // Get existing stake
-    const stakeKey = REDIS_KEYS.USER_STAKES(userId, predictionId);
+    const stakeKey = REDIS_KEYS.USER_STAKES(userId, predictionId, chain);
     const existingData = await redis.get(stakeKey);
     
     if (!existingData) {
@@ -275,7 +293,7 @@ export async function PUT(request: NextRequest) {
     }
     
     // Save updated stake
-    await redisHelpers.saveUserStake(updatedStake);
+    await redisHelpers.saveUserStake(updatedStake, chain);
     
     return NextResponse.json({
       success: true,

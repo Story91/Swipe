@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { NextRequest } from 'next/server';
 import { redisHelpers } from '@/lib/redis';
+import { chainFromRequest } from '@/lib/chains/requestChain';
 
 // Helper function to generate chart path
 function generateChartPath(prices: number[], width: number, height: number): string {
@@ -102,9 +103,13 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    
+
+    // Same reasoning as the other card renderer: the chain picks the market,
+    // and an unknown one renders the fallback image rather than an error body.
+    const requested = chainFromRequest(request);
+
     // Fetch prediction data
-    const prediction = await redisHelpers.getPrediction(id);
+    const prediction = requested.ok ? await redisHelpers.getPrediction(id, requested.chain) : null;
     
     if (!prediction) {
       return new ImageResponse(

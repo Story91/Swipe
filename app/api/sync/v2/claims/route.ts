@@ -6,6 +6,15 @@ import { redisHelpers } from '../../../../../lib/redis';
 // Initialize public client for Base network
 const publicClient = createChainPublicClient();
 
+/**
+ * Every read below goes to CONTRACTS.V2, which is a Base address, so the Redis
+ * records written from it are Base's. Named rather than left to the default: a
+ * sync route that inherits its chain is one config change away from writing one
+ * chain's contract state into another chain's keyspace, and the value would be
+ * right either way today, which is exactly what makes it worth pinning.
+ */
+const SYNC_CHAIN = 'base' as const;
+
 // Helper function for retry with backoff
 async function retryWithBackoff<T>(
   fn: () => Promise<T>,
@@ -37,7 +46,7 @@ export async function GET(request: NextRequest) {
     console.log('🔄 Starting V2 claims sync...');
 
     // Get all resolved predictions from Redis
-    const allPredictions = await redisHelpers.getAllPredictions();
+    const allPredictions = await redisHelpers.getAllPredictions(SYNC_CHAIN);
     const resolvedPredictions = allPredictions.filter(p => p.resolved || p.cancelled);
     
     console.log(`📊 Found ${resolvedPredictions.length} resolved predictions to check claims for`);
@@ -54,7 +63,7 @@ export async function GET(request: NextRequest) {
         console.log(`🔍 Checking claims for prediction ${prediction.id} (numeric: ${numericId})...`);
 
         // Get all stakes for this prediction from Redis
-        const stakes = await redisHelpers.getUserStakes(prediction.id);
+        const stakes = await redisHelpers.getUserStakes(prediction.id, SYNC_CHAIN);
         
         if (stakes.length === 0) {
           console.log(`⚠️ No stakes found for prediction ${prediction.id}`);
@@ -113,7 +122,7 @@ export async function GET(request: NextRequest) {
 
             // Save updated stake if needed
             if (needsUpdate) {
-              await redisHelpers.saveUserStake(updatedStake);
+              await redisHelpers.saveUserStake(updatedStake, SYNC_CHAIN);
               syncedClaims++;
               console.log(`✅ Fixed claim status for user ${stake.user} in prediction ${prediction.id}`);
             } else {

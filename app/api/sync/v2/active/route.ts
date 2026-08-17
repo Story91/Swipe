@@ -6,6 +6,15 @@ import { redisHelpers } from '../../../../../lib/redis';
 // Initialize public client for Base network
 const publicClient = createChainPublicClient();
 
+/**
+ * Every read below goes to CONTRACTS.V2, which is a Base address, so the Redis
+ * records written from it are Base's. Named rather than left to the default: a
+ * sync route that inherits its chain is one config change away from writing one
+ * chain's contract state into another chain's keyspace, and the value would be
+ * right either way today, which is exactly what makes it worth pinning.
+ */
+const SYNC_CHAIN = 'base' as const;
+
 // Helper function for retry with backoff
 async function retryWithBackoff<T>(
   fn: () => Promise<T>,
@@ -111,7 +120,7 @@ export async function GET(request: NextRequest) {
         const endTimeStr = deadlineDate.toISOString().split('T')[1].split('.')[0];
 
         // Get existing prediction from Redis to preserve non-blockchain fields
-        const existingPrediction = await redisHelpers.getPrediction(predictionId);
+        const existingPrediction = await redisHelpers.getPrediction(predictionId, SYNC_CHAIN);
 
         // Create Redis prediction object - preserve existing non-blockchain fields
         const redisPrediction = {
@@ -144,7 +153,7 @@ export async function GET(request: NextRequest) {
         };
 
         // Save prediction to Redis
-        await redisHelpers.savePrediction(redisPrediction);
+        await redisHelpers.savePrediction(redisPrediction, SYNC_CHAIN);
         activePredictions++;
 
         // Sync user stakes for each participant
@@ -201,7 +210,7 @@ export async function GET(request: NextRequest) {
 
             // Save stake only if user has stakes
             if (userStake.ETH || userStake.SWIPE) {
-              await redisHelpers.saveUserStake(userStake);
+              await redisHelpers.saveUserStake(userStake, SYNC_CHAIN);
             }
 
           } catch (stakeError) {
@@ -219,7 +228,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Update market stats
-    await redisHelpers.updateMarketStats();
+    await redisHelpers.updateMarketStats(SYNC_CHAIN);
 
     console.log(`🎉 V2 active sync completed! Synced: ${activePredictions} active predictions, ${syncedStakes} stakes, Errors: ${errorsCount}`);
 

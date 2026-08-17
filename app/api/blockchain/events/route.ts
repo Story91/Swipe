@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createChainPublicClient } from '@/lib/chains';
 import { CONTRACTS } from '../../../../lib/contract';
-import { redisHelpers, redis } from '../../../../lib/redis';
+import { redisHelpers, redis, REDIS_KEYS } from '../../../../lib/redis';
 
 // Initialize public client for Base network
 const publicClient = createChainPublicClient();
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
               }) as any
             ]);
 
-            const stakeKey = `user_stakes:${participant.toLowerCase()}:${predictionKey}`;
+            const stakeKey = REDIS_KEYS.USER_STAKES(participant.toLowerCase(), predictionKey, 'base');
             
             // V2 format - multi-token stake (all predictions use V2).
             // userStakes / userSwipeStakes return the struct {yesAmount, noAmount, claimed}
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
               if (eventType === 'stake_placed' && userId && participant.toLowerCase() === userId.toLowerCase()) {
                 try {
                   // Get prediction data for transaction record
-                  const predictionData = await redis.get(`prediction:${predictionKey}`);
+                  const predictionData = await redis.get(REDIS_KEYS.PREDICTION(predictionKey, 'base'));
                   let predictionQuestion = `Prediction #${predictionId}`;
                   if (predictionData) {
                     const prediction = typeof predictionData === 'string' ? JSON.parse(predictionData) : predictionData;
@@ -268,10 +268,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Save to Redis
-    await redisHelpers.savePrediction(redisPrediction);
+    await redisHelpers.savePrediction(redisPrediction, 'base');
     
     // Update market stats
-    await redisHelpers.updateMarketStats();
+    await redisHelpers.updateMarketStats('base');
 
     console.log(`✅ Event ${eventType} handled for prediction ${predictionId}: ${redisPrediction.question.substring(0, 50)}...`);
 

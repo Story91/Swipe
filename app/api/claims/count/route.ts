@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { redis, redisHelpers, REDIS_KEYS } from '../../../../lib/redis';
+import { chainFromRequest } from '@/lib/chains/requestChain';
 
 /**
  * GET /api/claims/count?userId=0x...
@@ -23,8 +24,16 @@ export async function GET(request: NextRequest) {
 
     const normalizedUserId = userId.toLowerCase();
 
+    // The badge counts what is claimable on one chain. Absent ?chain= means
+    // Base, so the badge keeps meaning exactly what it meant before.
+    const requested = chainFromRequest(request);
+    if (!requested.ok) {
+      return NextResponse.json({ success: false, error: requested.error }, { status: 400 });
+    }
+    const chain = requested.chain;
+
     // Get all predictions at once (cached and index-backed)
-    const allPredictions = await redisHelpers.getAllPredictions();
+    const allPredictions = await redisHelpers.getAllPredictions(chain);
     const predictionsMap = new Map(allPredictions.map(p => [p.id, p]));
 
     // Candidate stake keys come from the participants list each prediction
@@ -34,9 +43,15 @@ export async function GET(request: NextRequest) {
     // entire keyspace and blocks the server, and this endpoint is polled every
     // 30 seconds by every open tab — so the cost scaled with users online, not
     // with the work actually needed.
-    const stakeKeys = allPredictions
+    //
+    // The prediction id is carried alongside the key rather than parsed back
+    // out of it. Splitting on ':' and taking everything after the second colon
+    // only works while the key has no prefix; on a namespaced chain it would
+    // hand back the user address as the market id and every lookup would miss.
+    const stakeEntries = allPredictions
       .filter(p => (p.participants || []).some(a => a.toLowerCase() === normalizedUserId))
-      .map(p => `user_stakes:${normalizedUserId}:${p.id}`);
+      .map(p => ({ key: REDIS_KEYS.USER_STAKES(normalizedUserId, p.id, chain), predictionId: p.id }));
+    const stakeKeys = stakeEntries.map(e => e.key);
 
     if (stakeKeys.length === 0) {
       return NextResponse.json({
@@ -51,10 +66,10 @@ export async function GET(request: NextRequest) {
 
     // Fetch stakes in batches, one round trip per batch rather than per key.
     const batchSize = 50;
-    for (let i = 0; i < stakeKeys.length; i += batchSize) {
-      const batchKeys = stakeKeys.slice(i, i + batchSize);
-      const batchValues = (await redis.mget(...batchKeys)) as unknown[];
-      const stakePromises = batchKeys.map(async (key, batchIndex) => {
+    for (let i = 0; i < stakeEntries.length; i += batchSize) {
+      const batch = stakeEntries.slice(i, i + batchSize);
+      const batchValues = (await redis.mget(...batch.map(e => e.key))) as unknown[];
+      const stakePromises = batch.map(async ({ key, predictionId }, batchIndex) => {
         try {
           const data = batchValues[batchIndex];
           if (!data) return null;
@@ -64,10 +79,8 @@ export async function GET(request: NextRequest) {
             return null;
           }
 
-          // Extract prediction ID from key: user_stakes:userId:predictionId
-          const predictionId = key.split(':').slice(2).join(':');
           const prediction = predictionsMap.get(predictionId);
-          
+
           if (!prediction) return null;
 
           // Must be resolved OR cancelled
@@ -175,7 +188,7 @@ export async function GET(request: NextRequest) {
     if (usdcPredictions.length > 0) {
       // Check USDC stakes from Redis
       for (const prediction of usdcPredictions) {
-        const stakeKey = REDIS_KEYS.USER_STAKES(normalizedUserId, prediction.id);
+        const stakeKey = REDIS_KEYS.USER_STAKES(normalizedUserId, prediction.id, chain);
         const stakeData = await redis.get(stakeKey);
         const predAny = prediction as any;
         

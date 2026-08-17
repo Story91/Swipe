@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useActiveChain } from '@/lib/chains/activeChain';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import './CompactStats.css';
@@ -26,6 +27,10 @@ interface CompactStatsData {
 }
 
 export function CompactStats() {
+  // The active chain travels with every read below. The server defaults to
+  // Base when no chain is sent, which is right for Base and wrong for every
+  // other chain, so without this a user on Robinhood sees Base's numbers.
+  const { chainKey } = useActiveChain();
   const [statsData, setStatsData] = useState<CompactStatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +43,7 @@ export function CompactStats() {
 
         console.log('🔄 Fetching compact stats...');
         // Single API call to get all data
-        const response = await fetch('/api/market/compact-stats');
+        const response = await fetch(`/api/market/compact-stats?chain=${chainKey}`);
         console.log('📊 Compact stats response status:', response.status);
         
         if (!response.ok) {

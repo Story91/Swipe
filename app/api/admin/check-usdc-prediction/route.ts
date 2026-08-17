@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     const redisId = `pred_v2_${numericId}`;
     
     // Get prediction data
-    const predData = await redis.get(REDIS_KEYS.PREDICTION(redisId));
+    const predData = await redis.get(REDIS_KEYS.PREDICTION(redisId, 'base'));
     if (!predData) {
       return NextResponse.json({
         success: false,
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     const usdcParticipants = predAny.usdcParticipants || [];
     
     // Get all stakes for this prediction
-    const stakePattern = `user_stakes:*:${redisId}`;
+    const stakePattern = REDIS_KEYS.PREDICTION_STAKES_PATTERN(redisId, 'base');
     const allStakeKeys = await redis.keys(stakePattern);
     
     const usdcStakes: any[] = [];

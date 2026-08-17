@@ -84,7 +84,7 @@ export function addressUrl(key: ChainKey, address: string): string {
  * The exit value of a position, computed the way the contract computes it.
  *
  * V3 dropped the old pool's calculateExitValue view, so this is the client-side
- * copy of contracts/PredictionMarket_V3.sol exitEarly. Kept in one place because
+ * copy of contracts/PredictionMarket_V4.sol exitEarly. Kept in one place because
  * two copies of payout maths drift, and this one decides what a user is told
  * they will receive.
  *

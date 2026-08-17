@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { NextRequest, NextResponse } from 'next/server';
 import { redisHelpers, redis, REDIS_KEYS } from '@/lib/redis';
+import { chainFromRequest } from '@/lib/chains/requestChain';
 
 export const runtime = 'edge';
 
@@ -10,7 +11,13 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     let userAddress = searchParams.get('user');
-    
+
+    // PNL is per chain, since it is summed from one chain's pools. An unknown
+    // chain falls back rather than 400s, because this endpoint returns an image
+    // and a crawler renders whatever body it is handed.
+    const requestedChain = chainFromRequest(request);
+    const chain = requestedChain.ok ? requestedChain.chain : 'base';
+
     // If user param not in query, try to extract from referer
     // Farcaster crawler will include the page URL with ?user=0x... in the referer header
     if (!userAddress) {
@@ -87,7 +94,7 @@ export async function GET(request: NextRequest) {
     // Fetch all predictions and calculate PNL for user
     let allPredictions;
     try {
-      allPredictions = await redisHelpers.getAllPredictions();
+      allPredictions = await redisHelpers.getAllPredictions(chain);
       if (!allPredictions || allPredictions.length === 0) {
         console.warn('No predictions found in Redis');
         // Return default image if no predictions
@@ -159,7 +166,7 @@ export async function GET(request: NextRequest) {
     // Calculate PNL from all predictions
     for (const prediction of allPredictions) {
       try {
-        const stakes = await redisHelpers.getUserStakes(prediction.id);
+        const stakes = await redisHelpers.getUserStakes(prediction.id, chain);
         const userStakes = stakes.filter(
           (s) => s.user.toLowerCase() === userAddress.toLowerCase()
         );

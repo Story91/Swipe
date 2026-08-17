@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadBufferToImgBB } from '@/lib/imgbb';
 import { redisHelpers } from '@/lib/redis';
+import { chainFromRequest } from '@/lib/chains/requestChain';
 
 const BASE_URL = process.env.NEXT_PUBLIC_URL || 'https://theswipe.app';
 
@@ -15,11 +16,18 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    
-    console.log(`📸 Generating fresh OG image for USDC prediction: ${id}`);
-    
+
+    // Which chain's market this card is for. Absent means Base.
+    const requested = chainFromRequest(request);
+    if (!requested.ok) {
+      return NextResponse.json({ error: requested.error }, { status: 400 });
+    }
+    const chain = requested.chain;
+
+    console.log(`📸 Generating fresh OG image for USDC prediction: ${id} (${chain})`);
+
     // Check if prediction exists
-    const prediction = await redisHelpers.getPrediction(id);
+    const prediction = await redisHelpers.getPrediction(id, chain);
     if (!prediction) {
       return NextResponse.json({ error: 'Prediction not found' }, { status: 404 });
     }
@@ -53,7 +61,7 @@ export async function POST(
     
     // Save URL to Redis so layout.tsx can use it for og:image meta tag
     prediction.ogImageUrl = permanentUrl;
-    await redisHelpers.savePrediction(prediction);
+    await redisHelpers.savePrediction(prediction, chain);
     
     console.log(`💾 Saved ogImageUrl to Redis for USDC prediction: ${id}`);
     

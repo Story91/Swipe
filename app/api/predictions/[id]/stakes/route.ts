@@ -21,8 +21,11 @@ export async function GET(
     // Initialize public client for Base network
     const publicClient = createChainPublicClient();
 
-    // Get prediction data to determine contract version
-    const prediction = await redisHelpers.getPrediction(predictionId);
+    // Pinned to Base, and not from a query parameter. Everything below reads
+    // CONTRACTS.V1 / CONTRACTS.V2, which are Base addresses resolved at build
+    // time, so the Redis record has to be the Base one or the route would be
+    // answering about one chain's market with another chain's positions.
+    const prediction = await redisHelpers.getPrediction(predictionId, 'base');
     if (!prediction) {
       return NextResponse.json(
         { success: false, error: 'Prediction not found' },

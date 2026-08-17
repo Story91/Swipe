@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useActiveChain } from '@/lib/chains/activeChain';
 
 /**
  * Data behind the product panels.
@@ -37,6 +38,10 @@ interface PanelData {
 }
 
 export function useProductPanelData(address?: string): PanelData {
+  // The active chain travels with every read below. The server defaults to
+  // Base when no chain is sent, which is right for Base and wrong for every
+  // other chain, so without this a user on Robinhood sees Base's numbers.
+  const { chainKey } = useActiveChain();
   const [stats, setStats] = useState<MarketStats | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [claimCount, setClaimCount] = useState<number | null>(null);
@@ -48,8 +53,8 @@ export function useProductPanelData(address?: string): PanelData {
     const load = async () => {
       // Both are independent; one failing must not blank the other.
       const [statsRes, activityRes] = await Promise.allSettled([
-        fetch('/api/market/compact-stats').then((r) => r.json()),
-        fetch('/api/activity').then((r) => r.json()),
+        fetch(`/api/market/compact-stats?chain=${chainKey}`).then((r) => r.json()),
+        fetch(`/api/activity?chain=${chainKey}`).then((r) => r.json()),
       ]);
 
       if (cancelled) return;
@@ -76,7 +81,7 @@ export function useProductPanelData(address?: string): PanelData {
     }
     let cancelled = false;
 
-    fetch(`/api/claims/count?userId=${address}`)
+    fetch(`/api/claims/count?userId=${address}&chain=${chainKey}`)
       .then((r) => r.json())
       .then((json) => {
         if (!cancelled && json?.success) setClaimCount(json.count ?? 0);

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
+import { useActiveChain } from '@/lib/chains/activeChain';
 
 interface LeaderboardUser {
   rank: number;
@@ -17,6 +18,10 @@ interface LeaderboardUser {
 }
 
 export function Leaderboard() {
+  // The active chain travels with every read below. The server defaults to
+  // Base when no chain is sent, which is right for Base and wrong for every
+  // other chain, so without this a user on Robinhood sees Base's numbers.
+  const { chainKey } = useActiveChain();
   const { address } = useAccount();
   const [timeframe, setTimeframe] = useState<'7d' | '30d' | 'all'>('30d');
   const [sortBy, setSortBy] = useState<'profit' | 'winRate' | 'bets'>('profit');
@@ -30,7 +35,7 @@ export function Leaderboard() {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(`/api/leaderboard?timeframe=${timeframe}&limit=20`);
+        const response = await fetch(`/api/leaderboard?timeframe=${timeframe}&limit=20&chain=${chainKey}`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }

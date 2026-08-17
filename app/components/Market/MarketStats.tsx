@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useActiveChain } from '@/lib/chains/activeChain';
 import { Avatar, AvatarFallback, AvatarImage } from '../../../components/ui/avatar';
 import { useFarcasterProfiles } from '../../../lib/hooks/useFarcasterProfiles';
 import './MarketStats.css';
@@ -32,6 +33,10 @@ interface LargestStakesUser {
 }
 
 export function MarketStats() {
+  // The active chain travels with every read below. The server defaults to
+  // Base when no chain is sent, which is right for Base and wrong for every
+  // other chain, so without this a user on Robinhood sees Base's numbers.
+  const { chainKey } = useActiveChain();
   const [selectedTimeframe, setSelectedTimeframe] = useState<'1H' | '24H' | '7D' | '30D'>('24H');
   const [marketData, setMarketData] = useState<MarketStatsData | null>(null);
   const [largestStakes, setLargestStakes] = useState<LargestStakesUser[]>([]);
@@ -48,7 +53,7 @@ export function MarketStats() {
         setLoading(true);
         setError(null);
 
-        const response = await fetch('/api/market/stats');
+        const response = await fetch(`/api/market/stats?chain=${chainKey}`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -59,11 +64,11 @@ export function MarketStats() {
           const stats = result.data;
 
           // Get all predictions for total volume calculation
-          const allPredictionsResponse = await fetch('/api/predictions');
+          const allPredictionsResponse = await fetch(`/api/predictions?chain=${chainKey}`);
           const allPredictionsResult = await allPredictionsResponse.json();
 
           // Get active predictions for trending data
-          const activePredictionsResponse = await fetch('/api/predictions?status=active');
+          const activePredictionsResponse = await fetch(`/api/predictions?status=active&chain=${chainKey}`);
           const activePredictionsResult = await activePredictionsResponse.json();
 
           if (allPredictionsResult.success && activePredictionsResult.success) {
@@ -121,7 +126,7 @@ export function MarketStats() {
         }
 
         // Fetch largest stakes data
-        const largestStakesResponse = await fetch('/api/market/largest-stakes?limit=10');
+        const largestStakesResponse = await fetch(`/api/market/largest-stakes?limit=10&chain=${chainKey}`);
         if (largestStakesResponse.ok) {
           const largestStakesResult = await largestStakesResponse.json();
           if (largestStakesResult.success) {

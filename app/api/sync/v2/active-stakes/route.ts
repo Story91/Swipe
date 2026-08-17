@@ -7,6 +7,15 @@ import { redisHelpers } from '../../../../../lib/redis';
 const publicClient = createChainPublicClient();
 
 /**
+ * Every read below goes to CONTRACTS.V2, which is a Base address, so the Redis
+ * records written from it are Base's. Named rather than left to the default: a
+ * sync route that inherits its chain is one config change away from writing one
+ * chain's contract state into another chain's keyspace, and the value would be
+ * right either way today, which is exactly what makes it worth pinning.
+ */
+const SYNC_CHAIN = 'base' as const;
+
+/**
  * This route is POSTed on every page mount by useHybridPredictions, so without
  * a throttle a burst of visitors means a burst of blockchain reads for the same
  * data. One sync per window is plenty: stakes also resync after each bet.
@@ -31,7 +40,7 @@ export async function POST(request: NextRequest) {
     console.log('🔄 Starting active predictions stakes sync...');
 
     // Get all predictions from Redis first
-    const allPredictions = await redisHelpers.getAllPredictions();
+    const allPredictions = await redisHelpers.getAllPredictions(SYNC_CHAIN);
     
     // Filter only genuinely active predictions. The deadline check matters:
     // without it this walked every unresolved market ever created, including
@@ -107,7 +116,7 @@ export async function POST(request: NextRequest) {
         };
         
         // Save updated prediction to Redis
-        await redisHelpers.savePrediction(updatedPrediction);
+        await redisHelpers.savePrediction(updatedPrediction, SYNC_CHAIN);
         
         console.log(`✅ Synced stakes for prediction ${numericId}:`, {
           question: prediction.question.substring(0, 30) + '...',

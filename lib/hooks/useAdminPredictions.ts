@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useActiveChain } from '../chains/activeChain';
 import { RedisPrediction } from '../types/redis';
 
 // Admin-specific hook for optimized prediction loading
@@ -8,6 +9,10 @@ export function useAdminPredictions() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadedAll, setLoadedAll] = useState(false);
+  // The active chain travels with every read. The server defaults to Base
+  // when nothing is sent, which is right for Base and wrong for every other
+  // chain, so a user on Robinhood would silently be shown Base's markets.
+  const { chainKey } = useActiveChain();
 
   // Fetch only essential predictions (active + expired) - FAST
   const fetchEssentialPredictions = useCallback(async () => {
@@ -18,7 +23,7 @@ export function useAdminPredictions() {
       console.log('🚀 Fetching essential admin predictions (active + expired)...');
       
       // Fetch only active and expired predictions
-      const response = await fetch('/api/predictions?admin_essential=true');
+      const response = await fetch(`/api/predictions?admin_essential=true&chain=${chainKey}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -53,7 +58,7 @@ export function useAdminPredictions() {
     try {
       console.log('📊 Fetching ALL predictions for admin...');
       
-      const response = await fetch('/api/predictions');
+      const response = await fetch(`/api/predictions?chain=${chainKey}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

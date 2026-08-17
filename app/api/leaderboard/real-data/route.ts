@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { redisHelpers } from '../../../../lib/redis';
+import { chainFromRequest } from '@/lib/chains/requestChain';
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('🔍 Getting real leaderboard data from Redis...');
-    
-    const realData = await redisHelpers.getRealLeaderboardData();
-    
+    // Absent ?chain= means Base, where the collected data already sits.
+    const requested = chainFromRequest(request);
+    if (!requested.ok) {
+      return NextResponse.json({ success: false, error: requested.error }, { status: 400 });
+    }
+
+    console.log(`🔍 Getting real leaderboard data from Redis (${requested.chain})...`);
+
+    const realData = await redisHelpers.getRealLeaderboardData(requested.chain);
+
     if (!realData) {
       return NextResponse.json({
         success: false,

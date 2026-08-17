@@ -6,6 +6,15 @@ import { redisHelpers } from '../../../../lib/redis';
 // Initialize public client for Base network
 const publicClient = createChainPublicClient();
 
+/**
+ * Every read below goes to CONTRACTS.V2, which is a Base address, so the Redis
+ * records written from it are Base's. Named rather than left to the default: a
+ * sync route that inherits its chain is one config change away from writing one
+ * chain's contract state into another chain's keyspace, and the value would be
+ * right either way today, which is exactly what makes it worth pinning.
+ */
+const SYNC_CHAIN = 'base' as const;
+
 // POST /api/predictions/auto-sync - Automatically sync the latest prediction after creation
 export async function POST(request: NextRequest) {
   try {
@@ -139,10 +148,10 @@ export async function POST(request: NextRequest) {
     };
 
     // Save to Redis
-    await redisHelpers.savePrediction(redisPrediction);
+    await redisHelpers.savePrediction(redisPrediction, SYNC_CHAIN);
     
     // Update market stats
-    await redisHelpers.updateMarketStats();
+    await redisHelpers.updateMarketStats(SYNC_CHAIN);
 
     console.log(`✅ Auto-synced prediction ${latestPredictionId} to Redis: ${question.substring(0, 50)}...`);
 

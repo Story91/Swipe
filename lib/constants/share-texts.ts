@@ -102,7 +102,9 @@ export function getRandomStakeCTA(): string {
 export function buildStakeShareText(
   predictionText: string,
   formattedAmount: string,
-  token: 'ETH' | 'SWIPE',
+  // The collateral symbol of the chain the bet was signed on, USDC on Base and
+  // USDG on Robinhood. It was 'ETH' | 'SWIPE' while a bet could pick its token.
+  token: string,
   predictionUrl?: string,
   platform: 'farcaster' | 'twitter' = 'farcaster'
 ): { text: string; url: string } {

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAccount } from 'wagmi';
+import { useActiveChain } from '@/lib/chains/activeChain';
 import '../../styles/sheet.css';
 import './ActiveBets.css';
 
@@ -67,6 +68,10 @@ function timeLeft(deadlineSeconds: number) {
 }
 
 export function ActiveBets() {
+  // The active chain travels with every read below. The server defaults to
+  // Base when no chain is sent, which is right for Base and wrong for every
+  // other chain, so without this a user on Robinhood sees Base's numbers.
+  const { chainKey } = useActiveChain();
   const { address } = useAccount();
   const [activeBets, setActiveBets] = useState<ActiveBet[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
@@ -85,7 +90,7 @@ export function ActiveBets() {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(`/api/portfolio?userAddress=${address}`);
+        const response = await fetch(`/api/portfolio?userAddress=${address}&chain=${chainKey}`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
