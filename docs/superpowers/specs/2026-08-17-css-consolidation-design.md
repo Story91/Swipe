@@ -46,7 +46,33 @@ This is not theoretical. It was hit during this work: `.mf-hero-title`
 manifesto's headline rendered in Exo 2 rather than Orbitron because
 `h1, h2, h3...` from `theme.css` was the only rule left standing.
 
-**The conclusion that matters: a rewrite does not fix this.** New CSS meets the
+### Correction, measured after the fact
+
+**The paragraph above is wrong about the cause, and the gated Phase 1 is worth
+far less than it claims.** Sorting the 453 remaining `!important` by the
+property each one sets:
+
+| background | color | padding | border | font-size | font-weight | border-color |
+|---|---|---|---|---|---|---|
+| 80 | 63 | 37 | 27 | 20 | 18 | 18 |
+
+The global `h1..h6` rule sets exactly three properties: `font-family`,
+`font-weight`, `letter-spacing`. Across every stylesheet only **34**
+`!important` declarations set any of those three, and not all of them sit on
+headings. Deleting the global heading and button selectors therefore removes
+at most about 7% of the shouting, not the cause of it.
+
+The 143 `background` and `color` overrides cannot come from a rule that sets
+neither. They are components fighting each other, and the OnchainKit
+stylesheet the layout imports, which this document never measured.
+
+**Phase 1 should not be run on the strength of this spec.** It is a real
+specificity trap and worth closing eventually, but it is a small one, and
+changing the typography of every heading in the app at once is not repaid by
+34 declarations. Anyone continuing should start by measuring what those 143
+background and colour overrides are actually beating.
+
+**A rewrite still does not fix this.** New CSS meets the
 same global rules and regrows the same `!important` within weeks. The root
 cause has to go first, or nothing else is durable.
 
