@@ -1,0 +1,70 @@
+/*
+ * Design tokens, at the document root.
+ *
+ * These are the same values app/styles/sheet.css defines on `.sheet`. They are
+ * promoted here because a token that only exists inside one class is not a
+ * token, it is a local variable: any stylesheet outside `.sheet` had to either
+ * @import the sheet or copy the block, and both happened. EnhancedUserDashboard
+ * copied all nine colours verbatim.
+ *
+ * Loaded from app/layout.tsx, so every stylesheet in the app can reach these
+ * without importing anything.
+ *
+ * ADDITIVE ON PURPOSE. `.sheet` keeps its own declarations, so nothing that
+ * renders today changes: the sheet's block still wins inside `.sheet` (same
+ * values anyway), and everywhere else these were previously undefined. If a
+ * computed-style diff shows any pixel moving because of this file, that is a
+ * bug in this file, not a restyle.
+ *
+ * The literals these replace, counted across app/ before this landed: 237
+ * hardcoded #d4ff00, 353 ad-hoc rgba(255,255,255,α) across 12+ distinct alphas,
+ * 465 border-radius, 273 box-shadow, 338 font-family. The point of naming them
+ * is not brevity, it is that "the third grey" stops being a decision each
+ * component makes on its own.
+ */
+
+:root {
+  /* ---------------------------------------------------------------- colour */
+
+  /* The accent. One colour, used for the thing that matters on a screen and
+     nothing else. */
+  --sheet-lime: #d4ff00;
+
+  /* Text, in three weights of presence: primary, secondary, and the quiet tier
+     for labels and metadata. Three is the whole scale on purpose; the 12+
+     alphas this replaces were not a scale, they were 12 separate guesses. */
+  --sheet-paper: rgba(255, 255, 255, 0.92);
+  --sheet-paper-2: rgba(255, 255, 255, 0.72);
+  --sheet-paper-3: rgba(255, 255, 255, 0.5);
+
+  /* Hairlines. `rule` separates, `rule-strong` encloses. */
+  --sheet-rule: rgba(255, 255, 255, 0.1);
+  --sheet-rule-strong: rgba(255, 255, 255, 0.18);
+
+  /* The only fill. Anything that needs to sit above the page uses this rather
+     than inventing a gradient. */
+  --sheet-surface: rgba(255, 255, 255, 0.04);
+
+  /* Accent-tinted washes, for a highlighted row or an armed state. */
+  --sheet-wash: rgba(212, 255, 0, 0.06);
+  --sheet-lime-line: rgba(212, 255, 0, 0.22);
+
+  /* Loss. Deliberately not pure red: it marks a number as negative, it does not
+     signal an error, and #ef4444 on a dark ground reads as the latter. */
+  --sheet-loss: rgba(255, 138, 128, 0.9);
+
+  /* ------------------------------------------------------------------ type */
+
+  /* Three roles, no more. The fallbacks matter: if next/font fails to define
+     --font-display, `var(--font-display, 'Orbitron')` keeps the stack valid
+     rather than making the whole declaration invalid at computed-value time,
+     which is how this app once rendered entirely in Times New Roman. */
+  --sheet-display: var(--font-display, 'Orbitron'), 'Orbitron', sans-serif;
+  --sheet-body: var(--font-body, -apple-system), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --sheet-data: var(--font-data, 'Monaco'), 'Monaco', 'Menlo', monospace;
+
+  /* ---------------------------------------------------------------- layout */
+
+  --sheet-gutter: 24px;
+  --sheet-rail: 148px;
+}

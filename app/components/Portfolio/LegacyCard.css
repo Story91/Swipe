@@ -1,64 +1,86 @@
-/* Legacy Card Styles - Compact Prediction Cards */
+/*
+ * Prediction cards, moved onto the shared sheet (app/styles/sheet.css).
+ *
+ * These sit inside the dashboard, which is already on the sheet, so the cards
+ * were the last thing on that screen still drawing itself in the old language:
+ * a gradient fill, a lime frame, a 12px radius and a drop shadow, repeated
+ * once per card down a grid. Twelve of those stacked read as twelve identical
+ * boxes rather than twelve different questions.
+ *
+ * Now the card is a bordered surface and nothing else. The question is what
+ * carries the card, so it is the only thing set large.
+ *
+ * Type sizes went up across the board. The old card set its question at 11px
+ * and its description at 9px, which is below what most people can read
+ * comfortably and well under the 12px floor the rest of the sheet keeps.
+ */
 
 .legacy-card {
-  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0a0a0a 100%);
-  border: 1px solid rgba(212, 255, 0, 0.3);
-  border-radius: 12px;
-  padding: 10px;
-  margin-bottom: 8px;
+  background: var(--sheet-surface);
+  border: 1px solid var(--sheet-rule-strong);
+  border-radius: 0;
+  padding: 16px;
+  margin-bottom: 0;
   position: relative;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-  transition: all 0.3s ease;
+  box-shadow: none;
+  transition: border-color 140ms ease;
 }
 
 .legacy-card:hover {
-  border-color: rgba(212, 255, 0, 0.6);
-  box-shadow: 0 6px 24px rgba(212, 255, 0, 0.15);
-  transform: translateY(-1px);
+  border-color: var(--sheet-lime-line);
+  box-shadow: none;
+  transform: none;
 }
 
-/* Status Badge - Top Right Corner */
+/* Status badge. Sits on the card's own top rule rather than floating above it
+   on a pill, and states its status in the accent or in white: a resolved
+   market and an expired one are both just facts, and colouring them like a
+   traffic light implied a judgement the card cannot make. */
 .legacy-badge {
   position: absolute;
-  top: -8px;
-  right: 10px;
-  padding: 3px 10px;
-  border-radius: 12px;
-  font-size: 8px;
-  font-weight: 700;
+  top: -1px;
+  right: 16px;
+  padding: 4px 10px;
+  border-radius: 0;
+  font-size: 12px;
+  font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 4px;
-  color: #000;
+  gap: 5px;
+  color: var(--sheet-paper-3);
+  background: transparent;
+  border: 1px solid var(--sheet-rule);
+  border-top: 0;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  letter-spacing: 0.14em;
+  box-shadow: none;
   z-index: 10;
 }
 
 .legacy-badge.legacy-badge-resolved {
-  background: linear-gradient(135deg, #00ff88, #00cc6a);
+  background: transparent;
+  color: var(--sheet-lime);
+  border-color: var(--sheet-lime-line);
 }
 
 .legacy-badge.legacy-badge-active {
-  background: linear-gradient(135deg, #d4ff00, #c8f000);
+  background: transparent;
+  color: var(--sheet-paper-2);
 }
 
-.legacy-badge.legacy-badge-expired {
-  background: linear-gradient(135deg, #ff6b6b, #ff4757);
-}
-
+.legacy-badge.legacy-badge-expired,
 .legacy-badge.legacy-badge-cancelled {
-  background: linear-gradient(135deg, #ffa500, #ff8c00);
+  background: transparent;
+  color: var(--sheet-paper-3);
 }
 
 .legacy-status-icon {
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .legacy-status-text {
-  font-family: "Orbitron", sans-serif;
-  font-size: 8px;
+  font-family: var(--sheet-display);
+  font-size: 12px;
 }
 
 /* Card Header - Vertical Layout */
@@ -76,11 +98,11 @@
   width: 70px;
   height: 70px;
   min-width: 70px;
-  border-radius: 10px;
+  border-radius: 0;
   overflow: hidden;
   border: 2px solid rgba(212, 255, 0, 0.5);
   background: #1a1a1a;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: none;
 }
 
 .legacy-avatar img {
@@ -105,9 +127,9 @@
 }
 
 .legacy-question {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
-  color: #d4ff00 !important;
+  color: var(--sheet-lime) !important;
   margin: 0;
   line-height: 1.3;
   display: -webkit-box;
@@ -118,7 +140,7 @@
 
 /* Description */
 .legacy-description {
-  font-size: 9px;
+  font-size: 12px;
   color: rgba(255, 255, 255, 0.7);
   line-height: 1.5;
   margin: 0 0 8px 0;
@@ -129,14 +151,14 @@
 
 .legacy-description a,
 .legacy-description .legacy-link {
-  color: #00aaff;
+  color: var(--sheet-lime);
   text-decoration: underline;
   word-break: break-all;
 }
 
 .legacy-description a:hover,
 .legacy-description .legacy-link:hover {
-  color: #d4ff00;
+  color: var(--sheet-lime);
 }
 
 /* Outcome Banner - Shows the admin's decision */
@@ -146,22 +168,22 @@
   justify-content: center;
   gap: 8px;
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: 0;
   margin-bottom: 8px;
   font-size: 12px;
   font-weight: 700;
 }
 
 .legacy-outcome-banner.outcome-yes {
-  background: linear-gradient(135deg, rgba(0, 255, 136, 0.15), rgba(0, 204, 106, 0.1));
+  background: var(--sheet-wash);
   border: 2px solid rgba(0, 255, 136, 0.5);
-  color: #00ff88;
+  color: var(--sheet-lime);
 }
 
 .legacy-outcome-banner.outcome-no {
-  background: linear-gradient(135deg, rgba(255, 107, 107, 0.15), rgba(255, 71, 87, 0.1));
+  background: rgba(255, 138, 128, 0.08);
   border: 2px solid rgba(255, 107, 107, 0.5);
-  color: #ff6b6b;
+  color: var(--sheet-loss);
 }
 
 .legacy-outcome-banner .outcome-icon {
@@ -169,7 +191,7 @@
 }
 
 .legacy-outcome-banner .outcome-text {
-  font-family: "Orbitron", sans-serif;
+  font-family: var(--sheet-display);
   letter-spacing: 0.5px;
 }
 
@@ -192,19 +214,19 @@
   align-items: center;
   padding: 3px 8px;
   background: rgba(255, 255, 255, 0.05);
-  border-radius: 6px;
+  border-radius: 0;
   border: 1px solid rgba(212, 255, 0, 0.15);
 }
 
 .legacy-meta-label {
-  font-size: 7px;
+  font-size: 12px;
   color: rgba(255, 255, 255, 0.5);
   font-weight: 500;
 }
 
 .legacy-meta-value {
-  font-size: 7px;
-  color: #d4ff00;
+  font-size: 12px;
+  color: var(--sheet-lime);
   font-weight: 600;
 }
 
@@ -221,7 +243,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 4px 6px;
-  border-radius: 4px;
+  border-radius: 0;
   border: 1px solid rgba(212, 255, 0, 0.15);
 }
 
@@ -236,17 +258,17 @@
 }
 
 .legacy-pool-label {
-  font-size: 8px;
+  font-size: 12px;
   color: rgba(255, 255, 255, 0.7);
   font-weight: 500;
 }
 
 .legacy-pool-item.yes .legacy-pool-label {
-  color: #00ff88;
+  color: var(--sheet-lime);
 }
 
 .legacy-pool-item.no .legacy-pool-label {
-  color: #ff6b6b;
+  color: var(--sheet-loss);
 }
 
 .legacy-pool-values {
@@ -257,26 +279,26 @@
 }
 
 .legacy-pool-value {
-  font-size: 8px;
-  color: #fff;
+  font-size: 12px;
+  color: var(--sheet-paper);
   font-weight: 700;
-  font-family: "Exo 2", sans-serif;
+  font-family: var(--sheet-data);
 }
 
 .legacy-pool-value.swipe {
-  color: #00ff88;
-  font-size: 7px;
+  color: var(--sheet-lime);
+  font-size: 12px;
 }
 
 .legacy-pool-value.usdc {
-  color: #10b981;
-  font-size: 7px;
+  color: var(--sheet-lime);
+  font-size: 12px;
 }
 
 /* Stats Table */
 .legacy-stats-table {
   margin-bottom: 6px;
-  border-radius: 6px;
+  border-radius: 0;
   overflow: hidden;
   border: 1px solid rgba(212, 255, 0, 0.3);
 }
@@ -284,22 +306,22 @@
 .legacy-stats-table table {
   width: 100%;
   border-collapse: collapse;
-  font-family: "Exo 2", sans-serif;
+  font-family: var(--sheet-data);
 }
 
 .legacy-stats-table thead tr {
-  background: linear-gradient(135deg, #d4ff00, #c8f000);
+  background: transparent;
 }
 
 .legacy-stats-table th {
   padding: 4px 4px;
   text-align: center;
-  font-size: 7px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.2px;
   color: #000;
-  font-family: "Orbitron", sans-serif;
+  font-family: var(--sheet-display);
 }
 
 .legacy-stats-table th:first-child {
@@ -343,24 +365,24 @@
 
 .legacy-stats-table .value-cell {
   text-align: center;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 700;
 }
 
 .legacy-stats-table .value-cell.staked {
-  color: #3b82f6;
+  color: var(--sheet-paper-2);
 }
 
 .legacy-stats-table .value-cell.payout {
-  color: #10b981;
+  color: var(--sheet-lime);
 }
 
 .legacy-stats-table .value-cell.profit.positive {
-  color: #10b981;
+  color: var(--sheet-lime);
 }
 
 .legacy-stats-table .value-cell.profit.negative {
-  color: #ef4444;
+  color: var(--sheet-loss);
 }
 
 /* Card Actions */
@@ -373,11 +395,11 @@
 }
 
 .legacy-claim-btn {
-  background: linear-gradient(135deg, #d4ff00, #c8f000);
+  background: transparent;
   color: #000;
   border: none;
   padding: 12px 20px;
-  border-radius: 8px;
+  border-radius: 0;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -391,9 +413,9 @@
 }
 
 .legacy-claim-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #e0ff33, #d4ff00);
+  background: transparent;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(212, 255, 0, 0.4);
+  box-shadow: none;
 }
 
 .legacy-claim-btn:disabled {
@@ -412,14 +434,14 @@
 
 /* ETH Claim Button */
 .legacy-claim-btn.eth-claim-btn {
-  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%) !important;
-  color: #fff !important;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3) !important;
+  background: transparent !important;
+  color: var(--sheet-paper) !important;
+  box-shadow: none !important;
 }
 
 .legacy-claim-btn.eth-claim-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%) !important;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4) !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 .legacy-claim-btn.eth-claim-btn.disabled {
@@ -429,13 +451,13 @@
 
 /* SWIPE Claim Button */
 .legacy-claim-btn.swipe-claim-btn {
-  background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%) !important;
+  background: transparent !important;
   box-shadow: 0 2px 8px rgba(0, 255, 136, 0.3) !important;
   color: #000 !important;
 }
 
 .legacy-claim-btn.swipe-claim-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #00cc6a 0%, #00aa55 100%) !important;
+  background: transparent !important;
   box-shadow: 0 4px 12px rgba(0, 255, 136, 0.4) !important;
 }
 
@@ -446,13 +468,13 @@
 
 /* USDC Claim Button */
 .legacy-claim-btn.usdc-claim-btn {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
-  color: #fff !important;
+  background: transparent !important;
+  color: var(--sheet-paper) !important;
   box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3) !important;
 }
 
 .legacy-claim-btn.usdc-claim-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+  background: transparent !important;
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4) !important;
 }
 
@@ -473,7 +495,7 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #10b981, #059669);
+  background: var(--sheet-surface);
   color: white;
   font-size: 12px;
   font-weight: bold;
@@ -493,15 +515,15 @@
   }
 
   .legacy-question {
-    font-size: 10px;
+    font-size: 12px;
   }
 
   .legacy-description {
-    font-size: 7px;
+    font-size: 12px;
   }
 
   .legacy-stats-table .value-cell {
-    font-size: 8px;
+    font-size: 12px;
   }
 
   .legacy-claim-btn {
@@ -528,11 +550,11 @@
     width: 56px;
     height: 56px;
     min-width: 56px;
-    border-radius: 8px;
+    border-radius: 0;
   }
 
   .legacy-question {
-    font-size: 9px;
+    font-size: 12px;
   }
 
   .legacy-description {
@@ -541,7 +563,7 @@
 
   .legacy-badge {
     padding: 2px 6px;
-    font-size: 7px;
+    font-size: 12px;
     top: -6px;
     right: 8px;
   }
@@ -566,12 +588,12 @@
   }
 
   .legacy-stats-table .value-cell {
-    font-size: 7px;
+    font-size: 12px;
   }
 
   .legacy-claim-btn {
     padding: 8px 10px;
-    font-size: 10px;
+    font-size: 12px;
     gap: 3px;
     flex: 1 1 auto;
     min-width: 80px;
@@ -592,7 +614,7 @@
 
   .legacy-pool-label,
   .legacy-pool-value {
-    font-size: 7px;
+    font-size: 12px;
   }
 }
 
@@ -608,20 +630,20 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #d4ff00, #c8f000);
+  background: transparent;
   border: 3px solid #0a0a0a;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 2px 12px rgba(212, 255, 0, 0.4);
+  box-shadow: none;
   color: #000;
 }
 
 .legacy-share-badge:hover {
   transform: scale(1.1);
-  box-shadow: 0 4px 20px rgba(212, 255, 0, 0.6);
+  box-shadow: none;
 }
 
 .legacy-share-overlay {
@@ -638,12 +660,12 @@
   top: 100%;
   left: 0;
   margin-top: 8px;
-  background: linear-gradient(135deg, #1a1a1a, #0a0a0a);
+  background: var(--sheet-surface);
   border: 1px solid rgba(212, 255, 0, 0.3);
-  border-radius: 12px;
+  border-radius: 0;
   padding: 6px;
   min-width: 160px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  box-shadow: none;
   z-index: 20;
 }
 
@@ -655,9 +677,9 @@
   padding: 8px 12px;
   background: transparent;
   border: none;
-  border-radius: 8px;
-  color: #fff;
-  font-size: 11px;
+  border-radius: 0;
+  color: var(--sheet-paper);
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -677,7 +699,7 @@
 .legacy-share-divider {
   height: 1px;
   margin: 6px 0;
-  background: linear-gradient(90deg, transparent, rgba(212, 255, 0, 0.5), transparent);
+  background: var(--sheet-surface);
 }
 
 /* Farcaster/Base split button */
@@ -687,7 +709,7 @@
   align-items: center;
   justify-content: center;
   height: 36px;
-  border-radius: 6px;
+  border-radius: 0;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.15);
   padding: 0;
@@ -707,7 +729,7 @@
 
 .legacy-share-option.share-btn-farcaster-split .share-btn-half-white {
   flex: 1;
-  background-color: #ffffff;
+  background-color: var(--sheet-paper);
 }
 
 .legacy-share-option.share-btn-farcaster-split .share-btn-icons {
@@ -728,7 +750,7 @@
 
 .legacy-share-option.share-btn-farcaster-split:hover {
   transform: scale(1.02);
-  box-shadow: 0 4px 12px rgba(138, 99, 210, 0.3);
+  box-shadow: none;
   background: transparent;
 }
 
@@ -740,7 +762,7 @@
   height: 36px;
   background: #000;
   border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 6px;
+  border-radius: 0;
   margin-top: 0;
 }
 

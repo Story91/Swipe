@@ -1,4 +1,5 @@
 import "./theme.css";
+import "./styles/tokens.css";
 import "@coinbase/onchainkit/styles.css";
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
