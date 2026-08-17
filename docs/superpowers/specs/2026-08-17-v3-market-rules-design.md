@@ -133,6 +133,33 @@ pool and late backers a smaller one. **It must never be presented to users as
 "everyone earns more"** — it is a redistribution, someone will do the arithmetic,
 and being caught overstating it costs more than the feature is worth.
 
+#### `exitEarly` guard: only in the final quarter
+
+The final security review before mainnet found that `exitEarly` could be used
+to dodge a certain loss: stake 500 on NO and 1 on YES as the sole YES holder,
+watch YES become certain, exit that single YES unit for pennies, `yesPool`
+hits zero, resolution finds no winners, the market becomes refundable, and the
+500 that was certainly lost comes back in full. The first fix made this
+unconditional — no exit may reduce a non-empty pool to zero — but that also
+blocks the sole backer of a side from exiting **at all**, and in this
+product's markets (245 markets averaging nought to two players each) that is
+the normal case, not an edge case. An unconditional guard removes early exit
+for exactly the early users §5.1's ×1.50 bonus exists to attract.
+
+The guard now applies **only in the final quarter of a market's lifetime**
+(`elapsed * 4 >= window * 3`, the same multiply-not-divide comparison
+`weightBpsAt` uses for its brackets). Earlier than that, anyone may exit,
+including a sole backer, and a full exit can take a pool to zero. The exploit
+depends on acting once the outcome is knowable, which is overwhelmingly late
+in a market's life, so scoping the guard to the final quarter closes it in
+practice while leaving early exit intact for the common case.
+
+**Accepted residual risk.** An outcome that becomes certain early — a price
+crossing its threshold with days still to run — can still be escaped before
+the final quarter, recovering a stake that would otherwise have been forfeit.
+This is a knowing trade against the alternative of stranding every sole
+backer for a side's entire life, not an oversight.
+
 ### 5.2 Fee change
 
 `setPlatformFee(300)`. Configuration, not code.

@@ -194,15 +194,80 @@ describe("PredictionMarket_V3", function () {
   });
 
   describe("exitEarly cannot be used to dodge a loss", function () {
-    it("refuses an exit that would empty the winning pool", async function () {
+    // Read createdAt/deadline from the contract rather than deriving them
+    // from what openMarket was asked for: registerPrediction mines its own
+    // block, so a one-second drift is enough to flip a boundary assertion.
+    async function windowOf(id) {
+      const pred = await market.predictions(id);
+      return {
+        createdAt: Number(pred.createdAt),
+        deadline: Number(pred.deadline),
+        span: Number(pred.deadline) - Number(pred.createdAt),
+      };
+    }
+
+    // Sets the timestamp for the next block without mining an empty one:
+    // the following transaction is what lands on it. Mining a block here
+    // first would leave the actual exitEarly call one automined second
+    // later than intended, which is fatal precision at an exact boundary.
+    async function warpTo(timestamp) {
+      await ethers.provider.send("evm_setNextBlockTimestamp", [timestamp]);
+    }
+
+    // Bob rides 500 on NO — a bet he expects to lose — and holds a
+    // token-sized YES position as the sole YES backer. If he could exit that
+    // YES position down to zero, yesPool would go to zero, resolution would
+    // find no winners, the market would become refundable, and he would
+    // recover the full 500 NO stake instead of forfeiting it.
+    async function buildExploitPosition() {
       await openMarket(1, DAY);
-      // Bob rides 500 on NO — a bet he expects to lose — and holds a
-      // token-sized YES position as the sole YES backer. If he could exit
-      // that YES position down to zero, yesPool would go to zero, resolution
-      // would find no winners, the market would become refundable, and he
-      // would recover the full 500 NO stake instead of forfeiting it.
       await market.connect(bob).placeBet(1, false, usd(500));
       await market.connect(bob).placeBet(1, true, usd(1));
+    }
+
+    it("refuses an exit that would empty the winning pool in the final quarter", async function () {
+      await buildExploitPosition();
+      const { createdAt, span } = await windowOf(1);
+
+      // Well inside the final quarter, where the outcome is knowable.
+      await warpTo(createdAt + Math.ceil((span * 3) / 4) + 1);
+
+      await expect(
+        market.connect(bob).exitEarly(1, true, usd(1))
+      ).to.be.revertedWith("Would empty the pool");
+    });
+
+    it("allows the same exit before the final quarter", async function () {
+      await buildExploitPosition();
+      const { createdAt, span } = await windowOf(1);
+
+      // Roughly halfway through the market's life. This is the behaviour
+      // being deliberately bought back: a sole backer of a side — the
+      // common case in a thin market — can still exit in full here.
+      await warpTo(createdAt + Math.floor(span / 2));
+
+      await market.connect(bob).exitEarly(1, true, usd(1));
+
+      expect((await market.predictions(1)).yesPool).to.equal(0);
+    });
+
+    it("still allows the exit one second before the three-quarter mark", async function () {
+      await buildExploitPosition();
+      const { createdAt, span } = await windowOf(1);
+      const boundary = createdAt + Math.ceil((span * 3) / 4);
+
+      await warpTo(boundary - 1);
+      await market.connect(bob).exitEarly(1, true, usd(1));
+
+      expect((await market.predictions(1)).yesPool).to.equal(0);
+    });
+
+    it("refuses the exit at the three-quarter mark", async function () {
+      await buildExploitPosition();
+      const { createdAt, span } = await windowOf(1);
+      const boundary = createdAt + Math.ceil((span * 3) / 4);
+
+      await warpTo(boundary);
 
       await expect(
         market.connect(bob).exitEarly(1, true, usd(1))
@@ -434,12 +499,11 @@ describe("PredictionMarket_V3", function () {
 
   describe("early exit and weight", function () {
     it("zeroes the weight on a full exit", async function () {
+      // Well before the final quarter, so the pool-emptying guard does not
+      // apply and a sole backer can exit in full — the common case in a
+      // thin market.
       await openMarket(1, DAY);
       await market.connect(alice).placeBet(1, true, usd(100));
-      // A second YES backer, so alice's full exit does not empty the pool and
-      // trip the "Would empty the pool" guard that closes the exploit where
-      // draining a winning side turns resolution into a no-winners refund.
-      await market.connect(creator).placeBet(1, true, usd(10));
       await market.connect(bob).placeBet(1, false, usd(100));
 
       await market.connect(alice).exitEarly(1, true, usd(100));
@@ -448,10 +512,8 @@ describe("PredictionMarket_V3", function () {
       expect(pos.yesAmount).to.equal(0);
       expect(pos.weightedYes).to.equal(0);
 
-      // Only alice's weighted contribution left the pool; creator's remains.
-      const creatorPos = await market.positions(1, creator.address);
       const pred = await market.predictions(1);
-      expect(pred.weightedYesPool).to.equal(creatorPos.weightedYes);
+      expect(pred.weightedYesPool).to.equal(0);
     });
 
     it("removes weight in proportion to a partial exit", async function () {

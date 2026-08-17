@@ -73,6 +73,7 @@ and all are implemented in `contracts/PredictionMarket_USDG_DualPool.sol`.
 | **Ownership transfers in two steps; resolvers are a separate revocable role** | The old contract had no ownership transfer at all — it was the deployer's forever. Automation now runs on a narrow hot key while ownership stays cold. |
 | **Creator rewards are pulled, not pushed** | A creator who could not receive the token used to be able to block resolution for everyone in that market. |
 | **Early exit retains exactly what it does not pay out** | The difference used to go untracked, creating "orphaned" balances — and a drain function written to collect them that could take user stakes. |
+| **In a market's final quarter, an exit cannot take a side's pool to zero** | Once the last cent of a side is withdrawn, resolution finds no winners and refunds everyone — including the stake on the other side that had already lost. Late in a market's life the outcome is usually knowable, so this closes the path to converting a certain loss into a full refund. See §5.6. |
 
 ## 5. Market lifecycle rules 🟡
 
@@ -158,6 +159,31 @@ built around. WETH follows once a single market reliably fills.
 *Open: whether the WETH wrap can be hidden inside the existing approval
 sequence. If not, ETH betting should not ship — someone who asks to bet ETH must
 not be handed a lesson about wrapped tokens.*
+
+### 5.6 Exiting early 🔒
+
+You can sell part or all of a position back before the deadline, for a fee (see
+§3). **For most of a market's life this works exactly like that** — you can
+exit any amount, up to and including everything you hold, even if you are the
+only person on your side of the question.
+
+**In the last quarter of the market's life, you can no longer exit a side down
+to exactly zero.** You can still reduce your position, and you can still exit
+in full if someone else is backing the same side as you — the rule only bites
+if your exit would leave that side with nothing staked on it at all.
+
+**Why:** if a side's pool ever hits zero, the market resolves with no winners
+and refunds every stake on both sides — including bets on the other side that
+had already lost. Late in a market's life, once the likely outcome is usually
+clear, that would let someone holding a losing bet buy a token-sized position
+on the side about to win, exit it down to zero, and turn a stake they were
+about to lose into a full refund instead. Restricting the rule to the final
+quarter closes that off in the situation where it matters — when the outcome
+is knowable — without stopping the ordinary case of a single early backer
+walking away from a position that hasn't resolved yet.
+
+If you are the only backer of a side and want to be certain you can exit in
+full, do it before the market enters its final quarter.
 
 ## 6. Rewards ⬜
 

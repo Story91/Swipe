@@ -247,14 +247,20 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
         uint256 heldWeighted = isYes ? pos.weightedYes : pos.weightedNo;
         require(amount > 0 && amount <= held, "Invalid amount");
 
-        // Refuse an exit that would empty a side. Zeroing the winning pool
-        // turns resolution into a no-winners refund, which is how a bettor
-        // holding a large losing position and a token-sized winning one
-        // converts a certain loss into a full refund.
-        require(
-            (isYes ? pred.yesPool : pred.noPool) - amount > 0,
-            "Would empty the pool"
-        );
+        // Emptying a side turns resolution into a no-winners refund, which is
+        // how a bettor holding a large losing position and a token-sized
+        // winning one converts a certain loss into a full refund. Guarding
+        // only the final quarter keeps that shut when the outcome is knowable,
+        // without stranding the sole backer of a side in a thin market — which
+        // here is the common case, not the exception.
+        uint256 window = pred.deadline - pred.createdAt;
+        uint256 elapsed = block.timestamp - pred.createdAt;
+        if (elapsed * 4 >= window * 3) {
+            require(
+                (isYes ? pred.yesPool : pred.noPool) - amount > 0,
+                "Would empty the pool"
+            );
+        }
 
         uint256 totalPool = pred.yesPool + pred.noPool;
         require(totalPool > 0, "Empty pool");
