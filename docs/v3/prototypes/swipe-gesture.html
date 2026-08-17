@@ -1,0 +1,1099 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Swipe gesture prototype — V3</title>
+<style>
+  :root{
+    --bg:#0a0a0b;
+    --panel:#141416;
+    --panel-2:#1b1b1e;
+    --edge:#2a2a2e;
+    --text:#f3f3f0;
+    --text-dim:#9a9a9f;
+    --lime:#d4ff00;
+    --lime-dim:#8fa800;
+    --no:#ff5d5d;
+    --no-dim:#a83c3c;
+    --radius:26px;
+    font-size:16px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height:100vh;
+    -webkit-tap-highlight-color:transparent;
+  }
+  h1,h2,h3,p{margin:0;}
+
+  .app{
+    max-width:1180px;
+    margin:0 auto;
+    padding:28px 20px 60px;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 320px;
+    gap:28px;
+    align-items:start;
+  }
+  @media (max-width: 920px){
+    .app{grid-template-columns:1fr;}
+  }
+
+  header.top{
+    grid-column:1/-1;
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    margin-bottom:4px;
+  }
+  header.top h1{
+    font-size:1.35rem;
+    letter-spacing:-0.01em;
+    font-weight:650;
+  }
+  header.top .sub{
+    color:var(--text-dim);
+    font-size:0.88rem;
+    line-height:1.5;
+  }
+  header.top .sub code{
+    background:var(--panel-2);
+    border:1px solid var(--edge);
+    border-radius:5px;
+    padding:1px 5px;
+    font-size:0.82em;
+  }
+
+  /* ---------- stage / stack ---------- */
+  .stage-col{display:flex; flex-direction:column; gap:18px; min-width:0;}
+
+  .stack-wrap{
+    position:relative;
+    width:100%;
+    max-width:400px;
+    height:520px;
+    margin:0 auto;
+    touch-action:none;
+  }
+  .stage{
+    position:absolute;
+    inset:0;
+  }
+
+  .reveal{
+    position:absolute;
+    top:8%;
+    bottom:8%;
+    width:38%;
+    border-radius:22px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:12px;
+    opacity:0;
+    transform:scale(0.9);
+    transition:opacity 180ms ease, transform 180ms ease;
+    pointer-events:none;
+    background:var(--panel-2);
+    border:1px solid var(--edge);
+  }
+  .reveal.yes{ right:0; }
+  .reveal.no{ left:0; }
+  .reveal.visible{ opacity:1; transform:scale(1); pointer-events:auto; }
+  .reveal .reveal-label{
+    font-size:0.72rem;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--text-dim);
+  }
+  .reveal.yes .reveal-label{color:var(--lime);}
+  .reveal.no .reveal-label{color:var(--no);}
+  .chip-col{display:flex; flex-direction:column; gap:8px; width:76%;}
+  .chip{
+    appearance:none;
+    border:1px solid var(--edge);
+    background:var(--panel);
+    color:var(--text);
+    border-radius:12px;
+    padding:9px 6px;
+    font-size:0.92rem;
+    font-weight:600;
+    cursor:pointer;
+  }
+  .chip.selected{
+    border-color:var(--lime);
+    color:var(--lime);
+    background:rgba(212,255,0,0.08);
+  }
+  .chip:focus-visible{outline:2px solid var(--lime); outline-offset:2px;}
+
+  .card{
+    position:absolute;
+    left:50%;
+    top:50%;
+    width:280px;
+    height:400px;
+    margin-left:-140px;
+    margin-top:-200px;
+    border-radius:var(--radius);
+    background:linear-gradient(160deg,#1c1c1f,#131315);
+    border:1px solid var(--edge);
+    box-shadow:0 18px 40px rgba(0,0,0,0.45);
+    padding:18px;
+    display:flex;
+    flex-direction:column;
+    cursor:grab;
+    user-select:none;
+    will-change:transform;
+    --tint-yes:0;
+    --tint-no:0;
+  }
+  .card:active{cursor:grabbing;}
+  .card[data-pos="0"]{ z-index:40; }
+  .card[data-pos="1"]{ z-index:30; pointer-events:none; }
+  .card[data-pos="2"]{ z-index:20; pointer-events:none; }
+  .card[data-pos="3"]{ z-index:10; pointer-events:none; }
+
+  .card .stack-transform{
+    position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+  }
+
+  .card .tint{
+    position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+  }
+  .tint-yes{ background:radial-gradient(circle at 88% 50%, rgba(212,255,0,0.55), transparent 65%); opacity:var(--tint-yes); }
+  .tint-no{ background:radial-gradient(circle at 12% 50%, rgba(255,93,93,0.5), transparent 65%); opacity:var(--tint-no); }
+
+  .card-face{position:relative; display:flex; flex-direction:column; height:100%; gap:14px;}
+  .card-face-armed{
+    position:absolute; inset:18px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:10px; opacity:0; pointer-events:none; text-align:center;
+  }
+  .reduced-motion .card-face{transition:opacity 150ms ease;}
+  .reduced-motion .card-face-armed{transition:opacity 150ms ease;}
+  .card.armed .card-face{opacity:0; pointer-events:none;}
+  .card.armed .card-face-armed{opacity:1; pointer-events:auto;}
+  .card-face-armed .armed-dir{font-size:1.1rem; font-weight:700; letter-spacing:0.02em;}
+  .card-face-armed .armed-dir.yes{color:var(--lime);}
+  .card-face-armed .armed-dir.no{color:var(--no);}
+  .card-face-armed .armed-hint{color:var(--text-dim); font-size:0.82rem; max-width:220px; line-height:1.4;}
+
+  .row-top{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+  .badge{
+    display:inline-flex; align-items:center; gap:6px;
+    background:rgba(212,255,0,0.12);
+    color:var(--lime);
+    border:1px solid rgba(212,255,0,0.35);
+    border-radius:999px;
+    padding:3px 10px 3px 8px;
+    font-size:0.68rem;
+    font-weight:700;
+    letter-spacing:0.03em;
+  }
+  .badge .dot{width:5px;height:5px;border-radius:50%;background:var(--lime);}
+  .deadline{color:var(--text-dim); font-size:0.75rem; font-variant-numeric:tabular-nums;}
+
+  .row-body{display:flex; align-items:flex-start; gap:12px;}
+  .icon-badge{
+    flex:0 0 auto;
+    width:40px;height:40px;border-radius:12px;
+    background:var(--panel-2);
+    border:1px solid var(--edge);
+    display:flex;align-items:center;justify-content:center;
+    font-size:0.62rem;font-weight:800;letter-spacing:0.02em;color:var(--lime);
+  }
+  .question{font-size:1.02rem; line-height:1.32; font-weight:600;}
+
+  .odds{margin-top:auto; display:flex; flex-direction:column; gap:8px;}
+  .odds-row{display:flex; justify-content:space-between; font-size:0.82rem; font-weight:700;}
+  .odds-row .yes{color:var(--lime);}
+  .odds-row .no{color:var(--no);}
+  .odds-bar{height:8px; border-radius:999px; background:var(--no-dim); overflow:hidden;}
+  .odds-fill{height:100%; background:var(--lime-dim);}
+  .stats-row{display:flex; justify-content:space-between; color:var(--text-dim); font-size:0.72rem; padding-top:2px;}
+
+  /* ---------- action bar ---------- */
+  .action-bar{
+    max-width:400px;
+    margin:0 auto;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+  }
+  .action-bar.armed-row{grid-template-columns:1fr 1fr;}
+  .btn{
+    appearance:none;
+    border-radius:16px;
+    border:1px solid var(--edge);
+    background:var(--panel);
+    color:var(--text);
+    font-size:0.95rem;
+    font-weight:700;
+    padding:14px 10px;
+    cursor:pointer;
+    transition:transform 90ms ease, background 120ms ease, border-color 120ms ease;
+  }
+  .btn:active{transform:scale(0.97);}
+  .btn:focus-visible{outline:2px solid var(--lime); outline-offset:2px;}
+  .btn.yes{border-color:rgba(212,255,0,0.4); color:var(--lime);}
+  .btn.yes:hover{background:rgba(212,255,0,0.08);}
+  .btn.no{border-color:rgba(255,93,93,0.4); color:var(--no);}
+  .btn.no:hover{background:rgba(255,93,93,0.08);}
+  .btn.confirm{background:var(--lime); color:#101100; border-color:var(--lime);}
+  .btn.confirm:hover{filter:brightness(1.06);}
+  .btn.cancel{color:var(--text-dim);}
+  .btn[hidden]{display:none;}
+
+  .status-line{
+    max-width:400px;
+    margin:0 auto;
+    color:var(--text-dim);
+    font-size:0.72rem;
+    font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    text-align:center;
+    min-height:1.2em;
+  }
+
+  /* ---------- instructions ---------- */
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--edge);
+    border-radius:18px;
+    padding:16px 18px;
+  }
+  .panel h2{font-size:0.78rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-dim); margin-bottom:10px;}
+  .instructions ul{margin:0; padding-left:1.1em; display:flex; flex-direction:column; gap:7px; font-size:0.86rem; line-height:1.45;}
+  .instructions li strong{color:var(--lime); font-weight:700;}
+  .instructions li.important strong{color:#fff;}
+
+  /* ---------- params panel ---------- */
+  .params{
+    position:sticky;
+    top:20px;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+  .field{display:flex; flex-direction:column; gap:4px; margin-bottom:10px;}
+  .field:last-child{margin-bottom:0;}
+  .field-head{display:flex; justify-content:space-between; align-items:baseline; font-size:0.78rem;}
+  .field-head .val{
+    font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color:var(--lime);
+    font-size:0.78rem;
+  }
+  .field input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:4px;
+    border-radius:999px;
+    background:var(--edge);
+    outline:none;
+  }
+  .field input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:16px;height:16px;border-radius:50%;
+    background:var(--lime);
+    cursor:pointer;
+    border:2px solid #0a0a0b;
+  }
+  .field input[type=range]::-moz-range-thumb{
+    width:14px;height:14px;border-radius:50%;
+    background:var(--lime); border:2px solid #0a0a0b; cursor:pointer;
+  }
+  .group-title{font-size:0.72rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-dim); margin:12px 0 2px;}
+  .group-title:first-child{margin-top:0;}
+  .toggles{display:flex; flex-direction:column; gap:8px; margin-top:4px; padding-top:12px; border-top:1px solid var(--edge);}
+  .toggle-row{display:flex; align-items:center; gap:8px; font-size:0.82rem; color:var(--text-dim);}
+  .toggle-row input{accent-color:var(--lime);}
+  .reset-btn{
+    margin-top:6px;
+    appearance:none;
+    background:transparent;
+    border:1px solid var(--edge);
+    color:var(--text-dim);
+    border-radius:10px;
+    padding:8px;
+    font-size:0.78rem;
+    cursor:pointer;
+  }
+  .reset-btn:hover{color:var(--text); border-color:var(--text-dim);}
+  .reset-btn:focus-visible{outline:2px solid var(--lime); outline-offset:2px;}
+
+  footer.note{
+    grid-column:1/-1;
+    color:var(--text-dim);
+    font-size:0.72rem;
+    text-align:center;
+    padding-top:10px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <h1>Swipe gesture prototype <span style="color:var(--text-dim);font-weight:400;">— V3 §7.6</span></h1>
+    <p class="sub">Standalone feel-test for the two-stage swipe (arm, then commit). No build step — this is the approval
+      gate before the gesture is written into <code>the real app</code>. Judge it with a finger, not by reading.</p>
+  </header>
+
+  <div class="stage-col">
+
+    <div class="stack-wrap" id="stackWrap">
+      <div class="stage" id="stage">
+        <div class="reveal yes" id="revealYes">
+          <div class="reveal-label">YES · stake</div>
+          <div class="chip-col">
+            <button class="chip" data-amount="1">1 USDC</button>
+            <button class="chip selected" data-amount="5">5 USDC</button>
+            <button class="chip" data-amount="25">25 USDC</button>
+          </div>
+        </div>
+        <div class="reveal no" id="revealNo">
+          <div class="reveal-label">NO · stake</div>
+          <div class="chip-col">
+            <button class="chip" data-amount="1">1 USDC</button>
+            <button class="chip selected" data-amount="5">5 USDC</button>
+            <button class="chip" data-amount="25">25 USDC</button>
+          </div>
+        </div>
+        <!-- 4 card elements injected here by JS -->
+      </div>
+    </div>
+
+    <div class="action-bar" id="actionBarNeutral">
+      <button class="btn no" id="btnNo" type="button">Swipe NO</button>
+      <button class="btn yes" id="btnYes" type="button">Swipe YES</button>
+    </div>
+    <div class="action-bar armed-row" id="actionBarArmed" hidden>
+      <button class="btn cancel" id="btnCancel" type="button">Cancel</button>
+      <button class="btn confirm" id="btnConfirm" type="button">Confirm bet</button>
+    </div>
+
+    <div class="status-line" id="statusLine" aria-live="polite">stage: neutral</div>
+
+    <div class="panel instructions">
+      <h2>Try this</h2>
+      <ul>
+        <li>Drag the top card left or right — it tracks your finger 1:1, and the YES/NO side tints as you go.</li>
+        <li>Release past the halfway point, or <strong>flick</strong> quickly — the card <strong>docks</strong>
+          to that side instead of flying away, and stake chips appear. Feel for the light haptic on phones.</li>
+        <li>Swipe the <strong>same direction again</strong> to commit — the card flies off carrying your throw's speed.</li>
+        <li>Swipe the <strong>opposite direction</strong> while armed to cancel — it springs back to centre.</li>
+        <li class="important"><strong>Grab a card mid-flight and reverse it</strong> — mid-dock, mid-return, or even
+          mid fly-off. Nothing should ever be locked in; catching a committed card un-commits it.</li>
+        <li>No gesture required: the YES / NO / Cancel / Confirm buttons on the left do the same thing, with real
+          keyboard focus.</li>
+        <li>Tune the spring feel live in the panel — nothing needs a reload.</li>
+      </ul>
+    </div>
+  </div>
+
+  <aside class="panel params" id="paramsPanel">
+    <h2>Live physics panel</h2>
+
+    <div class="group-title">Return to centre <span style="opacity:.6;">(disarm / release below threshold)</span></div>
+    <div class="field">
+      <div class="field-head"><span>Damping</span><span class="val" id="v_returnDamping">1.00</span></div>
+      <input type="range" id="s_returnDamping" min="0.4" max="1.4" step="0.01" value="1.0">
+    </div>
+    <div class="field">
+      <div class="field-head"><span>Response</span><span class="val" id="v_returnResponse">0.30s</span></div>
+      <input type="range" id="s_returnResponse" min="0.10" max="0.80" step="0.01" value="0.30">
+    </div>
+
+    <div class="group-title">Dock to armed <span style="opacity:.6;">(momentum)</span></div>
+    <div class="field">
+      <div class="field-head"><span>Damping</span><span class="val" id="v_dockDamping">0.80</span></div>
+      <input type="range" id="s_dockDamping" min="0.4" max="1.4" step="0.01" value="0.8">
+    </div>
+    <div class="field">
+      <div class="field-head"><span>Response</span><span class="val" id="v_dockResponse">0.35s</span></div>
+      <input type="range" id="s_dockResponse" min="0.10" max="0.80" step="0.01" value="0.35">
+    </div>
+
+    <div class="group-title">Commit fly-off</div>
+    <div class="field">
+      <div class="field-head"><span>Damping</span><span class="val" id="v_commitDamping">1.00</span></div>
+      <input type="range" id="s_commitDamping" min="0.4" max="1.4" step="0.01" value="1.0">
+    </div>
+    <div class="field">
+      <div class="field-head"><span>Response</span><span class="val" id="v_commitResponse">0.40s</span></div>
+      <input type="range" id="s_commitResponse" min="0.10" max="0.80" step="0.01" value="0.40">
+    </div>
+
+    <div class="group-title">Gesture</div>
+    <div class="field">
+      <div class="field-head"><span>Projection constant (d)</span><span class="val" id="v_projection">0.998</span></div>
+      <input type="range" id="s_projection" min="0.90" max="0.999" step="0.001" value="0.998">
+    </div>
+    <div class="field">
+      <div class="field-head"><span>Arm threshold</span><span class="val" id="v_threshold">110px</span></div>
+      <input type="range" id="s_threshold" min="40" max="220" step="2" value="110">
+    </div>
+
+    <div class="toggles">
+      <label class="toggle-row"><input type="checkbox" id="toggleReduced"> Simulate <code>prefers-reduced-motion</code></label>
+      <label class="toggle-row"><input type="checkbox" id="toggleDebug" checked> Show live status line</label>
+    </div>
+    <button class="reset-btn" id="resetParams" type="button">Reset to spec defaults</button>
+  </aside>
+
+  <footer class="note">Pointer Events + a hand-rolled spring integrator. No CSS keyframes, no animation library, no network requests.</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============================= state / params ============================= */
+
+  var DEFAULTS = {
+    returnDamping: 1.0, returnResponse: 0.30,
+    dockDamping: 0.8,  dockResponse: 0.35,
+    commitDamping: 1.0, commitResponse: 0.40,
+    projection: 0.998,
+    threshold: 110
+  };
+  var params = Object.assign({}, DEFAULTS);
+
+  var HYSTERESIS = 10;          // px, fixed per spec ("~10px")
+  var EDGE_MARGIN = 18;         // px kept clear of the stage edge when rubber-banding
+  var RUBBER_CONST = 0.55;      // Apple's rubber-band constant
+  var ROTATE_DIVISOR = 22;      // px of travel per degree of tilt
+  var MAX_ROTATE_DEG = 10;
+
+  var simulateReduced = false;
+  var reduceMotionMQ = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+
+  function reducedMotionActive(){
+    return simulateReduced || (reduceMotionMQ && reduceMotionMQ.matches);
+  }
+
+  function applyReducedClass(){
+    document.body.classList.toggle('reduced-motion', reducedMotionActive());
+  }
+
+  /* ============================= spring integrator ============================= */
+
+  // Critically-damped / under-damped harmonic oscillator driven by
+  // (damping ratio, response) instead of (stiffness, damping) —
+  // response is a time constant in seconds, not a fixed duration:
+  //   w0 = 2*PI/response ; k = w0^2 ; c = 2*damping*w0   (mass = 1)
+  function springStepOnce(axis, dt, damping, response){
+    var r = Math.max(response, 0.02);
+    var w0 = (2 * Math.PI) / r;
+    var k = w0 * w0;
+    var c = 2 * damping * w0;
+    var accel = -k * (axis.pos - axis.target) - c * axis.vel;
+    axis.vel += accel * dt;
+    axis.pos += axis.vel * dt;
+  }
+
+  var MAX_SUBSTEP = 1 / 240; // keeps stiff/low-response settings numerically stable
+  function integrateAxis(axis, dt, damping, response){
+    var remaining = dt;
+    while (remaining > 0){
+      var h = Math.min(MAX_SUBSTEP, remaining);
+      springStepOnce(axis, h, damping, response);
+      remaining -= h;
+    }
+  }
+
+  function makeAxis(){ return {pos:0, vel:0, target:0}; }
+
+  // Apple's momentum-projection formula: where would this velocity land
+  // if it decelerated naturally, instead of snapping from the release point.
+  function project(velocity, d){
+    return (velocity / 1000) * d / (1 - d);
+  }
+
+  // Progressive resistance past a boundary instead of a hard stop.
+  function rubberband(overshoot, dimension){
+    var sign = overshoot < 0 ? -1 : 1;
+    var o = Math.abs(overshoot);
+    return sign * (o * dimension * RUBBER_CONST) / (dimension + RUBBER_CONST * o);
+  }
+
+  function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+
+  /* ============================= haptics ============================= */
+
+  function vibrate(pattern){
+    if (navigator.vibrate){
+      try { navigator.vibrate(pattern); } catch(e){ /* ignore */ }
+    }
+  }
+
+  /* ============================= card data ============================= */
+
+  var QUESTIONS = [
+    { icon:'BTC',  q:'Will Bitcoin hit $72,000 by Friday?',
+      yes:62, no:38, pool:'2,000 USDC', players:'47 players', left:'22h', badge:'×1.5 EARLY', nextBracket: 41*60 },
+    { icon:'FOMC', q:'Will the Fed cut rates at the September meeting?',
+      yes:41, no:59, pool:'3,450 USDC', players:'88 players', left:'3d', badge:null, nextBracket:0 },
+    { icon:'GAME', q:'Will the home team cover the spread tonight?',
+      yes:55, no:45, pool:'610 USDC', players:'19 players', left:'4h', badge:'×1.25', nextBracket: 12*60 },
+    { icon:'POL',  q:'Will the bill pass the Senate this week?',
+      yes:30, no:70, pool:'1,120 USDC', players:'33 players', left:'1d 6h', badge:'×1.5 EARLY', nextBracket: 3*3600 }
+  ];
+
+  /* ============================= DOM build ============================= */
+
+  var stage = document.getElementById('stage');
+  var revealYes = document.getElementById('revealYes');
+  var revealNo = document.getElementById('revealNo');
+  var statusLine = document.getElementById('statusLine');
+
+  function fmtCountdown(sec){
+    if (sec <= 0) return '0:00';
+    var h = Math.floor(sec/3600);
+    var m = Math.floor((sec%3600)/60);
+    var s = Math.floor(sec%60);
+    if (h > 0) return h + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    return m + ':' + String(s).padStart(2,'0');
+  }
+
+  function buildCardEl(data, idx){
+    var el = document.createElement('div');
+    el.className = 'card';
+    el.dataset.pos = String(idx);
+    el.dataset.slot = String(idx);
+    el.tabIndex = -1;
+
+    el.innerHTML =
+      '<div class="tint tint-no"></div>' +
+      '<div class="tint tint-yes"></div>' +
+      '<div class="card-face">' +
+        '<div class="row-top">' +
+          (data.badge ? '<span class="badge"><span class="dot"></span>' + data.badge + ' <span class="badge-timer"></span></span>' : '<span></span>') +
+          '<span class="deadline">' + data.left + ' left</span>' +
+        '</div>' +
+        '<div class="row-body">' +
+          '<div class="icon-badge">' + data.icon + '</div>' +
+          '<h3 class="question">' + data.q + '</h3>' +
+        '</div>' +
+        '<div class="odds">' +
+          '<div class="odds-row"><span class="yes">YES ' + data.yes + '%</span><span class="no">NO ' + data.no + '%</span></div>' +
+          '<div class="odds-bar"><div class="odds-fill" style="width:' + data.yes + '%"></div></div>' +
+          '<div class="stats-row"><span>' + data.pool + ' · ' + data.players + '</span><span>' + data.left + '</span></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="card-face-armed">' +
+        '<div class="armed-dir">ARMED</div>' +
+        '<div class="armed-hint">Swipe again to commit, or the other way to cancel.</div>' +
+      '</div>';
+
+    return el;
+  }
+
+  var cards = QUESTIONS.map(function(data, i){
+    var el = buildCardEl(data, i);
+    stage.appendChild(el);
+    return {
+      el: el,
+      data: data,
+      x: makeAxis(),
+      y: makeAxis(),
+      mode: 'resting',        // 'dragging' | 'animating' | 'resting'
+      motion: 'return',       // which spring preset is currently driving this card
+      stage: 'neutral',       // 'neutral' | 'armed' | 'committed'
+      armedDir: 0,            // -1 no, +1 yes, 0 none
+      slot: i,                // stack position, 0 = front/interactive
+      pointerId: null,
+      grabPointer: null,
+      grabPos: null,
+      history: [],
+      badgeTimerEl: el.querySelector('.badge-timer'),
+      armedDirEl: el.querySelector('.armed-dir'),
+      bracketLeft: data.nextBracket
+    };
+  });
+
+  var order = cards.slice(); // order[0] = interactive top card
+
+  var stackWrap = document.getElementById('stackWrap');
+  var stageWidth = 0, stageHeight = 0, cardWidth = 0, cardHeight = 0;
+  var DOCK_OFFSET = 0, EDGE_BOUNDARY = 0, FLY_DISTANCE = 0, FINALIZE_DISTANCE = 0, TINT_RANGE = 0;
+
+  function measure(){
+    var stageRect = stackWrap.getBoundingClientRect();
+    var cardRect = order[0].el.getBoundingClientRect();
+    stageWidth = stageRect.width;
+    stageHeight = stageRect.height;
+    cardWidth = cardRect.width || 280;
+    cardHeight = cardRect.height || 400;
+    DOCK_OFFSET = cardWidth * 0.46;
+    EDGE_BOUNDARY = Math.max(DOCK_OFFSET + 20, stageWidth/2 - cardWidth/2 - EDGE_MARGIN);
+    FLY_DISTANCE = stageWidth * 1.3 + cardWidth;
+    FINALIZE_DISTANCE = stageWidth/2 + cardWidth/2 + 30;
+    TINT_RANGE = params.threshold;
+  }
+  measure();
+  window.addEventListener('resize', measure);
+
+  function layoutStack(){
+    for (var i = 0; i < order.length; i++){
+      order[i].slot = i;
+      order[i].el.dataset.pos = String(i);
+    }
+  }
+  layoutStack();
+
+  /* ============================= per-card stack transform (non-interactive cards) ============================= */
+  // Cards at slot > 0 get a gentle static offset via CSS transition (not gesture-driven,
+  // so a plain transition is fine here — nothing here is grabbed mid-motion).
+  var styleTag = document.createElement('style');
+  styleTag.textContent =
+    '.card[data-pos]{transition:box-shadow 200ms ease;}' +
+    '.card:not(.dragging-live)[data-pos="1"],.card:not(.dragging-live)[data-pos="2"],.card:not(.dragging-live)[data-pos="3"]{' +
+    'transition:transform 320ms cubic-bezier(.2,.8,.2,1), opacity 320ms ease;}';
+  document.head.appendChild(styleTag);
+
+  function stackBaseTransform(slot){
+    if (slot === 0) return {x:0, y:0, scale:1, opacity:1, rotate:0};
+    var y = slot * 12;
+    var scale = 1 - slot * 0.045;
+    var opacity = 1 - slot * 0.22;
+    return {x:0, y:-y, scale:scale, opacity:Math.max(opacity, 0.25), rotate:0};
+  }
+
+  /* ============================= param wiring ============================= */
+
+  function fmt2(n){ return n.toFixed(2); }
+  function bindSlider(id, key, valId, formatter){
+    var input = document.getElementById(id);
+    var out = document.getElementById(valId);
+    function update(){
+      var v = parseFloat(input.value);
+      params[key] = v;
+      out.textContent = formatter ? formatter(v) : fmt2(v);
+      if (key === 'threshold') TINT_RANGE = v;
+    }
+    input.addEventListener('input', update);
+    input.value = params[key];
+    update();
+    return {input:input, update:update};
+  }
+
+  var sliderRefs = [
+    bindSlider('s_returnDamping', 'returnDamping', 'v_returnDamping'),
+    bindSlider('s_returnResponse','returnResponse','v_returnResponse', function(v){return v.toFixed(2)+'s';}),
+    bindSlider('s_dockDamping',   'dockDamping',   'v_dockDamping'),
+    bindSlider('s_dockResponse',  'dockResponse',  'v_dockResponse', function(v){return v.toFixed(2)+'s';}),
+    bindSlider('s_commitDamping', 'commitDamping', 'v_commitDamping'),
+    bindSlider('s_commitResponse','commitResponse','v_commitResponse', function(v){return v.toFixed(2)+'s';}),
+    bindSlider('s_projection',    'projection',    'v_projection', function(v){return v.toFixed(3);}),
+    bindSlider('s_threshold',     'threshold',     'v_threshold', function(v){return Math.round(v)+'px';})
+  ];
+
+  document.getElementById('resetParams').addEventListener('click', function(){
+    Object.keys(DEFAULTS).forEach(function(k){ params[k] = DEFAULTS[k]; });
+    sliderRefs.forEach(function(ref){
+      var key = ref.input.id.replace('s_','');
+      ref.input.value = params[key];
+      ref.update();
+    });
+  });
+
+  var toggleReduced = document.getElementById('toggleReduced');
+  toggleReduced.addEventListener('change', function(){
+    simulateReduced = toggleReduced.checked;
+    applyReducedClass();
+  });
+  if (reduceMotionMQ && reduceMotionMQ.addEventListener){
+    reduceMotionMQ.addEventListener('change', applyReducedClass);
+  }
+  applyReducedClass();
+
+  var toggleDebug = document.getElementById('toggleDebug');
+  toggleDebug.addEventListener('change', function(){
+    statusLine.style.display = toggleDebug.checked ? '' : 'none';
+  });
+
+  function currentPreset(motion){
+    if (motion === 'dock') return {damping: params.dockDamping, response: params.dockResponse};
+    if (motion === 'commit') return {damping: params.commitDamping, response: params.commitResponse};
+    return {damping: params.returnDamping, response: params.returnResponse};
+  }
+
+  /* ============================= gesture state machine ============================= */
+
+  function dockX(dir){ return dir * DOCK_OFFSET; }
+
+  function velocityFromHistory(history){
+    if (history.length < 2) return {vx:0, vy:0};
+    var now = history[history.length-1];
+    // use the oldest sample within the last ~100ms for a stable velocity estimate
+    var cutoff = now.t - 100;
+    var ref = history[0];
+    for (var i = history.length-2; i >= 0; i--){
+      if (history[i].t >= cutoff){ ref = history[i]; } else { break; }
+    }
+    var dt = (now.t - ref.t) / 1000;
+    if (dt <= 0.001) return {vx:0, vy:0};
+    return {vx:(now.x-ref.x)/dt, vy:(now.y-ref.y)/dt};
+  }
+
+  function setBadge(card, stage, dir){
+    card.stage = stage;
+    card.armedDir = dir || 0;
+    card.el.classList.toggle('armed', stage === 'armed' || stage === 'committed');
+    if (stage === 'armed'){
+      card.armedDirEl.textContent = dir > 0 ? 'ARMED — YES' : 'ARMED — NO';
+      card.armedDirEl.className = 'armed-dir ' + (dir > 0 ? 'yes' : 'no');
+    }
+  }
+
+  function showReveal(dir){
+    revealYes.classList.toggle('visible', dir > 0);
+    revealNo.classList.toggle('visible', dir < 0);
+  }
+  function hideReveals(){
+    revealYes.classList.remove('visible');
+    revealNo.classList.remove('visible');
+  }
+
+  function setMotion(card, motion, targetX, targetY, vx, vy){
+    card.motion = motion;
+    card.mode = 'animating';
+    card.x.target = targetX;
+    card.y.target = targetY;
+    card.x.vel = vx || 0;
+    card.y.vel = vy || 0;
+  }
+
+  function snapInstant(card, targetX, targetY){
+    card.x.pos = targetX; card.x.vel = 0; card.x.target = targetX;
+    card.y.pos = targetY; card.y.vel = 0; card.y.target = targetY;
+    card.mode = 'resting';
+  }
+
+  function armCard(card, dir, vx, vy){
+    setBadge(card, 'armed', dir);
+    showReveal(dir);
+    updateActionBar();
+    vibrate(12); // light tap
+    if (reducedMotionActive()){
+      snapInstant(card, dockX(dir), 0);
+    } else {
+      setMotion(card, 'dock', dockX(dir), 0, vx, vy);
+    }
+    announce('Armed ' + (dir > 0 ? 'YES' : 'NO') + ' — swipe the same way to commit, the other way to cancel.');
+  }
+
+  function returnToCentre(card, vx, vy){
+    setBadge(card, 'neutral', 0);
+    hideReveals();
+    updateActionBar();
+    if (reducedMotionActive()){
+      snapInstant(card, 0, 0);
+    } else {
+      setMotion(card, 'return', 0, 0, vx, vy);
+    }
+    announce('Back to neutral.');
+  }
+
+  function commitCard(card, dir, vx, vy){
+    setBadge(card, 'committed', dir);
+    hideReveals();
+    updateActionBar();
+    vibrate([14, 30, 18]); // firmer confirmation
+    announce((dir > 0 ? 'YES' : 'NO') + ' committed.');
+    if (reducedMotionActive()){
+      card.el.style.transition = 'opacity 160ms ease';
+      card.el.style.opacity = '0';
+      snapInstant(card, dockX(dir), 0);
+      setTimeout(function(){ finalizeCommit(card); card.el.style.transition=''; card.el.style.opacity='1'; }, 170);
+    } else {
+      setMotion(card, 'commit', dir * FLY_DISTANCE, vy * 0.15, vx, vy);
+    }
+  }
+
+  function finalizeCommit(card){
+    // recycle: back of the stack, reset to neutral
+    var i = order.indexOf(card);
+    if (i > -1) order.splice(i,1);
+    order.push(card);
+    setBadge(card, 'neutral', 0);
+    card.mode = 'resting';
+    card.motion = 'return';
+    card.x.pos = 0; card.x.vel = 0; card.x.target = 0;
+    card.y.pos = 0; card.y.vel = 0; card.y.target = 0;
+    card.el.style.setProperty('--tint-yes', 0);
+    card.el.style.setProperty('--tint-no', 0);
+    layoutStack();
+    updateActionBar();
+  }
+
+  function announce(msg){
+    statusDetail = msg;
+  }
+
+  var statusDetail = '';
+
+  /* ---------- pointer handling ---------- */
+
+  function onPointerDown(e){
+    var card = order[0];
+    if (card.el !== e.currentTarget) return;
+    if (card.stage === 'committed'){
+      // caught mid fly-off: the bet only actually leaves once it's off stage,
+      // so grabbing it un-commits back to armed.
+      setBadge(card, 'armed', card.armedDir);
+      showReveal(card.armedDir);
+      updateActionBar();
+    }
+    card.el.setPointerCapture(e.pointerId);
+    card.pointerId = e.pointerId;
+    card.mode = 'dragging';
+    card.el.classList.add('dragging-live');
+    card.grabPointer = {x:e.clientX, y:e.clientY};
+    card.grabPos = {x:card.x.pos, y:card.y.pos};
+    card.history = [{x:e.clientX, y:e.clientY, t:performance.now()}];
+    e.preventDefault();
+  }
+
+  function deadzone(v){
+    var s = v < 0 ? -1 : 1;
+    var a = Math.abs(v);
+    return a > HYSTERESIS ? s * (a - HYSTERESIS) : 0;
+  }
+
+  function onPointerMove(e){
+    var card = order[0];
+    if (card.pointerId !== e.pointerId || card.mode !== 'dragging') return;
+    card.history.push({x:e.clientX, y:e.clientY, t:performance.now()});
+    if (card.history.length > 12) card.history.shift();
+
+    var rawDX = e.clientX - card.grabPointer.x;
+    var rawDY = e.clientY - card.grabPointer.y;
+    var effDX = deadzone(rawDX);
+    var effDY = deadzone(rawDY);
+
+    var candidateX = card.grabPos.x + effDX;
+    var candidateY = card.grabPos.y + effDY;
+
+    if (card.stage === 'armed'){
+      var dir = card.armedDir;
+      // rubber-band only when pushing further outward, past the edge boundary
+      if (dir > 0 && candidateX > EDGE_BOUNDARY){
+        candidateX = EDGE_BOUNDARY + rubberband(candidateX - EDGE_BOUNDARY, cardWidth);
+      } else if (dir < 0 && candidateX < -EDGE_BOUNDARY){
+        candidateX = -EDGE_BOUNDARY + rubberband(candidateX + EDGE_BOUNDARY, cardWidth);
+      }
+    }
+
+    card.x.pos = candidateX;
+    card.y.pos = candidateY;
+
+    if (card.stage === 'neutral'){
+      var t = clamp(Math.abs(candidateX) / Math.max(TINT_RANGE,1), 0, 1);
+      card.el.style.setProperty('--tint-yes', candidateX > 0 ? t : 0);
+      card.el.style.setProperty('--tint-no', candidateX < 0 ? t : 0);
+    }
+  }
+
+  function endDrag(card, e){
+    var v = velocityFromHistory(card.history);
+    card.el.classList.remove('dragging-live');
+    try { card.el.releasePointerCapture(e.pointerId); } catch(err){}
+    card.pointerId = null;
+
+    if (card.stage === 'neutral'){
+      var projX = card.x.pos + project(v.vx, params.projection);
+      if (Math.abs(projX) > params.threshold){
+        armCard(card, projX > 0 ? 1 : -1, v.vx, v.vy);
+      } else {
+        returnToCentre(card, v.vx, v.vy);
+      }
+    } else { // armed (or reverted from committed above)
+      var dir = card.armedDir;
+      var relative = (card.x.pos - dockX(dir)) + project(v.vx, params.projection);
+      var outward = relative * dir;
+      var EXTRA = params.threshold * 0.55;
+      if (outward > EXTRA){
+        commitCard(card, dir, v.vx, v.vy);
+      } else if (outward < -EXTRA){
+        returnToCentre(card, v.vx, v.vy);
+      } else {
+        // indecisive — settle back onto the dock, no bounce
+        card.mode = 'animating';
+        card.motion = 'return';
+        card.x.target = dockX(dir);
+        card.y.target = 0;
+        card.x.vel = v.vx; card.y.vel = v.vy;
+      }
+    }
+  }
+
+  function onPointerUp(e){
+    var card = order[0];
+    if (card.pointerId !== e.pointerId) return;
+    endDrag(card, e);
+  }
+  function onPointerCancel(e){
+    var card = order[0];
+    if (card.pointerId !== e.pointerId) return;
+    endDrag(card, e);
+  }
+
+  cards.forEach(function(card){
+    card.el.addEventListener('pointerdown', onPointerDown);
+    card.el.addEventListener('pointermove', onPointerMove);
+    card.el.addEventListener('pointerup', onPointerUp);
+    card.el.addEventListener('pointercancel', onPointerCancel);
+  });
+
+  /* ============================= buttons (accelerator's alternative, not a fallback) ============================= */
+
+  var btnYes = document.getElementById('btnYes');
+  var btnNo = document.getElementById('btnNo');
+  var btnConfirm = document.getElementById('btnConfirm');
+  var btnCancel = document.getElementById('btnCancel');
+  var actionBarNeutral = document.getElementById('actionBarNeutral');
+  var actionBarArmed = document.getElementById('actionBarArmed');
+
+  function updateActionBar(){
+    var card = order[0];
+    var armed = card.stage === 'armed' || card.stage === 'committed';
+    actionBarNeutral.hidden = armed;
+    actionBarArmed.hidden = !armed;
+  }
+
+  btnYes.addEventListener('click', function(){
+    var card = order[0];
+    if (card.stage !== 'neutral') return;
+    armCard(card, 1, 0, 0);
+  });
+  btnNo.addEventListener('click', function(){
+    var card = order[0];
+    if (card.stage !== 'neutral') return;
+    armCard(card, -1, 0, 0);
+  });
+  btnConfirm.addEventListener('click', function(){
+    var card = order[0];
+    if (card.stage !== 'armed') return;
+    commitCard(card, card.armedDir, 0, 0);
+  });
+  btnCancel.addEventListener('click', function(){
+    var card = order[0];
+    if (card.stage !== 'armed') return;
+    returnToCentre(card, 0, 0);
+  });
+
+  document.querySelectorAll('.chip').forEach(function(chip){
+    chip.addEventListener('click', function(){
+      var siblings = chip.parentElement.querySelectorAll('.chip');
+      siblings.forEach(function(s){ s.classList.remove('selected'); });
+      chip.classList.add('selected');
+      var amt = chip.dataset.amount;
+      btnConfirm.textContent = 'Confirm ' + amt + ' USDC bet';
+    });
+  });
+
+  /* ============================= render loop ============================= */
+
+  var lastTime = performance.now();
+
+  function render(card){
+    var slot = order.indexOf(card);
+    var base = stackBaseTransform(slot);
+    var tx, ty, scale, opacity;
+
+    if (slot === 0){
+      tx = card.x.pos;
+      ty = card.y.pos;
+      scale = 1;
+      opacity = 1;
+    } else {
+      tx = base.x; ty = base.y; scale = base.scale; opacity = base.opacity;
+    }
+
+    var rot = slot === 0 ? clamp(tx / ROTATE_DIVISOR, -MAX_ROTATE_DEG, MAX_ROTATE_DEG) : 0;
+    card.el.style.transform =
+      'translate(-50%,-50%) translate(' + tx.toFixed(2) + 'px,' + ty.toFixed(2) + 'px) rotate(' + rot.toFixed(2) + 'deg) scale(' + scale.toFixed(3) + ')';
+    card.el.style.opacity = opacity.toFixed(3);
+
+    if (slot !== 0 || card.stage !== 'neutral'){
+      // tint stays fixed once armed/committed (reinforces the chosen side); zero for background cards
+      if (card.stage === 'armed' || card.stage === 'committed'){
+        card.el.style.setProperty('--tint-yes', card.armedDir > 0 ? 1 : 0);
+        card.el.style.setProperty('--tint-no', card.armedDir < 0 ? 1 : 0);
+      } else if (slot !== 0){
+        card.el.style.setProperty('--tint-yes', 0);
+        card.el.style.setProperty('--tint-no', 0);
+      }
+    }
+  }
+
+  function tick(now){
+    var dt = Math.min((now - lastTime) / 1000, 1/30);
+    lastTime = now;
+
+    for (var i = 0; i < cards.length; i++){
+      var card = cards[i];
+      if (card.mode === 'animating'){
+        var preset = currentPreset(card.motion);
+        integrateAxis(card.x, dt, preset.damping, preset.response);
+        integrateAxis(card.y, dt, preset.damping, preset.response);
+
+        if (card.motion === 'commit' && Math.abs(card.x.pos) > FINALIZE_DISTANCE){
+          finalizeCommit(card);
+        }
+      }
+      render(card);
+    }
+
+    // status line
+    var top = order[0];
+    var vx = top.history.length > 1 ? velocityFromHistory(top.history).vx : 0;
+    statusLine.textContent = 'stage: ' + top.stage +
+      (top.armedDir ? ' · dir: ' + (top.armedDir>0?'YES':'NO') : '') +
+      ' · mode: ' + top.mode +
+      (top.mode === 'dragging' ? ' · vx≈' + Math.round(vx) + 'px/s' : '') +
+      (statusDetail ? ' · ' + statusDetail : '');
+
+    // cosmetic bracket countdowns
+    tickBadges(dt);
+
+    requestAnimationFrame(tick);
+  }
+
+  var badgeAccum = 0;
+  function tickBadges(dt){
+    badgeAccum += dt;
+    if (badgeAccum < 1) return;
+    badgeAccum = 0;
+    cards.forEach(function(card){
+      if (!card.badgeTimerEl) return;
+      if (card.bracketLeft > 0){
+        card.bracketLeft -= 1;
+        card.badgeTimerEl.textContent = fmtCountdown(card.bracketLeft);
+        if (card.bracketLeft <= 0){
+          // bonus spent — badge disappears rather than showing x1.00, per spec
+          var badge = card.el.querySelector('.badge');
+          if (badge) badge.style.display = 'none';
+        }
+      }
+    });
+  }
+
+  cards.forEach(function(card){
+    if (card.badgeTimerEl) card.badgeTimerEl.textContent = fmtCountdown(card.bracketLeft);
+  });
+
+  updateActionBar();
+  requestAnimationFrame(tick);
+
+})();
+</script>
+</body>
+</html>
