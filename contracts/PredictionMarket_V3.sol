@@ -47,6 +47,13 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
     ///         delay, short enough that funds are never stranded for good.
     uint256 public constant REFUND_GRACE_PERIOD = 30 days;
 
+    /// @notice Stake weight by how early in a market's life the bet was placed.
+    ///         Brackets are fractions of the market's own window, not fixed
+    ///         hours, so a two-hour market and a seven-day one follow one rule.
+    uint256 public constant WEIGHT_EARLY = 15000; // x1.50, first quarter
+    uint256 public constant WEIGHT_MID = 12500;   // x1.25, second quarter
+    uint256 public constant WEIGHT_LATE = 10000;  // x1.00, second half
+
     // ============ Storage ============
 
     IERC20 public immutable collateral;
@@ -413,6 +420,32 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
         uint256 total = pred.yesPool + pred.noPool;
         if (total == 0) return (BASIS_POINTS / 2, BASIS_POINTS / 2);
         return ((pred.noPool * BASIS_POINTS) / total, (pred.yesPool * BASIS_POINTS) / total);
+    }
+
+    /**
+     * @notice The weight a bet placed at `timestamp` would carry.
+     * @dev Public because the UI shows the live multiplier and counts down to
+     *      the next bracket. Comparisons multiply rather than divide, so no
+     *      integer division decides a bracket.
+     */
+    function weightBpsAt(uint256 predictionId, uint256 timestamp)
+        public
+        view
+        predictionExists(predictionId)
+        returns (uint256)
+    {
+        Prediction storage pred = predictions[predictionId];
+        if (timestamp <= pred.createdAt) return WEIGHT_EARLY;
+        if (timestamp >= pred.deadline) return WEIGHT_LATE;
+
+        // _register requires deadline > block.timestamp and sets createdAt to
+        // block.timestamp, so this window is always positive.
+        uint256 window = pred.deadline - pred.createdAt;
+        uint256 elapsed = timestamp - pred.createdAt;
+
+        if (elapsed * 4 < window) return WEIGHT_EARLY;
+        if (elapsed * 2 < window) return WEIGHT_MID;
+        return WEIGHT_LATE;
     }
 
     function getParticipants(uint256 predictionId) external view returns (address[] memory) {

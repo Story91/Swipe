@@ -274,4 +274,63 @@ describe("PredictionMarket_V3", function () {
       expect((await market.getPrediction(10)).registered).to.equal(false);
     });
   });
+
+  // ------------------------------------------------------------ early bonus
+  describe("weight brackets", function () {
+    // Read createdAt from the contract rather than deriving it from the
+    // deadline: registerPrediction mines its own block, so the market's window
+    // is not exactly the number of seconds openMarket was asked for, and a
+    // one-second drift is enough to flip a boundary assertion.
+    async function windowOf(id) {
+      const pred = await market.predictions(id);
+      return {
+        createdAt: Number(pred.createdAt),
+        deadline: Number(pred.deadline),
+        span: Number(pred.deadline) - Number(pred.createdAt),
+      };
+    }
+
+    it("pays x1.50 in the first quarter of the market's life", async function () {
+      await openMarket(1, 4 * DAY);
+      const { createdAt, span } = await windowOf(1);
+
+      expect(await market.weightBpsAt(1, createdAt)).to.equal(15000);
+      // One second before the quarter boundary.
+      expect(await market.weightBpsAt(1, createdAt + Math.floor(span / 4) - 1)).to.equal(15000);
+    });
+
+    it("pays x1.25 in the second quarter", async function () {
+      await openMarket(1, 4 * DAY);
+      const { createdAt, span } = await windowOf(1);
+
+      // Exactly the quarter boundary is already the second bracket.
+      expect(await market.weightBpsAt(1, createdAt + Math.ceil(span / 4))).to.equal(12500);
+      expect(await market.weightBpsAt(1, createdAt + Math.floor(span / 2) - 1)).to.equal(12500);
+    });
+
+    it("pays x1.00 in the second half and at the deadline", async function () {
+      await openMarket(1, 4 * DAY);
+      const { createdAt, deadline, span } = await windowOf(1);
+
+      expect(await market.weightBpsAt(1, createdAt + Math.ceil(span / 2))).to.equal(10000);
+      expect(await market.weightBpsAt(1, deadline)).to.equal(10000);
+    });
+
+    it("uses the same fractions for a two-hour market as a four-day one", async function () {
+      const HOUR = 60 * 60;
+      await openMarket(2, 2 * HOUR);
+      const { createdAt, span } = await windowOf(2);
+
+      // A quarter of two hours is thirty minutes — the same rule, a shorter window.
+      expect(await market.weightBpsAt(2, createdAt + Math.floor(span / 4) - 1)).to.equal(15000);
+      expect(await market.weightBpsAt(2, createdAt + Math.ceil(span / 4))).to.equal(12500);
+      expect(await market.weightBpsAt(2, createdAt + Math.ceil(span / 2))).to.equal(10000);
+    });
+
+    it("reverts for a market that does not exist", async function () {
+      await expect(market.weightBpsAt(999, 0)).to.be.revertedWith(
+        "Prediction not registered"
+      );
+    });
+  });
 });
