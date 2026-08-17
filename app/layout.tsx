@@ -1,47 +1,62 @@
 import "./theme.css";
 import "@coinbase/onchainkit/styles.css";
 import type { Metadata, Viewport } from "next";
-import { Orbitron, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { Providers } from "./providers";
 
 /**
- * Orbitron is named in ~40 rules across the app's stylesheets and has never
- * actually been loaded: no @font-face, no link tag, no font files in the repo.
- * Every one of those rules has been falling through to the generic sans-serif
- * fallback in production. Loading it here through next/font self-hosts it at
- * build time, so there is no request to Google at runtime.
+ * The three type roles, served from this repo rather than fetched from Google.
  *
- * Exposed as CSS variables and applied by the two stylesheets that ask for it,
+ * These were on next/font/google, which downloads at BUILD time. That is a
+ * silent dependency on the build machine reaching fonts.gstatic.com, and when
+ * it does not, the build still succeeds: the <html> element gets the generated
+ * class names, the CSS variables are never defined, and every `font-family:
+ * var(--font-display), ...` becomes invalid at computed-value time. The whole
+ * app then renders in Times New Roman. That is exactly what was observed on one
+ * build here - class names present, zero @font-face rules in the document.
+ *
+ * The files under public/fonts are the latin subsets straight from Google, 112
+ * KB for all three. Orbitron and Plex Sans are variable, so one file covers
+ * every weight; Plex Mono ships three static instances.
+ *
+ * Exposed as CSS variables and applied by the stylesheets that ask for them,
  * not on <body>. next/font generates a scoped family name rather than
- * registering the literal "Orbitron", so the rest of the app keeps rendering
- * exactly as it does today. Switching the whole app onto its intended face is a
- * separate decision with a lot of layout riding on it.
+ * registering the literal "Orbitron", so nothing that names the bare family
+ * changes behaviour.
  */
-const orbitron = Orbitron({
-  subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
+const orbitron = localFont({
+  src: [{ path: "../public/fonts/orbitron.woff2", weight: "500 800", style: "normal" }],
   variable: "--font-display",
   display: "swap",
+  // Measured against the fallback so a swap does not shift layout.
+  adjustFontFallback: false,
+  fallback: ["Orbitron", "sans-serif"],
 });
 
 // Orbitron is a display face and unreadable at paragraph length. Plex Sans
 // carries the prose: humanist enough to contrast the squared display, and it
 // holds up at 17px on a dark ground.
-const plexSans = IBM_Plex_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
+const plexSans = localFont({
+  src: [{ path: "../public/fonts/plex-sans.woff2", weight: "400 600", style: "normal" }],
   variable: "--font-body",
   display: "swap",
+  adjustFontFallback: false,
+  fallback: ["-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
 });
 
 // Amounts, percentages and addresses. Tabular by construction, so figures in a
 // column line up the way a tote board's do.
-const plexMono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
+const plexMono = localFont({
+  src: [
+    { path: "../public/fonts/plex-mono-400.woff2", weight: "400", style: "normal" },
+    { path: "../public/fonts/plex-mono-500.woff2", weight: "500", style: "normal" },
+    { path: "../public/fonts/plex-mono-600.woff2", weight: "600", style: "normal" },
+  ],
   variable: "--font-data",
   display: "swap",
+  adjustFontFallback: false,
+  fallback: ["Monaco", "Menlo", "monospace"],
 });
 
 export const viewport: Viewport = {
