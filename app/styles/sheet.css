@@ -1,0 +1,514 @@
+/*
+ * The sheet: Swipe's shared surface for full-panel screens.
+ *
+ * Parimutuel betting is tote betting, so these screens are built like a tote
+ * board and a racecard rather than a stack of feature cards. Two devices carry
+ * every one of them: hairline rules that separate without boxing, and a narrow
+ * left rail that holds a block's label while its content sits in the wide
+ * column. Rounded gradient cards are deliberately absent; a grid of them makes
+ * every section look like every other one, which is what made these screens
+ * read as generated.
+ *
+ * Type has three roles. Orbitron is the display face, loaded in app/layout.tsx
+ * and exposed as --font-display. Plex Sans carries prose, because Orbitron is
+ * unreadable at paragraph length. Plex Mono carries every figure, tabular, so
+ * columns of numbers line up the way a board's do.
+ *
+ * WHY CONTAINER QUERIES, NOT MEDIA QUERIES
+ * These screens render in two places with very different widths at the same
+ * viewport: as a dashboard panel inside the app shell, which is about 528px on
+ * a 1280px desktop, and as a standalone route, which gets the whole window. A
+ * viewport breakpoint reads "desktop" in both and leaves the panel with a 148px
+ * rail eating a third of its width. Asking the element about its own width is
+ * the only question with the same answer in both places. For the same reason
+ * headline sizes scale in cqi rather than vw.
+ *
+ * Usage: put `sheet` on the outermost element, `sheet-shell` on the inner
+ * wrapper that holds the gutter and max width, then compose the primitives
+ * below. Page-specific classes live in that page's own stylesheet.
+ */
+
+.sheet {
+  --sheet-lime: #d4ff00;
+  --sheet-paper: rgba(255, 255, 255, 0.92);
+  --sheet-paper-2: rgba(255, 255, 255, 0.72);
+  --sheet-paper-3: rgba(255, 255, 255, 0.5);
+  --sheet-rule: rgba(255, 255, 255, 0.1);
+  --sheet-rule-strong: rgba(255, 255, 255, 0.18);
+  --sheet-surface: rgba(255, 255, 255, 0.04);
+  --sheet-wash: rgba(212, 255, 0, 0.06);
+  --sheet-lime-line: rgba(212, 255, 0, 0.22);
+  --sheet-loss: rgba(255, 138, 128, 0.9);
+
+  --sheet-display: var(--font-display), 'Orbitron', sans-serif;
+  --sheet-body: var(--font-body), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --sheet-data: var(--font-data), 'Monaco', 'Menlo', monospace;
+
+  --sheet-gutter: 24px;
+  --sheet-rail: 148px;
+
+  container-type: inline-size;
+  container-name: sheet;
+
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+  color: var(--sheet-paper);
+  font-family: var(--sheet-body);
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+.sheet-shell {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 var(--sheet-gutter);
+}
+
+/* ---------------------------------------------------------------- eyebrows */
+
+/* Small caps label in the display face. Rail labels and board heads, never
+   decoration on its own. */
+.sheet-eyebrow {
+  font-family: var(--sheet-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--sheet-lime);
+  margin: 0;
+}
+
+/* ------------------------------------------------------------------- hero */
+
+.sheet-hero {
+  padding: 72px 0 40px;
+  border-bottom: 1px solid var(--sheet-rule);
+}
+
+.sheet-hero-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.sheet-hero-title {
+  font-family: var(--sheet-display);
+  font-weight: 800;
+  font-size: clamp(30px, 7cqi, 56px);
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  margin: 14px 0 0;
+  max-width: 16ch;
+}
+
+/* The one place the accent lands large. Everything else stays white. */
+.sheet-hero-title em {
+  font-style: normal;
+  color: var(--sheet-lime);
+}
+
+.sheet-hero-lede {
+  font-size: 19px;
+  color: var(--sheet-paper-2);
+  max-width: 58ch;
+  margin: 24px 0 0;
+}
+
+/* ------------------------------------------------------------ rail layout */
+
+.sheet-body {
+  padding: 8px 0 0;
+}
+
+.sheet-block {
+  display: grid;
+  grid-template-columns: var(--sheet-rail) 1fr;
+  gap: 32px;
+  padding: 40px 0;
+  border-bottom: 1px solid var(--sheet-rule);
+}
+
+.sheet-block:last-child {
+  border-bottom: 0;
+}
+
+.sheet-rail {
+  padding-top: 4px;
+}
+
+.sheet-rail-meta {
+  font-family: var(--sheet-data);
+  font-size: 12px;
+  color: var(--sheet-paper-3);
+  margin: 8px 0 0;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.sheet-h2 {
+  font-family: var(--sheet-display);
+  font-size: clamp(19px, 3.2cqi, 26px);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  margin: 0 0 16px;
+}
+
+.sheet-p {
+  margin: 0 0 16px;
+  color: var(--sheet-paper-2);
+  max-width: 66ch;
+}
+
+.sheet-p:last-child {
+  margin-bottom: 0;
+}
+
+.sheet-p strong {
+  color: var(--sheet-paper);
+  font-weight: 600;
+}
+
+/* Any figure a reader might compare against another figure. */
+.sheet-data {
+  font-family: var(--sheet-data);
+  font-variant-numeric: tabular-nums;
+  color: var(--sheet-paper);
+}
+
+/* --------------------------------------------------------------- the board */
+
+/* A bordered surface for one coherent object: a settlement, a standing, a
+   position. Used sparingly, so it still reads as the page's focal point. */
+.sheet-board {
+  border: 1px solid var(--sheet-rule-strong);
+  background: var(--sheet-surface);
+}
+
+.sheet-board-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--sheet-rule);
+}
+
+.sheet-board-title {
+  font-family: var(--sheet-display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  margin: 0;
+}
+
+.sheet-board-meta {
+  font-family: var(--sheet-data);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sheet-lime);
+  margin: 0;
+}
+
+/* The ledger: keys left, figures right, hairline between rows, so a reader can
+   follow a column down. */
+.sheet-settle {
+  border-top: 1px solid var(--sheet-rule);
+}
+
+.sheet-settle:first-child {
+  border-top: 0;
+}
+
+.sheet-settle-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 20px;
+}
+
+.sheet-settle-row + .sheet-settle-row {
+  border-top: 1px solid var(--sheet-rule);
+}
+
+.sheet-settle-row--total {
+  background: var(--sheet-wash);
+}
+
+.sheet-settle-key {
+  font-size: 14px;
+  color: var(--sheet-paper-2);
+}
+
+.sheet-settle-row--total .sheet-settle-key {
+  color: var(--sheet-paper);
+  font-weight: 600;
+}
+
+.sheet-settle-val {
+  font-family: var(--sheet-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.sheet-settle-row--total .sheet-settle-val {
+  color: var(--sheet-lime);
+  font-weight: 600;
+}
+
+.sheet-settle-sub {
+  display: block;
+  font-family: var(--sheet-body);
+  font-size: 12px;
+  color: var(--sheet-paper-3);
+  text-align: right;
+  margin-top: 2px;
+}
+
+/* ------------------------------------------------------------------ controls */
+
+/* Segmented control. A row of options where exactly one is live, drawn as
+   hairline cells rather than pills. */
+.sheet-segment {
+  display: inline-flex;
+  flex-wrap: wrap;
+  border: 1px solid var(--sheet-rule);
+}
+
+.sheet-segment-item {
+  font-family: var(--sheet-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sheet-paper-3);
+  background: transparent;
+  border: 0;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: color 140ms ease, background-color 140ms ease;
+}
+
+.sheet-segment-item + .sheet-segment-item {
+  border-left: 1px solid var(--sheet-rule);
+}
+
+.sheet-segment-item:hover,
+.sheet-segment-item:focus-visible {
+  color: var(--sheet-paper);
+}
+
+.sheet-segment-item[aria-pressed='true'],
+.sheet-segment-item[aria-selected='true'] {
+  color: var(--sheet-lime);
+  background: var(--sheet-wash);
+}
+
+/* A bordered action. Same shape as a segment cell, used on its own. */
+.sheet-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--sheet-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sheet-paper-2);
+  background: transparent;
+  border: 1px solid var(--sheet-rule);
+  padding: 11px 16px;
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.sheet-action:hover,
+.sheet-action:focus-visible {
+  color: var(--sheet-lime);
+  border-color: var(--sheet-lime-line);
+}
+
+/* ------------------------------------------------------------------- notes */
+
+/* One flagged aside, for the thing about today's state a reader would
+   otherwise get wrong. */
+.sheet-note {
+  border-left: 2px solid var(--sheet-lime);
+  padding: 2px 0 2px 18px;
+  margin: 24px 0 0;
+}
+
+.sheet-note p {
+  margin: 0;
+  font-size: 15px;
+  color: var(--sheet-paper-2);
+}
+
+.sheet-note p + p {
+  margin-top: 10px;
+}
+
+.sheet-note strong {
+  color: var(--sheet-paper);
+  font-weight: 600;
+}
+
+/* Empty and loading states. A screen with nothing in it still has to say what
+   it is and why it is empty. */
+.sheet-empty {
+  padding: 40px 0;
+  color: var(--sheet-paper-3);
+  font-size: 15px;
+}
+
+.sheet-empty strong {
+  display: block;
+  font-family: var(--sheet-display);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: var(--sheet-paper-2);
+  margin-bottom: 6px;
+}
+
+/* ------------------------------------------------------------------ footer */
+
+.sheet-footer {
+  border-top: 1px solid var(--sheet-rule);
+  margin-top: 8px;
+  padding: 32px 0 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.sheet-footer-note {
+  font-family: var(--sheet-data);
+  font-size: 12px;
+  color: var(--sheet-paper-3);
+  margin: 0;
+}
+
+.sheet-footer-links {
+  display: flex;
+  gap: 8px;
+}
+
+/* ---------------------------------------------------------------- social */
+
+.sheet-social {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+  padding-top: 6px;
+}
+
+.sheet-social-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--sheet-rule);
+  background: transparent;
+  color: var(--sheet-paper-3);
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.sheet-social-link:hover,
+.sheet-social-link:focus-visible {
+  color: var(--sheet-lime);
+  border-color: var(--sheet-lime-line);
+}
+
+/* -------------------------------------------------------- quality floor */
+
+.sheet :focus-visible {
+  outline: 2px solid var(--sheet-lime);
+  outline-offset: 2px;
+}
+
+/* A container query cannot style its own container, so narrow-width overrides
+   land on .sheet-shell and cascade from there rather than on .sheet. */
+@container sheet (max-width: 860px) {
+  .sheet-shell {
+    --sheet-gutter: 18px;
+    font-size: 16px;
+  }
+
+  .sheet-hero {
+    padding: 44px 0 32px;
+  }
+
+  .sheet-hero-top {
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    gap: 20px;
+    margin-bottom: 24px;
+  }
+
+  .sheet-hero-lede {
+    font-size: 17px;
+  }
+
+  /* Rail becomes an eyebrow stacked above the content. */
+  .sheet-block {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 32px 0;
+  }
+
+  .sheet-rail {
+    padding-top: 0;
+  }
+
+  .sheet-rail-meta {
+    margin-top: 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet * {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+  }
+}
+
+@media print {
+  .sheet {
+    background: #fff;
+    color: #111;
+  }
+
+  .sheet-hero-title em,
+  .sheet-eyebrow,
+  .sheet-board-meta,
+  .sheet-settle-row--total .sheet-settle-val {
+    color: #111;
+  }
+
+  .sheet-social,
+  .sheet-footer-links {
+    display: none;
+  }
+
+  .sheet-p {
+    color: #333;
+  }
+
+  .sheet-board {
+    background: #f6f6f6;
+    border-color: #ddd;
+  }
+}

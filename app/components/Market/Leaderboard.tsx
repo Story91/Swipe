@@ -3,7 +3,24 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '../../../components/ui/avatar';
 import { useFarcasterProfiles } from '../../../lib/hooks/useFarcasterProfiles';
+import '../../styles/sheet.css';
 import './Leaderboard.css';
+
+/**
+ * Top stakers, on the shared sheet.
+ *
+ * The board is a snapshot: /api/leaderboard/real-data serves whatever an admin
+ * last collected into Redis, and 404s when nothing has been collected.
+ *
+ * That empty case used to fall back to ten hardcoded addresses with invented
+ * stake amounts, rendered identically to real entries, under a footer that read
+ * "Real data from blockchain and Farcaster profiles". Invented rankings of
+ * invented wallets are worse than an empty board, so the fallback is gone and
+ * the empty state says what happened instead.
+ *
+ * Figures are V2-era: the ETH and SWIPE pools are on the archived contracts, so
+ * this ranks historical staking rather than anything currently live.
+ */
 
 interface LeaderboardUser {
   rank: number;
@@ -26,111 +43,38 @@ interface RealLeaderboardData {
   };
 }
 
-// Hardcoded top stakers data
-const HARDCODED_LEADERBOARD: LeaderboardUser[] = [
-  {
-    rank: 1,
-    address: "0x1234567890123456789012345678901234567890",
-    totalStakedETH: 2.4567,
-    totalStakedSWIPE: 150000,
-    predictionsParticipated: 12
-  },
-  {
-    rank: 2,
-    address: "0x2345678901234567890123456789012345678901",
-    totalStakedETH: 1.8901,
-    totalStakedSWIPE: 120000,
-    predictionsParticipated: 9
-  },
-  {
-    rank: 3,
-    address: "0x3456789012345678901234567890123456789012",
-    totalStakedETH: 1.5678,
-    totalStakedSWIPE: 95000,
-    predictionsParticipated: 8
-  },
-  {
-    rank: 4,
-    address: "0x4567890123456789012345678901234567890123",
-    totalStakedETH: 1.2345,
-    totalStakedSWIPE: 78000,
-    predictionsParticipated: 7
-  },
-  {
-    rank: 5,
-    address: "0x5678901234567890123456789012345678901234",
-    totalStakedETH: 0.9876,
-    totalStakedSWIPE: 65000,
-    predictionsParticipated: 6
-  },
-  {
-    rank: 6,
-    address: "0x6789012345678901234567890123456789012345",
-    totalStakedETH: 0.8765,
-    totalStakedSWIPE: 55000,
-    predictionsParticipated: 5
-  },
-  {
-    rank: 7,
-    address: "0x7890123456789012345678901234567890123456",
-    totalStakedETH: 0.7654,
-    totalStakedSWIPE: 45000,
-    predictionsParticipated: 4
-  },
-  {
-    rank: 8,
-    address: "0x8901234567890123456789012345678901234567",
-    totalStakedETH: 0.6543,
-    totalStakedSWIPE: 38000,
-    predictionsParticipated: 4
-  },
-  {
-    rank: 9,
-    address: "0x9012345678901234567890123456789012345678",
-    totalStakedETH: 0.5432,
-    totalStakedSWIPE: 32000,
-    predictionsParticipated: 3
-  },
-  {
-    rank: 10,
-    address: "0x0123456789012345678901234567890123456789",
-    totalStakedETH: 0.4321,
-    totalStakedSWIPE: 28000,
-    predictionsParticipated: 3
-  }
-];
+type Pool = 'eth' | 'swipe';
+
+/**
+ * Cached amounts arrive either already denominated or still in wei, depending
+ * on which collector wrote them. Anything above 1e15 is wei by inspection: no
+ * real position is 10^15 ETH, and no real position is 0.000001 wei.
+ */
+const asWhole = (amount: number) => (amount > 1e15 ? amount / 1e18 : amount);
+
+const compact = (amount: number) => {
+  if (amount >= 1e9) return `${(amount / 1e9).toFixed(1)}B`;
+  if (amount >= 1e6) return `${(amount / 1e6).toFixed(1)}M`;
+  if (amount >= 1e3) return `${(amount / 1e3).toFixed(1)}K`;
+  return amount.toFixed(0);
+};
 
 export function Leaderboard() {
-  const [selectedTab, setSelectedTab] = useState<'eth' | 'swipe'>('eth');
-  const [loading, setLoading] = useState(false);
+  const [selectedPool, setSelectedPool] = useState<Pool>('eth');
+  const [loading, setLoading] = useState(true);
   const [realData, setRealData] = useState<RealLeaderboardData | null>(null);
 
-  // Get Farcaster profiles for leaderboard users
-  const leaderboardAddresses = useMemo(() => 
-    HARDCODED_LEADERBOARD.map(user => user.address), 
-    [] // Empty dependency array since HARDCODED_LEADERBOARD never changes
-  );
-  const { profiles: leaderboardProfiles } = useFarcasterProfiles(leaderboardAddresses);
-
-  // Load real leaderboard data from Redis cache only
   useEffect(() => {
     const loadRealData = async () => {
       try {
         setLoading(true);
-        console.log('🔍 Fetching cached leaderboard data from Redis...');
-        
         const response = await fetch('/api/leaderboard/real-data');
-        
+
         if (response.ok) {
           const data = await response.json();
           if (data.success) {
             setRealData(data.data);
-            console.log('✅ Loaded cached leaderboard data:', data.data);
-          } else {
-            console.log('⚠️ No cached data available, using hardcoded fallback');
           }
-        } else {
-          console.log('⚠️ No cached data available, using hardcoded fallback');
         }
       } catch (error) {
         console.error('❌ Failed to load cached leaderboard data:', error);
@@ -142,204 +86,245 @@ export function Leaderboard() {
     loadRealData();
   }, []);
 
-  // Use real data if available, otherwise fallback to hardcoded
-  const ethLeaderboard = realData?.ethLeaderboard || HARDCODED_LEADERBOARD;
-  const swipeLeaderboard = realData?.swipeLeaderboard || HARDCODED_LEADERBOARD;
-  const farcasterProfiles = realData?.farcasterProfiles || leaderboardProfiles;
-  
-  // Get addresses for Farcaster profiles from real data
-  const realLeaderboardAddresses = useMemo(() => {
+  const addresses = useMemo(() => {
     if (!realData) return [];
-    const ethAddresses = realData.ethLeaderboard?.map((user: LeaderboardUser) => user.address) || [];
-    const swipeAddresses = realData.swipeLeaderboard?.map((user: LeaderboardUser) => user.address) || [];
-    return [...new Set([...ethAddresses, ...swipeAddresses])];
+    const eth = realData.ethLeaderboard?.map(u => u.address) || [];
+    const swipe = realData.swipeLeaderboard?.map(u => u.address) || [];
+    return [...new Set([...eth, ...swipe])];
   }, [realData]);
-  
-  const { profiles: realProfiles } = useFarcasterProfiles(realLeaderboardAddresses);
 
-  // Sort leaderboard based on selected tab
-  const sortedLeaderboard = useMemo(() => {
-    const currentLeaderboard = selectedTab === 'eth' ? ethLeaderboard : swipeLeaderboard;
-    return [...currentLeaderboard].sort((a, b) => {
-      if (selectedTab === 'eth') {
-        return b.totalStakedETH - a.totalStakedETH;
-      } else {
-        return b.totalStakedSWIPE - a.totalStakedSWIPE;
-      }
-    }).map((user, index) => ({
-      ...user,
-      rank: index + 1
-    }));
-  }, [selectedTab, ethLeaderboard, swipeLeaderboard]);
+  const { profiles } = useFarcasterProfiles(addresses);
 
-  // Generate avatar color based on address
-  const getAvatarColor = (addr: string) => {
-    const colors = [
-      'bg-blue-500',
-      'bg-green-500', 
-      'bg-purple-500',
-      'bg-pink-500',
-      'bg-yellow-500',
-      'bg-red-500',
-      'bg-indigo-500',
-      'bg-teal-500'
-    ];
-    const hash = addr.split('').reduce((a, b) => {
-      a = ((a << 5) - a) + b.charCodeAt(0);
-      return a & a;
-    }, 0);
-    return colors[Math.abs(hash) % colors.length];
-  };
+  const ranked = useMemo(() => {
+    if (!realData) return [];
+    const list = selectedPool === 'eth'
+      ? realData.ethLeaderboard || []
+      : realData.swipeLeaderboard || [];
 
-  // Get initials from profile or address
+    return [...list]
+      .sort((a, b) => selectedPool === 'eth'
+        ? b.totalStakedETH - a.totalStakedETH
+        : b.totalStakedSWIPE - a.totalStakedSWIPE)
+      .map((user, index) => ({ ...user, rank: index + 1 }));
+  }, [selectedPool, realData]);
+
   const getInitials = (profile: any, address: string) => {
     if (profile?.display_name) {
-      return profile.display_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+      return profile.display_name
+        .split(' ')
+        .map((n: string) => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2);
     }
     return address.slice(2, 4).toUpperCase();
   };
 
-  // Format SWIPE amounts to be more compact
-  const formatSWIPEAmount = (amount: number) => {
-    const ethAmount = amount / 1e18;
-    if (ethAmount >= 1e9) {
-      return `${(ethAmount / 1e9).toFixed(1)}B`;
-    } else if (ethAmount >= 1e6) {
-      return `${(ethAmount / 1e6).toFixed(1)}M`;
-    } else if (ethAmount >= 1e3) {
-      return `${(ethAmount / 1e3).toFixed(1)}K`;
-    } else {
-      return ethAmount.toFixed(0);
-    }
-  };
+  const poolLabel = selectedPool === 'eth' ? 'ETH' : 'SWIPE';
 
-  return (
-    <div className="leaderboard-page">
-      {/* Header */}
-      <div className="leaderboard-header">
-        <h1>🏆 Top Stakers</h1>
-        <p>Biggest contributors to the prediction market</p>
-      </div>
-
-      {/* Tab Selector */}
-      <div className="tab-selector">
-        <button 
-          className={`tab-button ${selectedTab === 'eth' ? 'active' : ''}`}
-          onClick={() => setSelectedTab('eth')}
-        >
-          <img src="/eth.png" alt="ETH" className="tab-icon" />
-          ETH Pools
-        </button>
-        <button 
-          className={`tab-button ${selectedTab === 'swipe' ? 'active' : ''}`}
-          onClick={() => setSelectedTab('swipe')}
-        >
-          <img src="/logo.png" alt="SWIPE" className="tab-icon" />
-          SWIPE Pools
-        </button>
-      </div>
-
-      {/* Loading State */}
-      {loading && (
-        <div className="leaderboard-loading">
-          <div className="loading-spinner"></div>
-          <p>Loading real leaderboard data...</p>
-        </div>
-      )}
-
-      {/* Leaderboard List */}
-      {!loading && (
-        <div className="leaderboard-container">
-          <div className="leaderboard-list">
-          {sortedLeaderboard.map((user) => {
-            // Use real profiles if available, otherwise fallback to hardcoded profiles
-            const profile = realData ? realProfiles.find(p => p && p.address === user.address) : leaderboardProfiles.find(p => p.address === user.address);
-            const hasFarcasterProfile = profile && profile.fid !== null && !profile.isWalletOnly;
-
-            return (
-              <div key={user.address} className="leaderboard-item">
-                <div className="leaderboard-rank">#{user.rank}</div>
-
-                <div className="leaderboard-user">
-                  <div className="relative">
-                    <Avatar 
-                      className={hasFarcasterProfile 
-                        ? "leaderboard-avatar cursor-pointer hover:scale-110 transition-all duration-300 shadow-lg hover:shadow-xl border-2 border-white/20 hover:border-blue-400/60 ring-2 ring-blue-500/20 hover:ring-blue-400/40"
-                        : "leaderboard-avatar cursor-pointer hover:scale-105 transition-all duration-300 shadow-md border-2 border-gray-300 hover:border-gray-400"
-                      }
-                    >
-                      <AvatarImage 
-                        src={hasFarcasterProfile ? (profile?.pfp_url || undefined) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.address.slice(2, 8)}`} 
-                        alt={hasFarcasterProfile ? (profile?.display_name || `User ${user.address.slice(2, 6)}`) : `Wallet ${user.address.slice(2, 6)}`}
-                      />
-                      <AvatarFallback className={getAvatarColor(user.address)}>
-                        <span className="text-white text-xs font-semibold">
-                          {getInitials(profile, user.address)}
-                        </span>
-                      </AvatarFallback>
-                    </Avatar>
-                  </div>
-                  
-                  <div className="leaderboard-user-info">
-                    <div className="leaderboard-username">
-                      {hasFarcasterProfile ? (profile?.display_name || `User ${user.address.slice(2, 6)}`) : `Wallet ${user.address.slice(2, 6)}`}
-                    </div>
-                    <div className="leaderboard-user-handle">
-                      {hasFarcasterProfile ? `@${profile?.username}` : `${user.address.slice(0, 6)}...${user.address.slice(-4)}`}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="leaderboard-stats">
-                  <div className="leaderboard-stat">
-                    <div className="stat-value">
-                      {selectedTab === 'eth' ? (
-                        <>
-                          <img src="/eth.png" alt="ETH" className="stat-icon" />
-                          <span className="amount-text">
-                            {/* Check if value is in wei (> 1e15) or already in ETH (< 1e15) */}
-                            {(user.totalStakedETH > 1e15 
-                              ? (user.totalStakedETH / 1e18).toFixed(4) 
-                              : user.totalStakedETH.toFixed(4))}
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <img src="/logo.png" alt="SWIPE" className="stat-icon" />
-                          <span className="amount-text">
-                            {/* formatSWIPEAmount expects wei, so multiply if already in SWIPE */}
-                            {formatSWIPEAmount(user.totalStakedSWIPE > 1e15 
-                              ? user.totalStakedSWIPE 
-                              : user.totalStakedSWIPE * 1e18)}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                    <div className="stat-label">Total Staked</div>
-                  </div>
-                  <div className="leaderboard-stat">
-                    <div className="stat-value">{user.predictionsParticipated}</div>
-                    <div className="stat-label">Predictions</div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+  const shell = (body: React.ReactNode) => (
+    <div className="sheet">
+      <div className="sheet-shell">
+        <header className="sheet-hero">
+          <div className="sheet-hero-top">
+            <div>
+              <p className="sheet-eyebrow">Leaderboard</p>
+              <h1 className="sheet-hero-title">
+                Who put the <em>most</em> in
+              </h1>
+            </div>
           </div>
-        </div>
-      )}
-
-      {/* Footer Info */}
-      <div className="leaderboard-footer">
-        <p>📊 Real data from blockchain and Farcaster profiles</p>
-        <p>🔄 Data refreshed by admin (cached in Redis)</p>
-        {realData && (
-          <p>👥 {realData.totalUsers} users, {realData.totalPredictions} predictions</p>
-        )}
-        {!realData && (
-          <p>⚠️ Using hardcoded data - admin needs to refresh</p>
-        )}
+          <p className="sheet-hero-lede">
+            Ranked by total staked across the ETH and SWIPE pools. These are
+            V2-era figures on the archived contracts, so the board is a record
+            of what happened rather than a live standing.
+          </p>
+        </header>
+        <main className="sheet-body">{body}</main>
       </div>
     </div>
+  );
+
+  if (loading) {
+    return shell(
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">Standings</p>
+        </div>
+        <div>
+          <div className="sheet-empty">
+            <strong>Reading the snapshot</strong>
+            Pulling the cached board out of Redis.
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (!realData) {
+    return shell(
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">Standings</p>
+          <p className="sheet-rail-meta">{`No snapshot\ncached`}</p>
+        </div>
+        <div>
+          <div className="sheet-empty">
+            <strong>Nothing collected yet</strong>
+            This board is built from a snapshot an admin collects into Redis,
+            and there isn&apos;t one cached right now. It fills in once the next
+            collection runs.
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return shell(
+    <>
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">Standings</p>
+          <p className="sheet-rail-meta">
+            {`${ranked.length} ranked\nby ${poolLabel} staked`}
+          </p>
+        </div>
+        <div>
+          <div className="lb-tabs">
+            <div className="sheet-segment" role="group" aria-label="Which pool to rank by">
+              <button
+                type="button"
+                className="sheet-segment-item"
+                aria-pressed={selectedPool === 'eth'}
+                onClick={() => setSelectedPool('eth')}
+              >
+                <img src="/eth.png" alt="" className="lb-tab-icon" />
+                ETH pools
+              </button>
+              <button
+                type="button"
+                className="sheet-segment-item"
+                aria-pressed={selectedPool === 'swipe'}
+                onClick={() => setSelectedPool('swipe')}
+              >
+                <img src="/logo.png" alt="" className="lb-tab-icon" />
+                SWIPE pools
+              </button>
+            </div>
+          </div>
+
+          {ranked.length === 0 ? (
+            <div className="sheet-empty">
+              <strong>Nobody staked in this pool</strong>
+              Try the other one.
+            </div>
+          ) : (
+            <div className="lb-table">
+              <div className="lb-head" aria-hidden="true">
+                <span>Rank</span>
+                <span>Player</span>
+                <span>Staked</span>
+                <span>Markets</span>
+              </div>
+
+              {ranked.map(user => {
+                const profile = profiles.find(p => p && p.address === user.address);
+                const hasFarcaster = profile && profile.fid !== null && !profile.isWalletOnly;
+                const staked = selectedPool === 'eth'
+                  ? asWhole(user.totalStakedETH)
+                  : asWhole(user.totalStakedSWIPE);
+
+                return (
+                  <div key={user.address} className="lb-row">
+                    <div className={`lb-rank${user.rank <= 3 ? ' lb-rank--top' : ''}`}>
+                      {String(user.rank).padStart(2, '0')}
+                    </div>
+
+                    <div className="lb-who">
+                      <Avatar className={`lb-avatar${hasFarcaster ? '' : ' lb-avatar--wallet'}`}>
+                        <AvatarImage
+                          src={hasFarcaster ? (profile?.pfp_url || undefined) : undefined}
+                          alt=""
+                        />
+                        <AvatarFallback>
+                          <span className="text-white text-xs font-semibold">
+                            {getInitials(profile, user.address)}
+                          </span>
+                        </AvatarFallback>
+                      </Avatar>
+
+                      <div className="lb-who-text">
+                        <div className="lb-name">
+                          {hasFarcaster
+                            ? (profile?.display_name || `User ${user.address.slice(2, 6)}`)
+                            : `Wallet ${user.address.slice(2, 6)}`}
+                        </div>
+                        <div className="lb-handle">
+                          {hasFarcaster
+                            ? `@${profile?.username}`
+                            : `${user.address.slice(0, 6)}…${user.address.slice(-4)}`}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="lb-stats">
+                      <div>
+                        <span className="lb-stat-label">Staked</span>
+                        <span className="lb-figure">
+                          {selectedPool === 'eth' ? staked.toFixed(4) : compact(staked)}
+                          <span className="lb-figure-unit">{poolLabel}</span>
+                        </span>
+                      </div>
+                      <div>
+                        <span className="lb-stat-label">Markets</span>
+                        <span className="lb-count">{user.predictionsParticipated}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">The snapshot</p>
+          <p className="sheet-rail-meta">{`Collected,\nnot live`}</p>
+        </div>
+        <div>
+          <div className="sheet-board">
+            <div className="sheet-settle">
+              <div className="sheet-settle-row">
+                <span className="sheet-settle-key">Players in the snapshot</span>
+                <span className="sheet-settle-val">{realData.totalUsers}</span>
+              </div>
+              <div className="sheet-settle-row">
+                <span className="sheet-settle-key">Markets covered</span>
+                <span className="sheet-settle-val">{realData.totalPredictions}</span>
+              </div>
+              <div className="sheet-settle-row sheet-settle-row--total">
+                <span className="sheet-settle-key">Total {poolLabel} staked</span>
+                <span className="sheet-settle-val">
+                  {selectedPool === 'eth'
+                    ? asWhole(realData.summary?.totalETHStaked ?? 0).toFixed(4)
+                    : compact(asWhole(realData.summary?.totalSWIPEStaked ?? 0))}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="sheet-note">
+            <p>
+              Figures come from a cached collection rather than a live read, so
+              they lag the chain by however long ago that collection ran. Names
+              and avatars are Farcaster profiles where the address has one, and
+              a shortened address where it does not.
+            </p>
+          </div>
+        </div>
+      </section>
+    </>
   );
 }
