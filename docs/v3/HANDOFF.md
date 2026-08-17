@@ -1,6 +1,6 @@
 # Handoff — 2026-08-17
 
-State at the end of a long session. Read this before touching anything.
+State at the end of two long sessions. Read this before touching anything.
 
 ---
 
@@ -8,28 +8,37 @@ State at the end of a long session. Read this before touching anything.
 
 | Branch | Head | Pushed? | Contains |
 |---|---|---|---|
-| `main` | `88c7aad` | ✅ synced | All UI fixes shipped today, all docs, both plans, the spec |
-| `v3-contract` | `48b411a` | ✅ pushed | The whole V3 contract: 18 commits, 71 tests passing |
+| `main` | `ab99704` | ❌ **3 ahead of origin** | All UI fixes shipped today, all docs, both plans, the spec, the production fix, the landmine fix |
+| `v3-contract` | `7508ced` | ❌ **2 ahead of origin** | The whole V3 contract (18 commits), the docs correction, the boundary-test fix. 72 passing / 13 pending |
 
 **`main` is production.** Vercel deploys from it. `v3-contract` is a feature branch; pushing it triggers a Vercel *preview* build, which is how a build break got caught (see §5).
 
-## 2. ⚠️ `main` has an unpushed commit carrying an armed landmine
+**Nothing has been pushed.** Five commits sit locally across the two branches. Pushing `main` deploys to production; that is the owner's call.
 
-`869b65e` sits on local `main`, **not pushed**. It fixes the two production bugs in §4.1 — the chain check and the lying toast — and typecheck and build both pass. A duplicate copy is on the branch `fix/chain-aware-bet-guard` (also unpushed).
+## 2. The landmine is disarmed — and the mechanism recorded here was wrong
 
-**Read this before pushing it.**
+`ab99704` on `main` closes it. Read this section anyway, because the *reason* it was dangerous is not the reason the previous handoff gave, and the wrong version will lead the next person straight back into it.
 
-The agent that wrote it disclosed a fund-loss risk it deliberately did not fix, because fixing it was out of its scope:
+**What the fix does.** `lib/chains` now exports `isWritableMarket(key, target)`. The swipe-bet path refuses unless the address it is about to write to *is* the selected chain's market contract. `CONTRACTS.V2.address` — Base's V2, a module-load constant that does not follow the switcher — can never equal a chain's pool address, so the swipe bet stays shut until V3 routes both the address **and the ABI** through `lib/chains`. Mutation-proved three ways; see the commit message.
 
-> `CONTRACTS.V2`, used by every `writeContract` call in `TinderCard.tsx`, is a module-load-time constant fixed to Base's V2 address regardless of the active chain. If `ROBINHOOD_USDG_DUALPOOL` or `ROBINHOOD_TESTNET_USDG_DUALPOOL` is ever set before the real V3 migration lands, the new guard would pass but the write would still target the wrong (Base) address.
+**What the previous handoff got wrong.** It said setting `ROBINHOOD_USDG_DUALPOOL` arms the mine. It does not, and cannot:
 
-It does not manifest today: both env vars are unset, so `getWritableMarket()` returns `null` and the bet is refused.
+> `ROBINHOOD_USDG_DUALPOOL`, `ROBINHOOD_TESTNET_USDG_DUALPOOL` and `ROBINHOOD_TESTNET_MOCK_USDC` have **no `NEXT_PUBLIC_` prefix**, so Next.js leaves them `undefined` in the browser bundle. Every contract address the client actually uses today (`NEXT_PUBLIC_CONTRACT_V2_ADDRESS`, `NEXT_PUBLIC_USDC_DUALPOOL_CONTRACT`, `NEXT_PUBLIC_SWIPE_CLAIM_CONTRACT`) is prefixed. The Robinhood ones are not.
 
-**But setting that env var is the first step of deploying V3.** The landmine is armed by the very next thing you plan to do. Before that env var is set, either make the contract address follow the active chain, or add an explicit guard that refuses a write whose target address does not belong to the selected chain.
+Verified against a production build, not reasoned about: the values of `ROBINHOOD_TESTNET_USDG_DUALPOOL` and `ROBINHOOD_TESTNET_MOCK_USDC` — both of which `.env.local` **does** set — appear in **zero** client chunks, while `NEXT_PUBLIC_CONTRACT_V2_ADDRESS`'s value appears in three, and `lib/chains` is demonstrably bundled (its hardcoded USDG literal is in the same three chunks).
 
-Decision left open on purpose: push it (both fixes are real improvements and the mine is unarmed today), or hold it until the address is chain-aware. Do not push it *and* set the env var in the same sitting.
+Two consequences, both live:
 
-`artifacts/` and `cache/` churn is pre-existing noise from hardhat runs — leave it.
+1. **`getWritableMarket()` already answers the same question two different ways** depending on where it runs. On the server `robinhoodTestnet` has a real pool address; in the UI it has the zero address. Anything that branches on it server-side and client-side is comparing different worlds.
+2. **The mine was armed not by setting that env var but by the obvious next move.** Someone wires V3 up, betting is still refused, they find the address is `undefined` in the browser, and they prefix the var with `NEXT_PUBLIC_`. *That* is the moment the address becomes reachable. The address-comparison guard is what has to be sound before then, and now is.
+
+Both config sites in `lib/chains/index.ts` carry this note in a comment.
+
+**Still true, still the rule:** do not push the fix *and* make a Robinhood pool address client-visible in the same sitting.
+
+**Two more call sites with the same shape, not armed.** `KalshiMarkets.tsx:875` and `CreatePredictionModal.tsx:523` both call `isReadOnlyChain()` with **no argument** — the exact bug §4.1 fixed in `TinderCard` — so they evaluate Base and refuse everything regardless of the selected chain. Neither is armed by any env var, and `CreatePredictionModal` additionally pins `chainId: ACTIVE_CHAIN_ID` on its writes. But whoever makes them chain-aware must use `isWritableMarket`, not `getWritableMarket`, or they will rebuild the mine in a new place.
+
+`artifacts/` and `cache/` churn is pre-existing noise from hardhat runs — leave it. It does not block a branch switch except for `artifacts/contracts/PredictionMarket_V3.sol/`, which only exists on `v3-contract`; `git checkout -- ` that directory first. The churn is line endings only — verified the committed V3 artifact matches a fresh compile byte for byte in abi, bytecode and deployedBytecode.
 
 ## 3. What V3 actually is now
 
@@ -40,11 +49,15 @@ The contract is `contracts/PredictionMarket_V3.sol` (renamed from `PredictionMar
 - ✅ **Time-weighted stakes.** A bet's weight is frozen at bet time by which quarter of the market's lifetime it lands in: ×1.50 / ×1.25 / ×1.00. It decides how the losing pool is split. Stake always returns raw; only the share of the losers is weighted. `exitEarly` removes weight proportionally, rounded **up**, against the exiting user.
 - ❌ **Creator bond — designed, built, then removed.** Three commits build it, one removes it. History kept deliberately, because the reason it went is worth reading (§5).
 
-Plus: an `exitEarly` guard against a real exploit, and a deploy script applying platform fee 3%, `minBet` 0.1, on hardcoded collateral addresses.
+Plus: an `exitEarly` guard against a real exploit — read §4.3 before you rely on the description of that exploit — and a deploy script applying platform fee 3%, `minBet` 0.1, on hardcoded collateral addresses.
+
+**Nothing V3 is deployed anywhere.** Checked on-chain, not read off a doc: none of Base's V2 (`0x2bA3…`), Base's USDC dual pool (`0xf5Fa…`), the Robinhood testnet USDG pool (`0x3225…`) or the Robinhood testnet dual pool (`0x81B9…`) carries the `weightBpsAt` selector, which only V3 has. Robinhood **mainnet** has no market contract at all. What is on the Robinhood testnet is V3's audited *predecessor*; `rules-v3.md` §2 used to imply it was V3 and no longer does.
 
 ## 4. Next steps, in order
 
-### 4.1 Resolve the uncommitted TinderCard work (§2)
+### 4.1 ✅ Done — the TinderCard production fix and the landmine
+
+`869b65e` (chain-aware guard, honest toast) and `ab99704` (address-comparison guard) are both on local `main`, unpushed. What follows is kept as the record of what they fixed.
 
 Two production bugs, both found by the audit:
 
@@ -53,36 +66,56 @@ Two production bugs, both found by the audit:
 
 **The trap in fixing #1:** making the check chain-aware must not turn "always blocked" into "attempts a write against the zero address". Robinhood mainnet has no market contract configured. Verify `getWritableMarket()` returning `null` still refuses the bet.
 
-### 4.2 Fix the stale docs — the bond is gone but still documented
+### 4.2 ✅ Done — the bond and the false claim are out of the docs
 
-`docs/v3/rules-v3.md` and `docs/superpowers/specs/2026-08-17-v3-market-rules-design.md` both still describe the creator bond as a live feature. `rules-v3.md` is the file the user-facing **Help & FAQ and manifesto get rewritten from**, so leaving it would document a mechanic that does not exist.
+Fixed on **`v3-contract`** (`6f0776f`), not on `main`, for two reasons: the corrected §4 pointer names `contracts/PredictionMarket_V3.sol`, which only exists on that branch, and both `rules-v3.md` and the spec already had newer content there, so editing `main`'s copies would have meant merging two rewrites of a document that seeds user-facing copy. **They reach `main` with the merge in §4.4 and not before.**
 
-Three separate corrections needed:
+What changed: §5.4 removed from `rules-v3.md` and §5.5/§5.6 renumbered; bond rows dropped from the spec's decisions table, rollout phases, risk table and open questions; spec §5.3 rewritten as a record of *why* the bond went; `open-questions.md` items 2–5 closed; a "executed, and partly reversed" banner on the plan, whose body is left intact because it is the record of what was actually done; a line in `worklog.md` saying two of the four adopted rule families did not survive the day.
 
-1. Remove §5.4 (creator bond) from `rules-v3.md` and the bond rows from the spec's decisions table and §5.3.
-2. **Delete this sentence and the reasoning built on it** — it appears in `rules-v3.md` §5.4 and in the spec:
-   > *"A market that pays out necessarily had stake on both sides, so this is one rule, not four."*
+The false claim — *"a market that pays out necessarily had stake on both sides"* — is deleted, and where it did damage it is recorded **as false**, with the counterexample and with what it cost: the bond's "one side stayed empty → forfeited" row would never have fired when the empty side was the losing one. It survived two reviews because the only test written against it staked YES and resolved NO, the one sub-case where the claim holds. The spec's §9 test list now demands both directions.
 
-   **It is false.** With `yesPool = 100`, `noPool = 0`, resolving YES: `winnersPool > 0`, so the paying path runs. It survived two per-task reviews because it sounded right and the test only covered the sub-case where the *empty* side wins. Do not leave it in a document that seeds future features.
-3. `rules-v3.md` §4 still points at `contracts/PredictionMarket_USDG_DualPool.sol`, which no longer exists.
+It still exists, quoted, in `docs/superpowers/plans/2026-08-17-v3-contract.md` — including inside quoted contract comments. That is deliberate: the plan is the record of what was implemented, and the banner tells the reader not to copy from it.
 
-### 4.3 Scoped re-review of everything after the final review
+### 4.3 ✅ Done — scoped re-review of `7a6a4ad..48b411a`
 
-The final whole-branch review passed with no Critical. **Then the money code changed three more times** — bond removed, exploit guard added, guard narrowed to the final quarter. None of that has been reviewed by anyone but the agent who wrote it.
+Three commits: the bond removal + exploit guard (`e8eb4eb`), the narrowing to the final quarter (`48b411a`), and a prototype restyle (`3729959`, cosmetic). Result: **the contract code is sound. One test was not.**
 
-This is the last gate before merge. Scope it to `git diff <final-review-head>..48b411a`. The final review's own diff package is at `.superpowers/sdd/2026-08-17-v3-contract/review-0f11d07..7a6a4ad.diff`.
+**Fixed (`7508ced`).** `refuses the exit at the three-quarter mark` passed identically against `elapsed * 4 > window * 3` and the `>=` the contract has — the one assertion whose whole purpose was the exact boundary could not see the boundary move. Cause: `openMarket` asks for `DAY` but `registerPrediction` mines its own block, so the real span is 86399, and `ceil(86399 * 3 / 4)` overshoots the boundary by three units, putting the test at a point where both operators agree. Now pinned with `evm_setNextBlockTimestamp` to an exact span of `DAY`, with the mirror assertion one second earlier and an assertion that `span % 4 == 0` so it cannot become unreachable again.
 
-**Demand mutation proofs, not green suites.** Twice this session a test passed while the thing it claimed to guard was broken. Both times only "break it deliberately and confirm the test fails" caught it.
+**Mutation proofs, five against the reviewed code:**
+
+| Mutation | Caught by |
+|---|---|
+| Guard made unconditional | 3 tests (both before-quarter exits, sole-backer full exit) |
+| Guard removed | 2 tests (both refusals) |
+| `>=` weakened to `>` | **0 before `7508ced`**, 1 after |
+| `- amount > 0` weakened to `>= 0` | 2 tests (both refusals) |
+| Partial exit wipes the whole weight | 1 test — the lower bound `e8eb4eb` added |
+
+**Finding that is not a code bug and needs a decision: the exploit is misdescribed.** The spec and `rules-v3.md` say a bettor can "turn a stake they were about to lose into a full refund". Measured on-chain instead of argued — bob holds 500 on NO and 1 on YES as the sole YES backer:
+
+| | bob stays in | bob exits his 1 YES |
+|---|---|---|
+| A third party holds 300 on the losing side | bob **+288**, third party **−300** | bob **−0.05**, third party **0** |
+| bob alone in the market | bob **−7.50** (the fees) | bob **−0.05** |
+
+For bob's 500 to be "certainly lost", someone else must be positioned to win it — and if anyone else is on the winning side, bob cannot empty that pool at all. Being the *sole* holder of the winning side means bob is about to collect the entire net losing pool, so exiting **costs him 288** and *refunds the third party who would otherwise have lost everything*. Exiting only pays when bob is the only participant, and what it recovers is the platform + creator fee on his own stake (7.50 of 501 at the contract's 1% default; ~3.5% at the intended 3%).
+
+So the guard protects **fee revenue in self-dealt markets**, not user funds — and it charges a real cost to honest users: the sole backer of a side cannot exit at all in the final quarter, in markets that average nought to two players. The code is conservative and harmless; the *justification* in `rules-v3.md` §5.5 is player-facing copy that tells players a threat story that cannot happen to them. **Decide whether the guard is worth keeping on those terms, and fix that copy either way.** Not changed here: reversing it is a design decision, not a review finding.
+
+Also confirmed: no bond remnant anywhere in `contracts/`, `scripts/deploy_v3.js` or the V3 test file; the deploy script's bond configuration is cleanly removed; the committed artifact matches a fresh compile byte for byte in abi, bytecode and deployedBytecode — which matters because `lib/contract.ts:1677` `require()`s that exact file at build time.
 
 ### 4.4 Then merge `v3-contract` → `main`
 
 Merging will *not* delete `docs/v3/ui-backlog.md` or the WalletConnect fix, despite what `git diff main..v3-contract` suggests — those files were created on `main` after the branch was cut, so a diff shows them as deletions. A merge keeps them.
 
+**The merge is now also how the docs correction reaches production** (§4.2). `rules-v3.md`, the spec and `open-questions.md` were edited only on `v3-contract`; `open-questions.md` was separately edited on `main` (the WalletConnect closure, `88c7aad`) but in a different region, so the three-way merge should be clean. Check it rather than assume it.
+
 ### 4.5 Deploy to Base — the owner's call, not an agent's
 
 `npm run deploy:v3:base`. Collateral addresses are hardcoded on purpose: searching Robinhood Chain's explorer for "USDC" returns 18-decimal impostors with no liquidity. The script also refuses any token not reporting 6 decimals, and refuses any network it has no vetted address for.
 
-There is deliberately **no `deploy:v3:robinhood` script.** Base is first.
+There is deliberately no `deploy:v3:robinhood` **npm script** — but that is all the "Base first" sequencing is made of. `scripts/deploy_v3.js` has a vetted `robinhood` entry in its `COLLATERAL` map and `hardhat.config.js` defines a `robinhood` mainnet network, so `npx hardhat run scripts/deploy_v3.js --network robinhood` would deploy V3 to Robinhood mainnet today. If that ordering is meant to be enforced rather than merely intended, the script has to refuse the network, not just lack an alias.
 
 ## 5. Decisions already made — do not re-litigate
 
@@ -95,12 +128,17 @@ There is deliberately **no `deploy:v3:robinhood` script.** Base is first.
 | **No minimum pool** | Dropped. It solved market sprawl a second time while punishing users for betting on a quiet market. |
 | **12-market cap enforced off-chain** | `registerPrediction` is already `onlyResolver`, so the backend controls it. An on-chain counter costs a storage write per resolution and guarantees nothing extra. |
 | **Creator bond removed entirely** | It let the hot resolver key pull tokens from *any* wallet holding an allowance — every bettor — with no consent from that address, against audit finding 8. And it was defeated for one cent by wash-betting both sides. Bought real blast-radius expansion for a mechanic that did not work. |
-| **`exitEarly` guard only in the final quarter** | Unconditional, it stranded the sole backer of a side — the *normal* case in markets averaging 0–2 players, i.e. exactly the early users the ×1.50 bonus exists to attract. Accepted residual: an outcome certain early could still be escaped. |
+| **`exitEarly` guard only in the final quarter** | Unconditional, it stranded the sole backer of a side — the *normal* case in markets averaging 0–2 players, i.e. exactly the early users the ×1.50 bonus exists to attract. Accepted residual: an outcome certain early could still be escaped. **Re-litigate this one:** §4.3 measured what the guard actually protects, and it is not what the decision was made on. |
 | **Base first, Robinhood after** | Robinhood needs Redis key namespacing first. |
 | **USDC only at launch; WETH later** | Two collaterals against a 12-market cap means six markets each, working against the concentration the whole design is for. |
 | **Token does not block the contract** | V3 is collateralised in USDC and has no `$SWIPE` dependency. Only the fee rebate and the frozen gamification screens wait on the token. |
 
-**Open and unresolved:** the token is planned for Robinhood while the markets are on Base. That splits the reward loop — a user betting on Base would have to bridge to collect a rebate, and most will not. Three ways out are written up in `docs/v3/ui-backlog.md`. Decide before the token ships.
+**Open and unresolved:**
+
+1. **The token is planned for Robinhood while the markets are on Base.** That splits the reward loop — a user betting on Base would have to bridge to collect a rebate, and most will not. Three ways out are written up in `docs/v3/ui-backlog.md`. Decide before the token ships.
+2. **Push, or hold?** Five local commits: three on `main` (production), two on `v3-contract`. Nothing is pushed. Pushing `main` deploys.
+3. **Is the `exitEarly` final-quarter guard worth its cost?** §4.3 measured what it actually protects. Either keep it and rewrite the player-facing justification in `rules-v3.md` §5.5, or drop it. Both need the copy fixed.
+4. **Should `deploy_v3.js` refuse `--network robinhood`?** §4.5. "Base first" is currently a missing npm alias, not a gate.
 
 ## 6. What is documented where
 
@@ -127,8 +165,15 @@ Four pieces in spec §7. **None has an implementation plan yet** — an agent wa
 
 ## 8. Traps this session actually hit — expect them again
 
-1. **A green suite proves nothing.** Two tests passed while the thing they guarded was broken: the conservation test could not see the `exitEarly` weight bug (it drops position and pool by the same amount, so the aggregate stays consistent), and a refund test asserted only `platformFeeBalance`, never the refunds its name promised. Both were caught by deliberately breaking the code and checking the test failed.
-2. **`lib/contract.ts` `require()`s a compiled artifact at build time**, and `artifacts/` is tracked in git for that reason. Rename or change the ABI and you must recompile and commit `artifacts/contracts/PredictionMarket_V3.sol/`. Local builds pass regardless because the file sits on disk untracked — **only a clean clone catches it.** This already broke one Vercel build.
-3. **Test timestamps drift.** `registerPrediction` mines its own block, so deriving `createdAt` from the deadline is off by a second and flips quarter-boundary assertions. Read it from `market.predictions(id)`.
-4. **Test counts are per file.** `npx hardhat test` runs three files. The V3 file's own count is what plans quote; use `npx hardhat test test/PredictionMarket_V3.test.js`.
-5. **`minBet` is 1,000,000** (1 token at 6 decimals). Test amounts below it revert and can make a test unrunnable as written.
+1. **A green suite proves nothing.** Now **three** times: the conservation test could not see the `exitEarly` weight bug (it drops position and pool by the same amount, so the aggregate stays consistent); a refund test asserted only `platformFeeBalance`, never the refunds its name promised; and `refuses the exit at the three-quarter mark` could not tell `>=` from `>` at the boundary it was named after (§4.3). Every one was caught by deliberately breaking the code and checking the test failed, and by nothing else. **This is not a suggestion. Break it on purpose or you have not tested it.**
+
+   The same discipline applies to *claims*, not just tests. The landmine's stated mechanism (§2) was wrong and survived a whole handoff; it took a production build and a grep of the client chunks to find out. The exploit behind the `exitEarly` guard (§4.3) was wrong the same way and took an on-chain measurement of both branches. If a claim is load-bearing, run it.
+
+2. **A non-`NEXT_PUBLIC_` env var read in client code is `undefined` in the browser, silently.** `lib/chains/index.ts` reads three Robinhood addresses that way, so the server and the UI see different chain configs — a real, live split, not a hypothetical. Anything that decides where money goes must not be the thing that discovers this. See §2.
+
+3. **`ceil()` on a span that is not divisible by 4 does not land on the boundary.** `registerPrediction` mines its own block, so a market asked for `DAY` has a span of 86399, and `ceil(span * 3 / 4)` overshoots the guard's comparison by three units. A "boundary" test built that way is satisfied by both `>=` and `>`. Pin the registration block's timestamp with `evm_setNextBlockTimestamp` when a test's subject *is* a boundary.
+4. **`lib/contract.ts` `require()`s a compiled artifact at build time** (line 1677, `PredictionMarket_V3.json`), and `artifacts/` is tracked in git for that reason. Rename or change the ABI and you must recompile and commit `artifacts/contracts/PredictionMarket_V3.sol/`. Local builds pass regardless because the file sits on disk untracked — **only a clean clone catches it.** This already broke one Vercel build.
+5. **Test timestamps drift.** `registerPrediction` mines its own block, so deriving `createdAt` from the deadline is off by a second and flips quarter-boundary assertions. Read it from `market.predictions(id)` — and see trap 3 for when reading it is still not enough.
+6. **Test counts are per file.** `npx hardhat test` runs three files. The V3 file's own count is what plans quote; use `npx hardhat test test/PredictionMarket_V3.test.js`. Current: 39 in that file, 72 passing / 13 pending overall.
+7. **`minBet` is 1,000,000** (1 token at 6 decimals). Test amounts below it revert and can make a test unrunnable as written.
+8. **The contract's constructor defaults are not the launch rates.** `platformFee` is 1% in the contract and 3% only after `deploy_v3.js` runs `setPlatformFee`. A test or a calculation done against a freshly deployed contract is measuring 1%, not the intended rate — which is why the §4.3 table shows 7.50 of fees where 3% would give 17.50.
