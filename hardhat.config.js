@@ -70,7 +70,11 @@ module.exports = {
         network: "base",
         chainId: 8453,
         urls: {
-          apiURL: "https://api.etherscan.io/v2/api", // Use V2 API endpoint
+          // The V2 API needs chainid on every request. With a per-network apiKey
+          // object hardhat-verify still speaks V1 and will not add it, so it is
+          // pinned in the URL. Without this, verify fails with
+          // "Missing chainid parameter (required for v2 api)".
+          apiURL: "https://api.etherscan.io/v2/api?chainid=8453",
           browserURL: "https://basescan.org"
         }
       },
