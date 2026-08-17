@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useAccount, useSwitchChain } from 'wagmi';
 import { CHAINS, isReadOnlyChain } from '@/lib/chains';
 import { useActiveChain, selectableChains } from '@/lib/chains/activeChain';
 import type { ChainKey } from '@/lib/chains/types';
@@ -22,7 +23,10 @@ import './ChainSwitcher.css';
  */
 export function ChainSwitcher() {
   const { chainKey, setChain } = useActiveChain();
+  const { isConnected } = useAccount();
+  const { switchChainAsync } = useSwitchChain();
   const [open, setOpen] = useState(false);
+  const [switching, setSwitching] = useState<ChainKey | null>(null);
 
   const showTestnets = process.env.NEXT_PUBLIC_SHOW_TESTNETS === 'true';
   const options = selectableChains(showTestnets);
@@ -32,9 +36,37 @@ export function ChainSwitcher() {
 
   const active = CHAINS[chainKey];
 
-  const pick = (key: ChainKey) => {
-    setChain(key);
-    setOpen(false);
+  /**
+   * Move the wallet, then record the choice. Not the other way round.
+   *
+   * This used to write localStorage and nothing else, so the app's idea of the
+   * current chain and the wallet's could disagree indefinitely. Reads without an
+   * explicit chainId run on the wallet's chain, so picking a network changed the
+   * labels and the addresses the app resolved while the reads still executed
+   * somewhere else.
+   *
+   * A declined switch leaves the UI where it was, which is the honest outcome:
+   * the selection did not happen. `useMarketWrite` still re-checks and switches
+   * at send time regardless; that is what protects the money, and this is the
+   * convenience layer above it.
+   */
+  const pick = async (key: ChainKey) => {
+    if (key === chainKey) {
+      setOpen(false);
+      return;
+    }
+    setSwitching(key);
+    try {
+      if (isConnected) {
+        await switchChainAsync({ chainId: CHAINS[key].viemChain.id });
+      }
+      setChain(key);
+      setOpen(false);
+    } catch {
+      // Declined or unsupported. Leave the selection alone.
+    } finally {
+      setSwitching(null);
+    }
   };
 
   return (
@@ -61,6 +93,10 @@ export function ChainSwitcher() {
                 role="menuitem"
                 className={`chain-switcher__option${key === chainKey ? ' chain-switcher__option--active' : ''}`}
                 onClick={() => pick(key)}
+                // The wallet has to agree before the choice is recorded, and
+                // that takes a prompt. Disabling avoids queueing a second one.
+                disabled={switching !== null}
+                aria-busy={switching === key}
               >
                 <span className={`chain-switcher__dot${isReadOnlyChain(key) ? ' chain-switcher__dot--archived' : ''}`} aria-hidden="true" />
                 <span className="chain-switcher__name">{config.label}</span>
