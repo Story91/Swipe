@@ -1,11 +1,35 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAccount } from 'wagmi';
+import '../../styles/sheet.css';
+import './RecentActivity.css';
+
+/**
+ * Recent activity, on the shared sheet.
+ *
+ * This screen used to render a hardcoded array: ten invented events, invented
+ * wallets, an invented "DexterAdmin" claiming invented payouts, with no fetch
+ * anywhere in the file. Not a fallback for when data was missing, which is what
+ * the leaderboard had, but the only thing it ever showed, to everyone.
+ *
+ * /api/activity already existed and already built this feed out of real
+ * predictions and stakes in Redis. It is simply wired up now.
+ *
+ * The figures are V2-era and denominated in ETH, because that is what the
+ * settled markets in Redis are. The screen says so rather than implying these
+ * are live V3 events.
+ */
 
 interface ActivityItem {
   id: string;
-  type: 'prediction_created' | 'bet_placed' | 'prediction_resolved' | 'payout_claimed' | 'prediction_approved' | 'user_joined';
+  type:
+    | 'prediction_created'
+    | 'bet_placed'
+    | 'prediction_resolved'
+    | 'payout_claimed'
+    | 'prediction_approved'
+    | 'user_joined';
   timestamp: number;
   user: {
     address: string;
@@ -13,7 +37,7 @@ interface ActivityItem {
     avatar?: string;
   };
   prediction?: {
-    id: number;
+    id: string | number;
     question: string;
     category: string;
   };
@@ -27,427 +51,318 @@ interface ActivityItem {
   isCurrentUser?: boolean;
 }
 
+type Filter = 'all' | 'me' | 'predictions' | 'bets';
+type TimeRange = '1h' | '24h' | '7d' | '30d';
+
+const FILTERS: { key: Filter; label: string }[] = [
+  { key: 'all', label: 'Everything' },
+  { key: 'me', label: 'Mine' },
+  { key: 'predictions', label: 'Markets' },
+  { key: 'bets', label: 'Bets' },
+];
+
+const RANGES: { key: TimeRange; label: string; ms: number }[] = [
+  { key: '1h', label: '1h', ms: 60 * 60 * 1000 },
+  { key: '24h', label: '24h', ms: 24 * 60 * 60 * 1000 },
+  { key: '7d', label: '7d', ms: 7 * 24 * 60 * 60 * 1000 },
+  { key: '30d', label: '30d', ms: 30 * 24 * 60 * 60 * 1000 },
+];
+
+/** Which accent the row's marker takes. */
+const MARK: Record<ActivityItem['type'], string> = {
+  prediction_created: 'created',
+  bet_placed: 'bet',
+  prediction_resolved: 'resolved',
+  payout_claimed: 'payout',
+  prediction_approved: 'approved',
+  user_joined: 'created',
+};
+
+function timeAgo(timestamp: number) {
+  const diff = Date.now() - timestamp;
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  if (days > 0) return `${days}d ago`;
+  if (hours > 0) return `${hours}h ago`;
+  if (minutes > 0) return `${minutes}m ago`;
+  return 'just now';
+}
+
 export function RecentActivity() {
   const { address } = useAccount();
   const [activities, setActivities] = useState<ActivityItem[]>([]);
-  const [filter, setFilter] = useState<'all' | 'me' | 'predictions' | 'bets'>('all');
-  const [timeRange, setTimeRange] = useState<'1h' | '24h' | '7d' | '30d'>('24h');
+  const [filter, setFilter] = useState<Filter>('all');
+  const [timeRange, setTimeRange] = useState<TimeRange>('24h');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const mockActivities: ActivityItem[] = [
-      {
-        id: '1',
-        type: 'prediction_resolved',
-        timestamp: Date.now() - 5 * 60 * 1000, // 5 minutes ago
-        user: {
-          address: '0x1234567890123456789012345678901234567890',
-          displayName: 'DexterAdmin',
-          avatar: '👑'
-        },
-        prediction: {
-          id: 1,
-          question: 'Will Bitcoin reach $100,000 by end of 2024?',
-          category: 'Crypto'
-        },
-        details: {
-          outcome: 'YES',
-          payout: 25.67
-        }
-      },
-      {
-        id: '2',
-        type: 'payout_claimed',
-        timestamp: Date.now() - 8 * 60 * 1000, // 8 minutes ago
-        user: {
-          address: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
-          displayName: 'CryptoWhale',
-          avatar: '🐋'
-        },
-        prediction: {
-          id: 1,
-          question: 'Will Bitcoin reach $100,000 by end of 2024?',
-          category: 'Crypto'
-        },
-        details: {
-          payout: 3.45,
-          stake: 1.2
-        }
-      },
-      {
-        id: '3',
-        type: 'bet_placed',
-        timestamp: Date.now() - 12 * 60 * 1000, // 12 minutes ago
-        user: {
-          address: '0x987Fcba5213D9085c453C3B5eE5D1d9f8c7b2A1f',
-          displayName: 'PredictionMaster',
-          avatar: '🎯'
-        },
-        prediction: {
-          id: 2,
-          question: 'Will Tesla stock reach $300 by Q4 2024?',
-          category: 'Finance'
-        },
-        details: {
-          choice: 'YES',
-          amount: 0.8
-        }
-      },
-      {
-        id: '4',
-        type: 'prediction_approved',
-        timestamp: Date.now() - 18 * 60 * 1000, // 18 minutes ago
-        user: {
-          address: '0x987Fcba5213D9085c453C3B5eE5D1d9f8c7b2A1f',
-          displayName: 'PredictionMaster',
-          avatar: '✅'
-        },
-        prediction: {
-          id: 3,
-          question: 'Will Ethereum 2.0 launch successfully in 2024?',
-          category: 'Crypto'
-        }
-      },
-      {
-        id: '5',
-        type: 'prediction_created',
-        timestamp: Date.now() - 25 * 60 * 1000, // 25 minutes ago
-        user: {
-          address: '0x456Def789Abc1234567890Abcdef123456789012',
-          displayName: 'OracleSeer',
-          avatar: '🔮'
-        },
-        prediction: {
-          id: 3,
-          question: 'Will Ethereum 2.0 launch successfully in 2024?',
-          category: 'Crypto'
-        }
-      },
-      {
-        id: '6',
-        type: 'bet_placed',
-        timestamp: Date.now() - 32 * 60 * 1000, // 32 minutes ago
-        user: {
-          address: '0x123Abc456Def78901234567890Abcdef12345678',
-          displayName: 'BettingBull',
-          avatar: '🐂'
-        },
-        prediction: {
-          id: 4,
-          question: 'Will Manchester United win Premier League 2024?',
-          category: 'Sports'
-        },
-        details: {
-          choice: 'NO',
-          amount: 1.2
-        }
-      },
-      {
-        id: '7',
-        type: 'user_joined',
-        timestamp: Date.now() - 45 * 60 * 1000, // 45 minutes ago
-        user: {
-          address: '0x1111222233334444555566667777888899990000',
-          displayName: 'LuckyTrader',
-          avatar: '🍀'
-        },
-        details: {}
-      },
-      {
-        id: '8',
-        type: 'prediction_created',
-        timestamp: Date.now() - 55 * 60 * 1000, // 55 minutes ago
-        user: {
-          address: '0xAAAA1111BBBB2222CCCC3333DDDD4444EEEE5555',
-          displayName: 'MarketMaverick',
-          avatar: '📈'
-        },
-        prediction: {
-          id: 4,
-          question: 'Will Manchester United win Premier League 2024?',
-          category: 'Sports'
-        },
-        details: {}
-      },
-      {
-        id: '9',
-        type: 'bet_placed',
-        timestamp: Date.now() - 67 * 60 * 1000, // 67 minutes ago
-        user: {
-          address: '0x9999888877776666555544443333222211110000',
-          displayName: 'ProphetAI',
-          avatar: '🤖'
-        },
-        prediction: {
-          id: 1,
-          question: 'Will Bitcoin reach $100,000 by end of 2024?',
-          category: 'Crypto'
-        },
-        details: {
-          choice: 'YES',
-          amount: 0.5
-        }
-      },
-      {
-        id: '10',
-        type: 'prediction_resolved',
-        timestamp: Date.now() - 75 * 60 * 1000, // 75 minutes ago
-        user: {
-          address: '0x1234567890123456789012345678901234567890',
-          displayName: 'DexterAdmin',
-          avatar: '👑'
-        },
-        prediction: {
-          id: 5,
-          question: 'Will Solana reach $200 by end of 2024?',
-          category: 'Crypto'
-        },
-        details: {
-          outcome: 'NO',
-          payout: 18.34
-        }
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // 'me' has no server-side equivalent, so it fetches everything and
+        // narrows below. The other two map straight onto the API's own filter.
+        const type = filter === 'predictions' || filter === 'bets' ? filter : 'all';
+        const response = await fetch(`/api/activity?limit=50&type=${type}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const result = await response.json();
+        if (cancelled) return;
+
+        if (!result.success) throw new Error(result.error || 'Failed to load activity');
+        setActivities(result.data ?? []);
+      } catch (err) {
+        if (cancelled) return;
+        console.error('❌ Failed to load activity:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load activity');
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    ];
+    };
 
-    // Mark current user activities
-    const updatedActivities = mockActivities.map(activity => ({
-      ...activity,
-      isCurrentUser: activity.user.address.toLowerCase() === address?.toLowerCase()
-    }));
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [filter]);
 
-    setActivities(updatedActivities);
-  }, [address]);
+  const shown = useMemo(() => {
+    const cutoff = Date.now() - (RANGES.find(r => r.key === timeRange)?.ms ?? 0);
+    return activities
+      .map(a => ({
+        ...a,
+        isCurrentUser: !!address && a.user.address.toLowerCase() === address.toLowerCase(),
+      }))
+      .filter(a => a.timestamp >= cutoff)
+      .filter(a => (filter === 'me' ? a.isCurrentUser : true));
+  }, [activities, address, filter, timeRange]);
 
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case 'prediction_created': return '✨';
-      case 'bet_placed': return '🎯';
-      case 'prediction_resolved': return '✅';
-      case 'payout_claimed': return '💰';
-      case 'prediction_approved': return '🔍';
-      case 'user_joined': return '👋';
-      default: return '📝';
-    }
-  };
+  const betCount = shown.filter(a => a.type === 'bet_placed').length;
+  const marketCount = shown.filter(a => a.type === 'prediction_created').length;
+  const payouts = shown
+    .filter(a => a.details?.payout)
+    .reduce((sum, a) => sum + (a.details?.payout || 0), 0);
 
-  const formatActivityText = (activity: ActivityItem) => {
-    const user = activity.isCurrentUser ? 'You' : activity.user.displayName;
+  const describe = (a: ActivityItem) => {
+    const who = a.isCurrentUser ? 'You' : a.user.displayName;
+    const actor = <span className="ra-actor">{who}</span>;
 
-    switch (activity.type) {
+    switch (a.type) {
       case 'prediction_created':
-        return `${user} created prediction "${activity.prediction?.question}"`;
+        return <>{actor} opened a market</>;
       case 'bet_placed':
-        return `${user} bet ${activity.details?.amount || 0} ETH on ${activity.details?.choice || 'UNKNOWN'} for "${activity.prediction?.question}"`;
+        return (
+          <>
+            {actor} backed{' '}
+            <span className={`ra-side ra-side--${a.details?.choice === 'YES' ? 'yes' : 'no'}`}>
+              {a.details?.choice ?? '—'}
+            </span>
+            {a.details?.amount ? (
+              <>
+                {' '}with <span className="ra-amount">{a.details.amount} ETH</span>
+              </>
+            ) : null}
+          </>
+        );
       case 'prediction_resolved':
-        return `${user} resolved "${activity.prediction?.question}" as ${activity.details?.outcome || 'UNKNOWN'}`;
+        return (
+          <>
+            {actor} settled it{' '}
+            <span className={`ra-side ra-side--${a.details?.outcome === 'YES' ? 'yes' : 'no'}`}>
+              {a.details?.outcome ?? '—'}
+            </span>
+          </>
+        );
       case 'payout_claimed':
-        return `${user} claimed ${activity.details?.payout || 0} ETH payout from "${activity.prediction?.question}"`;
+        return (
+          <>
+            {actor} claimed{' '}
+            <span className="ra-amount">{(a.details?.payout ?? 0).toFixed(4)} ETH</span>
+          </>
+        );
       case 'prediction_approved':
-        return `${user} approved prediction "${activity.prediction?.question}"`;
+        return <>{actor} approved a market</>;
       case 'user_joined':
-        return `${user} joined Dexter!`;
+        return <>{actor} joined Swipe</>;
       default:
-        return `${user} performed an action`;
+        return <>{actor} did something</>;
     }
   };
 
-  const formatTime = (timestamp: number) => {
-    const now = Date.now();
-    const diff = now - timestamp;
-    const minutes = Math.floor(diff / (1000 * 60));
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (days > 0) return `${days}d ago`;
-    if (hours > 0) return `${hours}h ago`;
-    if (minutes > 0) return `${minutes}m ago`;
-    return 'Just now';
-  };
-
-  // For now, return activities as-is since filtering is done in API
-  // TODO: Implement client-side filtering if needed
-  const filteredActivities = activities;
-
-  const handleFilterChange = (newFilter: 'all' | 'me' | 'predictions' | 'bets') => {
-    setFilter(newFilter);
-  };
+  const shell = (body: React.ReactNode) => (
+    <div className="sheet">
+      <div className="sheet-shell">
+        <header className="sheet-hero">
+          <div className="sheet-hero-top">
+            <div>
+              <p className="sheet-eyebrow">Activity</p>
+              <h1 className="sheet-hero-title">
+                What just <em>happened</em>
+              </h1>
+            </div>
+          </div>
+          <p className="sheet-hero-lede">
+            Markets opened, bets taken, outcomes settled and payouts claimed,
+            newest first. Everything here is from the V2 era and denominated in
+            ETH; V3 has nothing settled yet, so nothing from it appears.
+          </p>
+        </header>
+        <main className="sheet-body">{body}</main>
+      </div>
+    </div>
+  );
 
   if (loading) {
-    return (
-      <div className="recent-activity">
-        <div className="activity-header">
-          <h1>🔔 Recent Activity</h1>
-          <p>Loading activity data...</p>
+    return shell(
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">Feed</p>
         </div>
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <div>Loading...</div>
+        <div>
+          <div className="sheet-empty">
+            <strong>Reading the feed</strong>
+            Building events from settled markets and stakes.
+          </div>
         </div>
-      </div>
+      </section>
     );
   }
 
   if (error) {
-    return (
-      <div className="recent-activity">
-        <div className="activity-header">
-          <h1>🔔 Recent Activity</h1>
-          <p>Latest happenings on Dexter</p>
+    return shell(
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">Feed</p>
         </div>
-        <div style={{ textAlign: 'center', padding: '40px', color: 'red' }}>
-          <div>❌ Failed to load activity</div>
-          <div style={{ fontSize: '14px', marginTop: '10px' }}>{error}</div>
+        <div>
+          <div className="sheet-empty">
+            <strong>Could not load the feed</strong>
+            {error}
+          </div>
         </div>
-      </div>
+      </section>
     );
   }
 
-  return (
-    <div className="recent-activity">
-      <div className="activity-header">
-        <h1>🔔 Recent Activity</h1>
-        <p>Latest happenings on Dexter</p>
-      </div>
-
-      {/* Filters */}
-      <div className="activity-filters">
-        <div className="filter-group">
-          <label>Show:</label>
-          <div className="filter-buttons">
-            <button
-              className={`filter-button ${filter === 'all' ? 'active' : ''}`}
-              onClick={() => handleFilterChange('all')}
-            >
-              All Activity
-            </button>
-            <button
-              className={`filter-button ${filter === 'me' ? 'active' : ''}`}
-              onClick={() => handleFilterChange('me')}
-            >
-              My Activity
-            </button>
-            <button
-              className={`filter-button ${filter === 'predictions' ? 'active' : ''}`}
-              onClick={() => handleFilterChange('predictions')}
-            >
-              Predictions
-            </button>
-            <button
-              className={`filter-button ${filter === 'bets' ? 'active' : ''}`}
-              onClick={() => handleFilterChange('bets')}
-            >
-              Bets & Payouts
-            </button>
-          </div>
+  return shell(
+    <>
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">Feed</p>
+          <p className="sheet-rail-meta">
+            {`${shown.length} event${shown.length === 1 ? '' : 's'}\nin the last ${timeRange}`}
+          </p>
         </div>
-
-        <div className="time-group">
-          <label>Time:</label>
-          <select
-            value={timeRange}
-            onChange={(e) => setTimeRange(e.target.value as '1h' | '24h' | '7d' | '30d')}
-            className="time-select"
-          >
-            <option value="1h">Last Hour</option>
-            <option value="24h">Last 24 Hours</option>
-            <option value="7d">Last 7 Days</option>
-            <option value="30d">Last 30 Days</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Activity Feed */}
-      <div className="activity-feed">
-        {filteredActivities.length === 0 ? (
-          <div className="no-activity">
-            <div className="no-activity-icon">📭</div>
-            <h3>No recent activity</h3>
-            <p>Try adjusting your filters or check back later.</p>
-          </div>
-        ) : (
-          <div className="activity-list">
-            {filteredActivities.map((activity) => (
-              <div key={activity.id} className={`activity-item ${activity.isCurrentUser ? 'current-user' : ''}`}>
-                <div className="activity-icon">
-                  {getActivityIcon(activity.type)}
-                </div>
-
-                <div className="activity-content">
-                  <div className="activity-text">
-                    {formatActivityText(activity)}
-                  </div>
-
-                  {activity.prediction && (
-                    <div className="activity-prediction">
-                      <span className="prediction-category">{activity.prediction.category}</span>
-                      <span className="prediction-question">
-                        {activity.prediction.question.length > 60
-                          ? `${activity.prediction.question.slice(0, 60)}...`
-                          : activity.prediction.question
-                        }
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="activity-meta">
-                    <span className="activity-user">
-                      {activity.user.avatar} {activity.user.displayName}
-                      {activity.isCurrentUser && <span className="current-user-badge">You</span>}
-                    </span>
-                    <span className="activity-time">
-                      {formatTime(activity.timestamp)}
-                    </span>
-                  </div>
-                </div>
+        <div>
+          <div className="ra-controls">
+            <div className="ra-control-group">
+              <span className="ra-control-label" id="ra-filter-label">Show</span>
+              <div className="sheet-segment" role="group" aria-labelledby="ra-filter-label">
+                {FILTERS.map(f => (
+                  <button
+                    key={f.key}
+                    type="button"
+                    className="sheet-segment-item"
+                    aria-pressed={filter === f.key}
+                    onClick={() => setFilter(f.key)}
+                  >
+                    {f.label}
+                  </button>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Activity Summary */}
-      <div className="activity-summary">
-        <div className="summary-card">
-          <div className="summary-icon">📊</div>
-          <div className="summary-content">
-            <div className="summary-value">{filteredActivities.length}</div>
-            <div className="summary-label">Activities Shown</div>
-          </div>
-        </div>
-
-        <div className="summary-card">
-          <div className="summary-icon">⚡</div>
-          <div className="summary-content">
-            <div className="summary-value">
-              {filteredActivities.filter(a => a.type === 'bet_placed').length}
             </div>
-            <div className="summary-label">Bets Placed</div>
-          </div>
-        </div>
 
-        <div className="summary-card">
-          <div className="summary-icon">💰</div>
-          <div className="summary-content">
-            <div className="summary-value">
-              {filteredActivities
-                .filter(a => a.details?.payout)
-                .reduce((sum, a) => sum + (a.details?.payout || 0), 0)
-                .toFixed(2)} ETH
+            <div className="ra-control-group">
+              <span className="ra-control-label" id="ra-range-label">Within</span>
+              <div className="sheet-segment" role="group" aria-labelledby="ra-range-label">
+                {RANGES.map(r => (
+                  <button
+                    key={r.key}
+                    type="button"
+                    className="sheet-segment-item"
+                    aria-pressed={timeRange === r.key}
+                    onClick={() => setTimeRange(r.key)}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="summary-label">Payouts Claimed</div>
           </div>
-        </div>
 
-        <div className="summary-card">
-          <div className="summary-icon">✨</div>
-          <div className="summary-content">
-            <div className="summary-value">
-              {filteredActivities.filter(a => a.type === 'prediction_created').length}
+          {shown.length === 0 ? (
+            <div className="sheet-empty">
+              <strong>Nothing in this window</strong>
+              {filter === 'me'
+                ? 'None of your own activity landed here. Widen the window, or switch back to everything.'
+                : 'Widen the window, or come back after the next market settles.'}
             </div>
-            <div className="summary-label">Predictions Created</div>
+          ) : (
+            <div className="ra-feed">
+              {shown.map(a => (
+                <div
+                  key={a.id}
+                  className={`ra-item ra-item--${MARK[a.type]}${a.isCurrentUser ? ' ra-item--you' : ''}`}
+                >
+                  <span className="ra-mark" aria-hidden="true" />
+
+                  <div className="ra-body">
+                    <div className="ra-text">
+                      {describe(a)}
+                      {a.isCurrentUser && <span className="ra-you-badge">You</span>}
+                    </div>
+
+                    {a.prediction && (
+                      <div className="ra-market">
+                        <span className="ra-category">{a.prediction.category}</span>
+                        <span className="ra-question" title={a.prediction.question}>
+                          {a.prediction.question}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <span className="ra-time">{timeAgo(a.timestamp)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">In this window</p>
+          <p className="sheet-rail-meta">{`Last ${timeRange}`}</p>
+        </div>
+        <div>
+          <div className="sheet-board">
+            <div className="sheet-settle">
+              <div className="sheet-settle-row">
+                <span className="sheet-settle-key">Events</span>
+                <span className="sheet-settle-val">{shown.length}</span>
+              </div>
+              <div className="sheet-settle-row">
+                <span className="sheet-settle-key">Bets placed</span>
+                <span className="sheet-settle-val">{betCount}</span>
+              </div>
+              <div className="sheet-settle-row">
+                <span className="sheet-settle-key">Markets opened</span>
+                <span className="sheet-settle-val">{marketCount}</span>
+              </div>
+              <div className="sheet-settle-row sheet-settle-row--total">
+                <span className="sheet-settle-key">Payouts claimed</span>
+                <span className="sheet-settle-val">{payouts.toFixed(4)} ETH</span>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
+      </section>
+    </>
   );
 }

@@ -1,0 +1,176 @@
+/*
+ * Recent activity, on the shared sheet (app/styles/sheet.css).
+ *
+ * A feed is a column of events read top to bottom, so it is set as hairline
+ * rows with a fixed marker gutter rather than as a stack of cards. The marker
+ * is a short accent rule keyed to the kind of event, not an emoji: six emoji
+ * down the left edge was the loudest thing on the old screen and none of them
+ * said anything the text did not.
+ *
+ * Times and amounts are mono and tabular so the right edge of the feed lines
+ * up when several events land in the same minute.
+ */
+
+.ra-feed {
+  border-top: 1px solid var(--sheet-rule);
+}
+
+.ra-item {
+  display: grid;
+  grid-template-columns: 3px 1fr auto;
+  gap: 0 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--sheet-rule);
+  align-items: start;
+}
+
+/* The marker: a short vertical rule, coloured by what happened. */
+.ra-mark {
+  align-self: stretch;
+  background: var(--sheet-rule-strong);
+  min-height: 100%;
+}
+
+.ra-item--created .ra-mark { background: var(--sheet-paper-3); }
+.ra-item--bet .ra-mark { background: var(--sheet-lime); }
+.ra-item--resolved .ra-mark { background: var(--sheet-lime); }
+.ra-item--payout .ra-mark { background: var(--sheet-lime); }
+.ra-item--approved .ra-mark { background: var(--sheet-paper-3); }
+
+/* The reader's own events, marked with a wash rather than a badge shout. */
+.ra-item--you {
+  background: var(--sheet-wash);
+  padding-left: 12px;
+  padding-right: 12px;
+  margin-left: -12px;
+  margin-right: -12px;
+}
+
+.ra-body {
+  min-width: 0;
+}
+
+.ra-text {
+  font-size: 15px;
+  color: var(--sheet-paper);
+  line-height: 1.5;
+}
+
+.ra-actor {
+  font-family: var(--sheet-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.ra-amount {
+  font-family: var(--sheet-data);
+  font-variant-numeric: tabular-nums;
+  color: var(--sheet-lime);
+}
+
+.ra-side {
+  font-family: var(--sheet-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.ra-side--yes { color: var(--sheet-lime); }
+.ra-side--no { color: var(--sheet-loss); }
+
+/* The market a row refers to, quoted rather than restated. */
+.ra-market {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 6px;
+  min-width: 0;
+}
+
+.ra-category {
+  font-family: var(--sheet-display);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sheet-paper-3);
+  border: 1px solid var(--sheet-rule);
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+
+.ra-question {
+  font-size: 13px;
+  color: var(--sheet-paper-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.ra-time {
+  font-family: var(--sheet-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--sheet-paper-3);
+  white-space: nowrap;
+  padding-top: 2px;
+}
+
+.ra-you-badge {
+  font-family: var(--sheet-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sheet-lime);
+  border: 1px solid var(--sheet-lime-line);
+  padding: 1px 5px;
+  margin-left: 8px;
+}
+
+/* Controls above the feed. */
+.ra-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.ra-control-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ra-control-label {
+  font-family: var(--sheet-display);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sheet-paper-3);
+}
+
+@container sheet (max-width: 860px) {
+  .ra-item {
+    grid-template-columns: 3px 1fr;
+    gap: 0 12px;
+  }
+
+  /* Time drops under the text rather than fighting it for width. */
+  .ra-time {
+    grid-column: 2;
+    padding-top: 6px;
+  }
+
+  .ra-controls {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+}
