@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { redis, REDIS_KEYS, redisHelpers } from '@/lib/redis';
 import { chainFromRequestOrBody } from '@/lib/chains/requestChain';
-import { getWritableMarket } from '@/lib/chains';
-import { verifyMessage } from 'viem';
+import { getWritableMarket, createChainPublicClient } from '@/lib/chains';
 import {
   PROPOSAL_HEADERS,
   PROPOSAL_LIMITS,
@@ -119,15 +118,40 @@ export async function POST(request: NextRequest) {
   if (!signature || !claimed) return bad('signature required', 401);
   if (claimed !== creator) return bad('signature address does not match creator', 401);
 
+  // Verified through a client on the proposal's own chain, not with viem's
+  // standalone verifyMessage.
+  //
+  // That helper is ECDSA recovery and nothing else. Its own docblock says "Only
+  // supports Externally Owned Accounts. Does not support Contract Accounts."
+  // Swipe runs as a Base miniapp, where a large share of wallets are Coinbase
+  // Smart Wallet, and a smart account's signature is not a recoverable ECDSA
+  // signature at all. Every one of those users got 401 "signature does not
+  // match this proposal" on a signature that was perfectly valid, which made
+  // "anyone with a wallet can propose a market" false for the audience the app
+  // is actually built for.
+  //
+  // The client action asks the chain instead: ERC-1271 for a deployed smart
+  // account, ERC-6492 for one that has not been deployed yet, and plain
+  // recovery as the fallback, so ordinary wallets still pass.
+  //
+  // It costs one eth_call per proposal. Proposals are capped at five per
+  // address per day, so that is a cheap price for the feature working at all.
   let signatureValid = false;
   try {
-    signatureValid = await verifyMessage({
+    const client = createChainPublicClient(chain);
+    signatureValid = await client.verifyMessage({
       address: creator as `0x${string}`,
       message: buildProposalMessage({ question, deadline, timestamp: Number(rawTimestamp) }),
       signature: signature as `0x${string}`,
     });
-  } catch {
-    signatureValid = false;
+  } catch (error) {
+    // A rejected signature comes back as false. Reaching here means the check
+    // could not be completed: the RPC refused, timed out or rate limited us.
+    // Answering 401 would tell someone their good signature was forged, and
+    // they would sign again and again against a node that is simply down. This
+    // is our failure, so it is a 503 and it says so.
+    console.error('[propose] signature verification could not complete:', error);
+    return bad('Could not verify your signature right now. Try again shortly.', 503);
   }
   if (!signatureValid) return bad('signature does not match this proposal', 401);
 
