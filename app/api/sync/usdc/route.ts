@@ -1,10 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createChainPublicClient } from '@/lib/chains';
+import { createChainPublicClient, DEFAULT_CHAIN_KEY, getChainConfig } from '@/lib/chains';
+import { getMarketContract } from '@/lib/chains/market';
+import { parseMarketId, type MarketRef } from '@/lib/marketId';
 import { redis, REDIS_KEYS } from '@/lib/redis';
 
-// USDC DualPool Contract
-const USDC_DUALPOOL_ADDRESS = '0xf5Fa6206c2a7d5473ae7468082c9D260DFF83205';
-const USDC_DUALPOOL_ABI = [
+/**
+ * Pulls a market's pools and positions off chain into Redis.
+ *
+ * Two contract generations are live at once and they are not interchangeable.
+ * Markets minted before V3 sit in the archived Base USDC pool, which still holds
+ * real positions people need to see. Markets minted by V3 sit in the current
+ * contract. Each id says which one it belongs to, so each id is routed rather
+ * than assumed.
+ *
+ * Three things this used to get wrong, all silently:
+ *
+ *  - It hardcoded the archived pool's address, so a V3 market would have been
+ *    read from a contract that has never heard of it and written back as
+ *    "not registered".
+ *  - Its local getPosition ABI declared slot 3 as `exitedEarly: bool`. The
+ *    archived pool actually returns `noEntryPrice: uint256` there. Any non-zero
+ *    NO entry price is truthy, so every such position was stored as having
+ *    exited early.
+ *  - It rebuilt every Redis id as `pred_v2_${n}` regardless of the id it was
+ *    given.
+ */
+
+/** The archived Base USDC pool. Read-only history, and its own ABI shape. */
+const ARCHIVED_POOL_ABI = [
   {
     inputs: [{ name: 'predictionId', type: 'uint256' }],
     name: 'getPrediction',
@@ -17,243 +40,313 @@ const USDC_DUALPOOL_ABI = [
       { name: 'resolved', type: 'bool' },
       { name: 'cancelled', type: 'bool' },
       { name: 'outcome', type: 'bool' },
-      { name: 'participantCount', type: 'uint256' }
+      { name: 'participantCount', type: 'uint256' },
     ],
     stateMutability: 'view',
-    type: 'function'
+    type: 'function',
   },
   {
     inputs: [
       { name: 'predictionId', type: 'uint256' },
-      { name: 'user', type: 'address' }
+      { name: 'user', type: 'address' },
     ],
     name: 'getPosition',
     outputs: [
       { name: 'yesAmount', type: 'uint256' },
       { name: 'noAmount', type: 'uint256' },
-      { name: 'entryPrice', type: 'uint256' },
-      { name: 'exitedEarly', type: 'bool' },
-      { name: 'claimed', type: 'bool' }
+      // Two entry prices, not a price and a flag. Getting this wrong is what
+      // wrote exitedEarly: true onto every position with a NO entry price.
+      { name: 'yesEntryPrice', type: 'uint256' },
+      { name: 'noEntryPrice', type: 'uint256' },
+      { name: 'claimed', type: 'bool' },
     ],
     stateMutability: 'view',
-    type: 'function'
+    type: 'function',
   },
   {
     inputs: [{ name: 'predictionId', type: 'uint256' }],
     name: 'getParticipants',
     outputs: [{ name: '', type: 'address[]' }],
     stateMutability: 'view',
-    type: 'function'
-  }
+    type: 'function',
+  },
 ] as const;
 
-// Create viem client
-const client = createChainPublicClient();
+/**
+ * Explicit rather than defaulted. Both contracts are on Base today; once a
+ * second chain is live this has to come from the request, and passing it here
+ * makes that a compile-time edit rather than a silent wrong answer.
+ */
+const CHAIN = DEFAULT_CHAIN_KEY;
+const client = createChainPublicClient(CHAIN);
 
-// Sync single prediction USDC data to Redis
-async function syncPredictionUSDC(predictionId: number): Promise<{
+interface SyncResult {
   success: boolean;
   registered: boolean;
   yesPool?: number;
   noPool?: number;
   participantCount?: number;
-}> {
-  const redisId = `pred_v2_${predictionId}`;
-  
+  error?: string;
+}
+
+/** Where a given market's data lives, and how to read it. */
+function resolveSource(ref: MarketRef) {
+  if (ref.generation === 'v3') {
+    const market = getMarketContract(CHAIN);
+    if (!market) return null;
+    return {
+      kind: 'v3' as const,
+      address: market.address,
+      abi: market.abi,
+      contractVersion: 'V3' as const,
+    };
+  }
+
+  const archived = getChainConfig(CHAIN).contracts.dualPool;
+  if (!archived) return null;
+  return {
+    kind: 'archived' as const,
+    address: archived,
+    abi: ARCHIVED_POOL_ABI,
+    contractVersion: 'V2' as const,
+  };
+}
+
+async function syncMarket(ref: MarketRef): Promise<SyncResult> {
+  const source = resolveSource(ref);
+  if (!source) {
+    return { success: false, registered: false, error: 'No contract for this market' };
+  }
+
+  const id = BigInt(ref.numericId);
+
   try {
-    // Read from USDC contract
-    const usdcData = await client.readContract({
-      address: USDC_DUALPOOL_ADDRESS as `0x${string}`,
-      abi: USDC_DUALPOOL_ABI,
+    // V3's getPrediction returns ten values and inserts `refundable` before
+    // participantCount; the archived pool returns nine. Reading one shape with
+    // the other's indexes silently swaps a bool for a count.
+    const data = (await client.readContract({
+      address: source.address,
+      abi: source.abi as never,
       functionName: 'getPrediction',
-      args: [BigInt(predictionId)]
-    });
+      args: [id],
+    })) as readonly unknown[];
 
-    if (!usdcData[0]) { // not registered
-      return { success: true, registered: false };
-    }
+    const registered = Boolean(data[0]);
+    if (!registered) return { success: true, registered: false };
 
-    // Get current Redis data
-    const predData = await redis.get(REDIS_KEYS.PREDICTION(redisId));
-    if (!predData) {
-      return { success: false, registered: true };
-    }
+    const yesPool = Number(data[3] as bigint);
+    const noPool = Number(data[4] as bigint);
+    const resolved = Boolean(data[5]);
+    const cancelled = Boolean(data[6]);
+    const outcome = Boolean(data[7]);
+    const refundable = source.kind === 'v3' ? Boolean(data[8]) : false;
+    const participantCount = Number((source.kind === 'v3' ? data[9] : data[8]) as bigint);
+
+    const predData = await redis.get(REDIS_KEYS.PREDICTION(ref.redisId));
+    if (!predData) return { success: false, registered: true, error: 'No Redis record' };
 
     const pred = typeof predData === 'string' ? JSON.parse(predData) : predData;
 
-    // Update with USDC data
-    const updated = {
+    const updated: Record<string, unknown> = {
       ...pred,
       usdcPoolEnabled: true,
-      usdcYesTotalAmount: Number(usdcData[3]), // yesPool (raw 6 decimals)
-      usdcNoTotalAmount: Number(usdcData[4]),  // noPool (raw 6 decimals)
-      usdcResolved: usdcData[5],
-      usdcCancelled: usdcData[6],
-      usdcOutcome: usdcData[7],
-      usdcParticipantCount: Number(usdcData[8])
+      usdcYesTotalAmount: yesPool, // raw, 6 decimals
+      usdcNoTotalAmount: noPool,
+      usdcResolved: resolved,
+      usdcCancelled: cancelled,
+      usdcOutcome: outcome,
+      usdcRefundable: refundable,
+      usdcParticipantCount: participantCount,
+      contractVersion: source.contractVersion,
     };
 
-    // Also sync USDC participants list and positions
-    try {
-      const participantCount = Number(usdcData[8]);
-      if (participantCount > 0) {
-        // Get USDC participants from contract
-        const usdcParticipants = await client.readContract({
-          address: USDC_DUALPOOL_ADDRESS as `0x${string}`,
-          abi: USDC_DUALPOOL_ABI,
+    if (participantCount > 0) {
+      const participants = (await client
+        .readContract({
+          address: source.address,
+          abi: source.abi as never,
           functionName: 'getParticipants',
-          args: [BigInt(predictionId)]
-        }).catch(() => null) as string[] | null;
+          args: [id],
+        })
+        .catch(() => null)) as string[] | null;
 
-        // Save USDC participants separately
-        if (usdcParticipants && usdcParticipants.length > 0) {
-          updated.usdcParticipants = usdcParticipants.map((p: string) => p.toLowerCase());
+      if (participants && participants.length > 0) {
+        updated.usdcParticipants = participants.map((p) => p.toLowerCase());
+
+        // Capped to avoid a request timeout. The cap is reported rather than
+        // silent, so a market that outgrows it does not look fully synced.
+        const CAP = 100;
+        const toSync = participants.slice(0, CAP);
+        if (participants.length > CAP) {
+          console.warn(
+            `[sync] ${ref.redisId}: ${participants.length} participants, syncing first ${CAP}`
+          );
         }
-        
-        // Sync positions for each USDC participant
-        const participantsToSync = usdcParticipants || [];
-        for (const participant of participantsToSync.slice(0, 100)) { // Limit to 100 to avoid timeout
+
+        for (const participant of toSync) {
           try {
-            const position = await client.readContract({
-              address: USDC_DUALPOOL_ADDRESS as `0x${string}`,
-              abi: USDC_DUALPOOL_ABI,
-              functionName: 'getPosition',
-              args: [BigInt(predictionId), participant.toLowerCase() as `0x${string}`]
-            }).catch(() => null);
+            const who = participant.toLowerCase() as `0x${string}`;
 
-            if (position) {
-              const usdcYesAmount = Number(position[0]) || 0;
-              const usdcNoAmount = Number(position[1]) || 0;
-              const usdcClaimed = position[4] || false;
+            // The two contracts disagree here in a way that compiles either
+            // way: both return five values of the same types, but V3's slots 2
+            // and 3 are weights where the archived pool's are entry prices.
+            const position = (await client
+              .readContract({
+                address: source.address,
+                abi: source.abi as never,
+                functionName: source.kind === 'v3' ? 'positions' : 'getPosition',
+                args: [id, who],
+              })
+              .catch(() => null)) as readonly unknown[] | null;
 
-              if (usdcYesAmount > 0 || usdcNoAmount > 0) {
-                // Get or create user stake
-                const stakeKey = REDIS_KEYS.USER_STAKES(participant.toLowerCase(), redisId);
-                const existingStake = await redis.get(stakeKey);
-                let userStake: any = existingStake ? (typeof existingStake === 'string' ? JSON.parse(existingStake) : existingStake) : {
-                  user: participant.toLowerCase(),
-                  predictionId: redisId,
+            if (!position) continue;
+
+            const yesAmount = Number(position[0] as bigint) || 0;
+            const noAmount = Number(position[1] as bigint) || 0;
+            if (yesAmount === 0 && noAmount === 0) continue;
+
+            const stakeKey = REDIS_KEYS.USER_STAKES(who, ref.redisId);
+            const existing = await redis.get(stakeKey);
+            const userStake = existing
+              ? typeof existing === 'string'
+                ? JSON.parse(existing)
+                : existing
+              : {
+                  user: who,
+                  predictionId: ref.redisId,
                   stakedAt: Math.floor(Date.now() / 1000),
-                  contractVersion: 'V2' as const
+                  contractVersion: source.contractVersion,
                 };
 
-                // Add/update USDC stake
-                userStake.USDC = {
-                  yesAmount: usdcYesAmount,
-                  noAmount: usdcNoAmount,
-                  claimed: usdcClaimed,
-                  tokenType: 'USDC' as const,
-                  entryPrice: Number(position[2]) || 0,
-                  exitedEarly: position[3] || false
-                };
+            userStake.contractVersion = source.contractVersion;
+            userStake.USDC = {
+              yesAmount,
+              noAmount,
+              claimed: Boolean(position[4]),
+              tokenType: 'USDC' as const,
+              ...(source.kind === 'v3'
+                ? {
+                    weightedYes: Number(position[2] as bigint) || 0,
+                    weightedNo: Number(position[3] as bigint) || 0,
+                  }
+                : {
+                    entryPrice: Number(position[2] as bigint) || 0,
+                    noEntryPrice: Number(position[3] as bigint) || 0,
+                  }),
+            };
 
-                await redis.set(stakeKey, JSON.stringify(userStake));
-              }
-            }
-          } catch (posError) {
-            // Skip individual position errors
-            console.warn(`Failed to sync USDC position for ${participant} in ${redisId}:`, posError);
+            await redis.set(stakeKey, JSON.stringify(userStake));
+          } catch (positionError) {
+            console.warn(`[sync] position failed for ${participant} in ${ref.redisId}:`, positionError);
           }
         }
       }
-    } catch (posSyncError) {
-      console.warn(`Failed to sync USDC positions for prediction ${predictionId}:`, posSyncError);
-      // Don't fail the whole sync if position sync fails
     }
 
-    // Save updated prediction back to Redis (with USDC participants and all data)
-    await redis.set(REDIS_KEYS.PREDICTION(redisId), JSON.stringify(updated));
+    await redis.set(REDIS_KEYS.PREDICTION(ref.redisId), JSON.stringify(updated));
 
     return {
       success: true,
       registered: true,
-      yesPool: Number(usdcData[3]) / 1e6,
-      noPool: Number(usdcData[4]) / 1e6,
-      participantCount: Number(usdcData[8])
+      yesPool: yesPool / 1e6,
+      noPool: noPool / 1e6,
+      participantCount,
     };
   } catch (error) {
-    console.error(`Error syncing USDC for prediction ${predictionId}:`, error);
-    return { success: false, registered: false };
+    console.error(`[sync] ${ref.redisId} failed:`, error);
+    return { success: false, registered: false, error: 'Read failed' };
   }
 }
 
-// POST - Sync specific prediction(s)
+/**
+ * POST { predictionIds: string[] | number[] }
+ *
+ * Ids may be Redis ids or bare numbers. A bare number has no generation, so it
+ * is read as a v2 market, which is what every existing caller means by it.
+ * Results are keyed by the numeric id, matching what callers already index by.
+ */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { predictionIds } = body;
+    const { predictionIds } = await request.json();
 
-    if (!predictionIds || !Array.isArray(predictionIds)) {
+    if (!Array.isArray(predictionIds)) {
       return NextResponse.json(
         { success: false, error: 'predictionIds array required' },
         { status: 400 }
       );
     }
 
-    const results: Record<number, any> = {};
-    
-    for (const id of predictionIds) {
-      const numericId = typeof id === 'string' 
-        ? parseInt(id.replace('pred_v2_', ''), 10) 
-        : id;
-      
-      if (!isNaN(numericId)) {
-        results[numericId] = await syncPredictionUSDC(numericId);
+    const results: Record<number, SyncResult> = {};
+    const skipped: unknown[] = [];
+
+    for (const raw of predictionIds) {
+      const ref =
+        typeof raw === 'number' && Number.isSafeInteger(raw) && raw >= 0
+          ? parseMarketId(`pred_v2_${raw}`)
+          : parseMarketId(raw);
+
+      if (!ref) {
+        skipped.push(raw);
+        continue;
       }
+      results[ref.numericId] = await syncMarket(ref);
     }
 
     return NextResponse.json({
       success: true,
       synced: Object.keys(results).length,
-      results
+      // Reported rather than dropped: an id this route cannot read used to
+      // vanish from the response and read as a successful no-op.
+      skipped,
+      results,
     });
   } catch (error) {
-    console.error('USDC sync error:', error);
-    return NextResponse.json(
-      { success: false, error: 'Sync failed' },
-      { status: 500 }
-    );
+    console.error('[sync] request failed:', error);
+    return NextResponse.json({ success: false, error: 'Sync failed' }, { status: 500 });
   }
 }
 
-// GET - Sync all registered USDC predictions (admin emergency sync)
+/**
+ * GET ?ids=pred_v3_1,pred_v2_224
+ *
+ * Manual sync. There is no default list any more: the previous one hardcoded
+ * three market numbers from a single incident, which made a bare GET look like
+ * a full resync while touching three markets.
+ */
 export async function GET(request: NextRequest) {
   try {
-    // Known registered prediction IDs (can be expanded)
-    const registeredIds = [224, 225, 226];
-    
-    // Also check URL params for specific IDs
-    const { searchParams } = new URL(request.url);
-    const idsParam = searchParams.get('ids');
-    
-    let idsToSync = registeredIds;
-    if (idsParam) {
-      idsToSync = idsParam.split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
+    const idsParam = new URL(request.url).searchParams.get('ids');
+    if (!idsParam) {
+      return NextResponse.json(
+        { success: false, error: 'ids query parameter required, comma separated' },
+        { status: 400 }
+      );
     }
 
-    const results: Record<number, any> = {};
+    const results: Record<string, SyncResult> = {};
+    const skipped: string[] = [];
     let syncedCount = 0;
 
-    for (const id of idsToSync) {
-      const result = await syncPredictionUSDC(id);
-      results[id] = result;
-      if (result.success && result.registered) {
-        syncedCount++;
+    for (const part of idsParam.split(',').map((s) => s.trim()).filter(Boolean)) {
+      const ref = /^\d+$/.test(part) ? parseMarketId(`pred_v2_${part}`) : parseMarketId(part);
+      if (!ref) {
+        skipped.push(part);
+        continue;
       }
+      const result = await syncMarket(ref);
+      results[ref.redisId] = result;
+      if (result.success && result.registered) syncedCount++;
     }
 
     return NextResponse.json({
       success: true,
-      message: `Synced ${syncedCount} USDC predictions`,
+      message: `Synced ${syncedCount} markets`,
       synced: syncedCount,
-      total: idsToSync.length,
-      results
+      skipped,
+      results,
     });
   } catch (error) {
-    console.error('USDC sync all error:', error);
-    return NextResponse.json(
-      { success: false, error: 'Sync failed' },
-      { status: 500 }
-    );
+    console.error('[sync] bulk failed:', error);
+    return NextResponse.json({ success: false, error: 'Sync failed' }, { status: 500 });
   }
 }

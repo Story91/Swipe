@@ -808,7 +808,7 @@ export default function SwipeMarkets() {
             const syncResponse = await fetch('/api/sync/usdc', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ predictionIds: [numericId] })
+              body: JSON.stringify({ predictionIds: [ref ? ref.redisId : numericId] })
             });
             
             if (syncResponse.ok) {
@@ -989,7 +989,7 @@ export default function SwipeMarkets() {
             const syncResponse = await fetch('/api/sync/usdc', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ predictionIds: [numericId] })
+              body: JSON.stringify({ predictionIds: [exitRef ? exitRef.redisId : numericId] })
             });
             
             if (syncResponse.ok) {

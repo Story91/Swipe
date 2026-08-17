@@ -58,14 +58,24 @@ export interface RedisUserStake {
   noAmount: number;
   claimed: boolean;
   stakedAt: number;
-  contractVersion?: 'V1' | 'V2'; // Contract version for hybrid migration
+  contractVersion?: 'V1' | 'V2' | 'V3'; // Which contract generation minted it
   isWinner?: boolean; // V2 only
   tokenType?: 'ETH' | 'SWIPE' | 'USDC'; // Token type for multi-token support
   canClaim?: boolean; // Calculated property - whether stake is ready to claim
-  // USDC-specific fields
-  entryPrice?: number; // Entry price in basis points (USDC only)
-  exitedEarly?: boolean; // Whether user exited early (USDC only)
-  exitAmount?: number; // Amount received from early exit (USDC only)
+  // Archived USDC pool only. That contract stored an entry price per side.
+  entryPrice?: number; // yesEntryPrice in basis points
+  noEntryPrice?: number; // the pool returns this too; it used to be read as exitedEarly
+  exitedEarly?: boolean; // Whether user exited early
+  exitAmount?: number; // Amount received from early exit
+  /**
+   * V3 only. The contract replaced entry prices with a weight fixed at bet
+   * time, which decides how the losing pool is split. Same slot positions in
+   * the returned tuple, different meaning, so these are named separately rather
+   * than reusing entryPrice: a weight of 15000 stored as a price in basis
+   * points reads as a plausible number and is wrong.
+   */
+  weightedYes?: number;
+  weightedNo?: number;
 }
 
 // User transaction interface
