@@ -158,7 +158,7 @@
   /* Not cosmetic. grid-auto-rows: 1fr stretches every card to the tallest in
      the grid, so the box this fills has an arbitrary aspect ratio. */
   object-fit: cover;
-  filter: blur(16px) saturate(0.85);
+  filter: blur(7px) saturate(1);
   /* Hides the transparent rim the blur leaves at the edges. */
   transform: scale(1.08);
   transition: transform 240ms ease;
@@ -225,7 +225,7 @@
 
 .mgcard__bg-initials {
   font-family: var(--sheet-display);
-  font-size: 72px;
+  font-size: 104px;
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.02em;

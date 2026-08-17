@@ -404,11 +404,24 @@ export default function App() {
     }
   };
 
-  // Callback for handling prediction ID from URL
+  /**
+   * Seek the app to one market, from `/?prediction=<id>`.
+   *
+   * Also switches the desktop view to swipe, and that is the whole fix for a
+   * dead end: "Place your bet" on /prediction/[id] pushes this URL, and staking
+   * lives on the swipe card. Setting activeDashboard alone was not enough,
+   * because showGrid is `isDesktop && desktopView === 'grid' && dashboard ===
+   * 'tinder'` and desktopView defaults to 'grid' and persists. So a desktop
+   * user pressed the one button on the page that stakes and arrived back at the
+   * market grid, with nothing to show for it.
+   *
+   * Harmless on mobile, where desktopView is never read.
+   */
   const handlePredictionId = useCallback((id: string) => {
     setInitialPredictionId(id);
     setActiveDashboard('tinder');
-  }, []);
+    setDesktopView('swipe');
+  }, [setDesktopView]);
 
   /*
    * The wallet controls, defined once and placed in one of two headers: the
