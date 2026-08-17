@@ -3,11 +3,11 @@
 import dynamic from 'next/dynamic';
 
 // Dynamic import to avoid SSR issues with framer-motion
-const KalshiMarkets = dynamic(
-  () => import('../components/Markets/KalshiMarkets'),
+const SwipeMarkets = dynamic(
+  () => import('../components/Markets/SwipeMarkets'),
   { ssr: false }
 );
 
 export default function USDCMarketsPage() {
-  return <KalshiMarkets />;
+  return <SwipeMarkets />;
 }

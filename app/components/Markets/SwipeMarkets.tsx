@@ -41,7 +41,7 @@ import { ConnectWallet, Wallet as WalletContainer } from '@coinbase/onchainkit/w
 import { useComposeCast, useOpenUrl } from '@coinbase/onchainkit/minikit';
 import { getRandomCurrentPredictionIntro, getRandomCurrentPredictionOutro } from '../../../lib/constants/share-texts';
 import sdk from '@farcaster/miniapp-sdk';
-import './KalshiMarkets.css';
+import './SwipeMarkets.css';
 
 // ERC20 ABI for USDC approval
 const ERC20_ABI = [
@@ -360,7 +360,7 @@ function MarketCard({
               </div>
             </div>
 
-            {/* Price Buttons - Kalshi Style */}
+            {/* Price buttons */}
             <div className="market-prices">
               <motion.button
                 className={`price-button yes ${hoveredSide === 'yes' ? 'hovered' : ''}`}
@@ -583,7 +583,7 @@ function MarketCard({
 // Transaction states
 type TxState = 'idle' | 'approving' | 'approved' | 'betting' | 'success' | 'error';
 
-export default function KalshiMarkets() {
+export default function SwipeMarkets() {
   const { predictions, loading, refresh } = useHybridPredictions();
   const { address, isConnected } = useAccount();
   // The chain the user actually selected, not the build-time default. The bet
@@ -1224,7 +1224,7 @@ export default function KalshiMarkets() {
   }, [usdcBalance]);
 
   return (
-    <div className="kalshi-markets">
+    <div className="swipe-markets">
       {/* Premium Header with shadcn */}
       <Card className="usdc-header-card">
         <div className="usdc-header-content">

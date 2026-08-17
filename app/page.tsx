@@ -74,7 +74,7 @@ const RecentActivity = dynamic(() => import("./components/Support/RecentActivity
 const SwipeTokenCard = dynamic(() => import("./components/Market/SwipeTokenCard").then(m => m.SwipeTokenCard), { ssr: false, loading });
 const SwipeClaim = dynamic(() => import("./components/Portfolio/SwipeClaim").then(m => m.SwipeClaim), { ssr: false, loading });
 const DailyTasks = dynamic(() => import("./components/Tasks/DailyTasks").then(m => m.DailyTasks), { ssr: false, loading });
-const KalshiMarkets = dynamic(() => import("./components/Markets/KalshiMarkets"), { ssr: false, loading });
+const SwipeMarkets = dynamic(() => import("./components/Markets/SwipeMarkets"), { ssr: false, loading });
 
 // Modals: mounted but closed most of the time, so they cost nothing until opened.
 const CreatePredictionModal = dynamic(() => import("./components/Modals/CreatePredictionModal").then(m => m.CreatePredictionModal), { ssr: false });
@@ -685,7 +685,7 @@ export default function App() {
           )}
 
           {/* USDC Markets */}
-          {activeDashboard === 'usdc-markets' && <KalshiMarkets />}
+          {activeDashboard === 'usdc-markets' && <SwipeMarkets />}
 
           {/* Dashboard - moved from 'user' to replace CLAIM */}
           {activeDashboard === 'user' && (

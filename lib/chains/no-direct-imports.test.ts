@@ -54,7 +54,7 @@ describe('chain abstraction is not bypassed', () => {
   // these paths onto contracts whose owner key is lost.
   const WRITE_PATHS = [
     ['app', 'components', 'Main', 'TinderCard.tsx'],
-    ['app', 'components', 'Markets', 'KalshiMarkets.tsx'],
+    ['app', 'components', 'Markets', 'SwipeMarkets.tsx'],
     ['app', 'components', 'Modals', 'CreatePredictionModal.tsx'],
   ];
 

@@ -1,6 +1,6 @@
-/* Kalshi-Style Markets - MiniApp Optimized */
+/* Swipe markets, miniapp optimised */
 
-.kalshi-markets {
+.swipe-markets {
   min-height: 100vh;
   background: transparent;
   padding: 12px;
@@ -1090,7 +1090,7 @@
 
 /* Dark Mode Override for this component */
 @media (prefers-color-scheme: dark) {
-  .kalshi-markets {
+  .swipe-markets {
     background: transparent;
   }
   
@@ -1219,7 +1219,7 @@
 
 /* Mobile/MiniApp Responsive - Optimized for 424px width */
 @media (max-width: 600px) {
-  .kalshi-markets {
+  .swipe-markets {
     padding: 10px;
   }
   
