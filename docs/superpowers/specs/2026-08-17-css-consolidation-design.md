@@ -104,8 +104,26 @@ them yet, so nothing can break.
 237 lime, 353 greys, 465 radii, 273 shadows, 338 font stacks. Script-driven and
 checkable by diffing computed styles before and after, not by eye.
 
-**Phase 4 — delete the dead.** Remove the 310 unreferenced classes, in one
-commit, with the scan that found them kept as a test so they cannot come back.
+**Phase 4 — delete the dead. NOT SAFE AS SPECIFIED; do not run the naive
+version.** The scan that found 310 unreferenced classes matches literal
+substrings in `.ts`/`.tsx`. Class names in this codebase are also built from
+data at runtime:
+
+```
+al-row al-row--${log.status}
+ab-side ab-side--${bet.choice === 'YES' ? 'yes' : 'no'}
+achievement-badge ${...hasStreak7 ? 'unlocked' : 'locked'}
+```
+
+`al-row--resolved` is live and appears nowhere as text, so the scan calls it
+dead. Deleting the 310 as a batch would take working styles with it, and the
+breakage would show up only on the states that happen to be rare — a resolved
+row, a locked achievement — which is the worst possible way to find out.
+
+Before this phase can run, the scan needs a second pass that expands every
+`--${...}` and `${... ? 'a' : 'b'}` site into the class names it can produce,
+and treats those as referenced. Only the remainder is safe to delete. That
+remainder is probably still worth having; it is just not the 310.
 
 **Phase 5 — per screen.** `TinderCard` and `SwipeMarkets` get rewritten rather
 than converted; both are past the point where conversion is cheaper. The
