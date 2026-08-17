@@ -19,7 +19,7 @@ export interface ChainContracts {
    */
   dualPool?: `0x${string}`;
   /**
-   * PredictionMarket_USDG_DualPool - the audited successor. Where this is set,
+   * PredictionMarket_V3 - the audited successor. Where this is set,
    * it is the contract new markets and bets go through.
    */
   usdgPool?: `0x${string}`;

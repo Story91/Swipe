@@ -1,5 +1,5 @@
 /**
- * Deploy PredictionMarket_USDG_DualPool.
+ * Deploy PredictionMarket_V3.
  *
  * Collateral is chosen per network:
  *   robinhoodTestnet - the MockUSDC already deployed there (no USDG on testnet)
@@ -9,7 +9,7 @@
  * Never resolve the collateral address by explorer search: Robinhood Chain has
  * impostor 18-decimal tokens named "USD Coin".
  *
- * Usage: npx hardhat run scripts/deploy_usdg_dualpool.js --network robinhoodTestnet
+ * Usage: npx hardhat run scripts/deploy_v3.js --network robinhoodTestnet
  */
 
 const hre = require("hardhat");
@@ -60,8 +60,8 @@ async function main() {
     );
   }
 
-  console.log("\nDeploying PredictionMarket_USDG_DualPool...");
-  const Market = await hre.ethers.getContractFactory("PredictionMarket_USDG_DualPool");
+  console.log("\nDeploying PredictionMarket_V3...");
+  const Market = await hre.ethers.getContractFactory("PredictionMarket_V3");
   const market = await Market.deploy(collateral);
   await market.waitForDeployment();
   const address = await market.getAddress();

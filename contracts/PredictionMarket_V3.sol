@@ -7,9 +7,9 @@ import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
- * @title PredictionMarket_USDG_DualPool
+ * @title PredictionMarket_V3
  * @notice Parimutuel YES/NO prediction market collateralised by a 6-decimal
- *         stablecoin (USDG on Robinhood Chain, USDC on Base).
+ *         stablecoin (USDC on Base, USDG on Robinhood Chain).
  *
  * Successor to PredictionMarket_USDC_DualPool. Every change from that contract
  * is a fix for a finding in
@@ -34,7 +34,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  *  8. Resolvers are a separate, revocable role from the owner, so automation
  *     runs on a narrow hot key while ownership stays cold.
  */
-contract PredictionMarket_USDG_DualPool is Ownable2Step, ReentrancyGuard {
+contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     // ============ Constants ============

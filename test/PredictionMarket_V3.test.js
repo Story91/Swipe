@@ -6,7 +6,7 @@ const { ethers } = require("hardhat");
  * docs/superpowers/specs/2026-08-17-usdc-dualpool-security-audit.md.
  * These are the proof that each one is closed, not just claimed to be.
  */
-describe("PredictionMarket_USDG_DualPool", function () {
+describe("PredictionMarket_V3", function () {
   let market, token, owner, resolver, creator, alice, bob;
 
   const DEC = 6;
@@ -30,7 +30,7 @@ describe("PredictionMarket_USDG_DualPool", function () {
     token = await MockUSDC.deploy();
     await token.waitForDeployment();
 
-    const Market = await ethers.getContractFactory("PredictionMarket_USDG_DualPool");
+    const Market = await ethers.getContractFactory("PredictionMarket_V3");
     market = await Market.deploy(await token.getAddress());
     await market.waitForDeployment();
 
