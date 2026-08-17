@@ -51,6 +51,10 @@ describe("PredictionMarket_V3", function () {
   // ---------------------------------------------------------------- finding 1
   describe("no house-takes-all when nobody backs the winner", function () {
     it("makes the market refundable instead of seizing the pool", async function () {
+      // Bond-exempt: this test isolates the losers' pool from being seized
+      // (finding 1). Bond forfeiture on an empty side is a separate, later
+      // behavior covered by "settling the creator bond" below.
+      await market.setBondExempt(creator.address, true);
       const deadline = await openMarket();
       await market.connect(alice).placeBet(1, true, usd(100));
       await market.connect(bob).placeBet(1, true, usd(100));
@@ -557,6 +561,70 @@ describe("PredictionMarket_V3", function () {
       ).to.be.reverted;
 
       expect((await market.predictions(1)).registered).to.equal(false);
+    });
+  });
+
+  describe("settling the creator bond", function () {
+    // `creator` is funded and approved in the top-level beforeEach as of Task 7.
+
+    it("returns the bond when the market paid out", async function () {
+      const deadline = await openMarket(1, DAY);
+      await market.connect(alice).placeBet(1, true, usd(100));
+      await market.connect(bob).placeBet(1, false, usd(100));
+      await warpPast(deadline);
+
+      await expect(market.connect(resolver).resolvePrediction(1, true))
+        .to.emit(market, "CreatorBondReturned")
+        .withArgs(1, creator.address, usd(10));
+
+      // Claimable alongside the creator fee, pull-based as before.
+      const before = await token.balanceOf(creator.address);
+      await market.connect(creator).claimCreatorReward();
+      expect((await token.balanceOf(creator.address)) - before).to.equal(
+        usd(10) + usd(0.5)
+      );
+    });
+
+    it("forfeits the bond when one side stayed empty", async function () {
+      const deadline = await openMarket(1, DAY);
+      await market.connect(alice).placeBet(1, true, usd(100));
+      await warpPast(deadline);
+
+      const feesBefore = await market.platformFeeBalance();
+      await expect(market.connect(resolver).resolvePrediction(1, false))
+        .to.emit(market, "CreatorBondForfeited")
+        .withArgs(1, creator.address, usd(10));
+
+      expect((await market.platformFeeBalance()) - feesBefore).to.equal(usd(10));
+      // Stakes are still fully refundable — the bond is not taken from players.
+      const before = await token.balanceOf(alice.address);
+      await market.connect(alice).claimRefund(1);
+      expect((await token.balanceOf(alice.address)) - before).to.equal(usd(100));
+    });
+
+    it("returns the bond when the platform cancels", async function () {
+      await openMarket(1, DAY);
+      await expect(market.connect(resolver).cancelPrediction(1, "bad question"))
+        .to.emit(market, "CreatorBondReturned")
+        .withArgs(1, creator.address, usd(10));
+    });
+
+    it("returns the bond when the platform abandons the market", async function () {
+      const deadline = await openMarket(1, DAY);
+      await warpPast(deadline + 31 * DAY);
+      await expect(market.enableRefundsAfterGrace(1))
+        .to.emit(market, "CreatorBondReturned")
+        .withArgs(1, creator.address, usd(10));
+    });
+
+    it("settles the bond only once", async function () {
+      const deadline = await openMarket(1, DAY);
+      await market.connect(alice).placeBet(1, true, usd(100));
+      await market.connect(bob).placeBet(1, false, usd(100));
+      await warpPast(deadline);
+      await market.connect(resolver).resolvePrediction(1, true);
+
+      expect((await market.predictions(1)).creatorBond).to.equal(0);
     });
   });
 

@@ -315,6 +315,32 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
         emit EarlyExit(predictionId, msg.sender, isYes, amount, netValue, retained);
     }
 
+    /**
+     * @notice Return or forfeit a market's creator bond, exactly once.
+     * @dev A market that pays out necessarily had stake on both sides — with
+     *      either pool empty the winning side could be empty and the market
+     *      would be refundable instead. So "the market was a real market" is
+     *      the single condition, and it is the caller's `forfeited` flag.
+     *      Returned bonds go through creatorRewards for the same reason the
+     *      creator fee does: a creator that cannot receive the token must not
+     *      be able to block settlement for everyone else.
+     */
+    function _settleBond(uint256 predictionId, bool forfeited) private {
+        Prediction storage pred = predictions[predictionId];
+        uint256 bond = pred.creatorBond;
+        if (bond == 0) return;
+
+        pred.creatorBond = 0;
+
+        if (forfeited) {
+            platformFeeBalance += bond;
+            emit CreatorBondForfeited(predictionId, pred.creator, bond);
+        } else {
+            creatorRewards[pred.creator] += bond;
+            emit CreatorBondReturned(predictionId, pred.creator, bond);
+        }
+    }
+
     // ============ Resolution ============
 
     function resolvePrediction(
@@ -340,6 +366,7 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
             // losing pool to the platform, which paid a resolver ~99.5% of every
             // pool for choosing the empty side. Everyone gets their stake back.
             pred.refundable = true;
+            _settleBond(predictionId, true);
             emit PredictionRefundable(predictionId, "No winners");
             emit PredictionResolved(predictionId, outcome, 0, 0, 0);
             return;
@@ -355,6 +382,8 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
         pred.netLosersPool = losersPool - platformFeeAmount - creatorReward;
         pred.weightedWinnersPool = outcome ? pred.weightedYesPool : pred.weightedNoPool;
 
+        _settleBond(predictionId, false);
+
         emit PredictionResolved(predictionId, outcome, platformFeeAmount, creatorReward, pred.netLosersPool);
     }
 
@@ -367,6 +396,8 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
 
         pred.cancelled = true;
         pred.refundable = true;
+
+        _settleBond(predictionId, false);
 
         emit PredictionRefundable(predictionId, reason);
     }
@@ -383,6 +414,7 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
         require(block.timestamp > pred.deadline + REFUND_GRACE_PERIOD, "Grace period not over");
 
         pred.refundable = true;
+        _settleBond(predictionId, false);
         emit PredictionRefundable(predictionId, "Abandoned past grace period");
     }
 
