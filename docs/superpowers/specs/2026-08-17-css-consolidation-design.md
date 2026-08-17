@@ -120,10 +120,25 @@ dead. Deleting the 310 as a batch would take working styles with it, and the
 breakage would show up only on the states that happen to be rare — a resolved
 row, a locked achievement — which is the worst possible way to find out.
 
-Before this phase can run, the scan needs a second pass that expands every
-`--${...}` and `${... ? 'a' : 'b'}` site into the class names it can produce,
-and treats those as referenced. Only the remainder is safe to delete. That
-remainder is probably still worth having; it is just not the 310.
+**That second pass now exists:** `npm run scan:dead-css`
+(`scripts/scan_dead_css.js`). It collects every prefix that a template literal
+can extend and treats any class starting with one as reachable, deliberately
+generously — keeping a dead class costs nothing, deleting a live one costs a
+broken state nobody sees until it is rare and in production.
+
+Measured: **311 naive, 206 after expansion.** So 105 of the original list were
+live classes the first scan could not see.
+
+**The remaining 206 are still not a delete list**, and the scan cannot fix this
+part: it flags `dragging-live`, which was added to `TinderCard.css` on purpose
+for the gesture engine that has not landed yet. A class staged for work in
+flight is indistinguishable from a dead one by any static measure.
+
+So the phase runs as: take the 206, remove anything a person recognises as
+staged, delete the rest in one commit, and keep the scan as a test pinned to
+whatever number survives. It needs a human pass over a 206-line list, not a
+scripted sweep — which is why it is not being done at the end of a long
+session.
 
 **Phase 5 — per screen.** `TinderCard` and `SwipeMarkets` get rewritten rather
 than converted; both are past the point where conversion is cheaper. The

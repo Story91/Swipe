@@ -19,7 +19,8 @@
     "compile": "hardhat compile",
     "compile:via-ir": "hardhat compile --config hardhat.config.js",
     "deploy:v3:robinhood": "hardhat run scripts/deploy_v3.js --network robinhood",
-    "dev:isolated": "node scripts/dev_isolated.js"
+    "dev:isolated": "node scripts/dev_isolated.js",
+    "scan:dead-css": "node scripts/scan_dead_css.js"
   },
   "dependencies": {
     "@coinbase/cdp-sdk": "^1.36.0",
