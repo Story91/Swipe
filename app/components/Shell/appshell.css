@@ -1,0 +1,442 @@
+/*
+ * Desktop shell: a fixed sidebar, a top bar, and one content column.
+ *
+ * The page ground stays the brand lime. Nothing in this file paints over it and
+ * nothing in this file may acquire a transform, filter, backdrop-filter,
+ * will-change, opacity below 1, contain: paint or isolation: isolate. Any of
+ * those turns an ancestor into a containing block or a stacking context, and
+ * body::before is a fixed pseudo-element at z-index -1. It disappears, or it
+ * paints over the content. Both have happened.
+ *
+ * Everything here is desktop-only. page.tsx gates the wrapper on
+ * useIsDesktop(), and the media query at the bottom is the belt to that
+ * braces: if the wrapper is ever rendered below 1024px it drops out of layout
+ * entirely and the mobile stack is byte-identical to before this file existed.
+ */
+
+.appshell {
+  display: grid;
+  grid-template-columns: var(--shell-sidebar) minmax(0, 1fr);
+  gap: var(--shell-gap);
+  width: 100%;
+  max-width: var(--shell-max);
+  margin-inline: auto;
+  padding-inline: var(--shell-gutter);
+  /* The shell is a flex item of the page root, which is min-h-screen and a
+     column. This is the first link of the chain that lets the browse sheet
+     reach the floor: shell fills the page, the content column fills the shell
+     row, the wrapper fills the column, main fills the wrapper, and the sheet
+     takes what is left. Break any link and the markets end in mid-air over
+     bare lime, silently. */
+  flex: 1 1 auto;
+}
+
+.appshell[data-collapsed='true'] {
+  grid-template-columns: var(--shell-sidebar-collapsed) minmax(0, 1fr);
+}
+
+.appshell__main {
+  display: flex;
+  flex-direction: column;
+  /* Without this a long market question blows the column out and the whole
+     page gets a horizontal scrollbar. */
+  min-width: 0;
+  padding-block: var(--shell-gutter);
+}
+
+/* The wrapper inside still carries its own py-3 and px-4/lg:px-8 for the
+   layouts that render without the shell. Inside the shell the gutters are the
+   shell's job, so they are zeroed rather than doubled. */
+.appshell .main-content-wrapper {
+  padding-inline: 0;
+  padding-block: 0;
+}
+
+/* .grid-shell caps itself at 1440px and centres. The content column is already
+   positioned and sized, so a second narrower centring inside it just puts the
+   markets off to one side. */
+.appshell .grid-shell {
+  max-width: none;
+  margin-inline: 0;
+}
+
+/* ---------- sidebar ---------- */
+
+.appnav {
+  position: sticky;
+  top: var(--shell-gutter);
+  /* A stretched grid item cannot stick, because it already fills the row. */
+  align-self: start;
+  max-height: calc(100vh - (var(--shell-gutter) * 2));
+  display: flex;
+  flex-direction: column;
+  /* Opaque. A translucent panel on the lime ground lets the accent through
+     under the row labels and they stop being readable. */
+  background: var(--sheet-ink-1);
+  border: 1px solid var(--sheet-ink-line);
+  border-radius: var(--shell-radius);
+  padding: 16px 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.appnav__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  flex: 0 0 auto;
+}
+
+.appnav__mark {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  background: var(--sheet-lime);
+  color: #000;
+  font-family: var(--sheet-display);
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.appnav__wordmark {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--sheet-display);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sheet-ink-text);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.appnav__collapse {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--sheet-ink-text-3);
+  cursor: pointer;
+}
+
+.appnav__collapse:hover {
+  color: var(--sheet-lime);
+}
+
+.appnav__group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+/* The rule bleeds to the panel edge rather than stopping at the padding, so it
+   reads as a division of the sidebar and not as an underline on a row. */
+.appnav__brand + .appnav__group,
+.appnav__spacer + .appnav__group {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sheet-ink-line);
+  margin-inline: -12px;
+  padding-inline: 12px;
+}
+
+.appnav__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  font-family: var(--sheet-body);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--sheet-ink-text-2);
+  background: transparent;
+  border: 0;
+  border-radius: var(--shell-radius);
+  text-align: left;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.appnav__row:hover {
+  background: var(--sheet-ink-3);
+  color: var(--sheet-ink-text);
+}
+
+/* Not a lime slab. A 244px block of the accent in the sidebar would be the
+   loudest thing on a screen whose actual subject is the markets, and it would
+   compete with the active filter chip, which is the same colour and is a
+   different kind of statement. The row lifts one step off the panel and the
+   accent goes into the label and a 2px edge. */
+.appnav__row--active {
+  background: var(--sheet-ink-4);
+  color: var(--sheet-lime);
+  box-shadow: inset 2px 0 0 var(--sheet-lime);
+}
+
+.appnav__icon {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+}
+
+.appnav__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.appnav__badge {
+  flex: 0 0 auto;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--sheet-data);
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--sheet-lime);
+  color: #000;
+  border-radius: var(--shell-radius);
+}
+
+/* On the active row the label is already lime, so a lime badge next to it
+   merges into one smear. */
+.appnav__row--active .appnav__badge {
+  background: #000;
+  color: var(--sheet-lime);
+}
+
+/* "3" on its own says nothing to a screen reader. */
+.appnav__badge-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.appnav__section {
+  margin: 20px 12px 8px;
+  font-family: var(--sheet-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sheet-ink-text-3);
+  flex: 0 0 auto;
+}
+
+.appnav__spacer {
+  flex: 1 1 auto;
+  min-height: 20px;
+}
+
+.appnav__group--utility .appnav__row {
+  font-size: 13px;
+  color: var(--sheet-ink-text-3);
+}
+
+.appnav__group--utility .appnav__row:hover {
+  color: var(--sheet-ink-text);
+}
+
+/* ---------- sidebar, collapsed ---------- */
+
+.appshell[data-collapsed='true'] .appnav {
+  padding-inline: 10px;
+}
+
+.appshell[data-collapsed='true'] .appnav__label,
+.appshell[data-collapsed='true'] .appnav__wordmark,
+.appshell[data-collapsed='true'] .appnav__badge,
+.appshell[data-collapsed='true'] .appnav__section {
+  display: none;
+}
+
+.appshell[data-collapsed='true'] .appnav__row {
+  justify-content: center;
+  padding: 0;
+  gap: 0;
+}
+
+.appshell[data-collapsed='true'] .appnav__brand {
+  justify-content: center;
+}
+
+.appshell[data-collapsed='true'] .appnav__brand + .appnav__group,
+.appshell[data-collapsed='true'] .appnav__spacer + .appnav__group {
+  margin-inline: -10px;
+  padding-inline: 10px;
+}
+
+/* The section label was the only thing separating the two upper groups, and it
+   is hidden here. */
+.appshell[data-collapsed='true'] .appnav__section + .appnav__group {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--sheet-ink-line);
+  margin-inline: -10px;
+  padding-inline: 10px;
+}
+
+/* ---------- top bar ---------- */
+
+.appbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 44px;
+  padding: 10px 16px;
+  background: var(--sheet-ink-1);
+  border: 1px solid var(--sheet-ink-line);
+  border-radius: var(--shell-radius);
+  /* No overflow here on purpose: the wallet menu and the chain switcher menu
+     are absolutely positioned children rather than portals, and a clipping
+     ancestor cuts them in half. */
+}
+
+.appbar__crumb {
+  min-width: 0;
+}
+
+.appbar__crumb ol {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.appbar__crumb li {
+  font-family: var(--sheet-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sheet-ink-text-3);
+  white-space: nowrap;
+}
+
+.appbar__crumb li[aria-current] {
+  color: var(--sheet-ink-text);
+}
+
+.appbar__crumb li + li::before {
+  content: '/';
+  margin-right: 8px;
+  color: var(--sheet-ink-line-3);
+}
+
+.appbar__right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+
+/* The wallet pill is black on black here. Its own border is #000, which is
+   invisible on the bar, so it gets the accent hairline instead; and its focus
+   ring is a black outline, which on a near-black bar is no ring at all. */
+.appbar .wallet-picker__trigger,
+.appbar .wallet-picker__connected {
+  border-color: var(--sheet-lime-line);
+}
+
+.appbar .wallet-picker__trigger:focus-visible,
+.appbar .wallet-picker__connected:focus-visible {
+  outline: 2px solid var(--sheet-lime);
+  outline-offset: 2px;
+}
+
+/* The picker's menu and its error box are anchored left: 0 to their trigger,
+   which was right when the trigger sat at the left of a stacked header. Here
+   the trigger is the last thing on the bar, and a 210px panel opening rightward
+   from x=1302 ends up 72px off the side of a 1440px window. Measured. */
+.appbar .wallet-picker__menu,
+.appbar .wallet-picker__error {
+  left: auto;
+  right: 0;
+}
+
+/* ---------- page title ---------- */
+
+/* The one place the brand colour is a ground rather than a margin: near-black
+   on lime, 16:1, sitting in the gap between the dark bar and the dark sheet. */
+.appshell__title {
+  font-family: var(--sheet-display);
+  font-weight: 800;
+  font-size: clamp(26px, 2.2vw, 34px);
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  color: #0a0a0a;
+  margin: 18px 0 14px;
+}
+
+/* ---------- focus ---------- */
+
+/* sheet.css scopes its focus ring to `.sheet`, and the shell is not inside one.
+   Scoped to the two dark panels: a lime ring on the lime ground would be no
+   ring at all. */
+.appnav :focus-visible,
+.appbar :focus-visible {
+  outline: 2px solid var(--sheet-lime);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .appnav__row {
+    transition: none;
+  }
+}
+
+/*
+ * Below the breakpoint the shell should not exist, and normally it does not:
+ * page.tsx gates it on useIsDesktop() and a fresh load under 1024px renders the
+ * mobile stack with the horizontal menubar, verified.
+ *
+ * This is the fallback for the window that gets dragged narrow. useMediaQuery
+ * listens for the change event, but if that state is ever stale the shell is
+ * still what is on screen and the menubar is still not rendered, so dropping
+ * the shell out of layout with `display: contents` would leave the page with an
+ * unstyled sidebar stacked on top of the content and no nav at all. That was
+ * tried and it is worse than the problem. One column instead: the sidebar sits
+ * above the content and stays usable.
+ */
+@media (max-width: 1023px) {
+  .appshell {
+    grid-template-columns: minmax(0, 1fr);
+    padding-inline: 12px;
+  }
+
+  .appshell[data-collapsed='true'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .appnav {
+    position: static;
+    max-height: none;
+  }
+}

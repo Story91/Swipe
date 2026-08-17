@@ -53,6 +53,50 @@
      signal an error, and #ef4444 on a dark ground reads as the latter. */
   --sheet-loss: rgba(255, 138, 128, 0.9);
 
+  /* Opaque dark faces.
+     A panel that sits on the lime ground must never be translucent. The accent
+     reads through under body text and the text stops being legible, which is
+     the single most repeated bug in this repo. --sheet-surface above is
+     rgba(255,255,255,0.04) and is the wrong tool for that job; these are the
+     right one. Four steps, every value already in service somewhere in app/,
+     so naming them changes nothing that renders today. */
+  --sheet-ink-0: #070707;   /* the sheet, deepest ground (.market-sheet) */
+  --sheet-ink-1: #0d0d0d;   /* sidebar and top bar face, card on bare lime */
+  --sheet-ink-2: #141414;   /* a card on the sheet */
+  --sheet-ink-3: #191919;   /* hover face */
+  --sheet-ink-4: #202020;   /* active nav row, raised chip, meter trough */
+
+  /* Hairlines for the opaque faces. The rgba rules above are for surfaces that
+     have something behind them; these are for surfaces that do not. */
+  --sheet-ink-line: #242424;    /* on ink-0 and ink-1 */
+  --sheet-ink-line-2: #2c2c2c;  /* on ink-2, card border */
+  --sheet-ink-line-3: #3d3d3d;  /* hover border */
+
+  /* Text on the opaque faces, in the same three weights of presence. Measured
+     on #141414: 17.4:1, 8.6:1, 5.2:1. */
+  --sheet-ink-text: #ffffff;
+  --sheet-ink-text-2: #b4b4b4;
+  --sheet-ink-text-3: #8a8a8a;
+
+  /* Urgency. Not red: a market running out of time is a fact, not an error.
+     10:1 on #141414. */
+  --sheet-warn: #ffb020;
+
+  /* ---------------------------------------------------------------- shell */
+
+  --shell-sidebar: 268px;
+  --shell-sidebar-collapsed: 68px;
+  --shell-gap: 20px;
+  --shell-gutter: 24px;
+  /* Wide enough that a 1728px browser still gets four market columns:
+     1760 - 48 gutter - 268 sidebar - 20 gap - 32 sheet padding = 1392 of track,
+     and four 320px columns with three 14px gaps need 1322. */
+  --shell-max: 1760px;
+  /* Square on purpose. The grid sets border-radius: 0 in nine places and
+     sheet.css says why. One line to change if that is ever revisited; the
+     swipe card's own 24px is not driven from here. */
+  --shell-radius: 0;
+
   /* ------------------------------------------------------------------ type */
 
   /* Three roles, no more. The fallbacks matter: if next/font fails to define

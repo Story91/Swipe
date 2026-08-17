@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Menu, Plus, BarChart3, PlayCircle, Trophy, HelpCircle, Settings } from "lucide-react";
 import { useAccount, useConnect } from "wagmi";
 import { useActiveChain } from "@/lib/chains/activeChain";
+import { getChainConfig } from "@/lib/chains";
 import { useState, useEffect, useRef, Suspense, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -43,6 +44,9 @@ import { ReadOnlyNotice } from "./components/Panels/ReadOnlyNotice";
 import { ComingSoonOverlay } from "./components/Panels/ComingSoonOverlay";
 import { ChainSwitcher } from "./components/Wallet/ChainSwitcher";
 import { WalletPicker } from "./components/Wallet/WalletPicker";
+import { AppSidebar, AppBar } from "./components/Shell/AppSidebar";
+import { useSidebarCollapsed } from "./components/Shell/sidebarCollapsed";
+import { CRUMB, type DashboardType } from "./components/Shell/navItems";
 import "./components/Markets/GridPage.css";
 
 /**
@@ -82,7 +86,9 @@ const SwipeMarkets = dynamic(() => import("./components/Markets/SwipeMarkets"), 
 const CreatePredictionModal = dynamic(() => import("./components/Modals/CreatePredictionModal").then(m => m.CreatePredictionModal), { ssr: false });
 const HowToPlayModal = dynamic(() => import("./components/Modals/HowToPlayModal").then(m => m.HowToPlayModal), { ssr: false });
 
-type DashboardType = 'tinder' | 'user' | 'admin' | 'approver' | 'market-stats' | 'analytics' | 'settings' | 'audit-logs' | 'my-portfolio' | 'active-bets' | 'bet-history' | 'help-faq' | 'leaderboard' | 'recent-activity' | 'swipe-token' | 'claim' | 'daily-tasks' | 'usdc-markets';
+/* DashboardType now comes from components/Shell/navItems, which is also what
+   the sidebar is built from and what navItems.test.ts checks for coverage. Two
+   copies of the union is how a dashboard ends up with no way in. */
 
 // User profile type
 interface UserProfile {
@@ -124,6 +130,15 @@ export default function App() {
   const { connect, connectors } = useConnect();
   // The claim badge is per chain, so the count has to be asked for per chain.
   const { chainKey } = useActiveChain();
+  /**
+   * The collateral this network actually settles in, for the nav.
+   *
+   * The markets tab was labelled USDC in the markup. On Robinhood the contract
+   * holds Paxos USDG and cannot hold USDC at all, so the tab named a token that
+   * is not there, and the network switcher changed everything except the one
+   * word that says what you are betting with.
+   */
+  const collateralSymbol = getChainConfig(chainKey).stable.symbol;
   const tinderCardRef = useRef<{ refresh: () => void; goToPrediction?: (id: string) => void } | null>(null);
   const dashboardTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [hasTriedAddMiniApp, setHasTriedAddMiniApp] = useState(false);
@@ -135,9 +150,21 @@ export default function App() {
   const viewProfile = useViewProfile();
   const isDesktop = useIsDesktop();
   const { mode: desktopView, setMode: setDesktopView } = useDesktopViewMode();
+  const { collapsed: sidebarCollapsed, toggle: toggleSidebar } = useSidebarCollapsed();
+
+  /*
+   * The desktop shell: sidebar, top bar, one content column.
+   *
+   * Not shown in swipe mode, and that is deliberate rather than unfinished. The
+   * swipe rails are position: fixed at left: 0 and right: 0, so a sidebar in the
+   * flow would sit underneath the left one at every viewport under 1760px. Swipe
+   * mode keeps exactly the layout it has today, horizontal menubar included, and
+   * the Grid/Swipe switch is the way between the two.
+   */
+  const showShell = isDesktop && desktopView === 'grid';
 
   // Grid is a desktop-only browse layout; mobile always stays on the swipe card.
-  const showGrid = isDesktop && desktopView === 'grid' && activeDashboard === 'tinder';
+  const showGrid = showShell && activeDashboard === 'tinder';
   // Side rails only make sense around the narrow swipe card — in grid mode the
   // markets themselves fill the width.
   const showSidePanels = isDesktop && desktopView === 'swipe';
@@ -383,6 +410,106 @@ export default function App() {
     setActiveDashboard('tinder');
   }, []);
 
+  /*
+   * The wallet controls, defined once and placed in one of two headers: the
+   * shell's top bar on desktop, the stacked row everywhere else. Only one of
+   * the two branches ever renders, so this is a move, not a copy — which
+   * matters, because <WalletDropdown> is a popover anchored to its own trigger
+   * and two of them on a page would fight.
+   *
+   * Disconnected: our own picker, because OnchainKit's <ConnectWallet> connects
+   * with a single connector — that is why the app only ever offered Coinbase
+   * Smart Wallet and MetaMask was unreachable.
+   *
+   * Connected: OnchainKit's components stay, since they carry the avatar, the
+   * Farcaster display name and the whole <WalletDropdown>. Replacing them
+   * outright would trade one wallet for a worse header.
+   */
+  const walletControl = !address ? (
+    <WalletPicker />
+  ) : (
+    <Wallet className="z-10">
+      <ConnectWallet
+        className="swipe-glow-button swipe-glow-green !px-3 !py-1.5 !text-sm !min-w-0 !font-semibold !rounded-full hover:!scale-105 !transition-all !duration-200"
+        text="Sign In"
+      >
+        {address && userProfile ? (
+          <div className="flex items-center gap-2">
+            <ShadcnAvatar className="w-7 h-7 ring-2 ring-[#d4ff00]/30">
+              <AvatarImage
+                src={userProfile?.pfp_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${address?.slice(2, 8)}`}
+                alt={userProfile?.display_name || 'User'}
+              />
+              <AvatarFallback className="bg-black text-[#d4ff00] font-bold text-[10px]">
+                {userProfile?.display_name?.slice(0, 2).toUpperCase() || address?.slice(2, 4).toUpperCase()}
+              </AvatarFallback>
+            </ShadcnAvatar>
+            <span className="text-[#d4ff00] font-bold text-xs truncate max-w-[120px]" style={{ fontFamily: '"Spicy Rice", cursive' }}>
+              {userProfile?.display_name || userProfile?.username}
+            </span>
+          </div>
+        ) : address ? (
+          <div className="flex items-center gap-2">
+            <ShadcnAvatar className="w-7 h-7 ring-2 ring-[#d4ff00]/30">
+              <AvatarImage
+                src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${address?.slice(2, 8)}`}
+                alt="User"
+              />
+              <AvatarFallback className="bg-black text-[#d4ff00] font-bold text-[10px]">
+                {address?.slice(2, 4).toUpperCase()}
+              </AvatarFallback>
+            </ShadcnAvatar>
+            <span className="text-[#d4ff00] font-bold text-xs" style={{ fontFamily: '"Spicy Rice", cursive' }}>
+              {`${address?.slice(0, 6)}...`}
+            </span>
+          </div>
+        ) : (
+          <span className="text-[#d4ff00]" style={{ fontFamily: '"Spicy Rice", cursive' }}>Sign In</span>
+        )}
+      </ConnectWallet>
+      <WalletDropdown>
+        <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
+          <Avatar />
+          <Name />
+          <Address />
+          <EthBalance />
+        </Identity>
+        {/* View Base Profile button */}
+        {userProfile?.fid && (
+          <div
+            className="px-4 py-2 cursor-pointer hover:bg-gray-100 text-sm text-blue-600 font-medium border-t"
+            onClick={() => viewProfile(parseInt(userProfile.fid!, 10))}
+          >
+            👤 View Base Profile
+          </div>
+        )}
+        <WalletDropdownDisconnect />
+      </WalletDropdown>
+    </Wallet>
+  );
+
+  /* Layout switch. Desktop only; mobile is always swipe. */
+  const viewSwitch = isDesktop && activeDashboard === 'tinder' ? (
+    <div className="nav-view-switch" role="group" aria-label="Markets layout">
+      <button
+        type="button"
+        className={`nav-view-switch__option${desktopView === 'grid' ? ' nav-view-switch__option--active' : ''}`}
+        aria-pressed={desktopView === 'grid'}
+        onClick={() => setDesktopView('grid')}
+      >
+        Grid
+      </button>
+      <button
+        type="button"
+        className={`nav-view-switch__option${desktopView === 'swipe' ? ' nav-view-switch__option--active' : ''}`}
+        aria-pressed={desktopView === 'swipe'}
+        onClick={() => setDesktopView('swipe')}
+      >
+        Swipe
+      </button>
+    </div>
+  ) : null;
+
   return (
     <div className="flex flex-col min-h-screen font-sans text-[var(--app-foreground)] mini-app-theme from-[var(--app-background)] to-[var(--app-gray)]">
       {/* Suspense wrapper for useSearchParams */}
@@ -392,6 +519,45 @@ export default function App() {
       
       {/* Side rails - desktop swipe mode only */}
       {showSidePanels && <SidePanels />}
+
+      {/* The shell. `contents` keeps both wrappers out of layout on mobile and
+          in swipe mode, so those stacks render exactly as they did before the
+          shell existed. */}
+      <div
+        className={showShell ? 'appshell' : 'contents'}
+        data-collapsed={showShell && sidebarCollapsed ? 'true' : undefined}
+      >
+        {showShell && (
+          <AppSidebar
+            active={activeDashboard}
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={toggleSidebar}
+            onSelect={setActiveDashboard}
+            onCreate={() => setIsCreateModalOpen(true)}
+            onHowToPlay={() => setIsHowToPlayOpen(true)}
+            claimCount={readyToClaimCount}
+            collateralSymbol={collateralSymbol}
+            isAdmin={!!isAdmin}
+          />
+        )}
+
+        <div className={showShell ? 'appshell__main' : 'contents'}>
+          {/* The bar sits outside .main-content-wrapper on purpose: that
+              wrapper sets overflow-x-hidden on two of its three branches, and
+              the wallet menu and the chain switcher menu are absolutely
+              positioned children rather than portals. Inside it they would be
+              cut in half. */}
+          {showShell && (
+            <AppBar active={activeDashboard}>
+              {viewSwitch}
+              <ChainSwitcher />
+              {walletControl}
+            </AppBar>
+          )}
+
+          {showGrid && (
+            <h1 className="appshell__title">{CRUMB[activeDashboard].title}</h1>
+          )}
 
       <div
         className={`w-full mx-auto py-3 main-content-wrapper ${
@@ -406,88 +572,15 @@ export default function App() {
               : 'max-w-[424px] px-2 sm:px-4 overflow-x-hidden'
         }`}
       >
-        {/* In grid mode the nav and the wallet controls share one header row;
-            `contents` keeps this wrapper out of the layout everywhere else, so
-            the swipe and mobile stacks are untouched. */}
-        <div className={showGrid ? 'grid-shell grid-topbar' : 'contents'}>
+        {/* Mobile and swipe mode keep the header they have always had: the
+            wallet row, then the horizontal menubar. On desktop those controls
+            are in the shell above and this whole block stands down. */}
+        {!showShell && (
+          <>
 
         {/* Wallet Connection and Admin/Help - Top */}
-        <div
-          className={`flex justify-between items-center ${
-            showGrid ? 'grid-topbar__wallet' : 'mb-3'
-          }`}
-        >
-          {/*
-            Disconnected: our own picker, because OnchainKit's <ConnectWallet>
-            connects with a single connector — that is why the app only ever
-            offered Coinbase Smart Wallet and MetaMask was unreachable.
-
-            Connected: OnchainKit's components stay, since they carry the
-            avatar, the Farcaster display name and the whole <WalletDropdown>.
-            Replacing them outright would trade one wallet for a worse header.
-          */}
-          {!address ? (
-            <WalletPicker />
-          ) : (
-          <Wallet className="z-10">
-            <ConnectWallet
-              className="swipe-glow-button swipe-glow-green !px-3 !py-1.5 !text-sm !min-w-0 !font-semibold !rounded-full hover:!scale-105 !transition-all !duration-200"
-              text="Sign In"
-            >
-              {address && userProfile ? (
-                <div className="flex items-center gap-2">
-                  <ShadcnAvatar className="w-7 h-7 ring-2 ring-[#d4ff00]/30">
-                    <AvatarImage 
-                      src={userProfile?.pfp_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${address?.slice(2, 8)}`} 
-                      alt={userProfile?.display_name || 'User'} 
-                    />
-                    <AvatarFallback className="bg-black text-[#d4ff00] font-bold text-[10px]">
-                      {userProfile?.display_name?.slice(0, 2).toUpperCase() || address?.slice(2, 4).toUpperCase()}
-                    </AvatarFallback>
-                  </ShadcnAvatar>
-                  <span className="text-[#d4ff00] font-bold text-xs truncate max-w-[120px]" style={{ fontFamily: '"Spicy Rice", cursive' }}>
-                    {userProfile?.display_name || userProfile?.username}
-                  </span>
-                </div>
-              ) : address ? (
-                <div className="flex items-center gap-2">
-                  <ShadcnAvatar className="w-7 h-7 ring-2 ring-[#d4ff00]/30">
-                    <AvatarImage 
-                      src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${address?.slice(2, 8)}`} 
-                      alt="User" 
-                    />
-                    <AvatarFallback className="bg-black text-[#d4ff00] font-bold text-[10px]">
-                      {address?.slice(2, 4).toUpperCase()}
-                    </AvatarFallback>
-                  </ShadcnAvatar>
-                  <span className="text-[#d4ff00] font-bold text-xs" style={{ fontFamily: '"Spicy Rice", cursive' }}>
-                    {`${address?.slice(0, 6)}...`}
-                  </span>
-                </div>
-              ) : (
-                <span className="text-[#d4ff00]" style={{ fontFamily: '"Spicy Rice", cursive' }}>Sign In</span>
-              )}
-            </ConnectWallet>
-            <WalletDropdown>
-              <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
-                <Avatar />
-                <Name />
-                <Address />
-                <EthBalance />
-              </Identity>
-              {/* View Base Profile button */}
-              {userProfile?.fid && (
-                <div 
-                  className="px-4 py-2 cursor-pointer hover:bg-gray-100 text-sm text-blue-600 font-medium border-t"
-                  onClick={() => viewProfile(parseInt(userProfile.fid!, 10))}
-                >
-                  👤 View Base Profile
-                </div>
-              )}
-              <WalletDropdownDisconnect />
-            </WalletDropdown>
-          </Wallet>
-          )}
+        <div className="flex justify-between items-center mb-3">
+          {walletControl}
 
           {/* Menu Dropdown - Top Right */}
           <Menubar className="!bg-transparent !border-0 !p-0 !h-auto">
@@ -562,10 +655,7 @@ export default function App() {
         </div>
 
         {/* Menu Bar - Right after Wallet */}
-        <div
-          className={`relative ${showGrid ? 'grid-topbar__nav' : 'mb-4'}`}
-          style={{ overflow: 'visible' }}
-        >
+        <div className="relative mb-4" style={{ overflow: 'visible' }}>
           <Menubar className="mini-app-menu">
             <MenubarMenu>
               <MenubarTrigger className="menubar-trigger" onClick={() => setActiveDashboard('tinder')}>
@@ -575,33 +665,15 @@ export default function App() {
             {/* Network switch sits with the other nav controls so the active
                 chain is visible without opening a menu. */}
             <ChainSwitcher />
-            {/* Layout switch lives in the main nav on desktop; mobile is always swipe */}
-            {isDesktop && activeDashboard === 'tinder' && (
-              <div className="nav-view-switch" role="group" aria-label="Markets layout">
-                <button
-                  type="button"
-                  className={`nav-view-switch__option${desktopView === 'grid' ? ' nav-view-switch__option--active' : ''}`}
-                  aria-pressed={desktopView === 'grid'}
-                  onClick={() => setDesktopView('grid')}
-                >
-                  Grid
-                </button>
-                <button
-                  type="button"
-                  className={`nav-view-switch__option${desktopView === 'swipe' ? ' nav-view-switch__option--active' : ''}`}
-                  aria-pressed={desktopView === 'swipe'}
-                  onClick={() => setDesktopView('swipe')}
-                >
-                  Swipe
-                </button>
-              </div>
-            )}
+            {/* Layout switch lives in the main nav here; on the desktop shell
+                it moves to the top bar. */}
+            {viewSwitch}
             <MenubarMenu>
               <MenubarTrigger 
                 className="menubar-trigger !bg-gradient-to-r !from-blue-500 !to-green-500 !text-white !font-bold hover:!from-blue-400 hover:!to-green-400" 
                 onClick={() => setActiveDashboard('usdc-markets')}
               >
-                💵 USDC
+                💵 {collateralSymbol}
               </MenubarTrigger>
             </MenubarMenu>
             <MenubarMenu>
@@ -639,7 +711,8 @@ export default function App() {
           </Menubar>
         </div>
 
-        </div>
+          </>
+        )}
 
         {/* Swipe mode only ever offers markets you can still bet on, so when
             none are open it is a dead end. This is the way out to the full
@@ -686,24 +759,21 @@ export default function App() {
 
           {/* SWIPE Token Card — the Base token's fee stream sits in an archived
               contract, so this is being rebuilt on the new token. */}
-          {activeDashboard === 'swipe-token' && (
-            <ComingSoonOverlay
-              title="New $SWIPE incoming"
-              message="The token page is moving to the new $SWIPE on Robinhood Chain. Balances, price and DEX links will return once it launches."
-            >
-              <SwipeTokenCard />
-            </ComingSoonOverlay>
-          )}
+          {/* No overlay, for the same reason as the tasks screen below. The
+              page now says the old token is finished and the new one has no
+              date, so covering it repeats the message while blurring it out.
+              The overlay also sets pointer-events: none, aria-hidden and inert,
+              which put the live chain readout, its retry button and every link
+              out of reach of a mouse and a keyboard alike. */}
+          {activeDashboard === 'swipe-token' && <SwipeTokenCard />}
 
           {/* Daily Tasks — rewards were paid in the old token. */}
-          {activeDashboard === 'daily-tasks' && (
-            <ComingSoonOverlay
-              title="Daily tasks are being rebuilt"
-              message="Tasks and streak rewards are moving to the new $SWIPE on Robinhood Chain. Nothing is claimable here in the meantime."
-            >
-              <DailyTasks />
-            </ComingSoonOverlay>
-          )}
+          {/* No overlay. The screen underneath used to be the old rewards UI,
+              wired to three archived contracts, so it had to be covered. It is
+              now a preview that says what it is on its own, and the overlay set
+              `inert` and `aria-hidden`, which switched off the one control the
+              preview has and hid the whole thing from a screen reader. */}
+          {activeDashboard === 'daily-tasks' && <DailyTasks />}
 
           {/* USDC Markets */}
           {activeDashboard === 'usdc-markets' && <SwipeMarkets />}
@@ -727,15 +797,11 @@ export default function App() {
             </div>
           )}
 
-          {/* Market Stats — the SWIPE figures here come from the old token. */}
-          {activeDashboard === 'market-stats' && (
-            <ComingSoonOverlay
-              title="Stats are being rebuilt"
-              message="Market stats still count volume in the old $SWIPE. They return once the new token is live on Robinhood Chain."
-            >
-              <CompactStats />
-            </ComingSoonOverlay>
-          )}
+          {/* No overlay. Every figure here is now read from the live contract
+              in the chain's own symbol, or sits under an "archived" heading
+              next to the token it is denominated in, so the old warning about
+              volume being counted in $SWIPE is itself the inaccurate line. */}
+          {activeDashboard === 'market-stats' && <CompactStats />}
 
           {/* Portfolio Components */}
           {activeDashboard === 'my-portfolio' && <MyPortfolio />}
@@ -758,6 +824,9 @@ export default function App() {
 
           {activeDashboard === 'audit-logs' && <AuditLogs />}
         </main>
+      </div>
+
+        </div>
       </div>
 
       {/* Create Prediction Modal */}

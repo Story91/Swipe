@@ -1,26 +1,257 @@
-/* Ultra Modern Compact Stats for Miniapp */
+/*
+ * The stats tab.
+ *
+ * One column, phone first, no desktop branch until 560px and nothing that can
+ * push the page sideways. Every colour is a --sheet-* token from
+ * app/styles/tokens.css; the single literal is the #0d0d0d panel face, which
+ * matches MarketPools, MarketChooserModal and WalletPicker. The app ground is
+ * lime, and a translucent panel puts the accent through body text.
+ *
+ * Written as BEM on the block `compact-stats`. What it replaces was 470 lines of
+ * names built out of a visual treatment rather than a thing, ending in "-new" or
+ * a bare adjective, with eleven of them colliding with classes other screens
+ * also write.
+ *
+ * Class names are not quoted with a leading dot in this comment on purpose.
+ * scripts/scan_dead_css.js reads selectors with a regex that does not skip
+ * comments, so writing a deleted class with its dot here re-declares it and the
+ * scan then reports it dead.
+ */
+
 .compact-stats {
-  padding: 12px;
-  max-width: 424px;
-  margin: 0 auto;
-  background: var(--sheet-surface);
-  min-height: 100vh;
-  color: #ffffff;
-  font-family: "Exo 2", -apple-system, BlinkMacSystemFont, sans-serif;
   display: flex;
   flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  /* A stats page is a reading column. Past this it stops being one. */
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 12px;
+  font-family: var(--sheet-body);
+  color: var(--sheet-paper);
+}
+
+.compact-stats__intro {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--sheet-paper-2);
+}
+
+.compact-stats__card {
+  background: #0d0d0d;
+  border: 1px solid var(--sheet-rule-strong);
+  border-radius: 0;
+  padding: 12px;
+  /* A long symbol or a wide number wraps rather than widening the page. */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.compact-stats__card--rules {
+  border-color: var(--sheet-lime-line);
+}
+
+.compact-stats__card--archive,
+.compact-stats__card--gaps {
+  border-color: var(--sheet-rule);
+}
+
+.compact-stats__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+h3.compact-stats__title {
+  margin: 0;
+  font-family: var(--sheet-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sheet-lime);
+}
+
+.compact-stats__badge {
+  flex: 0 0 auto;
+  font-family: var(--sheet-data);
+  font-size: 11px;
+  color: var(--sheet-paper-3);
+  text-align: right;
+}
+
+.compact-stats__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+}
+
+.compact-stats__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
   gap: 12px;
+  padding: 6px 0;
+  border-top: 1px solid var(--sheet-rule);
 }
 
-/* Loading/Error Cards */
-.stats-loading-card,
-.stats-error-card,
-.stats-empty-card {
-  background: rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(212, 255, 0, 0.2);
+.compact-stats__row:first-child {
+  border-top: none;
 }
 
-.loading-container, .error-container, .no-data {
+.compact-stats__row dt {
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--sheet-paper-3);
+}
+
+.compact-stats__row dd {
+  margin: 0;
+  font-family: var(--sheet-data);
+  font-size: 13px;
+  color: var(--sheet-paper);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+/* Three brackets across, which fits a 320px phone without shrinking the text. */
+.compact-stats__weights {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.compact-stats__weight {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  background: var(--sheet-surface);
+  border: 1px solid var(--sheet-rule);
+  text-align: center;
+}
+
+.compact-stats__weight-x {
+  font-family: var(--sheet-data);
+  font-size: 13px;
+  color: var(--sheet-paper-2);
+}
+
+.compact-stats__weight-when {
+  font-size: 9px;
+  line-height: 1.3;
+  color: var(--sheet-paper-3);
+}
+
+.compact-stats__note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--sheet-paper-2);
+}
+
+.compact-stats__note--quiet {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--sheet-paper-3);
+}
+
+.compact-stats__gap + .compact-stats__gap {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sheet-rule);
+}
+
+.compact-stats__gap-title {
+  margin: 0;
+  font-family: var(--sheet-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--sheet-paper);
+}
+
+.compact-stats__gap .compact-stats__note {
+  margin-top: 4px;
+}
+
+.compact-stats__status {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--sheet-paper-3);
+}
+
+.compact-stats__retry {
+  margin-top: 10px;
+  font-family: var(--sheet-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sheet-lime);
+  background: transparent;
+  border: 1px solid var(--sheet-lime-line);
+  border-radius: 0;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: border-color 140ms ease;
+}
+
+.compact-stats__retry:hover {
+  border-color: var(--sheet-lime);
+}
+
+.compact-stats__retry:focus-visible {
+  outline: 2px solid var(--sheet-lime);
+  outline-offset: 2px;
+}
+
+.compact-stats__footnote {
+  margin: 2px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--sheet-paper-3);
+}
+
+/* Above a phone there is room for the rows to breathe. */
+@media (min-width: 560px) {
+  .compact-stats__card {
+    padding: 14px 16px;
+  }
+
+  .compact-stats__row dd {
+    font-size: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .compact-stats__retry {
+    transition: none;
+  }
+}
+
+/*
+ * Below here is not this component's styling.
+ *
+ * These class names are written in TinderCard.tsx, MarketStats.tsx and
+ * EnhancedUserDashboard.tsx as well. Each of those has its own definition in its
+ * own stylesheet, but this file contributes properties theirs do not (the flex
+ * centring and the min-height), and `.loading-logo .spinning-logo` outranks every
+ * bare `.spinning-logo` by specificity, so today all three spin on spinLogo and
+ * this file holds the only copy of those keyframes.
+ *
+ * Deleting the block would therefore change three screens that are nothing to do
+ * with the stats tab. It is kept byte for byte and left alone, rather than moved,
+ * because moving it means editing files this change has no business in.
+ */
+.loading-container, .error-container {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -31,7 +262,6 @@
   min-height: 300px;
 }
 
-/* Spinning Logo for Loading */
 .loading-logo {
   margin-bottom: 24px;
 }
@@ -43,28 +273,18 @@
   filter: drop-shadow(0 0 20px rgba(212, 255, 0, 0.5));
 }
 
-.loading-text {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--sheet-lime);
-  font-family: "Orbitron", var(--sheet-body);
-  text-shadow: 0 0 10px rgba(212, 255, 0, 0.3);
-  margin: 0;
-}
-
 @keyframes spinLogo {
-  0% { 
+  0% {
     transform: rotate(0deg) scale(1);
   }
   50% {
     transform: rotate(180deg) scale(1.05);
   }
-  100% { 
+  100% {
     transform: rotate(360deg) scale(1);
   }
 }
 
-/* Legacy spinner (fallback) */
 .loading-spinner {
   width: 36px;
   height: 36px;
@@ -78,392 +298,4 @@
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
-}
-
-.error-icon {
-  font-size: 28px;
-  margin-bottom: 10px;
-}
-
-.retry-button {
-  background: var(--sheet-surface);
-  color: #000;
-  border: none;
-  padding: 8px 20px;
-  border-radius: 0;
-  font-weight: 700;
-  cursor: pointer;
-  margin-top: 12px;
-  transition: all 0.3s ease;
-  font-size: 12px;
-}
-
-.retry-button:hover {
-  transform: translateY(-2px);
-  box-shadow: none;
-}
-
-/* Header Card */
-
-
-
-
-/* Metrics Grid - New Style */
-.metrics-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.metric-card-new {
-  background: rgba(0, 0, 0, 0.6) !important;
-  border: 1px solid var(--sheet-rule);
-  border-radius: 0;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  overflow: hidden;
-}
-
-.metric-card-new:hover {
-  transform: translateY(-3px);
-  box-shadow: none;
-}
-
-.metric-card-new.primary {
-  border-color: rgba(212, 255, 0, 0.3);
-  background: var(--sheet-surface);
-}
-
-.metric-card-new.secondary {
-  border-color: rgba(99, 102, 241, 0.3);
-  background: var(--sheet-surface);
-}
-
-.metric-card-new.accent {
-  border-color: rgba(236, 72, 153, 0.3);
-  background: var(--sheet-surface);
-}
-
-.metric-card-new.success {
-  border-color: rgba(34, 197, 94, 0.3);
-  background: var(--sheet-surface) !important;
-}
-
-.metric-content-new {
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.metric-value-new {
-  font-size: 22px;
-  font-weight: 800;
-  color: #ffffff;
-  font-family: var(--sheet-display);
-}
-
-.metric-value-new.small {
-  font-size: 16px;
-}
-
-.metric-value-container-new {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.metric-logo-new {
-  width: 20px;
-  height: 20px;
-  border-radius: 0;
-  object-fit: contain;
-}
-
-.metric-badge {
-  font-size: 9px;
-  padding: 3px 8px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  background: rgba(212, 255, 0, 0.15) !important;
-  color: var(--sheet-lime) !important;
-  border: none;
-}
-
-.metric-badge.active {
-  background: var(--sheet-surface) !important;
-  color: #000 !important;
-}
-
-/* Section Cards */
-.section-card {
-  background: rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(212, 255, 0, 0.15);
-  border-radius: 0;
-}
-
-.section-card.category {
-  border-color: rgba(212, 255, 0, 0.25) !important;
-}
-
-.section-card.trending {
-  border-color: rgba(255, 107, 0, 0.25) !important;
-}
-
-.section-header {
-  padding: 12px 14px 8px;
-  border-bottom: 1px solid var(--sheet-surface);
-}
-
-.section-title {
-  font-size: 14px !important;
-  color: var(--sheet-lime) !important;
-  font-weight: 700 !important;
-  font-family: var(--sheet-body);
-}
-
-/* Activity Grid */
-.activity-grid {
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  padding: 14px;
-}
-
-.activity-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.activity-value-new {
-  font-size: 24px;
-  font-weight: 800;
-  color: var(--sheet-lime);
-  font-family: var(--sheet-display);
-}
-
-.activity-label-new {
-  font-size: 12px;
-  color: var(--sheet-paper-2);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.activity-divider {
-  width: 1px;
-  height: 40px;
-  background: var(--sheet-surface);
-}
-
-/* Category Content */
-.category-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px;
-}
-
-.category-badge {
-  font-size: 14px !important;
-  padding: 6px 14px !important;
-  background: var(--sheet-surface) !important;
-  color: #000 !important;
-  font-weight: 700 !important;
-}
-
-.category-active-count {
-  font-size: 12px;
-  color: var(--sheet-paper-2);
-}
-
-/* Trending List - New */
-.trending-list-new {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px 14px 14px;
-}
-
-.trending-item-new {
-  background: var(--sheet-surface);
-  border: 1px solid var(--sheet-surface);
-  border-radius: 0;
-  padding: 12px;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  transition: all 0.3s ease;
-}
-
-.trending-item-new:hover {
-  background: var(--sheet-surface);
-  border-color: rgba(212, 255, 0, 0.2);
-  transform: translateX(4px);
-}
-
-.trending-rank-badge {
-  font-size: 10px;
-  padding: 4px 8px;
-  background: rgba(212, 255, 0, 0.1);
-  color: var(--sheet-lime);
-  border-color: rgba(212, 255, 0, 0.3);
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
-.trending-content-new {
-  flex: 1;
-  min-width: 0;
-}
-
-.trending-question-new {
-  font-size: 12px;
-  color: #ffffff;
-  font-weight: 600;
-  margin-bottom: 6px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  line-height: 1.4;
-}
-
-.trending-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.trending-volume-new {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--sheet-lime);
-}
-
-.trending-volume-new.swipe {
-  color: #00ff88;
-}
-
-.trending-logo-new {
-  width: 12px;
-  height: 12px;
-  border-radius: 0;
-  object-fit: contain;
-}
-
-.participants-badge {
-  font-size: 9px;
-  padding: 2px 6px;
-  background: var(--sheet-rule);
-  color: var(--sheet-paper-2);
-}
-
-.trending-arrow {
-  font-size: 16px;
-  flex-shrink: 0;
-}
-
-.trending-arrow.up {
-  color: #22c55e;
-}
-
-.trending-arrow.down {
-  color: #ef4444;
-}
-
-/* Footer Card */
-.footer-card {
-  background: var(--sheet-surface);
-  border: 1px solid rgba(212, 255, 0, 0.2);
-  border-radius: 0;
-}
-
-.footer-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  padding: 14px;
-}
-
-.footer-stat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-
-.footer-label {
-  font-size: 12px;
-  color: var(--sheet-paper-3);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.footer-value-badge {
-  font-size: 14px;
-  padding: 4px 12px;
-  background: var(--sheet-surface);
-  color: #000;
-  font-weight: 800;
-}
-
-.footer-divider {
-  width: 1px;
-  height: 40px;
-  background: var(--sheet-surface);
-}
-
-.footer-values {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.footer-value-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--sheet-lime);
-}
-
-.footer-logo {
-  width: 14px;
-  height: 14px;
-  border-radius: 0;
-  object-fit: contain;
-}
-
-/* Responsive adjustments */
-@media (max-width: 375px) {
-  .compact-stats {
-    padding: 10px;
-    gap: 10px;
-  }
-  
-  .metrics-grid {
-    gap: 8px;
-  }
-  
-  .metric-value-new {
-    font-size: 18px;
-  }
-  
-  .stats-main-title {
-    font-size: 18px;
-  }
-
-  .trending-question-new {
-    font-size: 12px;
-  }
 }

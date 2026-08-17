@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAccount } from 'wagmi';
 import { useRedisPredictions } from './useRedisPredictions';
+import { useActiveChain } from '../chains/activeChain';
 import { RedisPrediction } from '../types/redis';
 
 export interface HybridPrediction {
@@ -66,6 +67,9 @@ export function useHybridPredictions() {
   const [allPredictionsLoaded, setAllPredictionsLoaded] = useState(false); // Track if ALL predictions (not just active) have been loaded
   const fetchAllModeRef = useRef(false); // Track if dashboard requested all predictions (using ref to avoid stale closure)
   const { address } = useAccount();
+  // The chain every read below is about. Switching it must clear the list, not
+  // leave the other chain's markets up.
+  const { chainKey } = useActiveChain();
   
   // Redis predictions hook
   const { 
@@ -165,16 +169,53 @@ export function useHybridPredictions() {
 
   // Transform predictions when Redis data changes
   useEffect(() => {
-    if (redisPredictions.length > 0) {
-      const transformed = transformPredictions(redisPredictions);
-      setPredictions(transformed);
-      setInitialLoading(false);
-      // If we're in "fetch all" mode, mark as loaded now that predictions are transformed
-      if (fetchAllModeRef.current) {
-        setAllPredictionsLoaded(true);
-      }
+    /**
+     * Copy the result through even when it is empty.
+     *
+     * This was guarded by `redisPredictions.length > 0`, which meant a fetch
+     * that legitimately returned nothing left the previous list on screen. On
+     * one chain that is a stale render. On two it is a lie about money: Redis
+     * is namespaced per chain and Robinhood holds no markets yet, so switching
+     * to it fetched zero, skipped this branch, and kept showing Base's markets
+     * with Base's pools under a USDG heading. Tapping one would have opened a
+     * bet dialog for a market that does not exist on the chain you are on.
+     *
+     * Empty is an answer. It renders as an empty state, which is the truth.
+     */
+    const transformed = transformPredictions(redisPredictions);
+    setPredictions(transformed);
+    setInitialLoading(false);
+    if (fetchAllModeRef.current) {
+      setAllPredictionsLoaded(true);
     }
   }, [redisPredictions, transformPredictions]);
+
+  /**
+   * Drop the old chain's markets the moment the chain changes.
+   *
+   * Without this the previous chain's list stays up for as long as the new
+   * fetch takes, so the first thing a user sees after switching to Robinhood is
+   * Base's markets relabelled with Robinhood's collateral symbol.
+   */
+  const knownChainRef = useRef(chainKey);
+  useEffect(() => {
+    // Skip the first run. The mount effect below already does the first fetch,
+    // and clearing here as well would just flash an empty list on load.
+    if (knownChainRef.current === chainKey) return;
+    knownChainRef.current = chainKey;
+
+    setPredictions([]);
+    setInitialLoading(true);
+    setAllPredictionsLoaded(false);
+    // Fetch here rather than leaning on the effect keyed to `address`. That one
+    // is guarded by a connected wallet, so a visitor with no wallet who
+    // switched chains would have had the list cleared and never refilled.
+    if (fetchAllModeRef.current) {
+      fetchAllPredictionsComplete();
+    } else {
+      fetchAllPredictions();
+    }
+  }, [chainKey, fetchAllPredictions, fetchAllPredictionsComplete]);
 
   // A fetch that legitimately returns nothing still ends the initial load.
   // Without this the effect above never fires when there are no open markets,

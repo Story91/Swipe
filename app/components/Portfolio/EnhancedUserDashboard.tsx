@@ -169,6 +169,10 @@ export function EnhancedUserDashboard() {
   const [loadingStakes, setLoadingStakes] = useState(false);
   const [isTransactionLoading, setIsTransactionLoading] = useState(false);
   const [userTransactions, setUserTransactions] = useState<UserTransaction[]>([]);
+  /** Set when a refresh failed, so an empty list is never read as "none". */
+  const [transactionsError, setTransactionsError] = useState<string | null>(null);
+  /** The same, for the positions list. */
+  const [stakesError, setStakesError] = useState<string | null>(null);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
   const [syncingBlockchain, setSyncingBlockchain] = useState(false);
   
@@ -460,16 +464,31 @@ export function EnhancedUserDashboard() {
     
     setLoadingTransactions(true);
     try {
-      console.log('🔄 Fetching user transactions from server...');
       const response = await fetch(`/api/user-transactions?userId=${address.toLowerCase()}`);
       const result = await response.json();
-      const transactions = result.success ? result.data : [];
-      setUserTransactions(transactions);
-      console.log(`📊 Loaded ${transactions.length} user transactions`);
-      
-      // No cache - always fresh from Redis
+
+      /**
+       * A failed load must not empty the list.
+       *
+       * This read `result.success ? result.data : []` and then set that, so any
+       * answer that was not a success replaced the history with nothing. The
+       * component remounts every time you leave the dashboard and come back, so
+       * one flaky response was enough to make months of transactions vanish,
+       * and the empty state then told the user they had never placed a bet.
+       *
+       * Failing to fetch history is not the same fact as having none. Keep what
+       * is on screen, record that the refresh failed, and let the render say so.
+       */
+      if (!result?.success || !Array.isArray(result.data)) {
+        setTransactionsError('Could not refresh your history just now.');
+        return;
+      }
+
+      setTransactionsError(null);
+      setUserTransactions(result.data);
     } catch (error) {
       console.error('Failed to fetch user transactions:', error);
+      setTransactionsError('Could not reach the server for your history.');
     } finally {
       setLoadingTransactions(false);
     }
@@ -555,21 +574,41 @@ export function EnhancedUserDashboard() {
     setLoadingStakes(true);
     try {
       // OPTIMIZATION: Get all user stakes in one API call instead of individual calls
-      const allStakesResponse = await fetch(`/api/stakes?getAllUserStakes=true&userId=${address.toLowerCase()}`);
+      // Positions are per chain, so the read has to name one. Without it the
+      // server defaults to Base and a Robinhood user is shown Base's stakes.
+      const allStakesResponse = await fetch(
+        `/api/stakes?getAllUserStakes=true&userId=${address.toLowerCase()}&chain=${claimChainKey}`
+      );
       const allStakesData = await allStakesResponse.json();
-      
-      if (!allStakesData.success) {
-        setAllUserPredictions([]);
+
+      /**
+       * Two early returns used to empty the list on their way out, and between
+       * them they are why history vanishes when you leave this screen and come
+       * back.
+       *
+       * The component unmounts on a dashboard switch and remounts fresh, so
+       * `allPredictions` is empty for the first render or two while its own
+       * fetch is in flight. This function ran in that window, saw zero
+       * predictions, and wrote an empty array over everything the user had.
+       * Not loaded yet and none are different facts, and only one of them is
+       * worth rendering.
+       *
+       * The other return did the same for a failed stakes read, so a single
+       * flaky response wiped the board.
+       */
+      if (!allStakesData?.success) {
+        setStakesError('Could not load your positions just now.');
         return;
       }
-      
+
       const userStakes = allStakesData.data || [];
       const predictions = allPredictions || [];
-      
-      if (predictions.length === 0) {
-        setAllUserPredictions([]);
-        return;
-      }
+
+      // Nothing to join against yet. Leave what is on screen and wait for the
+      // predictions to arrive; this callback re-runs when they do.
+      if (predictions.length === 0) return;
+
+      setStakesError(null);
       
       // Group stakes by prediction ID for faster lookup
       const stakesByPrediction: { [key: string]: any[] } = {};
@@ -900,7 +939,10 @@ export function EnhancedUserDashboard() {
     } finally {
       setLoadingStakes(false);
     }
-  }, [address, allPredictions, predictionsLoading]);
+    // claimChainKey belongs here: the stakes read now names a chain, and
+    // without the dep this keeps the chain it captured on first render and
+    // shows Base's positions after a switch.
+  }, [address, allPredictions, predictionsLoading, claimChainKey]);
 
   // Fetch user stakes for predictions - now filters allUserPredictions
   const fetchUserStakes = useCallback(async (forceRefresh: boolean = false, filterType: string = 'ready-to-claim') => {
@@ -2063,44 +2105,13 @@ export function EnhancedUserDashboard() {
                 </span>
               </td>
             </tr>
-            {ethTotalStaked > 0 && (
-              <tr className="eth-row">
-                <td className="token-cell">
-                  <img src="/Ethereum-icon-purple.svg" alt="" className="token-logo" />
-                  <span className="token-cell-symbol">ETH</span>
-                </td>
-                <td className="value-cell">
-                  <span className="stat-value-total">{formatEth(ethTotalStaked)}</span>
-                </td>
-                <td className="value-cell">
-                  <span className="stat-value-payout">{formatEth(ethTotalPotentialPayout)}</span>
-                </td>
-                <td className="value-cell">
-                  <span className={`stat-value-profit ${ethTotalPotentialProfit >= 0 ? 'profit' : 'loss'}`}>
-                    {ethTotalPotentialProfit >= 0 ? '+' : ''}{formatEth(ethTotalPotentialProfit)}
-                  </span>
-                </td>
-              </tr>
-            )}
-            {swipeTotalStaked > 0 && (
-              <tr className="swipe-row">
-                <td className="token-cell">
-                  <img src="/splash.png" alt="" className="token-logo" />
-                  <span className="token-cell-symbol">SWIPE</span>
-                </td>
-                <td className="value-cell">
-                  <span className="stat-value-total">{formatSwipe(swipeTotalStaked)}</span>
-                </td>
-                <td className="value-cell">
-                  <span className="stat-value-payout">{formatSwipe(swipeTotalPotentialPayout)}</span>
-                </td>
-                <td className="value-cell">
-                  <span className={`stat-value-profit ${swipeTotalPotentialProfit >= 0 ? 'profit' : 'loss'}`}>
-                    {swipeTotalPotentialProfit >= 0 ? '+' : ''}{formatSwipe(swipeTotalPotentialProfit)}
-                  </span>
-                </td>
-              </tr>
-            )}
+            {/* ETH and SWIPE rows are gone from this summary.
+
+                They sat on contracts nobody can settle, so the money they
+                counted cannot be won, lost or collected, and putting them in a
+                table headed Bets, Payout and Profit implied all three. The
+                positions themselves are still listed below and still readable;
+                what is removed is their claim to be part of a running book. */}
           </tbody>
         </table>
         
@@ -2513,9 +2524,19 @@ export function EnhancedUserDashboard() {
               </div>
             )}
           </>
+        ) : transactionsError ? (
+          /* An empty list after a failed read is not an empty history, and
+             saying "no transactions found" there tells someone their record is
+             gone when the server simply did not answer. */
+          <div className="no-transactions">
+            <p>{transactionsError}</p>
+            <button type="button" className="sync-blockchain-btn" onClick={() => fetchUserTransactions(true)}>
+              Try again
+            </button>
+          </div>
         ) : (
           <div className="no-transactions">
-            <p>No transactions found. Your transaction history will appear here.</p>
+            <p>Nothing here yet. Bets, exits and claims show up as you make them.</p>
           </div>
         )}
       </div>

@@ -104,10 +104,10 @@
 .mgcard {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  background: #0d0d0d;
-  border: 1px solid #262626;
-  border-radius: 0;
+  gap: 10px;
+  background: var(--sheet-ink-1);
+  border: 1px solid var(--sheet-ink-line-2);
+  border-radius: var(--shell-radius);
   padding: 14px;
   cursor: pointer;
   transition: transform 140ms ease, border-color 140ms ease;
@@ -124,25 +124,29 @@
   outline-offset: 2px;
 }
 
-/* ---------- head: thumb + question ---------- */
+/* ---------- category row ----------
+   The thumbnail used to sit beside the question at 42px, which made the picture
+   the first thing read on a card whose whole job is a sentence. It is now a
+   22px mark on a label row, and that row finally says the category out loud:
+   `prediction.category` has always been on the record and was thrown away. */
 
-.mgcard__head {
+.mgcard__cat {
   display: flex;
-  align-items: flex-start;
-  gap: 11px;
+  align-items: center;
+  gap: 8px;
 }
 
 .mgcard__thumb {
   flex: 0 0 auto;
-  width: 42px;
-  height: 42px;
-  border-radius: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--shell-radius);
   object-fit: cover;
   background: #1a1a1a;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.02em;
 }
@@ -152,16 +156,56 @@
   color: var(--sheet-lime);
 }
 
+/* The inline svg asks for 20px, which overflows a 22px tile. */
+.mgcard__thumb--chart svg {
+  width: 14px;
+  height: 14px;
+}
+
+.mgcard__cat-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--sheet-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sheet-ink-text-3);
+}
+
+/* Amber, not red. A busy market is worth noticing, it is not a warning. */
+.mgcard__flag {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  font-family: var(--sheet-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sheet-warn);
+  background: transparent;
+  border: 1px solid var(--sheet-warn);
+  border-radius: var(--shell-radius);
+}
+
+/* ---------- question ---------- */
+
 .mgcard__question {
   margin: 0;
-  font-size: 13.5px;
-  line-height: 1.35;
+  font-size: 15px;
+  line-height: 1.4;
   font-weight: 600;
   /* Pure white on near-black: the question is the one thing that must be
      readable at a glance across a dense grid. */
-  color: #ffffff;
+  color: var(--sheet-ink-text);
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  /* Two lines, not three. The odds block below is now fixed height, so a
+     third line was the only thing making cards ragged. The full text is on
+     the title attribute and on /prediction/[id]. */
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -171,30 +215,64 @@
 .mgcard__odds {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
   margin-top: auto;
 }
 
-.mgcard__odds-labels {
+/* One row per side: a named pill and the number it is running at.
+   These are spans and they carry a side name, never a verb. They are not
+   buttons and must not become buttons here: the whole card is already a
+   role="link", nesting controls inside it gives assistive tech two competing
+   activation targets, and a bet placed from the grid would be a second
+   staking implementation on a page where one chain is read-only. Betting
+   lives at /prediction/[id], behind the guarded write path. */
+.mgcard__side {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.mgcard__side-pill {
+  flex: 0 0 auto;
+  min-width: 52px;
+  padding: 4px 10px;
+  text-align: center;
+  font-family: var(--sheet-display);
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: var(--shell-radius);
 }
 
-.mgcard__yes {
-  color: var(--sheet-lime);
+.mgcard__side-pill--yes {
+  background: var(--sheet-lime);
+  color: #000;
+  border: 1px solid var(--sheet-lime);
 }
 
-.mgcard__no {
-  color: #ff7a7a;
+/* Grey, not red. An open market has no opinion about which side is right, and
+   colouring NO like a failure state tells the reader it does. */
+.mgcard__side-pill--no {
+  background: var(--sheet-ink-4);
+  color: #e8e8e8;
+  border: 1px solid var(--sheet-ink-line-3);
+}
+
+.mgcard__side-pct {
+  margin-left: auto;
+  font-family: var(--sheet-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sheet-ink-text);
 }
 
 .mgcard__bar {
-  height: 5px;
-  border-radius: 0;
-  background: #3a1f22;
+  height: 4px;
+  border-radius: var(--shell-radius);
+  /* Was #3a1f22, a red-brown trough, which is red-for-no by another name. */
+  background: var(--sheet-ink-4);
   overflow: hidden;
 }
 
@@ -202,7 +280,7 @@
   display: block;
   height: 100%;
   background: var(--sheet-lime);
-  border-radius: 0;
+  border-radius: var(--shell-radius);
   transition: width 240ms ease;
 }
 
@@ -213,12 +291,12 @@
   align-items: center;
   gap: 5px;
   padding-top: 10px;
-  border-top: 1px solid #1f1f1f;
+  border-top: 1px solid var(--sheet-ink-line-2);
   font-size: 12px;
 }
 
 .mgcard__stat {
-  color: #b0b0b0;
+  color: var(--sheet-ink-text-2);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -234,9 +312,9 @@
 .mgcard__badge {
   flex: 0 0 auto;
   padding: 3px 8px;
-  border-radius: 0;
-  background: #1f1f1f;
-  color: #cfcfcf;
+  border-radius: var(--shell-radius);
+  background: var(--sheet-ink-line);
+  color: var(--sheet-ink-text-2);
   font-weight: 700;
   font-size: 12px;
   letter-spacing: 0.03em;
@@ -245,7 +323,7 @@
 }
 
 .mgcard__badge--urgent {
-  color: #ffb020;
+  color: var(--sheet-warn);
 }
 
 .mgcard__badge--yes {
@@ -253,8 +331,10 @@
   color: #000;
 }
 
+/* The one red that survives. A settled market does have an opinion, and this
+   says which way it went, not that something went wrong. */
 .mgcard__badge--no {
-  background: #2a2a2a;
+  background: var(--sheet-ink-4);
   color: #ff8a8a;
 }
 
@@ -332,7 +412,7 @@
 
 .mgcard--skeleton {
   min-height: 148px;
-  background: #0d0d0d;
+  background: var(--sheet-ink-1);
   opacity: 0.5;
   animation: mgcard-pulse 1.4s ease-in-out infinite;
   cursor: default;
@@ -350,9 +430,9 @@
   margin: 48px auto;
   padding: 32px;
   text-align: center;
-  background: #0d0d0d;
+  background: var(--sheet-ink-1);
   border: 2px solid #000;
-  border-radius: 0;
+  border-radius: var(--shell-radius);
   color: #f5f5f5;
 }
 
@@ -430,7 +510,9 @@
 
 .mgcard__result dt {
   font-family: var(--sheet-display);
-  font-size: 10px;
+  /* 10px was under the 12px floor. The extra ~6px of card height is absorbed
+     by grid-auto-rows: 1fr. */
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;

@@ -28,41 +28,9 @@
   flex: 1 1 auto;
 }
 
-/* ---------- header ---------- */
-
-/*
- * Nav on the left at its own width, wallet controls on the right, one line.
- * They were two stacked rows, which left a single Sign In button alone in a
- * 1440px band and put four rows of chrome above the first market.
- */
-.grid-topbar {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  margin-bottom: 18px;
-}
-
-.grid-topbar__nav {
-  order: 1;
-  flex: 0 1 auto;
-  min-width: 0;
-}
-
-.grid-topbar__wallet {
-  order: 2;
-  flex: 0 0 auto;
-  gap: 12px;
-  margin-left: auto;
-}
-
-/* The nav pill is width:100% + space-evenly, which is right when it is the only
-   thing on its row and wrong here: stretched across the shell it turns seven
-   buttons into seven islands. Content width, packed left. */
-.grid-topbar__nav .mini-app-menu {
-  width: auto;
-  justify-content: flex-start !important;
-  gap: 2px;
-}
+/* The header that used to live here, .grid-topbar, is gone. On desktop the nav
+   and the wallet controls now sit in the shell's own top bar, which is defined
+   in app/components/Shell/appshell.css and rendered above this column. */
 
 /* ---------- browse sheet ---------- */
 
@@ -70,9 +38,10 @@
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
-  /* A shade under the cards, so a card is the thing that lifts off the page. */
-  background: #070707;
-  border: 1px solid #242424;
+  /* A shade under the cards, so a card is the thing that lifts off the page.
+     Opaque, because it sits directly on the lime ground. */
+  background: var(--sheet-ink-0);
+  border: 1px solid var(--sheet-ink-line);
   padding: 16px 20px 20px;
   margin-bottom: 24px;
 }
@@ -99,20 +68,20 @@
 .market-sheet .market-filter-bar {
   margin-bottom: 16px;
   padding-bottom: 14px;
-  border-bottom: 1px solid #1f1f1f;
+  border-bottom: 1px solid var(--sheet-ink-line);
 }
 
 .market-sheet .market-filter__chip {
-  color: #b4b4b4;
-  background: #141414;
-  border: 1px solid #2f2f2f;
+  color: var(--sheet-ink-text-2);
+  background: var(--sheet-ink-2);
+  border: 1px solid var(--sheet-ink-line-3);
   padding: 8px 16px;
 }
 
 .market-sheet .market-filter__chip:hover {
-  background: #1c1c1c;
+  background: var(--sheet-ink-3);
   color: #f0f0f0;
-  border-color: #3d3d3d;
+  border-color: var(--sheet-ink-line-3);
 }
 
 .market-sheet .market-filter__chip--active {
@@ -127,20 +96,20 @@
 }
 
 .market-sheet .market-filter__count {
-  background: #2a2a2a;
+  background: var(--sheet-ink-4);
   color: #e8e8e8;
 }
 
 .market-sheet .market-filter__hint {
-  color: #8a8a8a;
+  color: var(--sheet-ink-text-3);
   opacity: 1;
 }
 
 /* ---------- card, on the sheet ---------- */
 
 .market-sheet .mgcard {
-  background: #141414;
-  border-color: #2c2c2c;
+  background: var(--sheet-ink-2);
+  border-color: var(--sheet-ink-line-2);
   padding: 15px 16px;
   /* A card with a short question was 159px tall and read as a fragment. This is
      the height of a card carrying a two-line question, so the grid is regular
@@ -150,32 +119,14 @@
 
 .market-sheet .mgcard:hover,
 .market-sheet .mgcard:focus-visible {
-  background: #191919;
+  background: var(--sheet-ink-3);
   border-color: var(--sheet-lime);
 }
 
-/* 13.5px in a 350px column was smaller than the numbers underneath it, on the
-   one line that decides whether anyone clicks. */
-.market-sheet .mgcard__question {
-  font-size: 14.5px;
-  line-height: 1.4;
-}
-
-.market-sheet .mgcard__foot {
-  border-top-color: #262626;
-}
-
-.market-sheet .mgcard__bar {
-  height: 6px;
-}
-
-.market-sheet .mgcard__badge {
-  background: #242424;
-}
-
-.market-sheet .mgcard__badge--yes {
-  background: var(--sheet-lime);
-}
+/* The question size, the bar height, the foot rule and the badge fill used to
+   be overridden here. They now hold one value each in MarketGrid.css, because
+   the grid only ever renders inside this sheet. Two places to change a colour
+   is how the NO label stayed red for a month after the rule said otherwise. */
 
 .market-sheet .mgcard--skeleton {
   background: #131313;
@@ -186,21 +137,21 @@
 .market-sheet .market-pagination {
   padding: 18px 0 0;
   margin-top: auto;
-  border-top: 1px solid #1f1f1f;
+  border-top: 1px solid var(--sheet-ink-line);
 }
 
 .market-sheet .market-pagination__page,
 .market-sheet .market-pagination__step {
-  color: #b4b4b4;
-  background: #141414;
-  border: 1px solid #2f2f2f;
+  color: var(--sheet-ink-text-2);
+  background: var(--sheet-ink-2);
+  border: 1px solid var(--sheet-ink-line-3);
 }
 
 .market-sheet .market-pagination__page:hover:not(:disabled),
 .market-sheet .market-pagination__step:hover:not(:disabled) {
-  background: #1c1c1c;
+  background: var(--sheet-ink-3);
   color: #f0f0f0;
-  border-color: #3d3d3d;
+  border-color: var(--sheet-ink-line-3);
 }
 
 .market-sheet .market-pagination__page--active {
@@ -211,14 +162,14 @@
 
 .market-sheet .market-pagination__summary,
 .market-sheet .market-pagination__gap {
-  color: #8a8a8a;
+  color: var(--sheet-ink-text-3);
   opacity: 1;
 }
 
 .market-sheet .market-grid__notice {
   margin: auto;
-  background: #141414;
-  border: 1px solid #2c2c2c;
+  background: var(--sheet-ink-2);
+  border: 1px solid var(--sheet-ink-line-2);
 }
 
 /* ---------- stat bar ---------- */
@@ -255,26 +206,6 @@
 }
 
 @media (max-width: 1024px) {
-  .grid-topbar {
-    flex-wrap: wrap;
-  }
-
-  .grid-topbar__nav {
-    order: 2;
-    flex: 1 1 100%;
-  }
-
-  .grid-topbar__wallet {
-    order: 1;
-    flex: 1 1 100%;
-    justify-content: space-between;
-  }
-
-  .grid-topbar__nav .mini-app-menu {
-    width: 100%;
-    justify-content: space-evenly !important;
-  }
-
   .market-sheet {
     padding: 14px 14px 18px;
   }

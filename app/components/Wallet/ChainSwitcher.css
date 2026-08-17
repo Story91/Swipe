@@ -111,3 +111,31 @@
     transition: none;
   }
 }
+
+/**
+ * The network mark in the trigger.
+ *
+ * Base has an asset in public/; Robinhood does not yet, so it renders as a
+ * lettered tile rather than an invented logo. Both occupy the same box so the
+ * nav does not shift when the real file lands.
+ */
+.chain-switcher__mark {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  object-fit: contain;
+  border-radius: 0;
+}
+
+.chain-switcher__mark--letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--sheet-display);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--sheet-lime);
+  background: var(--sheet-wash);
+  border: 1px solid var(--sheet-lime-line);
+}

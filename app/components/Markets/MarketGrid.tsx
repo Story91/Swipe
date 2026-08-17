@@ -50,6 +50,13 @@ const FILTERS: { key: StatusFilter; label: string }[] = [
 /** Divisible by 2, 3 and 4 so the last row is full at every column count. */
 const PAGE_SIZE = 24;
 
+/**
+ * Display heuristic, nothing more. Nothing on HybridPrediction says a market is
+ * busy, and player count is the closest honest reading of it. Eight is where a
+ * market stops looking like its creator and three friends.
+ */
+const HOT_PLAYER_THRESHOLD = 8;
+
 function isOpen(p: HybridPrediction, now: number): boolean {
   return !p.resolved && !p.cancelled && p.deadline > now;
 }
@@ -117,6 +124,8 @@ function MarketCard({
   const time = formatTimeLeft(prediction.deadline);
   const pool = formatPool(prediction.totalPool ?? 0);
   const settled = prediction.resolved || prediction.cancelled;
+  const players = prediction.participants?.length ?? 0;
+  const hot = !settled && players >= HOT_PLAYER_THRESHOLD;
 
   return (
     <article
@@ -132,15 +141,26 @@ function MarketCard({
       }}
       aria-label={prediction.question}
     >
-      <div className="mgcard__head">
+      <div className="mgcard__cat">
         <MarketThumb prediction={prediction} />
-        <h3 className="mgcard__question">{prediction.question}</h3>
+        <span className="mgcard__cat-name">{prediction.category || "Market"}</span>
+        {hot && <span className="mgcard__flag">Hot</span>}
       </div>
 
+      {/* The title attribute is the clamped tail: the question is cut at two
+          lines now, so hovering has to be able to finish the sentence. */}
+      <h3 className="mgcard__question" title={prediction.question}>
+        {prediction.question}
+      </h3>
+
       <div className="mgcard__odds">
-        <div className="mgcard__odds-labels">
-          <span className="mgcard__yes">YES {yes}%</span>
-          <span className="mgcard__no">NO {no}%</span>
+        <div className="mgcard__side">
+          <span className="mgcard__side-pill mgcard__side-pill--yes">Yes</span>
+          <span className="mgcard__side-pct">{yes}%</span>
+        </div>
+        <div className="mgcard__side">
+          <span className="mgcard__side-pill mgcard__side-pill--no">No</span>
+          <span className="mgcard__side-pct">{no}%</span>
         </div>
         <div className="mgcard__bar" aria-hidden="true">
           <span className="mgcard__bar-yes" style={{ width: `${yes}%` }} />
