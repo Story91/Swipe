@@ -244,6 +244,7 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
         Position storage pos = positions[predictionId][msg.sender];
 
         uint256 held = isYes ? pos.yesAmount : pos.noAmount;
+        uint256 heldWeighted = isYes ? pos.weightedYes : pos.weightedNo;
         require(amount > 0 && amount <= held, "Invalid amount");
 
         uint256 totalPool = pred.yesPool + pred.noPool;
@@ -263,12 +264,22 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
         uint256 netValue = grossValue - fee;
         require(netValue > 0, "Exit value too small");
 
+        // Rounded UP, against the exiting user. Rounding down would leave them
+        // holding weight their remaining stake does not back — a slow leak paid
+        // for by every other winner in this market. A full exit still lands on
+        // exactly heldWeighted.
+        uint256 weightedRemoved = (heldWeighted * amount + held - 1) / held;
+
         if (isYes) {
             pos.yesAmount -= amount;
             pred.yesPool -= amount;
+            pos.weightedYes -= weightedRemoved;
+            pred.weightedYesPool -= weightedRemoved;
         } else {
             pos.noAmount -= amount;
             pred.noPool -= amount;
+            pos.weightedNo -= weightedRemoved;
+            pred.weightedNoPool -= weightedRemoved;
         }
 
         // Everything the pool gave up that the user did not receive.

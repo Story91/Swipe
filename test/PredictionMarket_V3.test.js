@@ -414,4 +414,80 @@ describe("PredictionMarket_V3", function () {
       expect(paid).to.equal(usd(100) + usd(100) - usd(1) - usd(0.5));
     });
   });
+
+  describe("early exit and weight", function () {
+    it("zeroes the weight on a full exit", async function () {
+      await openMarket(1, DAY);
+      await market.connect(alice).placeBet(1, true, usd(100));
+      await market.connect(bob).placeBet(1, false, usd(100));
+
+      await market.connect(alice).exitEarly(1, true, usd(100));
+
+      const pos = await market.positions(1, alice.address);
+      expect(pos.yesAmount).to.equal(0);
+      expect(pos.weightedYes).to.equal(0);
+
+      const pred = await market.predictions(1);
+      expect(pred.weightedYesPool).to.equal(0);
+    });
+
+    it("removes weight in proportion to a partial exit", async function () {
+      await openMarket(1, DAY);
+      await market.connect(alice).placeBet(1, true, usd(100));
+      await market.connect(bob).placeBet(1, false, usd(100));
+
+      const before = await market.positions(1, alice.address);
+      await market.connect(alice).exitEarly(1, true, usd(40));
+      const after = await market.positions(1, alice.address);
+
+      expect(after.yesAmount).to.equal(usd(60));
+      // 60% of the stake remains, so at most 60% of the weight may remain.
+      expect(after.weightedYes).to.be.lte((before.weightedYes * 60n) / 100n);
+    });
+
+    it("rounds weight removal against the exiting user", async function () {
+      await openMarket(1, DAY);
+      // held = 1,000,005 (>= minBet) is divisible by 3 (exit is exactly 1/3 of
+      // the stake), but its weighted value at the 1.5x early bracket,
+      // 1,500,007, is not divisible by 3 — so the removal fraction does not
+      // divide cleanly and rounding is observable.
+      await market.connect(alice).placeBet(1, true, 1000005n);
+      await market.connect(bob).placeBet(1, false, usd(100));
+
+      const before = await market.positions(1, alice.address);
+      await market.connect(alice).exitEarly(1, true, 333335n);
+      const after = await market.positions(1, alice.address);
+
+      // Exact proportion would be 2/3 of the weight; rounding must not leave
+      // the user with more than that.
+      expect(after.weightedYes).to.be.lte((before.weightedYes * 2n) / 3n);
+    });
+
+    it("keeps the market solvent after an exit and a re-entry at a lower weight", async function () {
+      const deadline = await openMarket(1, 4 * DAY);
+      const pred = await market.predictions(1);
+      const createdAt = Number(pred.createdAt);
+      const span = Number(pred.deadline) - createdAt;
+
+      await market.connect(alice).placeBet(1, true, usd(100));
+      await market.connect(bob).placeBet(1, false, usd(100));
+      await market.connect(alice).exitEarly(1, true, usd(50));
+
+      await ethers.provider.send("evm_setNextBlockTimestamp", [
+        createdAt + Math.floor((span * 3) / 4),
+      ]);
+      await ethers.provider.send("evm_mine", []);
+      await market.connect(alice).placeBet(1, true, usd(50));
+
+      await warpPast(deadline);
+      await market.connect(resolver).resolvePrediction(1, true);
+
+      const contractBefore = await token.balanceOf(await market.getAddress());
+      await market.connect(alice).claimWinnings(1);
+      const paid = contractBefore - (await token.balanceOf(await market.getAddress()));
+
+      const predAfter = await market.predictions(1);
+      expect(paid).to.be.lte(predAfter.yesPool + predAfter.netLosersPool);
+    });
+  });
 });
