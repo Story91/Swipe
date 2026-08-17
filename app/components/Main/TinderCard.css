@@ -85,7 +85,7 @@ html, body {
   left: -50%;
   width: 200%;
   height: 200%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+  background: radial-gradient(circle, var(--sheet-rule) 0%, transparent 70%);
   animation: float 20s ease-in-out infinite;
   pointer-events: none;
 }
@@ -253,7 +253,7 @@ html, body {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   align-self: flex-start;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid var(--sheet-paper-3);
 }
 
 .price-info {
@@ -271,17 +271,17 @@ html, body {
   font-size: 18px;
   font-weight: 700;
   backdrop-filter: blur(10px);
-  font-family: "Source Code Pro", monospace;
+  font-family: var(--sheet-data);
 }
 
 .change {
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--sheet-paper);
   padding: 6px 12px;
   border-radius: 12px;
   font-size: 14px;
   font-weight: 600;
   backdrop-filter: blur(10px);
-  font-family: "Source Code Pro", monospace;
+  font-family: var(--sheet-data);
 }
 
 .change.positive {
@@ -489,8 +489,8 @@ html, body {
 
 .voting-no {
   height: 100%;
-  background: rgba(255, 255, 255, 0.06);
-  border-top: 2px solid rgba(255, 255, 255, 0.35);
+  background: var(--sheet-surface);
+  border-top: 2px solid var(--sheet-paper-3);
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -532,7 +532,7 @@ html, body {
   justify-content: center;
   pointer-events: none;
   z-index: 30;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--sheet-rule);
   backdrop-filter: blur(10px);
 }
 
@@ -551,11 +551,11 @@ html, body {
   letter-spacing: 3px;
   padding: 24px 48px;
   border-radius: 20px;
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--sheet-paper);
   backdrop-filter: blur(20px);
   box-shadow: 
     0 20px 40px rgba(0, 0, 0, 0.1),
-    0 0 0 1px rgba(255, 255, 255, 0.3) inset;
+    0 0 0 1px var(--sheet-paper-3) inset;
   transform: rotate(-15deg);
   animation: textAppear 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -592,7 +592,7 @@ html, body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--sheet-paper);
   backdrop-filter: blur(10px);
   border-radius: 16px;
   z-index: 10;
@@ -646,14 +646,14 @@ html, body {
   margin: 20px auto 40px auto;
   width: 95%;
   max-width: 600px;
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--sheet-paper);
   backdrop-filter: blur(20px);
   border-radius: 20px;
   padding: 16px;
   box-shadow: 
     0 20px 40px rgba(0, 0, 0, 0.1),
-    0 0 0 1px rgba(255, 255, 255, 0.3) inset;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+    0 0 0 1px var(--sheet-paper-3) inset;
+  border: 1px solid var(--sheet-paper-3);
   z-index: 15;
 }
 
@@ -663,7 +663,7 @@ html, body {
   align-items: center;
   margin-bottom: 16px;
   padding-bottom: 12px;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+  border-bottom: 2px solid var(--sheet-rule-strong);
 }
 
 .details-header h4 {
@@ -671,7 +671,7 @@ html, body {
   font-size: 18px;
   font-weight: 700;
   color: var(--sheet-paper);
-  font-family: "Exo 2", sans-serif;
+  font-family: var(--sheet-body);
   letter-spacing: -0.025em;
   background: linear-gradient(135deg, #1e293b, #3b82f6, #8b5cf6);
   background-clip: text;
@@ -715,7 +715,7 @@ html, body {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  background: linear-gradient(90deg, transparent, var(--sheet-rule-strong), transparent);
   transition: left 2s ease;
 }
 
@@ -738,7 +738,7 @@ html, body {
   border-radius: 12px;
   border: 1px solid rgba(0, 0, 0, 0.05);
   font-weight: 600;
-  font-family: "Orbitron", sans-serif;
+  font-family: var(--sheet-display);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
@@ -764,10 +764,10 @@ html, body {
   gap: 12px;
   margin-bottom: 16px;
   padding: 12px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--sheet-rule);
   border-radius: 12px;
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--sheet-rule-strong);
 }
 
 .stat {
@@ -781,13 +781,13 @@ html, body {
 }
 
 .stat-label {
-  font-size: 6px;
+  font-size: 12px;
   font-weight: 600;
   color: #6b7280;
   text-transform: uppercase;
   letter-spacing: 0.2px;
-  font-family: "Orbitron", sans-serif;
-  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.6);
+  font-family: var(--sheet-display);
+  text-shadow: 0 1px 1px var(--sheet-paper-2);
   opacity: 0.8;
 }
 
@@ -796,10 +796,10 @@ html, body {
   font-weight: 700;
   color: var(--sheet-paper);
   padding: 4px 8px;
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--sheet-rule-strong);
   border-radius: 6px;
   backdrop-filter: blur(10px);
-  font-family: "Exo 2", sans-serif;
+  font-family: var(--sheet-body);
   word-break: break-word;
   overflow-wrap: break-word;
   white-space: nowrap;
@@ -814,11 +814,11 @@ html, body {
   font-weight: 600 !important;
   padding: 2px 6px !important;
   height: auto !important;
-  font-family: "Orbitron", sans-serif !important;
+  font-family: var(--sheet-display) !important;
   text-transform: uppercase !important;
   letter-spacing: 0.3px !important;
-  border: 1px solid rgba(255, 255, 255, 0.3) !important;
-  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid var(--sheet-paper-3) !important;
+  background: var(--sheet-rule) !important;
   color: #6b7280 !important;
 }
 
@@ -827,10 +827,10 @@ html, body {
   font-weight: 700 !important;
   padding: 4px 8px !important;
   height: auto !important;
-  font-family: "Exo 2", sans-serif !important;
-  background: rgba(255, 255, 255, 0.2) !important;
+  font-family: var(--sheet-body) !important;
+  background: var(--sheet-rule-strong) !important;
   color: var(--sheet-paper) !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border: 1px solid var(--sheet-rule-strong) !important;
   word-break: break-word !important;
   overflow-wrap: break-word !important;
   white-space: nowrap !important;
@@ -846,18 +846,18 @@ html, body {
   gap: 8px !important;
   margin-top: 16px !important;
   padding: 12px !important;
-  background: rgba(255, 255, 255, 0.1) !important;
+  background: var(--sheet-rule) !important;
   border-radius: 12px !important;
   backdrop-filter: blur(10px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border: 1px solid var(--sheet-rule-strong) !important;
 }
 
 .chart-item {
-  background: rgba(255, 255, 255, 0.2) !important;
+  background: var(--sheet-rule-strong) !important;
   backdrop-filter: blur(10px) !important;
   border-radius: 8px !important;
   padding: 8px 12px !important;
-  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  border: 1px solid var(--sheet-paper-3) !important;
   text-align: center !important;
   min-height: 50px !important;
   display: flex !important;
@@ -867,7 +867,7 @@ html, body {
 }
 
 .chart-title {
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--sheet-paper-3);
   text-transform: uppercase;
@@ -880,11 +880,11 @@ html, body {
   font-weight: 700;
   color: var(--sheet-paper);
   margin-bottom: 4px;
-  font-family: "Exo 2", sans-serif;
+  font-family: var(--sheet-body);
 }
 
 .chart-subtitle {
-  font-size: 8px;
+  font-size: 12px;
   color: #3b82f6;
   text-transform: uppercase;
   font-weight: 600;
@@ -902,20 +902,20 @@ html, body {
   font-size: 14px;
   font-weight: 700;
   color: var(--sheet-paper);
-  font-family: "Exo 2", sans-serif;
+  font-family: var(--sheet-body);
 }
 
 .risk-score {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   color: #ef4444;
-  font-family: "Exo 2", sans-serif;
+  font-family: var(--sheet-body);
 }
 
 .risk-breakdown {
-  font-size: 7px;
+  font-size: 12px;
   color: var(--sheet-paper-3);
-  font-family: "Source Code Pro", monospace;
+  font-family: var(--sheet-data);
   line-height: 1.2;
   word-break: break-all;
 }
@@ -1029,7 +1029,7 @@ html, body {
   }
 
   .voting-text {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
   }
 
@@ -1120,7 +1120,7 @@ html, body {
   }
 
   .voting-text {
-    font-size: 8px;
+    font-size: 12px;
     font-weight: 600;
   }
 
@@ -1185,7 +1185,7 @@ html, body {
   .quick-amount-btn {
     padding: 8px 10px;
     min-width: 44px;
-    font-size: 11px;
+    font-size: 12px;
   }
 }
 
@@ -1296,7 +1296,7 @@ html, body {
 .loading-spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid rgba(255, 255, 255, 0.3);
+  border: 4px solid var(--sheet-paper-3);
   border-radius: 50%;
   border-top-color: #4ecdc4;
   animation: spin 1s linear infinite;
@@ -1320,9 +1320,9 @@ html, body {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--sheet-paper);
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--sheet-rule-strong);
   border-radius: 16px;
   padding: 12px 20px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
@@ -1359,7 +1359,7 @@ html, body {
 }
 
 .feedback-prediction {
-  font-size: 11px;
+  font-size: 12px;
   color: #a0aec0;
   font-weight: 500;
 }
@@ -1504,7 +1504,7 @@ html, body {
   border: 2px solid #3b82f6;
   border-radius: 18px;
   padding: 7px 10px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   cursor: not-allowed;
   transition: all 0.3s ease;
@@ -1791,14 +1791,14 @@ html, body {
   
   .skip-button {
     padding: 5px 10px;
-    font-size: 10px;
+    font-size: 12px;
     min-width: 85px;
     height: 30px;
   }
   
   .tutorial-button {
     padding: 5px 8px;
-    font-size: 9px;
+    font-size: 12px;
     min-width: 105px;
     height: 30px;
   }
@@ -1814,7 +1814,7 @@ html, body {
   .ai-analyze-button {
     min-width: 85px;
     height: 30px;
-    font-size: 10px;
+    font-size: 12px;
     padding: 5px 10px;
     gap: 4px;
   }
@@ -1874,15 +1874,15 @@ html, body {
 
 .modal-subtitle {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--sheet-paper-2);
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 1px;
 }
 
 .modern-close-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--sheet-rule);
+  border: 1px solid var(--sheet-rule-strong);
   border-radius: 12px;
   width: 40px;
   height: 40px;
@@ -1890,13 +1890,13 @@ html, body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--sheet-paper-2);
   transition: all 0.3s ease;
 }
 
 .modern-close-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-  color: rgba(255, 255, 255, 0.9);
+  background: var(--sheet-rule);
+  color: var(--sheet-paper);
   border-color: rgba(212, 255, 0, 0.3);
 }
 
@@ -1965,12 +1965,12 @@ html, body {
 .modern-modal .amount-currency {
   font-size: 18px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--sheet-paper);
 }
 
 .amount-description {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--sheet-paper-3);
   font-weight: 500;
 }
 
@@ -1985,10 +1985,10 @@ html, body {
 
 .modern-cancel-btn {
   padding: 16px 24px;
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  border: 2px solid var(--sheet-rule-strong);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.8);
+  background: var(--sheet-surface);
+  color: var(--sheet-paper);
   font-weight: 600;
   font-size: 16px;
   cursor: pointer;
@@ -1996,9 +1996,9 @@ html, body {
 }
 
 .modern-cancel-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.3);
-  color: rgba(255, 255, 255, 0.9);
+  background: var(--sheet-rule);
+  border-color: var(--sheet-paper-3);
+  color: var(--sheet-paper);
 }
 
 .modern-confirm-btn {
@@ -2093,7 +2093,7 @@ html, body {
 }
 
 .amount-value {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: #1f2937;
   line-height: 1.2;
@@ -2108,7 +2108,7 @@ html, body {
 }
 
 .no-stakes-text {
-  font-size: 11px;
+  font-size: 12px;
   color: #9ca3af;
   margin-bottom: 4px;
 }
@@ -2154,7 +2154,7 @@ html, body {
   right: 0;
   width: 1px;
   height: 100%;
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--sheet-paper-3);
 }
 
 .split-no {
@@ -2165,7 +2165,7 @@ html, body {
 .split-percentages {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -2200,7 +2200,7 @@ html, body {
   }
   
   .chart-title {
-    font-size: 11px;
+    font-size: 12px;
     margin-bottom: 4px;
   }
   
@@ -2210,7 +2210,7 @@ html, body {
   }
   
   .chart-subtitle {
-    font-size: 9px;
+    font-size: 12px;
   }
   
   .amount-value {
@@ -2218,7 +2218,7 @@ html, body {
   }
   
   .amount-label {
-    font-size: 10px;
+    font-size: 12px;
   }
   
   .split-bar {
@@ -2226,7 +2226,7 @@ html, body {
   }
   
   .split-percentages {
-    font-size: 9px;
+    font-size: 12px;
   }
 }
 
@@ -2240,7 +2240,7 @@ html, body {
 }
 
 .no-swipers-text {
-  font-size: 11px;
+  font-size: 12px;
   color: #9ca3af;
   margin-bottom: 4px;
 }
@@ -2351,7 +2351,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid rgba(255, 255, 255, 0.8);
+  border: 2px solid var(--sheet-paper);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   transition: all 0.3s ease;
   overflow: hidden;
@@ -2375,11 +2375,11 @@ html, body {
 }
 
 .avatar-initials {
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 700;
   color: white;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  font-family: "Source Code Pro", monospace;
+  font-family: var(--sheet-data);
   letter-spacing: 0.5px;
 }
 
@@ -2392,7 +2392,7 @@ html, body {
   color: white;
   padding: 8px 12px;
   border-radius: 8px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
   opacity: 0;
@@ -2401,7 +2401,7 @@ html, body {
   z-index: 30;
   min-width: 200px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--sheet-rule);
 }
 
 .swiper-avatar:hover .avatar-tooltip {
@@ -2409,22 +2409,22 @@ html, body {
 }
 
 .tooltip-header {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  border-bottom: 1px solid var(--sheet-rule-strong);
   padding-bottom: 4px;
   margin-bottom: 6px;
 }
 
 .tooltip-title {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: #d4ff00;
   margin-bottom: 2px;
 }
 
 .tooltip-address {
-  font-size: 9px;
-  color: rgba(255, 255, 255, 0.8);
-  font-family: "Source Code Pro", monospace;
+  font-size: 12px;
+  color: var(--sheet-paper);
+  font-family: var(--sheet-data);
 }
 
 .tooltip-content {
@@ -2441,23 +2441,23 @@ html, body {
 }
 
 .tooltip-label {
-  font-size: 9px;
-  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  color: var(--sheet-paper-2);
   font-weight: 500;
 }
 
 .tooltip-value {
-  font-size: 9px;
+  font-size: 12px;
   color: white;
   font-weight: 600;
-  font-family: "Source Code Pro", monospace;
+  font-family: var(--sheet-data);
   max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .tooltip-action {
-  font-size: 8px;
+  font-size: 12px;
   color: #d4ff00;
   font-weight: 600;
   text-align: center;
@@ -2473,10 +2473,10 @@ html, body {
   right: 0;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 10px;
+  font-size: 12px;
   color: #6b7280;
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--sheet-paper);
   padding: 2px 6px;
   border-radius: 10px;
   border: 1px solid #e5e7eb;
@@ -2503,7 +2503,7 @@ html, body {
 }
 
 .loading-swipers .loading-text {
-  font-size: 8px;
+  font-size: 12px;
   color: #6b7280;
   font-weight: 500;
 }
@@ -2579,10 +2579,10 @@ html, body {
 }
 
 .vote-indicator.vote-none {
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  border: 2px solid var(--sheet-rule-strong);
   border-radius: 50%;
   padding: 2px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--sheet-surface);
 }
 
 .vote-badge {
@@ -2671,7 +2671,7 @@ html, body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+  background: linear-gradient(135deg, var(--sheet-rule), var(--sheet-surface));
   border-radius: 10px;
 }
 
@@ -2843,7 +2843,7 @@ html, body {
   box-shadow: 
     0 0 40px rgba(212, 255, 0, 0.15),
     0 20px 60px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    inset 0 1px 0 var(--sheet-surface);
   animation: slideUp 0.4s ease-out;
   position: relative;
 }
@@ -2855,8 +2855,8 @@ html, body {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--sheet-rule);
+  border: 1px solid var(--sheet-rule-strong);
   color: #888;
   font-size: 14px;
   cursor: pointer;
@@ -2867,7 +2867,7 @@ html, body {
 }
 
 .share-close-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--sheet-rule-strong);
   color: #fff;
 }
 
@@ -2924,7 +2924,7 @@ html, body {
 }
 
 .share-title {
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--sheet-display);
   font-weight: 700;
   font-size: 24px;
   color: #fff;
@@ -2932,7 +2932,7 @@ html, body {
 }
 
 .share-subtitle {
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--sheet-data);
   font-size: 14px;
   color: #888;
   margin: 0 0 20px 0;
@@ -2947,7 +2947,7 @@ html, body {
 }
 
 .share-bet-question {
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--sheet-data);
   font-size: 14px;
   color: #fff;
   line-height: 1.5;
@@ -2964,20 +2964,20 @@ html, body {
 }
 
 .share-bet-label {
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--sheet-data);
   font-size: 12px;
   color: #666;
 }
 
 .share-bet-value {
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--sheet-display);
   font-size: 16px;
   font-weight: 700;
   color: #d4ff00;
 }
 
 .share-description {
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--sheet-data);
   font-size: 13px;
   color: #888;
   margin: 0 0 20px 0;
@@ -2990,7 +2990,7 @@ html, body {
   border: none;
   border-radius: 16px;
   background: linear-gradient(135deg, #d4ff00 0%, #a8cc00 100%);
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--sheet-display);
   font-weight: 700;
   font-size: 15px;
   color: #000;
@@ -3020,7 +3020,7 @@ html, body {
 .share-skip-link {
   background: none;
   border: none;
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--sheet-data);
   font-size: 13px;
   color: #666;
   cursor: pointer;
@@ -3035,7 +3035,7 @@ html, body {
 
 /* Legacy styles - keep for backward compatibility */
 .share-prompt-content {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.9) 100%);
+  background: linear-gradient(135deg, var(--sheet-paper) 0%, var(--sheet-paper) 100%);
   backdrop-filter: blur(20px);
   border-radius: 24px;
   padding: 32px;
@@ -3044,7 +3044,7 @@ html, body {
   text-align: center;
   box-shadow: 
     0 20px 40px rgba(0, 0, 0, 0.1),
-    0 0 0 1px rgba(255, 255, 255, 0.2);
+    0 0 0 1px var(--sheet-rule-strong);
   animation: slideUp 0.4s ease-out;
 }
 
@@ -3059,7 +3059,7 @@ html, body {
 }
 
 .share-prompt-header h3 {
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--sheet-display);
   font-weight: 700;
   font-size: 24px;
   color: #1a1a1a;
@@ -3067,7 +3067,7 @@ html, body {
 }
 
 .share-prompt-header p {
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--sheet-data);
   font-size: 14px;
   color: #666;
   margin: 0;
@@ -3078,7 +3078,7 @@ html, body {
 }
 
 .share-prompt-body p {
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--sheet-data);
   font-size: 16px;
   color: #333;
   line-height: 1.5;
@@ -3095,7 +3095,7 @@ html, body {
   padding: 16px 24px;
   border: none;
   border-radius: 16px;
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--sheet-display);
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
@@ -3111,7 +3111,7 @@ html, body {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  background: linear-gradient(90deg, transparent, var(--sheet-paper-3), transparent);
   transition: left 0.5s ease;
 }
 
@@ -3548,7 +3548,7 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 .cyber-label {
   padding: 12px 16px;
   color: #333 !important;
-  font-size: 11px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 1px;
   font-weight: 600 !important;
@@ -3586,7 +3586,7 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 
 .risk-label-main {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: #333 !important;
   text-transform: uppercase;
@@ -3608,7 +3608,7 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 
 .risk-pts {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 11px;
+  font-size: 12px;
   color: #1a1a1a !important;
   font-weight: 600;
   background: rgba(0, 0, 0, 0.1);
@@ -3630,14 +3630,14 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 
 .risk-detail {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 10px;
+  font-size: 12px;
   color: #1a1a1a !important;
   font-weight: 600;
 }
 
 .risk-divider {
   color: #666 !important;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 /* Cyber Progress Bar - Dark on SWIPE Yellow */
@@ -3659,22 +3659,22 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 
 .cyber-progress-fill.confidence {
   background: linear-gradient(90deg, #1a1a1a, #333);
-  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 2px var(--sheet-rule);
 }
 
 .cyber-progress-fill.safe {
   background: linear-gradient(90deg, #059669, #10b981);
-  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 1px 2px var(--sheet-rule-strong);
 }
 
 .cyber-progress-fill.warning {
   background: linear-gradient(90deg, #d97706, #f59e0b);
-  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 1px 2px var(--sheet-rule-strong);
 }
 
 .cyber-progress-fill.danger {
   background: linear-gradient(90deg, #dc2626, #ef4444);
-  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 1px 2px var(--sheet-rule-strong);
 }
 
 /* Cyber Pool */
@@ -3745,7 +3745,7 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 .swipe-pool .pool-title { color: #7c3aed !important; }
 
 .pool-total {
-  font-size: 11px;
+  font-size: 12px;
   color: #333 !important;
   font-weight: 600;
 }
@@ -3760,7 +3760,7 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 .pool-side {
   padding: 16px;
   text-align: center;
-  background: rgba(255, 255, 255, 0.3) !important;
+  background: var(--sheet-paper-3) !important;
 }
 
 .pool-side.yes {
@@ -3768,7 +3768,7 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 }
 
 .side-label {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 2px;
   margin-bottom: 8px;
@@ -3796,13 +3796,13 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
   padding: 16px;
   text-align: center;
   color: #666;
-  font-size: 11px;
+  font-size: 12px;
   font-style: italic;
 }
 
 .pool-bar-container {
   padding: 12px 16px 16px;
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--sheet-rule-strong);
 }
 
 .pool-bar {
@@ -3828,7 +3828,7 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
   display: flex;
   justify-content: space-between;
   margin-top: 8px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -3863,7 +3863,7 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 .swipers-footer {
   text-align: center;
   padding: 8px;
-  font-size: 10px;
+  font-size: 12px;
   color: #555 !important;
   border-top: 1px solid rgba(0, 0, 0, 0.1);
   background: transparent !important;
@@ -3894,10 +3894,10 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
   padding: 8px 12px;
   border-radius: 20px;
   background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 0.8);
-  font-family: 'Orbitron', sans-serif;
-  font-size: 11px;
+  border: 1px solid var(--sheet-rule-strong);
+  color: var(--sheet-paper);
+  font-family: var(--sheet-display);
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -3909,7 +3909,7 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 
 .category-filter-btn:hover {
   background: rgba(0, 0, 0, 0.5);
-  border-color: rgba(255, 255, 255, 0.4);
+  border-color: var(--sheet-paper-3);
   color: #ffffff;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
