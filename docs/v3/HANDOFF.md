@@ -6,10 +6,12 @@ State at the end of two long sessions. Read this before touching anything.
 
 ## 1. Where the code is
 
-| Branch | Head | Pushed? | Contains |
+| Branch | Last pushed | Unpushed | Contains |
 |---|---|---|---|
-| `main` | `ab99704` | ❌ **3 ahead of origin** | All UI fixes shipped today, all docs, both plans, the spec, the production fix, the landmine fix |
-| `v3-contract` | `7508ced` | ❌ **2 ahead of origin** | The whole V3 contract (18 commits), the docs correction, the boundary-test fix. 72 passing / 13 pending |
+| `main` | `c30f249` | `869b65e` production fix, `bb22939` + this file, `ab99704` landmine fix | All UI fixes shipped today, all docs, both plans, the spec |
+| `v3-contract` | `48b411a` | `6f0776f` docs correction, `7508ced` boundary-test fix | The whole V3 contract (18 commits). 72 passing / 13 pending |
+
+Counts go stale; `git status -sb` does not.
 
 **`main` is production.** Vercel deploys from it. `v3-contract` is a feature branch; pushing it triggers a Vercel *preview* build, which is how a build break got caught (see §5).
 
