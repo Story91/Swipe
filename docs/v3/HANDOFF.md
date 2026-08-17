@@ -13,13 +13,21 @@ State at the end of a long session. Read this before touching anything.
 
 **`main` is production.** Vercel deploys from it. `v3-contract` is a feature branch; pushing it triggers a Vercel *preview* build, which is how a build break got caught (see §5).
 
-## 2. ⚠️ Uncommitted work in the tree — deal with this first
+## 2. ⚠️ `main` has an unpushed commit carrying an armed landmine
 
-`app/components/Main/TinderCard.tsx` is **modified and uncommitted on `main`.** An agent was fixing two production bugs there and its outcome was never confirmed — it may have died mid-task when a session limit hit.
+`869b65e` sits on local `main`, **not pushed**. It fixes the two production bugs in §4.1 — the chain check and the lying toast — and typecheck and build both pass. A duplicate copy is on the branch `fix/chain-aware-bet-guard` (also unpushed).
 
-**Do not `git checkout` or switch branches before inspecting it.** Run `git diff app/components/Main/TinderCard.tsx` and decide: finish the work, or discard it and redo from §4.1.
+**Read this before pushing it.**
 
-Also untracked and worth committing: `docs/v3/swipe-migration-audit.md` (a substantial audit, see §6).
+The agent that wrote it disclosed a fund-loss risk it deliberately did not fix, because fixing it was out of its scope:
+
+> `CONTRACTS.V2`, used by every `writeContract` call in `TinderCard.tsx`, is a module-load-time constant fixed to Base's V2 address regardless of the active chain. If `ROBINHOOD_USDG_DUALPOOL` or `ROBINHOOD_TESTNET_USDG_DUALPOOL` is ever set before the real V3 migration lands, the new guard would pass but the write would still target the wrong (Base) address.
+
+It does not manifest today: both env vars are unset, so `getWritableMarket()` returns `null` and the bet is refused.
+
+**But setting that env var is the first step of deploying V3.** The landmine is armed by the very next thing you plan to do. Before that env var is set, either make the contract address follow the active chain, or add an explicit guard that refuses a write whose target address does not belong to the selected chain.
+
+Decision left open on purpose: push it (both fixes are real improvements and the mine is unarmed today), or hold it until the address is chain-aware. Do not push it *and* set the env var in the same sitting.
 
 `artifacts/` and `cache/` churn is pre-existing noise from hardhat runs — leave it.
 
