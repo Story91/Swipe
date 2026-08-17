@@ -1,99 +1,68 @@
+const { ethers, network } = require("hardhat");
+
 /**
- * Deploy PredictionMarket_V3.
+ * Deploys PredictionMarket_V3 and applies the V3 launch configuration.
  *
- * Collateral is chosen per network:
- *   robinhoodTestnet - the MockUSDC already deployed there (no USDG on testnet)
- *   robinhood        - Paxos USDG, verified on-chain as symbol USDG, 6 decimals
- *   base             - canonical USDC
- *
- * Never resolve the collateral address by explorer search: Robinhood Chain has
- * impostor 18-decimal tokens named "USD Coin".
- *
- * Usage: npx hardhat run scripts/deploy_v3.js --network robinhoodTestnet
+ * The rates are not contract defaults on purpose: they are policy, and policy
+ * that lives in the constructor cannot be changed without a redeploy. Setting
+ * them here keeps the source identical across chains.
  */
 
-const hre = require("hardhat");
-
+// The collateral for each network. Never look these up on an explorer at
+// deploy time: searching Robinhood Chain for "USDC" returns 18-decimal
+// impostors with no liquidity.
 const COLLATERAL = {
+  base: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // USDC, 6 decimals
+  robinhood: "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168", // USDG, 6 decimals
   robinhoodTestnet: process.env.ROBINHOOD_TESTNET_MOCK_USDC,
-  robinhood: "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168", // Paxos USDG
-  base: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // canonical USDC
 };
 
-async function main() {
-  const network = hre.network.name;
-  const collateral = COLLATERAL[network];
+const PLATFORM_FEE = 300; // 3% of the losing pool
+const MIN_BET = 100_000; // 0.1 token at 6 decimals
+const CREATOR_BOND = 10_000_000; // 10 tokens at 6 decimals
 
+async function main() {
+  const collateral = COLLATERAL[network.name];
   if (!collateral) {
-    throw new Error(
-      `No collateral configured for network '${network}'. ` +
-      `On robinhoodTestnet, set ROBINHOOD_TESTNET_MOCK_USDC in .env.local.`
-    );
+    throw new Error(`No collateral address configured for network ${network.name}`);
   }
 
-  const [deployer] = await hre.ethers.getSigners();
-  if (!deployer) throw new Error("No signer. Is PRIVATE_KEY set in .env.local?");
-
-  console.log(`Network:    ${network}`);
-  console.log(`Deployer:   ${deployer.address}`);
+  const [deployer] = await ethers.getSigners();
+  console.log(`Deploying as ${deployer.address} on ${network.name}`);
   console.log(`Collateral: ${collateral}`);
 
-  const balance = await hre.ethers.provider.getBalance(deployer.address);
-  console.log(`Balance:    ${hre.ethers.formatEther(balance)} ETH`);
-  if (balance === 0n) throw new Error("Deployer has no gas on this network.");
-
-  // Confirm the collateral is what we think it is before locking it in as an
-  // immutable constructor argument.
-  const token = new hre.ethers.Contract(
-    collateral,
-    [
-      "function symbol() view returns (string)",
-      "function decimals() view returns (uint8)",
-    ],
-    hre.ethers.provider
+  // Confirm the token is what we think it is before anything depends on it.
+  const erc20 = await ethers.getContractAt(
+    ["function symbol() view returns (string)", "function decimals() view returns (uint8)"],
+    collateral
   );
-  const [symbol, decimals] = await Promise.all([token.symbol(), token.decimals()]);
-  console.log(`Collateral is ${symbol} with ${decimals} decimals`);
+  const [symbol, decimals] = [await erc20.symbol(), await erc20.decimals()];
+  console.log(`Collateral reports ${symbol}, ${decimals} decimals`);
   if (Number(decimals) !== 6) {
-    throw new Error(
-      `Collateral has ${decimals} decimals, expected 6. minBet and MIN_BET_FLOOR assume 6.`
-    );
+    throw new Error(`Expected a 6-decimal collateral, got ${decimals}`);
   }
 
-  console.log("\nDeploying PredictionMarket_V3...");
-  const Market = await hre.ethers.getContractFactory("PredictionMarket_V3");
+  const Market = await ethers.getContractFactory("PredictionMarket_V3");
   const market = await Market.deploy(collateral);
   await market.waitForDeployment();
   const address = await market.getAddress();
-  console.log("Deployed:", address);
+  console.log(`PredictionMarket_V3 deployed at ${address}`);
 
-  // Read it back, so we know the bytecode executes and not just that it deployed.
-  console.log("\n--- Post-deploy verification ---");
-  console.log("owner:            ", await market.owner());
-  console.log("collateral:       ", await market.collateral());
-  console.log("deployer resolver:", await market.resolvers(deployer.address));
-  const [platform, creator, exit, minBet] = await market.getFeeConfig();
-  console.log(
-    `fees:              platform ${Number(platform) / 100}%, creator ${Number(creator) / 100}%, ` +
-    `exit ${Number(exit) / 100}%, minBet ${Number(minBet) / 1e6}`
-  );
-  console.log("refund grace:     ", (await market.REFUND_GRACE_PERIOD()) / 86400n, "days");
+  console.log("Applying launch configuration...");
+  await (await market.setPlatformFee(PLATFORM_FEE)).wait();
+  await (await market.setMinBet(MIN_BET)).wait();
+  await (await market.setCreatorBondAmount(CREATOR_BOND)).wait();
+  await (await market.setBondExempt(deployer.address, true)).wait();
 
-  const envKey =
-    network === "robinhoodTestnet"
-      ? "ROBINHOOD_TESTNET_USDG_DUALPOOL"
-      : network === "robinhood"
-        ? "ROBINHOOD_USDG_DUALPOOL"
-        : "BASE_USDG_DUALPOOL";
+  console.log(`  platformFee       ${await market.platformFee()}`);
+  console.log(`  creatorFee        ${await market.creatorFee()}`);
+  console.log(`  minBet            ${await market.minBet()}`);
+  console.log(`  creatorBondAmount ${await market.creatorBondAmount()}`);
 
-  console.log(`\nAdd to .env.local:\n${envKey}=${address}`);
-  console.log(
-    `\nVerify:\nnpx hardhat verify --network ${network} ${address} "${collateral}"`
-  );
-
-  return { address, collateral, network };
+  console.log(`\nVerify with:\n  npx hardhat verify --network ${network.name} ${address} ${collateral}`);
 }
 
-main()
-  .then((r) => { console.log("\n" + JSON.stringify(r, null, 2)); process.exit(0); })
-  .catch((e) => { console.error("\nDeployment failed:", e.message); process.exit(1); });
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
