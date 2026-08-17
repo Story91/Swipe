@@ -28,16 +28,12 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useHybridPredictions } from '../../../lib/hooks/useHybridPredictions';
-import { useAccount, useWriteContract, useReadContract, useWaitForTransactionReceipt } from 'wagmi';
-import { isWritableMarket } from '@/lib/chains';
+import { useAccount, useReadContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useActiveChain } from '@/lib/chains/activeChain';
+import { useMarketWrite } from '@/lib/chains/useMarketWrite';
+import { getMarketContract, exitValue as computeExitValue, wouldEmptyPool } from '@/lib/chains/market';
 import { parseMarketId, marketNumber } from '@/lib/marketId';
 import { parseUnits, formatUnits } from 'viem';
-import { 
-  USDC_DUALPOOL_ABI, 
-  USDC_DUALPOOL_CONTRACT_ADDRESS,
-  USDC_TOKEN 
-} from '../../../lib/contract';
 import { ConnectWallet, Wallet as WalletContainer } from '@coinbase/onchainkit/wallet';
 import { useComposeCast, useOpenUrl } from '@coinbase/onchainkit/minikit';
 import { getRandomCurrentPredictionIntro, getRandomCurrentPredictionOutro } from '../../../lib/constants/share-texts';
@@ -143,15 +139,22 @@ function MarketCard({
   // and one of them fell back to market 0.
   const marketRef = parseMarketId(predictionId);
   const numericId = marketRef?.numericId ?? null;
+  // Same resolution the shell uses, so the card reads the contract the shell
+  // writes to. It used to read the archived pool while the shell bet on V3.
+  const { chainKey: cardChainKey } = useActiveChain();
+  const cardMarket = useMemo(() => getMarketContract(cardChainKey), [cardChainKey]);
 
   // Fetch user's position in this market
+  // V3 exposes positions(), not getPosition(). Both return five values of the
+  // same types, but V3's slots 2 and 3 are time weights where the archived
+  // pool's were entry prices, so only slots 0, 1 and 4 are read here.
   const { data: userPositionData } = useReadContract({
-    address: USDC_DUALPOOL_CONTRACT_ADDRESS as `0x${string}`,
-    abi: USDC_DUALPOOL_ABI,
-    functionName: 'getPosition',
+    address: cardMarket?.address,
+    abi: cardMarket?.abi,
+    functionName: 'positions',
     args: address && numericId !== null ? [BigInt(numericId), address] : undefined,
     query: {
-      enabled: !!address && numericId !== null
+      enabled: !!address && numericId !== null && !!cardMarket
     }
   });
   
@@ -173,21 +176,24 @@ function MarketCard({
   const positionAmount = userPosition ? 
     (userPosition.yesAmount > userPosition.noAmount ? userPosition.yesAmount : userPosition.noAmount) : BigInt(0);
 
-  // Calculate exit value for user's position
-  const { data: exitValueData } = useReadContract({
-    address: USDC_DUALPOOL_CONTRACT_ADDRESS as `0x${string}`,
-    abi: USDC_DUALPOOL_ABI,
-    functionName: 'calculateExitValue',
-    args: hasPosition && positionSide && numericId !== null ? [BigInt(numericId), positionSide === 'yes', positionAmount] : undefined,
-    query: {
-      enabled: !!hasPosition && !!positionSide && positionAmount > BigInt(0) && numericId !== null
+  // V3 dropped calculateExitValue, so this is computed rather than read. The
+  // maths is verified against the deployed contract in lib/chains/market.test.ts,
+  // including Solidity's truncation and the case the archived pool got wrong:
+  // with nobody on the other side V3 pays principal less the fee, where the old
+  // contract returned zero.
+  const { exitNetValue, exitFee } = useMemo(() => {
+    if (!hasPosition || !positionSide || positionAmount === BigInt(0)) {
+      return { exitNetValue: BigInt(0), exitFee: BigInt(0) };
     }
-  });
-  
-  // Parse exit value: [grossValue, fee, netValue]
-  const exitValue = exitValueData as [bigint, bigint, bigint] | undefined;
-  const exitNetValue = exitValue ? exitValue[2] : BigInt(0);
-  const exitFee = exitValue ? exitValue[1] : BigInt(0);
+    const r = computeExitValue({
+      amount: positionAmount,
+      isYes: positionSide === 'yes',
+      yesPool: BigInt(Math.round(usdcYesPool)),
+      noPool: BigInt(Math.round(usdcNoPool)),
+      earlyExitFeeBps: BigInt(500),
+    });
+    return { exitNetValue: r.net, exitFee: r.fee };
+  }, [hasPosition, positionSide, positionAmount, usdcYesPool, usdcNoPool]);
   
   // USDC Markets page - always show USDC pools (0 if not registered = 50/50)
   // This is a USDC-only view, not ETH/SWIPE
@@ -591,9 +597,13 @@ type TxState = 'idle' | 'approving' | 'approved' | 'betting' | 'success' | 'erro
 export default function SwipeMarkets() {
   const { predictions, loading, refresh } = useHybridPredictions();
   const { address, isConnected } = useAccount();
-  // The chain the user actually selected, not the build-time default. The bet
-  // guard below has to gate on this.
+  // The chain the user actually selected, not the build-time default.
   const { chainKey } = useActiveChain();
+  // One resolution of this chain's market: address, ABI, chain id, collateral
+  // and explorer together. Every read and write below comes from it, so no call
+  // can take the address from one chain and the token from another.
+  const marketWrite = useMarketWrite();
+  const market = marketWrite.market;
   const [txState, setTxState] = useState<TxState>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -679,28 +689,37 @@ export default function SwipeMarkets() {
     amount: 10
   });
 
-  // Read user's USDC balance
+  // Balance of this chain's collateral, not a hardcoded Base USDC literal.
+  // The two tokens share 6 decimals and differ in address, so the literal read
+  // a Base address on whatever chain the wallet was on and showed a confident
+  // 0.00.
   const { data: usdcBalance } = useReadContract({
-    address: USDC_TOKEN.address as `0x${string}`,
+    address: market?.collateral.address,
     abi: ERC20_ABI,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
-    query: { enabled: !!address }
+    query: { enabled: !!address && !!market }
   });
 
-  // Read USDC allowance
+  // Allowance against the contract that will actually pull the tokens. Reading
+  // it against one address while approving another gives a needsApproval that
+  // never clears.
   const { data: usdcAllowance, refetch: refetchAllowance } = useReadContract({
-    address: USDC_TOKEN.address as `0x${string}`,
+    address: market?.collateral.address,
     abi: ERC20_ABI,
     functionName: 'allowance',
-    args: address ? [address, USDC_DUALPOOL_CONTRACT_ADDRESS as `0x${string}`] : undefined,
-    query: { enabled: !!address }
+    args: address && market ? [address, market.address] : undefined,
+    query: { enabled: !!address && !!market }
   });
 
-  // Contract write hooks
-  const { writeContract: approveUSDC, data: approveHash, isPending: isApproving } = useWriteContract();
-  const { writeContract: placeBet, data: betHash, isPending: isBetting } = useWriteContract();
-  const { writeContract: exitEarly, data: exitHash, isPending: isExiting } = useWriteContract();
+  // Hashes held locally so the existing useWaitForTransactionReceipt effects
+  // keep working unchanged, while the sending itself moves to useMarketWrite.
+  const [approveHash, setApproveHash] = useState<`0x${string}` | undefined>();
+  const [betHash, setBetHash] = useState<`0x${string}` | undefined>();
+  const [exitHash, setExitHash] = useState<`0x${string}` | undefined>();
+  const [isApproving, setIsApproving] = useState(false);
+  const [isBetting, setIsBetting] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
   
   // Early exit modal state
   const [exitModal, setExitModal] = useState<{
@@ -864,57 +883,58 @@ export default function SwipeMarkets() {
     
     setErrorMessage(null);
     try {
-      const amountToApprove = parseUnits('1000000', 6); // Approve 1M USDC
-      
-      approveUSDC({
-        address: USDC_TOKEN.address as `0x${string}`,
+      const amountToApprove = parseUnits('1000000', 6);
+      setIsApproving(true);
+      // Spender is the market that will pull the tokens, and the token is this
+      // chain's collateral. Both come from the same resolution as the bet below.
+      const hash = await marketWrite.writeCollateral({
         abi: ERC20_ABI,
         functionName: 'approve',
-        args: [USDC_DUALPOOL_CONTRACT_ADDRESS as `0x${string}`, amountToApprove]
+        args: [marketWrite.market!.address, amountToApprove],
       });
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Approval failed');
+      setApproveHash(hash);
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Approval failed');
       setTxState('error');
+    } finally {
+      setIsApproving(false);
     }
-  }, [address, approveUSDC]);
+  }, [address, marketWrite]);
 
   // Handle place bet
   const handlePlaceBet = useCallback(async () => {
     if (!address || !betModal.side || !betModal.marketId) return;
 
-    // USDC_DUALPOOL_CONTRACT_ADDRESS below is the old Base pool, archived: its
-    // owner key is no longer available, so a bet placed there could never be
-    // resolved or claimed. The guard therefore compares the address this is
-    // about to write to against the selected chain's live market, and refuses
-    // anything else.
-    //
-    // It used to ask isReadOnlyChain() with no argument, which answered for the
-    // build-time default rather than the selected chain. That reading blocked
-    // everything only for as long as Base itself was unwritable. Base runs V3
-    // now, so the old form would have opened this path onto the dead pool.
-    if (!isWritableMarket(chainKey, USDC_DUALPOOL_CONTRACT_ADDRESS)) {
+    // useMarketWrite owns the guard now: it re-checks the address against this
+    // chain's market at send time, moves the wallet onto the matching chain and
+    // pins chainId. `ready` is only the "is there a market here at all" half,
+    // answered before the dialog does any work.
+    if (!marketWrite.ready) {
       setErrorMessage(
-        'These markets are archived and take no new bets. Betting runs on V3 now, ' +
-        'with audited contracts, fairer payouts and fees taken only from the losing side.'
+        'This network has no Swipe market yet. Switch networks to place a bet.'
       );
       return;
     }
 
     setErrorMessage(null);
     try {
-      const amountInUSDC = parseUnits(betModal.amount.toString(), 6);
-      
-      placeBet({
-        address: USDC_DUALPOOL_CONTRACT_ADDRESS as `0x${string}`,
-        abi: USDC_DUALPOOL_ABI,
+      const amountInCollateral = parseUnits(
+        betModal.amount.toString(),
+        marketWrite.market!.collateral.decimals
+      );
+      setIsBetting(true);
+      const hash = await marketWrite.write({
         functionName: 'placeBet',
-        args: [BigInt(betModal.marketId), betModal.side === 'yes', amountInUSDC]
+        args: [BigInt(betModal.marketId), betModal.side === 'yes', amountInCollateral],
       });
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Bet failed');
+      setBetHash(hash);
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Bet failed');
       setTxState('error');
+    } finally {
+      setIsBetting(false);
     }
-  }, [address, betModal, placeBet, chainKey]);
+  }, [address, betModal, marketWrite]);
 
   // Check if approval needed
   const needsApproval = useMemo(() => {
@@ -1057,22 +1077,29 @@ export default function SwipeMarkets() {
   }, []);
 
   // Confirm early exit
-  const confirmEarlyExit = useCallback(() => {
-    if (!address || !exitModal.numericId) return;
-    
+  const confirmEarlyExit = useCallback(async () => {
+    // `!exitModal.numericId` rejected market 0, which is a real on-chain id.
+    if (!address || exitModal.numericId === null || exitModal.numericId === undefined) return;
+    if (!marketWrite.ready) {
+      setErrorMessage('This network has no Swipe market yet.');
+      return;
+    }
+
     setErrorMessage(null);
     try {
-      exitEarly({
-        address: USDC_DUALPOOL_CONTRACT_ADDRESS as `0x${string}`,
-        abi: USDC_DUALPOOL_ABI,
+      setIsExiting(true);
+      const hash = await marketWrite.write({
         functionName: 'exitEarly',
-        args: [BigInt(exitModal.numericId), exitModal.isYes, exitModal.amount]
+        args: [BigInt(exitModal.numericId), exitModal.isYes, exitModal.amount],
       });
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Exit failed');
+      setExitHash(hash);
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Exit failed');
       setTxState('error');
+    } finally {
+      setIsExiting(false);
     }
-  }, [address, exitModal, exitEarly]);
+  }, [address, exitModal, marketWrite]);
 
   // Transform predictions to market format
   const markets = useMemo(() => {
