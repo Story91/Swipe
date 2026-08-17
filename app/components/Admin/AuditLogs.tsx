@@ -1,8 +1,18 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAccount } from 'wagmi';
+import '../../styles/sheet.css';
 import './AuditLogs.css';
+
+/**
+ * Audit log, on the shared sheet.
+ *
+ * Data comes from /api/audit and is unchanged; this is a presentation rewrite.
+ * Status moves from an emoji to a coloured rule in the gutter, which is the
+ * same information but survives being scanned quickly and keeps every row the
+ * same height.
+ */
 
 interface AuditLog {
   id: string;
@@ -14,23 +24,45 @@ interface AuditLog {
   status: 'success' | 'error' | 'warning' | 'info';
 }
 
+type Filter = 'all' | 'admin' | 'approver' | 'user' | 'system';
+
+const FILTERS: { key: Filter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'admin', label: 'Admin' },
+  { key: 'approver', label: 'Approver' },
+  { key: 'user', label: 'User' },
+  { key: 'system', label: 'System' },
+];
+
+function timeAgo(timestamp: number) {
+  const diff = Date.now() - timestamp;
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  if (days > 0) return `${days}d ago`;
+  if (hours > 0) return `${hours}h ago`;
+  if (minutes > 0) return `${minutes}m ago`;
+  return 'just now';
+}
+
 export function AuditLogs() {
   const { address } = useAccount();
   const [logs, setLogs] = useState<AuditLog[]>([]);
-  const [filter, setFilter] = useState<'all' | 'admin' | 'approver' | 'user' | 'system'>('all');
+  const [filter, setFilter] = useState<Filter>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Check permissions
-  const isAdmin = address && process.env.NEXT_PUBLIC_ADMIN_1?.toLowerCase() === address.toLowerCase();
-  const isApprover = address && (process.env.NEXT_PUBLIC_APPROVER_1?.toLowerCase() === address.toLowerCase() ||
-                               process.env.NEXT_PUBLIC_APPROVER_2?.toLowerCase() === address.toLowerCase() ||
-                               process.env.NEXT_PUBLIC_APPROVER_3?.toLowerCase() === address.toLowerCase() ||
-                               process.env.NEXT_PUBLIC_APPROVER_4?.toLowerCase() === address.toLowerCase() ||
-                               process.env.NEXT_PUBLIC_ADMIN_1?.toLowerCase() === address.toLowerCase());
+  const isAdmin =
+    address && process.env.NEXT_PUBLIC_ADMIN_1?.toLowerCase() === address.toLowerCase();
+  const isApprover =
+    address &&
+    (process.env.NEXT_PUBLIC_APPROVER_1?.toLowerCase() === address.toLowerCase() ||
+      process.env.NEXT_PUBLIC_APPROVER_2?.toLowerCase() === address.toLowerCase() ||
+      process.env.NEXT_PUBLIC_APPROVER_3?.toLowerCase() === address.toLowerCase() ||
+      process.env.NEXT_PUBLIC_APPROVER_4?.toLowerCase() === address.toLowerCase() ||
+      process.env.NEXT_PUBLIC_ADMIN_1?.toLowerCase() === address.toLowerCase());
 
-  // Real audit logs data from API
   useEffect(() => {
     const fetchLogs = async () => {
       try {
@@ -65,176 +97,191 @@ export function AuditLogs() {
     return () => clearInterval(interval);
   }, [filter]);
 
-  if (!isAdmin && !isApprover) {
-    return (
-      <div className="audit-logs">
-        <div className="access-denied">
-          <h2>🔒 Access Denied</h2>
-          <p>You don&apos;t have permission to view audit logs.</p>
-        </div>
+  const shown = useMemo(() => {
+    const needle = searchTerm.trim().toLowerCase();
+    return logs
+      .filter(log => (filter === 'all' ? true : log.type === filter))
+      .filter(log =>
+        needle === ''
+          ? true
+          : log.action.toLowerCase().includes(needle) ||
+            log.details.toLowerCase().includes(needle) ||
+            log.user.toLowerCase().includes(needle)
+      );
+  }, [logs, filter, searchTerm]);
+
+  const counts = {
+    success: logs.filter(l => l.status === 'success').length,
+    error: logs.filter(l => l.status === 'error').length,
+    warning: logs.filter(l => l.status === 'warning').length,
+  };
+
+  const shell = (body: React.ReactNode) => (
+    <div className="sheet">
+      <div className="sheet-shell">
+        <header className="sheet-hero">
+          <div className="sheet-hero-top">
+            <div>
+              <p className="sheet-eyebrow">Audit</p>
+              <h1 className="sheet-hero-title">
+                What the system <em>did</em>
+              </h1>
+            </div>
+          </div>
+          <p className="sheet-hero-lede">
+            Actions taken by admins, approvers, users and the system itself,
+            newest first. This is the record you check when something happened
+            and nobody remembers doing it.
+          </p>
+        </header>
+        <main className="sheet-body">{body}</main>
       </div>
+    </div>
+  );
+
+  if (!isAdmin && !isApprover) {
+    return shell(
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">Log</p>
+        </div>
+        <div>
+          <div className="sheet-empty">
+            <strong>Not your log</strong>
+            The audit trail is visible to admins and approvers only.
+          </div>
+        </div>
+      </section>
     );
   }
 
-  const filteredLogs = logs.filter(log => {
-    const matchesFilter = filter === 'all' || log.type === filter;
-    const matchesSearch = searchTerm === '' ||
-      log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.details.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.user.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
-
   if (loading) {
-    return (
-      <div className="audit-logs">
-        <div className="logs-header">
-          <h2>🔍 Audit Logs</h2>
-          <p>Loading audit logs...</p>
+    return shell(
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">Log</p>
         </div>
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <div>Loading...</div>
+        <div>
+          <div className="sheet-empty">
+            <strong>Reading the log</strong>
+            Pulling the most recent entries.
+          </div>
         </div>
-      </div>
+      </section>
     );
   }
 
   if (error) {
-    return (
-      <div className="audit-logs">
-        <div className="logs-header">
-          <h2>🔍 Audit Logs</h2>
-          <p>Complete system activity and transaction history</p>
+    return shell(
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">Log</p>
         </div>
-        <div style={{ textAlign: 'center', padding: '40px', color: 'red' }}>
-          <div>❌ Failed to load audit logs</div>
-          <div style={{ fontSize: '14px', marginTop: '10px' }}>{error}</div>
+        <div>
+          <div className="sheet-empty">
+            <strong>Could not load the log</strong>
+            {error}
+          </div>
         </div>
-      </div>
+      </section>
     );
   }
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'admin': return '👑';
-      case 'approver': return '✅';
-      case 'user': return '👤';
-      case 'system': return '⚙️';
-      default: return '📝';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'success': return '✅';
-      case 'error': return '❌';
-      case 'warning': return '⚠️';
-      case 'info': return 'ℹ️';
-      default: return '📝';
-    }
-  };
-
-  const formatTime = (timestamp: number) => {
-    const now = new Date();
-    const diffMs = now.getTime() - timestamp;
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMins < 60) {
-      return `${diffMins}m ago`;
-    } else if (diffHours < 24) {
-      return `${diffHours}h ago`;
-    } else {
-      return `${diffDays}d ago`;
-    }
-  };
-
-  return (
-    <div className="audit-logs">
-      <div className="logs-header">
-        <h2>🔍 Audit Logs</h2>
-        <p>Complete system activity and transaction history</p>
-      </div>
-
-      <div className="logs-controls">
-        <div className="filter-controls">
-          <label>Filter by type:</label>
-          <select value={filter} onChange={(e) => setFilter(e.target.value as 'all' | 'admin' | 'approver' | 'user' | 'system')}>
-            <option value="all">All Types</option>
-            <option value="admin">Admin Actions</option>
-            <option value="approver">Approver Actions</option>
-            <option value="user">User Actions</option>
-            <option value="system">System Events</option>
-          </select>
+  return shell(
+    <>
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">Log</p>
+          <p className="sheet-rail-meta">
+            {`${shown.length} shown\nof ${logs.length} loaded`}
+          </p>
         </div>
-
-        <div className="search-control">
-          <input
-            type="text"
-            placeholder="Search logs..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="logs-container">
-        {filteredLogs.length === 0 ? (
-          <div className="no-logs">
-            <p>📝 No logs found matching your criteria.</p>
-          </div>
-        ) : (
-          <div className="logs-list">
-            {filteredLogs.map((log) => (
-              <div key={log.id} className={`log-entry ${log.type} ${log.status}`}>
-                <div className="log-icon">
-                  {getStatusIcon(log.status)}
-                </div>
-
-                <div className="log-content">
-                  <div className="log-header">
-                    <span className="log-action">{log.action}</span>
-                    <span className="log-type-badge">
-                      {getTypeIcon(log.type)} {log.type}
-                    </span>
-                  </div>
-
-                  <div className="log-details">
-                    {log.details}
-                  </div>
-
-                  <div className="log-meta">
-                    <span className="log-user">User: {log.user}</span>
-                    <span className="log-time">{formatTime(log.timestamp)}</span>
-                  </div>
-                </div>
+        <div>
+          <div className="al-controls">
+            <div className="al-control-group">
+              <span className="al-control-label" id="al-filter-label">Source</span>
+              <div className="sheet-segment" role="group" aria-labelledby="al-filter-label">
+                {FILTERS.map(f => (
+                  <button
+                    key={f.key}
+                    type="button"
+                    className="sheet-segment-item"
+                    aria-pressed={filter === f.key}
+                    onClick={() => setFilter(f.key)}
+                  >
+                    {f.label}
+                  </button>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            </div>
 
-      <div className="logs-summary">
-        <div className="summary-stats">
-          <div className="stat">
-            <span className="stat-value">{logs.length}</span>
-            <span className="stat-label">Total Logs</span>
+            <div className="al-control-group">
+              <label className="al-control-label" htmlFor="al-search">Find</label>
+              <input
+                id="al-search"
+                type="search"
+                className="al-search"
+                placeholder="action, detail or address"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
           </div>
-          <div className="stat">
-            <span className="stat-value">{logs.filter(l => l.status === 'success').length}</span>
-            <span className="stat-label">Success</span>
-          </div>
-          <div className="stat">
-            <span className="stat-value">{logs.filter(l => l.status === 'error').length}</span>
-            <span className="stat-label">Errors</span>
-          </div>
-          <div className="stat">
-            <span className="stat-value">{logs.filter(l => l.status === 'warning').length}</span>
-            <span className="stat-label">Warnings</span>
+
+          {shown.length === 0 ? (
+            <div className="sheet-empty">
+              <strong>Nothing matches</strong>
+              {searchTerm
+                ? 'No entry contains that. Try a shorter search.'
+                : 'No entries of this kind in the last 50.'}
+            </div>
+          ) : (
+            <div className="al-list">
+              {shown.map(log => (
+                <div key={log.id} className={`al-row al-row--${log.status}`}>
+                  <span className="al-mark" aria-hidden="true" />
+
+                  <div className="al-body">
+                    <div className="al-action">
+                      <span>{log.action}</span>
+                      <span className="al-type">{log.type}</span>
+                    </div>
+                    {log.details && <div className="al-details">{log.details}</div>}
+                    {log.user && <div className="al-actor">{log.user}</div>}
+                  </div>
+
+                  <span className="al-time">{timeAgo(log.timestamp)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="sheet-block">
+        <div className="sheet-rail">
+          <p className="sheet-eyebrow">Loaded</p>
+          <p className="sheet-rail-meta">{`Last ${logs.length}\nentries`}</p>
+        </div>
+        <div>
+          <div className="sheet-board">
+            <div className="sheet-settle">
+              <div className="sheet-settle-row">
+                <span className="sheet-settle-key">Succeeded</span>
+                <span className="sheet-settle-val">{counts.success}</span>
+              </div>
+              <div className="sheet-settle-row">
+                <span className="sheet-settle-key">Warnings</span>
+                <span className="sheet-settle-val">{counts.warning}</span>
+              </div>
+              <div className="sheet-settle-row sheet-settle-row--total">
+                <span className="sheet-settle-key">Errors</span>
+                <span className="sheet-settle-val">{counts.error}</span>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
+      </section>
+    </>
   );
 }
