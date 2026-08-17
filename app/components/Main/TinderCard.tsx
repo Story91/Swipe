@@ -5,7 +5,8 @@ import { ethers } from 'ethers';
 import { CONTRACTS, SWIPE_TOKEN, getV2Contract, getContractForAction } from '../../../lib/contract';
 import { calculateApprovalAmount } from '../../../lib/constants/approval';
 import { useAdminRequest } from '../../../lib/auth/useAdminRequest';
-import { isReadOnlyChain } from '@/lib/chains';
+import { getWritableMarket } from '@/lib/chains';
+import { useActiveChain } from '@/lib/chains/activeChain';
 import { useViewProfile, useComposeCast, useMiniKit, useViewCast, useOpenUrl } from '@coinbase/onchainkit/minikit';
 import sdk from '@farcaster/miniapp-sdk';
 import './TinderCard.css';
@@ -164,9 +165,14 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     selectedToken: 'ETH'
   });
 
-  // Track user actions for feedback
+  // Track user actions for feedback.
+  // `status` distinguishes "a side was picked, the dialog is opening" (set on
+  // swipe release) from "the stake actually landed on-chain" (set only once
+  // useWaitForTransactionReceipt confirms, in handleStakeSuccess) — the two used
+  // to share one "Stake Accepted" label even though only the second is true.
   const [lastAction, setLastAction] = useState<{
     type: 'skip' | 'bet' | null;
+    status?: 'selected' | 'confirmed';
     predictionId: number;
     direction: 'left' | 'right' | null;
     timestamp: number;
@@ -247,6 +253,9 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   }, [aiModal.analysis, aiModal.isOpen]);
   
   const { address } = useAccount();
+  // The chain the user actually has selected (ChainSwitcher), not the build-time
+  // default. handleStakeBet's guard must gate on this, not on DEFAULT_CHAIN_KEY.
+  const { chainKey } = useActiveChain();
   // Signs each admin action; the server verifies it rather than trusting the UI.
   const signAdminRequest = useAdminRequest();
   const { writeContract } = useWriteContract();
@@ -1052,10 +1061,14 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   // Dashboard handlers
 
   const handleStakeBet = (predictionId: number, isYes: boolean, amount: number, token: 'ETH' | 'SWIPE') => {
-    // These markets live on a chain whose contracts are owned by a compromised,
-    // unrecoverable key. A stake here could never be resolved or claimed, so the
-    // transaction is refused rather than taking the user's money.
-    if (isReadOnlyChain()) {
+    // Refuse unless the chain the user actually has selected (not the build-time
+    // default) both accepts writes and has a market contract configured.
+    // getWritableMarket returns null in both cases: Base is read-only (its
+    // contracts are owned by a compromised, unrecoverable key, so a stake there
+    // could never be resolved or claimed), and Robinhood mainnet is writable but
+    // has no deployed pool address yet (ROBINHOOD_USDG_DUALPOOL unset). Either
+    // way, this must fail closed before any wallet interaction.
+    if (!getWritableMarket(chainKey)) {
       alert(
         'Betting is moving to V3.\n\n' +
         'V3 brings audited contracts with fairer payouts and lower fees. ' +
@@ -1155,7 +1168,25 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     // Close modal and reset loading state
     setStakeModal(prev => ({ ...prev, isOpen: false }));
     setIsTransactionLoading(false);
-    
+
+    // The stake has genuinely landed on-chain at this point — this function only
+    // runs once useWaitForTransactionReceipt confirms the transaction. This is
+    // the one place "Stake Accepted" is actually true; onSwipe only reports that
+    // a side was selected (see its own lastAction, status: 'selected').
+    if (stakePredictionId !== null && stakeIsYes !== null) {
+      setLastAction({
+        type: 'bet',
+        status: 'confirmed',
+        predictionId: stakePredictionId,
+        direction: stakeIsYes ? 'right' : 'left',
+        timestamp: Date.now()
+      });
+      setShowActionFeedback(true);
+      setTimeout(() => {
+        setShowActionFeedback(false);
+      }, 3000);
+    }
+
     // Cache user's Farcaster profile to Redis (reduces Neynar API calls)
     if (address && context?.user) {
       try {
@@ -1927,12 +1958,14 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       return;
     }
     
-    // Determine action type
-    const actionType = 'bet';
-
-    // Record the action
+    // A swipe only picks a side and opens the stake dialog here — nothing has
+    // been staked yet (no amount chosen, no signature, no transaction). Record
+    // it as "selected", not "bet", so the feedback overlay can't claim a stake
+    // was accepted before one exists. The genuine "Stake Accepted" feedback is
+    // fired separately, in handleStakeSuccess, once the transaction is confirmed.
     setLastAction({
-      type: actionType,
+      type: 'bet',
+      status: 'selected',
       predictionId: swipedId,
       direction: direction as 'left' | 'right',
       timestamp: Date.now()
@@ -2393,12 +2426,19 @@ KEY USER-FACING CHANGES: V1 → V2
             </div>
             <div className="feedback-text">
               <div className="feedback-title">
-                {lastAction.type === 'skip' ? 'Skipped' : 'Stake Accepted'}
+                {lastAction.type === 'skip'
+                  ? 'Skipped'
+                  : lastAction.status === 'confirmed'
+                    ? 'Stake Accepted'
+                    : `${lastAction.direction === 'right' ? 'YES' : 'NO'} Selected`
+                }
               </div>
               <div className="feedback-subtitle">
                 {lastAction.type === 'skip'
                   ? 'Prediction skipped'
-                  : `Staking ${lastAction.direction === 'right' ? 'YES' : 'NO'}`
+                  : lastAction.status === 'confirmed'
+                    ? `Staked ${lastAction.direction === 'right' ? 'YES' : 'NO'}`
+                    : 'Choose an amount to confirm'
                 }
               </div>
             </div>
