@@ -42,9 +42,19 @@ in.
 
 | Fee | Rate | Taken from | Goes to |
 |---|---|---|---|
-| Platform | 1.0% | losing pool | platform treasury |
+| Platform | **3.0%** | losing pool | platform treasury |
 | Creator | 0.5% | losing pool | whoever created the market, claimed on demand |
 | Early exit | 5.0% | the exit value | platform treasury |
+
+At 3% a winner keeps 97% of their winnings — still materially cheaper than
+Betfair (5% of winnings) and far below a traditional parimutuel takeout
+(15–20%). The rate was 1%, which over the whole of V2's history produced a
+fraction of a per-mille of one ETH. Raising it needs no contract change:
+`setPlatformFee` allows up to 5%.
+
+A fee on *total volume* rather than on winnings was considered and rejected — it
+cannot be expressed by the contract, it collapses on lopsided markets, and it
+would break the promise above. See §6.1 of the design.
 
 Fee rates are frozen per market at the moment it resolves, so a later rate
 change cannot alter what an already-settled market pays out.
@@ -70,35 +80,39 @@ Chosen; parameters still open. These exist to solve a problem V2 had that was
 never about security: **245 markets, 525 players, 0.391 ETH of volume.**
 Liquidity was spread so thin that almost every market showed 0 players.
 
-### 5.1 Minimum pool threshold 🟡
+### 5.1 No minimum pool 🔒
 
-A market that has not reached a minimum total pool by its deadline does not
-resolve — it becomes refundable and everyone takes their stake back. Dead
-markets clear themselves instead of accumulating.
+**Considered and dropped.** A market that failed to reach a minimum pool would
+have refunded everyone instead of paying out. It solved market sprawl a second
+time — the cap below already does — while punishing users for having bet on a
+quiet market.
 
-*Open: the threshold value, and whether it is global or set per market.*
+The minimum *bet* drops to **0.1 USDC**, the contract's own floor. Effectively
+"whatever you want", while still preventing the unbounded participant list that
+dust bets would create.
 
-### 5.2 Cap on simultaneously open markets 🟡
+### 5.2 Cap on simultaneously open markets 🔒
 
-At most N markets open at once, rather than 245. Concentrates the same
-liquidity into markets that visibly have players in them.
+**At most 12 open at once**, rather than 245, enforced in the market creation
+path rather than in the contract. `registerPrediction` is already
+`onlyResolver`, so the backend physically controls how many markets exist; an
+on-chain counter would add a storage write to every resolution and guarantee
+nothing extra.
 
-*Open: N, and whether the cap is enforced in the contract or in the market
-creation path.*
-
-### 5.3 Early-entry bonus 🟡
+### 5.3 Early-entry bonus 🔒
 
 Stake placed early counts for more when the losing pool is split. Backing a
 question before it is obvious is what the market is for; V2 paid the same
 whether you took a view three days out or three minutes out.
 
 Three brackets, chosen over a smooth curve because a user can hold it in their
-head and the UI can show a countdown to the next step-down:
+head and the UI can show a countdown to the next step-down. Brackets are **quarters of the market's own lifetime**, not fixed hours — one
+rule that works for a two-hour market and a seven-day one alike:
 
 | When the bet is placed | Weight |
 |---|---|
-| First 24 hours the market is open | ×1.50 |
-| Up to the halfway point | ×1.25 |
+| First quarter of the market's life | ×1.50 |
+| Second quarter | ×1.25 |
 | Second half | ×1.00 |
 
 Payout becomes `(stake × weight) / (sum of winning weights) × net losing pool`,
@@ -111,17 +125,39 @@ be described to users as "everyone earns more".
 Weight is frozen at the moment the bet is placed. Refunds always return the raw
 stake, never the weighted amount.
 
-*Open: exact bracket boundaries for very short markets (a 2-hour market cannot
-have a 24-hour first bracket).*
-
 ### 5.4 Creator bond 🟡
 
-Creating a market requires locking a bond. The market reaches the minimum
-threshold → the bond comes back, plus the 0.5% creator fee. It does not → the
-bond is forfeited. This is what makes it safe to let users create markets at
-all, instead of restricting creation to admins.
+Creating a market locks a bond from the creator's wallet. Because registration
+is `onlyResolver`, the creator approves the bond first and the backend pulls it
+when it registers the market — so the platform still decides what markets
+exist, which it must, since every market is an obligation to resolve it.
 
-*Open: bond size, and where a forfeited bond goes.*
+| Outcome | Bond |
+|---|---|
+| Market resolved and paid out | Returned, plus the 0.5% creator fee |
+| One side of the market stayed empty | **Forfeited** |
+| Cancelled by the platform | Returned — not the creator's failure |
+| Abandoned past the grace period | Returned — the platform's failure |
+
+A market that pays out necessarily had stake on both sides, so this is one rule,
+not four: **the bond comes back whenever the market was a real market.**
+
+*Open: bond size (10 USDC is a proposal, not a researched number), and whether
+the bond earns its place at all while creation stays platform-gated.*
+
+### 5.5 Betting in ETH or USDC 🟡
+
+Supported by deploying the same audited contract twice — once with USDC as
+collateral, once with WETH — rather than by teaching one contract two
+currencies. No new contract code and nothing new to audit.
+
+Launching **USDC-only**: two collateral options against a 12-market cap would
+mean six markets each, which cuts against the concentration everything above is
+built around. WETH follows once a single market reliably fills.
+
+*Open: whether the WETH wrap can be hidden inside the existing approval
+sequence. If not, ETH betting should not ship — someone who asks to bet ETH must
+not be handed a lesson about wrapped tokens.*
 
 ## 6. Rewards ⬜
 
