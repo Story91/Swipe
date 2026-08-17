@@ -225,6 +225,31 @@ describe("PredictionMarket_V3", function () {
       await market.connect(bob).placeBet(1, true, usd(1));
     }
 
+    // The guard's boundary is `elapsed * 4 >= window * 3`, and the difference
+    // between that and `>` only exists on the one second where the two sides
+    // are equal — which needs a window divisible by 4. openMarket cannot give
+    // one: registerPrediction mines its own block, so the span lands a second
+    // short of what was asked for and `ceil(span * 3 / 4)` overshoots the
+    // boundary. A test built on it therefore passes against `>=` and `>`
+    // alike, and cannot see the boundary move. Pinning the registration
+    // block's timestamp makes the span exact.
+    async function buildExploitPositionOnExactSpan(span) {
+      const now = (await ethers.provider.getBlock("latest")).timestamp;
+      const createdAt = now + 10;
+      await ethers.provider.send("evm_setNextBlockTimestamp", [createdAt]);
+      await market.registerPrediction(1, creator.address, createdAt + span);
+
+      const pred = await market.predictions(1);
+      expect(Number(pred.createdAt)).to.equal(createdAt);
+      expect(Number(pred.deadline) - createdAt).to.equal(span);
+      expect(span % 4).to.equal(0); // or the exact boundary is unreachable
+
+      await market.connect(bob).placeBet(1, false, usd(500));
+      await market.connect(bob).placeBet(1, true, usd(1));
+
+      return { createdAt, boundary: createdAt + (span * 3) / 4 };
+    }
+
     it("refuses an exit that would empty the winning pool in the final quarter", async function () {
       await buildExploitPosition();
       const { createdAt, span } = await windowOf(1);
@@ -262,16 +287,25 @@ describe("PredictionMarket_V3", function () {
       expect((await market.predictions(1)).yesPool).to.equal(0);
     });
 
-    it("refuses the exit at the three-quarter mark", async function () {
-      await buildExploitPosition();
-      const { createdAt, span } = await windowOf(1);
-      const boundary = createdAt + Math.ceil((span * 3) / 4);
+    it("refuses the exit at exactly the three-quarter mark", async function () {
+      // DAY is divisible by 4, so elapsed * 4 == window * 3 here exactly. This
+      // is the second the guard's `>=` claims and `>` would give away.
+      const { boundary } = await buildExploitPositionOnExactSpan(DAY);
 
       await warpTo(boundary);
 
       await expect(
         market.connect(bob).exitEarly(1, true, usd(1))
       ).to.be.revertedWith("Would empty the pool");
+    });
+
+    it("allows the exit on the last second before that exact mark", async function () {
+      const { boundary } = await buildExploitPositionOnExactSpan(DAY);
+
+      await warpTo(boundary - 1);
+      await market.connect(bob).exitEarly(1, true, usd(1));
+
+      expect((await market.predictions(1)).yesPool).to.equal(0);
     });
   });
 
