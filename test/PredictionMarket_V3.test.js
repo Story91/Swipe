@@ -549,6 +549,20 @@ describe("PredictionMarket_V3", function () {
           }
         }
 
+        // The bound below is an aggregate and cannot see a per-user weight
+        // ledger that has drifted from the stake backing it — a stale weight
+        // inflates numerator and denominator together. This is the check that
+        // does see it: weight can never exceed what the remaining stake could
+        // have earned at the best bracket (x1.50).
+        for (const user of actors) {
+          const pos = await market.positions(id, user.address);
+          expect(pos.weightedYes * 10000n).to.be.lte(pos.yesAmount * 15000n);
+          expect(pos.weightedNo * 10000n).to.be.lte(pos.noAmount * 15000n);
+        }
+        const ledger = await market.predictions(id);
+        expect(ledger.weightedYesPool * 10000n).to.be.lte(ledger.yesPool * 15000n);
+        expect(ledger.weightedNoPool * 10000n).to.be.lte(ledger.noPool * 15000n);
+
         await warpPast(deadline);
         await market.connect(resolver).resolvePrediction(id, rand(2) === 0);
 
