@@ -12,9 +12,13 @@
    clipped by the wrapper's overflow-x. Widening the real container avoids both. */
 .market-grid {
   display: grid;
-  /* Compact tiles: at 1920px this lands on six columns, at 1400px on four,
-     matching the density the layout was benchmarked against. */
-  grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+  /* Four across, not six. Six 268px tiles on a wide screen wrapped every
+     question onto three lines in a column too narrow to read, and left the
+     settled cards nowhere to put their result. The cap is what makes the card
+     wide enough to carry its own numbers. */
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  max-width: 1440px;
+  margin-inline: auto;
   gap: 14px;
   width: 100%;
   padding-top: 8px;
@@ -41,7 +45,7 @@
   margin: 0;
   font-size: 12px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--sheet-paper-2);
   opacity: 0.65;
 }
 
@@ -54,9 +58,9 @@
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: #1a1a1a;
+  color: var(--sheet-paper-2);
   background: transparent;
-  border: 2px solid #000;
+  border: 1px solid var(--sheet-rule-strong);
   border-radius: 0;
   padding: 7px 16px;
   cursor: pointer;
@@ -64,7 +68,7 @@
 }
 
 .market-filter__chip:hover {
-  background: rgba(0, 0, 0, 0.08);
+  background: var(--sheet-wash);
 }
 
 .market-filter__chip--active {
@@ -73,7 +77,7 @@
 }
 
 .market-filter__chip:focus-visible {
-  outline: 3px solid #000;
+  outline: 2px solid var(--sheet-lime);
   outline-offset: 3px;
 }
 
@@ -268,9 +272,9 @@
   font-family: var(--sheet-display);
   font-size: 13px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--sheet-paper-2);
   background: transparent;
-  border: 2px solid #000;
+  border: 1px solid var(--sheet-rule-strong);
   border-radius: 0;
   cursor: pointer;
   transition: background 140ms ease, color 140ms ease;
@@ -278,7 +282,7 @@
 
 .market-pagination__page:hover:not(:disabled),
 .market-pagination__step:hover:not(:disabled) {
-  background: rgba(0, 0, 0, 0.08);
+  background: var(--sheet-wash);
 }
 
 .market-pagination__page--active {
@@ -293,13 +297,13 @@
 
 .market-pagination__page:focus-visible,
 .market-pagination__step:focus-visible {
-  outline: 3px solid #000;
+  outline: 2px solid var(--sheet-lime);
   outline-offset: 3px;
 }
 
 .market-pagination__gap {
   padding: 0 2px;
-  color: #1a1a1a;
+  color: var(--sheet-paper-2);
   opacity: 0.5;
 }
 
@@ -307,7 +311,7 @@
   margin-left: 10px;
   font-size: 12px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--sheet-paper-2);
   opacity: 0.65;
 }
 
@@ -342,7 +346,7 @@
   padding: 32px;
   text-align: center;
   background: #0d0d0d;
-  border: 2px solid #000;
+  border: 1px solid var(--sheet-rule-strong);
   border-radius: 0;
   color: #f5f5f5;
 }
@@ -397,4 +401,55 @@
   .mgcard--skeleton {
     animation: none;
   }
+}
+
+/* ---------- settled result block ----------
+   A settled market is read for its numbers, so it gets a definition list
+   rather than the same one-line stat strip a live market uses. The two states
+   answer different questions: a live card is asked "how much is on this and
+   how long do I have", a settled one "what happened". */
+.mgcard__result {
+  margin: 10px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--sheet-rule);
+  display: grid;
+  gap: 5px;
+}
+
+.mgcard__result-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mgcard__result dt {
+  font-family: var(--sheet-display);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sheet-paper-3);
+  margin: 0;
+}
+
+.mgcard__result dd {
+  margin: 0;
+  font-family: var(--sheet-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--sheet-paper-2);
+  text-align: right;
+}
+
+/* The outcome is the one figure that gets the accent, and only when yes won.
+   A no result is not a failure, so it stays white rather than going red. */
+.mgcard__result dd.is-yes {
+  color: var(--sheet-lime);
+  font-weight: 600;
+}
+
+.mgcard__result dd.is-no {
+  color: var(--sheet-paper);
+  font-weight: 600;
 }

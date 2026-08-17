@@ -2,10 +2,10 @@
 .dashboard-selector {
   text-align: center;
   padding: 20px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--sheet-rule);
   backdrop-filter: blur(10px);
   margin-bottom: 20px;
-  border-radius: 15px;
+  border-radius: 0;
 }
 
 .dashboard-tabs {
@@ -18,9 +18,9 @@
 
 .tab-btn {
   padding: 12px 30px;
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--sheet-rule-strong);
   border: none;
-  border-radius: 25px;
+  border-radius: 0;
   color: white;
   cursor: pointer;
   font-weight: bold;
@@ -29,9 +29,9 @@
 }
 
 .tab-btn.active, .tab-btn:hover {
-  background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+  background: var(--sheet-surface);
   transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  box-shadow: none;
 }
 
 .dashboard {
@@ -53,7 +53,7 @@
 .dashboard-title {
   font-size: 2.5em;
   margin-bottom: 10px;
-  background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+  background: var(--sheet-surface);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -68,9 +68,9 @@
 }
 
 .stat-card {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--sheet-rule);
   backdrop-filter: blur(10px);
-  border-radius: 15px;
+  border-radius: 0;
   padding: 25px;
   text-align: center;
   transition: transform 0.3s;
@@ -85,7 +85,7 @@
   font-weight: bold;
   color: #4ecdc4;
   margin-bottom: 10px;
-  font-family: "Exo 2", sans-serif;
+  font-family: var(--sheet-body);
   font-weight: 700;
 }
 
@@ -102,12 +102,12 @@
 }
 
 .prediction-card {
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--sheet-paper);
   backdrop-filter: blur(10px);
-  border-radius: 15px;
+  border-radius: 0;
   padding: 20px;
   margin-bottom: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--sheet-rule);
   transition: all 0.3s ease;
   color: #1a202c;
 }
@@ -126,14 +126,14 @@
 .category-badge {
   background: rgba(255, 107, 107, 0.8);
   padding: 5px 15px;
-  border-radius: 15px;
+  border-radius: 0;
   font-size: 0.9em;
   font-weight: bold;
 }
 
 .status-badge {
   padding: 5px 15px;
-  border-radius: 15px;
+  border-radius: 0;
   font-size: 0.9em;
   font-weight: bold;
 }
@@ -160,9 +160,9 @@
 }
 
 .stat-item {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--sheet-rule);
   padding: 10px;
-  border-radius: 10px;
+  border-radius: 0;
   text-align: center;
 }
 
@@ -179,17 +179,17 @@
 .odds-visual {
   display: flex;
   height: 8px;
-  border-radius: 4px;
+  border-radius: 0;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--sheet-rule-strong);
 }
 
 .yes-bar {
-  background: linear-gradient(90deg, #4caf50, #8bc34a);
+  background: var(--sheet-surface);
 }
 
 .no-bar {
-  background: linear-gradient(90deg, #f44336, #ff7043);
+  background: var(--sheet-surface);
 }
 
 .odds-labels {
@@ -208,7 +208,7 @@
 .btn {
   padding: 10px 20px;
   border: none;
-  border-radius: 20px;
+  border-radius: 0;
   cursor: pointer;
   font-weight: bold;
   transition: all 0.3s;
@@ -217,45 +217,45 @@
 }
 
 .btn-yes {
-  background: linear-gradient(45deg, #4caf50, #8bc34a);
+  background: var(--sheet-surface);
   color: white;
 }
 
 .btn-no {
-  background: linear-gradient(45deg, #f44336, #ff7043);
+  background: var(--sheet-surface);
   color: white;
 }
 
 .btn-approve {
-  background: linear-gradient(45deg, #4caf50, #66bb6a);
+  background: var(--sheet-surface);
   color: white;
 }
 
 .btn-reject {
-  background: linear-gradient(45deg, #f44336, #ef5350);
+  background: var(--sheet-surface);
   color: white;
 }
 
 .btn-resolve {
-  background: linear-gradient(45deg, #2196f3, #42a5f5);
+  background: var(--sheet-surface);
   color: white;
 }
 
 .btn-cancel {
-  background: linear-gradient(45deg, #ff9800, #ffb74d);
+  background: var(--sheet-surface);
   color: white;
 }
 
 .btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  box-shadow: none;
 }
 
 .approval-section {
   background: rgba(255, 193, 7, 0.2);
   border: 2px solid rgba(255, 193, 7, 0.5);
   padding: 15px;
-  border-radius: 15px;
+  border-radius: 0;
   margin: 15px 0;
 }
 
@@ -269,21 +269,21 @@
 .progress-bar {
   flex: 1;
   height: 8px;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 4px;
+  background: var(--sheet-paper-3);
+  border-radius: 0;
   overflow: hidden;
 }
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #4caf50, #8bc34a);
+  background: var(--sheet-surface);
   transition: width 0.3s;
 }
 
 .user-stakes {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--sheet-rule);
   padding: 15px;
-  border-radius: 10px;
+  border-radius: 0;
   margin-top: 15px;
 }
 
@@ -296,17 +296,17 @@
 .potential-payout {
   background: rgba(76, 175, 80, 0.3);
   padding: 10px;
-  border-radius: 8px;
+  border-radius: 0;
   margin-top: 10px;
   border: 1px solid rgba(76, 175, 80, 0.5);
 }
 
 .stake-input-section {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 15px;
+  background: var(--sheet-rule);
+  border-radius: 0;
   padding: 20px;
   margin: 15px 0;
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  border: 2px solid var(--sheet-rule-strong);
 }
 
 .stake-input-group {
@@ -320,29 +320,29 @@
   flex: 1;
   padding: 12px 15px;
   border: none;
-  border-radius: 10px;
+  border-radius: 0;
   background: rgba(0, 0, 0, 0.7);
   color: white;
   font-size: 16px;
   font-weight: bold;
   text-align: center;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid var(--sheet-paper-3);
 }
 
 .stake-input::placeholder {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--sheet-paper-2);
 }
 
 .stake-input:focus {
   outline: none;
-  background: rgba(255, 255, 255, 0.3);
-  box-shadow: 0 0 10px rgba(76, 220, 196, 0.5);
+  background: var(--sheet-paper-3);
+  box-shadow: none;
 }
 
 .eth-label {
   background: rgba(76, 220, 196, 0.3);
   padding: 8px 15px;
-  border-radius: 20px;
+  border-radius: 0;
   font-weight: bold;
   color: #4ecdc4;
 }
@@ -355,11 +355,11 @@
 }
 
 .quick-amount-btn {
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: var(--sheet-rule-strong);
+  border: 1px solid var(--sheet-paper-3);
   color: white;
   padding: 8px 15px;
-  border-radius: 15px;
+  border-radius: 0;
   cursor: pointer;
   font-size: 0.9em;
   transition: all 0.3s;
@@ -373,7 +373,7 @@
 .stake-preview {
   background: rgba(76, 175, 80, 0.2);
   border: 1px solid rgba(76, 175, 80, 0.5);
-  border-radius: 10px;
+  border-radius: 0;
   padding: 15px;
   margin-top: 15px;
 }
@@ -385,7 +385,7 @@
 }
 
 .preview-total {
-  border-top: 1px solid rgba(255, 255, 255, 0.3);
+  border-top: 1px solid var(--sheet-paper-3);
   padding-top: 10px;
   margin-top: 10px;
   font-weight: bold;
@@ -403,7 +403,7 @@
   background: rgba(156, 39, 176, 0.2);
   border: 2px solid rgba(156, 39, 176, 0.5);
   padding: 20px;
-  border-radius: 15px;
+  border-radius: 0;
   margin-top: 20px;
 }
 
@@ -416,7 +416,7 @@
 .resolution-notice, .resolution-success, .rejection-details, .already-approved, .approval-success {
   background: rgba(255, 193, 7, 0.2);
   padding: 15px;
-  border-radius: 10px;
+  border-radius: 0;
   margin: 15px 0;
 }
 
@@ -444,9 +444,9 @@
 }
 
 .prediction-details, .live-stats {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--sheet-rule);
   padding: 15px;
-  border-radius: 10px;
+  border-radius: 0;
   margin-bottom: 15px;
 }
 
@@ -500,7 +500,7 @@
   
   .prediction-card {
     padding: 12px;
-    border-radius: 10px;
+    border-radius: 0;
   }
   
   .prediction-question {
@@ -509,12 +509,12 @@
   }
   
   .odds-labels {
-    font-size: 11px;
+    font-size: 12px;
   }
   
   .action-buttons button {
     padding: 6px 10px;
-    font-size: 11px;
+    font-size: 12px;
   }
   
   .stats-grid {
@@ -544,15 +544,15 @@
 }
 
 .stake-modal {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.9));
+  background: var(--sheet-surface);
   backdrop-filter: blur(20px);
-  border-radius: 20px;
+  border-radius: 0;
   max-width: 420px;
   width: 90%;
   max-height: 90vh;
   overflow-y: auto;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--sheet-paper-3);
+  box-shadow: none;
   animation: slideUp 0.3s ease-out;
 }
 
@@ -578,7 +578,7 @@
   cursor: pointer;
   color: rgba(0, 0, 0, 0.6);
   padding: 5px;
-  border-radius: 50%;
+  border-radius: 0;
   width: 35px;
   height: 35px;
   display: flex;
@@ -616,17 +616,17 @@
   font-size: 1.2em;
   font-weight: 600;
   padding: 10px 20px;
-  border-radius: 25px;
+  border-radius: 0;
   display: inline-block;
 }
 
 .choice-indicator.yes {
-  background: linear-gradient(45deg, #10b981, #34d399);
+  background: var(--sheet-surface);
   color: white;
 }
 
 .choice-indicator.no {
-  background: linear-gradient(45deg, #ef4444, #f87171);
+  background: var(--sheet-surface);
   color: white;
 }
 
@@ -651,10 +651,10 @@
   width: 100%;
   padding: 15px 50px 15px 15px;
   border: 2px solid rgba(0, 0, 0, 0.1);
-  border-radius: 12px;
+  border-radius: 0;
   font-size: 1.1em;
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--sheet-paper);
   color: rgba(0, 0, 0, 0.8);
   transition: all 0.3s;
 }
@@ -662,7 +662,7 @@
 .stake-input:focus {
   outline: none;
   border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  box-shadow: none;
 }
 
 .eth-label {
@@ -691,8 +691,8 @@
 .stake-quick-amounts button {
   padding: 10px;
   border: 2px solid rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.9);
+  border-radius: 0;
+  background: var(--sheet-paper);
   color: rgba(0, 0, 0, 0.8);
   font-weight: 600;
   cursor: pointer;
@@ -715,8 +715,8 @@
 .btn-cancel {
   padding: 15px;
   border: 2px solid rgba(0, 0, 0, 0.2);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.9);
+  border-radius: 0;
+  background: var(--sheet-paper);
   color: rgba(0, 0, 0, 0.7);
   font-weight: 600;
   cursor: pointer;
@@ -732,19 +732,19 @@
 .btn-confirm {
   padding: 15px;
   border: none;
-  border-radius: 12px;
-  background: linear-gradient(45deg, #3b82f6, #1d4ed8);
+  border-radius: 0;
+  background: var(--sheet-surface);
   color: white;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s;
   font-size: 1em;
-  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+  box-shadow: none;
 }
 
 .btn-confirm:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+  box-shadow: none;
 }
 
 .btn-confirm:active {
@@ -759,8 +759,8 @@
 .btn-confirm.loading .loading-spinner {
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
+  border: 2px solid var(--sheet-paper-3);
+  border-radius: 0;
   border-top-color: white;
   animation: spin 1s ease-in-out infinite;
   margin-right: 8px;
@@ -797,10 +797,10 @@
 .transaction-history-section {
   margin-top: 30px;
   padding: 20px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--sheet-rule);
   backdrop-filter: blur(10px);
-  border-radius: 15px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0;
+  border: 1px solid var(--sheet-rule);
 }
 
 .history-header {
@@ -819,9 +819,9 @@
 
 .btn-history-toggle {
   padding: 8px 16px;
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 20px;
+  background: var(--sheet-rule-strong);
+  border: 1px solid var(--sheet-paper-3);
+  border-radius: 0;
   color: rgba(0, 0, 0, 0.8);
   cursor: pointer;
   font-size: 0.9em;
@@ -830,7 +830,7 @@
 }
 
 .btn-history-toggle:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--sheet-paper-3);
   transform: translateY(-1px);
 }
 
@@ -844,14 +844,14 @@
   align-items: center;
   padding: 15px;
   margin-bottom: 10px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--sheet-rule);
+  border-radius: 0;
+  border: 1px solid var(--sheet-rule-strong);
   transition: all 0.3s;
 }
 
 .transaction-item:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--sheet-rule-strong);
   transform: translateX(5px);
 }
 
@@ -889,7 +889,7 @@
 
 .outcome-badge {
   padding: 4px 8px;
-  border-radius: 12px;
+  border-radius: 0;
   font-size: 0.8em;
   font-weight: 600;
 }
@@ -989,11 +989,11 @@
   align-items: flex-start;
   background: rgba(0, 0, 0, 0.9);
   backdrop-filter: blur(10px);
-  border-radius: 12px;
+  border-radius: 0;
   padding: 16px;
   margin-bottom: 12px;
   border-left: 4px solid;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  box-shadow: none;
   pointer-events: auto;
   transform: translateX(420px);
   opacity: 0;
@@ -1045,24 +1045,24 @@
 .notification-title {
   font-weight: 600;
   font-size: 0.9em;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--sheet-paper);
   margin-bottom: 4px;
 }
 
 .notification-message {
   font-size: 0.85em;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--sheet-paper-2);
   line-height: 1.4;
 }
 
 .notification-close {
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--sheet-paper-2);
   font-size: 16px;
   cursor: pointer;
   padding: 4px;
-  border-radius: 50%;
+  border-radius: 0;
   width: 24px;
   height: 24px;
   display: flex;
@@ -1074,8 +1074,8 @@
 }
 
 .notification-close:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.9);
+  background: var(--sheet-rule);
+  color: var(--sheet-paper);
 }
 
 @keyframes slideInNotification {

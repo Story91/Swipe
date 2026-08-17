@@ -147,12 +147,42 @@ function MarketCard({
         </div>
       </div>
 
+      {/* A settled market's numbers are the only thing anyone reads it for, and
+          they were being thrown away: the card showed the same "0 ETH · 0
+          players" line as a live one, plus a badge. Now the two states carry
+          different information, because they answer different questions. */}
+      {settled && !prediction.cancelled ? (
+        <dl className="mgcard__result">
+          <div className="mgcard__result-row">
+            <dt>Settled</dt>
+            <dd className={prediction.outcome ? "is-yes" : "is-no"}>
+              {prediction.outcome ? "YES" : "NO"}
+            </dd>
+          </div>
+          <div className="mgcard__result-row">
+            <dt>Winning side</dt>
+            <dd>{prediction.outcome ? yes : no}% of the pool</dd>
+          </div>
+          <div className="mgcard__result-row">
+            <dt>Pool</dt>
+            <dd>
+              {pool} ETH · {prediction.participants?.length ?? 0} player
+              {(prediction.participants?.length ?? 0) === 1 ? "" : "s"}
+            </dd>
+          </div>
+        </dl>
+      ) : null}
+
       <div className="mgcard__foot">
-        <span className="mgcard__stat">{pool} ETH</span>
-        <span className="mgcard__dot" aria-hidden="true">·</span>
-        <span className="mgcard__stat">
-          {prediction.participants?.length ?? 0} players
-        </span>
+        {settled && !prediction.cancelled ? null : (
+          <>
+            <span className="mgcard__stat">{pool} ETH</span>
+            <span className="mgcard__dot" aria-hidden="true">·</span>
+            <span className="mgcard__stat">
+              {prediction.participants?.length ?? 0} players
+            </span>
+          </>
+        )}
         <span className="mgcard__spacer" />
         {prediction.cancelled ? (
           <span className="mgcard__badge">Cancelled</span>

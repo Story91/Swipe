@@ -5,7 +5,7 @@
 @tailwind utilities;
 
 :root {
-  --app-background: #d4ff00;
+  --app-background: #14140f;
   --app-foreground: #111111;
   --app-foreground-muted: #58585c;
   --app-accent: #0052ff;
@@ -20,7 +20,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --app-background: #d4ff00;
+    --app-background: #14140f;
     --app-foreground: #111111;
     --app-foreground-muted: #58585c;
     --app-accent: #0052ff;
@@ -114,10 +114,13 @@ body::before {
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--app-background);
-  /* 0.85 left hero.png legible enough to read as a photo behind the content,
-     which fought with it on wide screens. At 0.95 it survives as texture. */
-  opacity: 0.95;
+  /* The dark ground every screen is designed against. This used to paint the
+     accent colour across the whole page, which only worked while every
+     component covered it with an opaque face. The moment those faces became
+     translucent the app turned lime under white text. An accent belongs on the
+     one thing that matters on a screen, never on the floor. */
+  background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+  opacity: 1;
   z-index: -1;
   pointer-events: none;
 }
