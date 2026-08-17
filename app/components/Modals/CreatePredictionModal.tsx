@@ -521,9 +521,9 @@ export function CreatePredictionModal({ isOpen, onClose, onSuccess }: CreatePred
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // This modal creates markets on CONTRACTS.V2, whose owner key is compromised
-    // and unrecoverable, so a market created there could never be resolved. The
-    // guard compares that target address against the selected chain's live
+    // This modal creates markets on CONTRACTS.V2, archived: its owner key is
+    // no longer available, so a market created there could never be resolved.
+    // The guard compares that target address against the selected chain's live
     // market and refuses anything else.
     //
     // It used to ask isReadOnlyChain() with no argument, which held only while

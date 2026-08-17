@@ -1716,7 +1716,7 @@ export function getUSDGDualPoolContract(signer?: ethers.Signer) {
   return new ethers.Contract(USDG_DUALPOOL_CONTRACT_ADDRESS, USDG_DUALPOOL_ABI, signer);
 }
 
-// USDC DualPool Contract Config (legacy - owner key compromised, read-only)
+// USDC DualPool Contract Config (legacy - owner key unavailable, read-only)
 export const USDC_DUALPOOL_CONFIG = {
   address: USDC_DUALPOOL_CONTRACT_ADDRESS,
   abi: USDC_DUALPOOL_ABI,

@@ -49,7 +49,7 @@ community-reviewed submission path.
 | `creatorFee` | 50 (0.5%) | of the losing pool, credited to whoever registered the market |
 | `earlyExitFee` | 500 (5%) | charged on `exitEarly` |
 | `minBet` | 100000 (0.1 USDC) | 6 decimals |
-| `owner` / first resolver | `0xD4885...030e` | a fresh key, unrelated to the compromised legacy owner below |
+| `owner` / first resolver | `0xD4885...030e` | a fresh key, unrelated to the legacy contracts' archived owner |
 | `collateral` | `0x8335...C913` | USDC on Base |
 
 Constructor defaults differ from the above (`platformFee` starts at 1%,

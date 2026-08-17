@@ -14,8 +14,8 @@ export interface ChainContracts {
   v2?: `0x${string}`;
   /**
    * PredictionMarket_USDC_DualPool - the original stablecoin market.
-   * Its owner key is compromised and unrecoverable, so on Base this is
-   * read-only history: no new markets, no new bets.
+   * Its owner key is no longer available, so on Base this is read-only
+   * history: no new markets, no new bets.
    */
   dualPool?: `0x${string}`;
   /**
@@ -40,7 +40,7 @@ export interface ChainConfig {
   contracts: ChainContracts;
   /**
    * True when this chain carries markets on contracts nobody controls any more.
-   * Base does: its V1, V2 and USDC pools are owned by a compromised key, so
+   * Base does: its V1, V2 and USDC pools have no available owner key, so
    * those markets can never be resolved or claimed again.
    *
    * This is a statement about old markets, not about the chain. Base runs V3

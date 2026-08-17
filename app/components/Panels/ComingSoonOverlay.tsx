@@ -7,7 +7,7 @@ import './ComingSoonOverlay.css';
  * Blurs a feature that depends on the old SWIPE token and explains what is
  * coming, without deleting it.
  *
- * The Base SWIPE token's fee stream is captured by a compromised key, so
+ * The Base SWIPE token's fee stream sits in an archived contract, so
  * everything built on it — daily tasks, claims, token stats — is being rebuilt
  * around the new token on Robinhood Chain. Leaving the old screens visible but
  * inert shows people what the feature is and that it is returning; removing

@@ -15,11 +15,10 @@ export const CHAINS: Record<ChainKey, ChainConfig> = {
     viemChain: base,
     rpcUrl: process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org',
     explorer: 'https://basescan.org',
-    // The v2, dualPool and V1 contracts below are owned by
-    // 0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd, whose key was compromised and
-    // cannot be recovered. PredictionMarketV2 has no transferOwnership at all,
-    // so those markets can never be resolved again. They stay readable and
-    // nothing new is ever written to them.
+    // The v2, dualPool and V1 contracts below are archived: their owner key
+    // is no longer available, and PredictionMarketV2 has no transferOwnership
+    // at all, so those markets can never be resolved again. They stay
+    // readable and nothing new is ever written to them.
     archivedMarkets: true,
     contracts: {
       v2: (process.env.NEXT_PUBLIC_CONTRACT_V2_ADDRESS
@@ -27,9 +26,8 @@ export const CHAINS: Record<ChainKey, ChainConfig> = {
       dualPool: (process.env.NEXT_PUBLIC_USDC_DUALPOOL_CONTRACT
         || '0xf5Fa6206c2a7d5473ae7468082c9D260DFF83205') as `0x${string}`,
       // PredictionMarket_V3, deployed and verified on Base mainnet 2026-08-17,
-      // collateralised in the USDC below. Owner and first resolver
-      // 0xD4885A5aa53446843CABcDE1F35DE9b4E906030e, a key that is not the
-      // compromised one above.
+      // collateralised in the USDC below. Owned by a fresh operational key,
+      // unrelated to the archived contracts above.
       //
       // Literal fallback on purpose, and NEXT_PUBLIC_ on purpose: this address
       // has to be readable in the browser or the UI silently sees the zero

@@ -663,8 +663,8 @@ export default function App() {
 
           {activeDashboard === 'approver' && <AdminPanel />}
 
-          {/* SWIPE Token Card — the Base token's fee stream is captured by the
-              compromised key, so this is being rebuilt on the new token. */}
+          {/* SWIPE Token Card — the Base token's fee stream sits in an archived
+              contract, so this is being rebuilt on the new token. */}
           {activeDashboard === 'swipe-token' && (
             <ComingSoonOverlay
               title="New $SWIPE incoming"

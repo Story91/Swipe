@@ -42,7 +42,7 @@ export function RecentActivity() {
         type: 'prediction_resolved',
         timestamp: Date.now() - 5 * 60 * 1000, // 5 minutes ago
         user: {
-          address: '0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd',
+          address: '0x1234567890123456789012345678901234567890',
           displayName: 'DexterAdmin',
           avatar: '👑'
         },
@@ -194,7 +194,7 @@ export function RecentActivity() {
         type: 'prediction_resolved',
         timestamp: Date.now() - 75 * 60 * 1000, // 75 minutes ago
         user: {
-          address: '0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd',
+          address: '0x1234567890123456789012345678901234567890',
           displayName: 'DexterAdmin',
           avatar: '👑'
         },

@@ -874,8 +874,8 @@ export default function KalshiMarkets() {
   const handlePlaceBet = useCallback(async () => {
     if (!address || !betModal.side || !betModal.marketId) return;
 
-    // USDC_DUALPOOL_CONTRACT_ADDRESS below is the old Base pool, whose owner key
-    // is compromised and unrecoverable: a bet placed there could never be
+    // USDC_DUALPOOL_CONTRACT_ADDRESS below is the old Base pool, archived: its
+    // owner key is no longer available, so a bet placed there could never be
     // resolved or claimed. The guard therefore compares the address this is
     // about to write to against the selected chain's live market, and refuses
     // anything else.
