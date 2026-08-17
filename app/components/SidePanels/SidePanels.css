@@ -17,7 +17,7 @@
   z-index: 10;
   overflow-y: auto;
   overflow-x: hidden;
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+  box-shadow: none;
 }
 
 .side-panel-left {
@@ -69,7 +69,7 @@
    worse, and an infinite animation kept it moving. Near-black carries real
    contrast against the brand lime and stays legible. */
 .side-panel-subtitle {
-  font-family: "Orbitron", sans-serif;
+  font-family: var(--sheet-display);
   font-size: 0.75rem;
   color: #1a1a1a;
   font-weight: 700;

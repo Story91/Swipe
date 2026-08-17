@@ -3,7 +3,7 @@
   padding: 12px;
   max-width: 424px;
   margin: 0 auto;
-  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0f0f0f 100%);
+  background: var(--sheet-surface);
   min-height: 100vh;
   color: #ffffff;
   font-family: "Exo 2", -apple-system, BlinkMacSystemFont, sans-serif;
@@ -27,7 +27,7 @@
   justify-content: center;
   padding: 60px 20px;
   text-align: center;
-  color: #d4ff00;
+  color: var(--sheet-lime);
   min-height: 300px;
 }
 
@@ -46,8 +46,8 @@
 .loading-text {
   font-size: 18px;
   font-weight: 600;
-  color: #d4ff00;
-  font-family: "Orbitron", "Exo 2", sans-serif;
+  color: var(--sheet-lime);
+  font-family: "Orbitron", var(--sheet-body);
   text-shadow: 0 0 10px rgba(212, 255, 0, 0.3);
   margin: 0;
 }
@@ -69,8 +69,8 @@
   width: 36px;
   height: 36px;
   border: 3px solid rgba(212, 255, 0, 0.2);
-  border-top: 3px solid #d4ff00;
-  border-radius: 50%;
+  border-top: 3px solid var(--sheet-lime);
+  border-radius: 0;
   animation: spin 1s linear infinite;
   margin-bottom: 12px;
 }
@@ -86,11 +86,11 @@
 }
 
 .retry-button {
-  background: linear-gradient(135deg, #d4ff00, #a8cc00);
+  background: var(--sheet-surface);
   color: #000;
   border: none;
   padding: 8px 20px;
-  border-radius: 20px;
+  border-radius: 0;
   font-weight: 700;
   cursor: pointer;
   margin-top: 12px;
@@ -100,14 +100,14 @@
 
 .retry-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(212, 255, 0, 0.4);
+  box-shadow: none;
 }
 
 /* Header Card */
 .stats-header-card {
-  background: linear-gradient(135deg, rgba(212, 255, 0, 0.1), rgba(0, 0, 0, 0.8)) !important;
+  background: var(--sheet-surface) !important;
   border: 2px solid rgba(212, 255, 0, 0.4) !important;
-  border-radius: 16px !important;
+  border-radius: 0;
   overflow: hidden;
 }
 
@@ -118,9 +118,9 @@
 
 .stats-main-title {
   font-size: 22px !important;
-  color: #d4ff00 !important;
+  color: var(--sheet-lime) !important;
   font-weight: 800 !important;
-  font-family: "Orbitron", sans-serif !important;
+  font-family: var(--sheet-display) !important;
   letter-spacing: 1px;
   display: flex;
   align-items: center;
@@ -141,35 +141,35 @@
 
 .metric-card-new {
   background: rgba(0, 0, 0, 0.6) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  border-radius: 12px !important;
+  border: 1px solid var(--sheet-rule) !important;
+  border-radius: 0;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
 }
 
 .metric-card-new:hover {
   transform: translateY(-3px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: none;
 }
 
 .metric-card-new.primary {
   border-color: rgba(212, 255, 0, 0.3) !important;
-  background: linear-gradient(135deg, rgba(212, 255, 0, 0.08), rgba(0, 0, 0, 0.6)) !important;
+  background: var(--sheet-surface) !important;
 }
 
 .metric-card-new.secondary {
   border-color: rgba(99, 102, 241, 0.3) !important;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(0, 0, 0, 0.6)) !important;
+  background: var(--sheet-surface) !important;
 }
 
 .metric-card-new.accent {
   border-color: rgba(236, 72, 153, 0.3) !important;
-  background: linear-gradient(135deg, rgba(236, 72, 153, 0.08), rgba(0, 0, 0, 0.6)) !important;
+  background: var(--sheet-surface) !important;
 }
 
 .metric-card-new.success {
   border-color: rgba(34, 197, 94, 0.3) !important;
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(0, 0, 0, 0.6)) !important;
+  background: var(--sheet-surface) !important;
 }
 
 .metric-content-new {
@@ -184,7 +184,7 @@
   font-size: 22px;
   font-weight: 800;
   color: #ffffff;
-  font-family: "Orbitron", sans-serif;
+  font-family: var(--sheet-display);
 }
 
 .metric-value-new.small {
@@ -200,7 +200,7 @@
 .metric-logo-new {
   width: 20px;
   height: 20px;
-  border-radius: 50%;
+  border-radius: 0;
   object-fit: contain;
 }
 
@@ -211,12 +211,12 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   background: rgba(212, 255, 0, 0.15) !important;
-  color: #d4ff00 !important;
+  color: var(--sheet-lime) !important;
   border: none !important;
 }
 
 .metric-badge.active {
-  background: linear-gradient(135deg, #d4ff00, #a8cc00) !important;
+  background: var(--sheet-surface) !important;
   color: #000 !important;
 }
 
@@ -224,7 +224,7 @@
 .section-card {
   background: rgba(0, 0, 0, 0.6) !important;
   border: 1px solid rgba(212, 255, 0, 0.15) !important;
-  border-radius: 12px !important;
+  border-radius: 0;
 }
 
 .section-card.category {
@@ -237,14 +237,14 @@
 
 .section-header {
   padding: 12px 14px 8px !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--sheet-surface);
 }
 
 .section-title {
   font-size: 14px !important;
-  color: #d4ff00 !important;
+  color: var(--sheet-lime) !important;
   font-weight: 700 !important;
-  font-family: "Exo 2", sans-serif !important;
+  font-family: var(--sheet-body) !important;
 }
 
 /* Activity Grid */
@@ -265,13 +265,13 @@
 .activity-value-new {
   font-size: 24px;
   font-weight: 800;
-  color: #d4ff00;
-  font-family: "Orbitron", sans-serif;
+  color: var(--sheet-lime);
+  font-family: var(--sheet-display);
 }
 
 .activity-label-new {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  color: var(--sheet-paper-2);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -279,7 +279,7 @@
 .activity-divider {
   width: 1px;
   height: 40px;
-  background: linear-gradient(180deg, transparent, rgba(212, 255, 0, 0.3), transparent);
+  background: var(--sheet-surface);
 }
 
 /* Category Content */
@@ -293,14 +293,14 @@
 .category-badge {
   font-size: 14px !important;
   padding: 6px 14px !important;
-  background: linear-gradient(135deg, #d4ff00, #a8cc00) !important;
+  background: var(--sheet-surface) !important;
   color: #000 !important;
   font-weight: 700 !important;
 }
 
 .category-active-count {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  color: var(--sheet-paper-2);
 }
 
 /* Trending List - New */
@@ -312,9 +312,9 @@
 }
 
 .trending-item-new {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
+  background: var(--sheet-surface);
+  border: 1px solid var(--sheet-surface);
+  border-radius: 0;
   padding: 12px;
   display: flex;
   align-items: flex-start;
@@ -323,7 +323,7 @@
 }
 
 .trending-item-new:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--sheet-surface);
   border-color: rgba(212, 255, 0, 0.2);
   transform: translateX(4px);
 }
@@ -332,7 +332,7 @@
   font-size: 10px !important;
   padding: 4px 8px !important;
   background: rgba(212, 255, 0, 0.1) !important;
-  color: #d4ff00 !important;
+  color: var(--sheet-lime) !important;
   border-color: rgba(212, 255, 0, 0.3) !important;
   font-weight: 700 !important;
   flex-shrink: 0;
@@ -344,7 +344,7 @@
 }
 
 .trending-question-new {
-  font-size: 11px;
+  font-size: 12px;
   color: #ffffff;
   font-weight: 600;
   margin-bottom: 6px;
@@ -367,9 +367,9 @@
   display: flex;
   align-items: center;
   gap: 3px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
-  color: #d4ff00;
+  color: var(--sheet-lime);
 }
 
 .trending-volume-new.swipe {
@@ -379,15 +379,15 @@
 .trending-logo-new {
   width: 12px;
   height: 12px;
-  border-radius: 50%;
+  border-radius: 0;
   object-fit: contain;
 }
 
 .participants-badge {
   font-size: 9px !important;
   padding: 2px 6px !important;
-  background: rgba(255, 255, 255, 0.1) !important;
-  color: rgba(255, 255, 255, 0.7) !important;
+  background: var(--sheet-rule) !important;
+  color: var(--sheet-paper-2) !important;
 }
 
 .trending-arrow {
@@ -405,9 +405,9 @@
 
 /* Footer Card */
 .footer-card {
-  background: linear-gradient(135deg, rgba(212, 255, 0, 0.05), rgba(0, 0, 0, 0.8)) !important;
+  background: var(--sheet-surface) !important;
   border: 1px solid rgba(212, 255, 0, 0.2) !important;
-  border-radius: 12px !important;
+  border-radius: 0;
 }
 
 .footer-content {
@@ -425,8 +425,8 @@
 }
 
 .footer-label {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  color: var(--sheet-paper-3);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -434,7 +434,7 @@
 .footer-value-badge {
   font-size: 14px !important;
   padding: 4px 12px !important;
-  background: linear-gradient(135deg, #d4ff00, #a8cc00) !important;
+  background: var(--sheet-surface) !important;
   color: #000 !important;
   font-weight: 800 !important;
 }
@@ -442,7 +442,7 @@
 .footer-divider {
   width: 1px;
   height: 40px;
-  background: linear-gradient(180deg, transparent, rgba(212, 255, 0, 0.2), transparent);
+  background: var(--sheet-surface);
 }
 
 .footer-values {
@@ -456,15 +456,15 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  color: #d4ff00;
+  color: var(--sheet-lime);
 }
 
 .footer-logo {
   width: 14px;
   height: 14px;
-  border-radius: 50%;
+  border-radius: 0;
   object-fit: contain;
 }
 
@@ -488,6 +488,6 @@
   }
 
   .trending-question-new {
-    font-size: 10px;
+    font-size: 12px;
   }
 }

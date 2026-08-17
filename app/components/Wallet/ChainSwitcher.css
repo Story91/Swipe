@@ -14,10 +14,10 @@
   font-family: "Spicy Rice", cursive;
   font-size: 0.85rem;
   line-height: 1;
-  color: #d4ff00;
+  color: var(--sheet-lime);
   background: rgba(212, 255, 0, 0.12);
   border: 1px solid rgba(212, 255, 0, 0.35);
-  border-radius: 999px;
+  border-radius: 0;
   padding: 6px 14px;
   cursor: pointer;
   white-space: nowrap;
@@ -30,7 +30,7 @@
 
 .chain-switcher__trigger:focus-visible,
 .chain-switcher__option:focus-visible {
-  outline: 2px solid #d4ff00;
+  outline: 2px solid var(--sheet-lime);
   outline-offset: 2px;
 }
 
@@ -39,7 +39,7 @@
 .chain-switcher__dot {
   width: 7px;
   height: 7px;
-  border-radius: 50%;
+  border-radius: 0;
   background: #4ade80;
   flex: 0 0 auto;
 }
@@ -59,9 +59,9 @@
   gap: 2px;
   padding: 6px;
   background: #0d0d0d;
-  border: 2px solid #d4ff00;
-  border-radius: 12px;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+  border: 2px solid var(--sheet-lime);
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .chain-switcher__option {
@@ -69,14 +69,14 @@
   align-items: center;
   gap: 9px;
   width: 100%;
-  font-family: "Orbitron", sans-serif;
+  font-family: var(--sheet-display);
   font-size: 12px;
   font-weight: 600;
   text-align: left;
   color: #f0f0f0;
   background: transparent;
   border: none;
-  border-radius: 8px;
+  border-radius: 0;
   padding: 9px 12px;
   cursor: pointer;
   transition: background 120ms ease;
@@ -95,13 +95,13 @@
 }
 
 .chain-switcher__tag {
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: #000;
   background: #ffb020;
-  border-radius: 999px;
+  border-radius: 0;
   padding: 2px 6px;
 }
 

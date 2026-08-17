@@ -10,10 +10,10 @@
 .wallet-picker__connected {
   font-family: "Spicy Rice", cursive;
   font-size: 0.9rem;
-  color: #d4ff00;
+  color: var(--sheet-lime);
   background: #000;
   border: 2px solid #000;
-  border-radius: 999px;
+  border-radius: 0;
   padding: 8px 18px;
   cursor: pointer;
   white-space: nowrap;
@@ -38,7 +38,7 @@
 }
 
 .wallet-picker__connected {
-  font-family: "Source Code Pro", monospace;
+  font-family: var(--sheet-data);
   font-size: 0.8rem;
   font-weight: 600;
 }
@@ -54,9 +54,9 @@
   gap: 2px;
   padding: 6px;
   background: #0d0d0d;
-  border: 2px solid #d4ff00;
-  border-radius: 12px;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+  border: 2px solid var(--sheet-lime);
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .wallet-picker__option {
@@ -64,14 +64,14 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  font-family: "Orbitron", sans-serif;
+  font-family: var(--sheet-display);
   font-size: 12px;
   font-weight: 600;
   text-align: left;
   color: #f0f0f0;
   background: transparent;
   border: none;
-  border-radius: 8px;
+  border-radius: 0;
   padding: 10px 12px;
   cursor: pointer;
   transition: background 120ms ease;
@@ -85,7 +85,7 @@
 .wallet-picker__error {
   margin: 0;
   padding: 8px 12px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.4;
   color: #9a9a9a;
 }
@@ -98,7 +98,7 @@
   max-width: 280px;
   background: #0d0d0d;
   border: 1px solid #ffb020;
-  border-radius: 10px;
+  border-radius: 0;
   color: #ffb020;
   z-index: 100;
 }
