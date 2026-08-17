@@ -5,7 +5,7 @@ import { chainFromRequest, chainFromRequestOrBody } from '@/lib/chains/requestCh
 import type { ChainKey } from '@/lib/chains/types';
 import { getMarketContract } from '@/lib/chains/market';
 import { parseMarketId, CURRENT_GENERATION, type MarketRef } from '@/lib/marketId';
-import { redis, REDIS_KEYS } from '@/lib/redis';
+import { redis, REDIS_KEYS, invalidatePredictionsCache } from '@/lib/redis';
 
 /**
  * Pulls a market's pools and positions off chain into Redis.
@@ -268,6 +268,23 @@ async function syncMarket(ref: MarketRef, chain: ChainKey, client: PublicClient)
     }
 
     await redis.set(REDIS_KEYS.PREDICTION(ref.redisId, chain), JSON.stringify(updated));
+
+    /**
+     * Drop this chain's listing snapshot, or the new pools are invisible.
+     *
+     * `/api/predictions` does not read these records. It reads
+     * `predictions:index`, a denormalised copy of the whole list that exists so
+     * a listing is one round trip instead of hundreds. That snapshot is rebuilt
+     * only when something invalidates it, and `redisHelpers.savePrediction`
+     * does. This route does not go through savePrediction; it writes the record
+     * straight, so it was updating the record and leaving the list serving the
+     * pools from before the bet.
+     *
+     * That is the whole reason a bet did not appear under the card until much
+     * later. The chain had it, the record had it, and the one thing the UI
+     * actually reads still did not.
+     */
+    invalidatePredictionsCache(chain);
 
     return {
       success: true,

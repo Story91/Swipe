@@ -2,143 +2,162 @@
  * Pools and rules under the swipe card.
  *
  * Its own stylesheet rather than an addition to TinderCard.css, which is 3000
- * lines of the old hacker-terminal styling and is being edited elsewhere.
+ * lines and is being edited elsewhere.
  *
- * Mobile first, and mobile only in the sense that there is no desktop branch
- * until 560px: the swipe card is a phone surface, so one column, full width,
- * and nothing that can push the page sideways. Every colour is a --sheet-*
- * token from app/styles/tokens.css. The one literal is the #0d0d0d panel face,
- * which is deliberate and matches MarketChooserModal and WalletPicker: the app
- * ground is lime, so a translucent panel makes body text unreadable.
+ * Lime face with dark ink, not the dark panel the modals use. The first version
+ * of this borrowed the #0d0d0d sheet language from MarketChooserModal, which is
+ * right inside a dialog floating over the app and wrong here: everything around
+ * this component on the card surface is lime, so a black slab read as a hole in
+ * the page. The tokens still supply the greens and reds; what is matched by hand
+ * is the panel itself, because the old pool panels set it in TinderCard.css and
+ * that is what the eye is comparing against.
+ *
+ * Mobile first, one column, nothing that can push the page sideways.
  */
 
 .mkpools {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
   margin-bottom: 16px;
 }
 
 .mkpool {
-  background: #0d0d0d;
-  border: 1px solid var(--sheet-rule-strong);
-  border-radius: 0;
-  padding: 12px;
-  /* A long token symbol or a big number must wrap rather than widen the page. */
+  background: linear-gradient(135deg, #d4ff00 0%, #c4ef00 100%);
+  border: 2px solid rgba(0, 0, 0, 0.15);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow:
+    0 4px 20px rgba(212, 255, 0, 0.3),
+    0 0 40px rgba(212, 255, 0, 0.15);
+  /* A long symbol or a big number wraps rather than widening the page. */
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.mkpool--rules {
-  border-color: var(--sheet-lime-line);
-}
-
 .mkpool__head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 10px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.1);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.1);
 }
 
 h3.mkpool__title {
   margin: 0;
-  font-family: var(--sheet-display);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 1px;
   text-transform: uppercase;
-  color: var(--sheet-lime);
+  color: #1a1a1a;
 }
 
 .mkpool__total {
-  font-family: var(--sheet-data);
   font-size: 12px;
-  color: var(--sheet-paper);
+  font-weight: 700;
+  color: #1a1a1a;
   text-align: right;
 }
 
 .mkpool__sides {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 1px;
+  background: rgba(0, 0, 0, 0.08);
 }
 
 .mkpool__side {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 8px 10px;
-  background: var(--sheet-surface);
-  border: 1px solid var(--sheet-rule);
-}
-
-.mkpool__side--yes {
-  border-color: var(--sheet-lime-line);
+  gap: 4px;
+  align-items: center;
+  padding: 14px 10px;
+  background: rgba(255, 255, 255, 0.3);
+  text-align: center;
 }
 
 .mkpool__side-label {
-  font-family: var(--sheet-display);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 2px;
   text-transform: uppercase;
-  color: var(--sheet-paper-3);
 }
 
-.mkpool__side--yes .mkpool__side-label {
-  color: var(--sheet-lime);
-}
+.mkpool__side--yes .mkpool__side-label { color: #047857; }
+.mkpool__side--no .mkpool__side-label { color: #b91c1c; }
 
 .mkpool__side-amount {
-  font-family: var(--sheet-data);
-  font-size: 14px;
-  color: var(--sheet-paper);
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a1a1a;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A stake that just landed pulses once, so the number is seen to change. */
+.mkpool__side-amount--bumped {
+  animation: mkpoolBump 620ms ease;
+}
+
+@keyframes mkpoolBump {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.16); }
+  100% { transform: scale(1); }
 }
 
 .mkpool__empty {
-  margin: 10px 0 0;
-  font-family: var(--sheet-body);
+  margin: 0;
+  padding: 14px 16px;
+  text-align: center;
   font-size: 12px;
   line-height: 1.5;
-  color: var(--sheet-paper-3);
+  color: #4a4a2e;
 }
 
 .mkpool__bar-wrap {
-  margin-top: 10px;
+  padding: 12px 16px 16px;
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .mkpool__bar {
   display: flex;
-  width: 100%;
-  height: 8px;
+  height: 10px;
+  border-radius: 5px;
   overflow: hidden;
-  background: var(--sheet-surface);
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 .mkpool__bar-yes {
-  background: var(--sheet-lime);
+  background: linear-gradient(90deg, #059669, #10b981);
+  transition: width 500ms ease;
 }
 
 .mkpool__bar-no {
-  background: var(--sheet-loss);
+  background: linear-gradient(90deg, #dc2626, #ef4444);
+  transition: width 500ms ease;
 }
 
 .mkpool__bar-labels {
   display: flex;
   justify-content: space-between;
-  margin-top: 4px;
-  font-family: var(--sheet-data);
-  font-size: 10px;
-  color: var(--sheet-paper-3);
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
+
+.mkpool__bar-labels span:first-child { color: #047857; }
+.mkpool__bar-labels span:last-child { color: #b91c1c; }
 
 /* Three brackets across, which fits a 320px phone without shrinking the text. */
 .mkpool__weights {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
+  gap: 1px;
+  background: rgba(0, 0, 0, 0.08);
 }
 
 .mkpool__weight {
@@ -146,63 +165,68 @@ h3.mkpool__title {
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding: 8px 4px;
-  background: var(--sheet-surface);
-  border: 1px solid var(--sheet-rule);
+  padding: 10px 4px;
+  background: rgba(255, 255, 255, 0.3);
   text-align: center;
 }
 
 .mkpool__weight--now {
-  background: var(--sheet-wash);
-  border-color: var(--sheet-lime);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.35);
 }
 
 .mkpool__weight-x {
-  font-family: var(--sheet-data);
-  font-size: 13px;
-  color: var(--sheet-paper-2);
+  font-size: 14px;
+  font-weight: 700;
+  color: #4a4a2e;
+  font-variant-numeric: tabular-nums;
 }
 
 .mkpool__weight--now .mkpool__weight-x {
-  color: var(--sheet-lime);
+  color: #1a1a1a;
 }
 
 .mkpool__weight-when {
-  font-family: var(--sheet-body);
   font-size: 9px;
   line-height: 1.3;
-  color: var(--sheet-paper-3);
+  color: #4a4a2e;
 }
 
 .mkpool__note {
-  margin: 10px 0 0;
-  font-family: var(--sheet-body);
+  margin: 0;
+  padding: 12px 16px 0;
   font-size: 12px;
   line-height: 1.5;
-  color: var(--sheet-paper-2);
+  color: #1a1a1a;
 }
 
 .mkpool__note--quiet {
-  margin-top: 6px;
+  padding-top: 6px;
+  padding-bottom: 14px;
   font-size: 11px;
-  color: var(--sheet-paper-3);
+  color: #4a4a2e;
 }
 
 .mkpools__archived {
   margin: 0;
-  font-family: var(--sheet-body);
   font-size: 11px;
   line-height: 1.5;
-  color: var(--sheet-paper-3);
+  color: rgba(255, 255, 255, 0.6);
 }
 
-/* Above a phone there is room to sit the two sides wider apart. */
 @media (min-width: 560px) {
-  .mkpool {
-    padding: 14px 16px;
+  .mkpool__side-amount {
+    font-size: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mkpool__side-amount--bumped {
+    animation: none;
   }
 
-  .mkpool__side-amount {
-    font-size: 16px;
+  .mkpool__bar-yes,
+  .mkpool__bar-no {
+    transition: none;
   }
 }

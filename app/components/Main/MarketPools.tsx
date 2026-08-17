@@ -58,6 +58,33 @@ function units(raw: number, decimals: number): number {
 }
 
 /** Two sides and the bar between them, for one token. */
+/**
+ * Which side just grew, for one animation frame's worth of attention.
+ *
+ * A bet that lands changes a number by a small amount in a component that was
+ * already on screen, which is easy to miss entirely. Marking the side that
+ * moved is the difference between the page updating and the user seeing it
+ * update. Cleared on a timer so it fires once rather than staying lit.
+ */
+function useBumped(yes: number, no: number): 'yes' | 'no' | null {
+  const previous = React.useRef({ yes, no });
+  const [bumped, setBumped] = React.useState<'yes' | 'no' | null>(null);
+
+  React.useEffect(() => {
+    const before = previous.current;
+    previous.current = { yes, no };
+    // Only growth. A pool shrinks when somebody exits, and flashing the number
+    // green for that would read as a bet arriving.
+    const side = yes > before.yes ? 'yes' : no > before.no ? 'no' : null;
+    if (!side) return;
+    setBumped(side);
+    const timer = setTimeout(() => setBumped(null), 700);
+    return () => clearTimeout(timer);
+  }, [yes, no]);
+
+  return bumped;
+}
+
 function Pool({
   title,
   total,
@@ -75,6 +102,7 @@ function Pool({
 }) {
   const sum = yes + no;
   const yesPercent = sum > 0 ? (yes / sum) * 100 : 50;
+  const bumped = useBumped(yes, no);
 
   return (
     <section className="mkpool">
@@ -86,11 +114,15 @@ function Pool({
       <div className="mkpool__sides">
         <div className="mkpool__side mkpool__side--yes">
           <span className="mkpool__side-label">Yes</span>
-          <span className="mkpool__side-amount">{format(yes)}</span>
+          <span className={`mkpool__side-amount${bumped === 'yes' ? ' mkpool__side-amount--bumped' : ''}`}>
+            {format(yes)}
+          </span>
         </div>
         <div className="mkpool__side mkpool__side--no">
           <span className="mkpool__side-label">No</span>
-          <span className="mkpool__side-amount">{format(no)}</span>
+          <span className={`mkpool__side-amount${bumped === 'no' ? ' mkpool__side-amount--bumped' : ''}`}>
+            {format(no)}
+          </span>
         </div>
       </div>
 

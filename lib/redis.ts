@@ -175,7 +175,7 @@ const allPredictionsCache = new Map<ChainKey, { at: number; data: RedisPredictio
  * only when a prediction is written or deleted, so steady-state reads never
  * touch the individual keys at all.
  */
-function invalidatePredictionsCache(chain: ChainKey = DEFAULT_CHAIN_KEY): void {
+export function invalidatePredictionsCache(chain: ChainKey = DEFAULT_CHAIN_KEY): void {
   allPredictionsCache.delete(chain);
   // Fire-and-forget: a failed delete only costs us a rebuild on the next read.
   void redis.del(REDIS_KEYS.PREDICTIONS_INDEX(chain)).catch(() => {});

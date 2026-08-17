@@ -24,15 +24,20 @@ import './ChainSwitcher.css';
 /**
  * The mark shown beside a network's name.
  *
- * Base ships with its own asset in public/. Robinhood Chain does not, and I am
- * not going to draw something approximate and let it pass as their logo: a
- * wrong mark on a network selector is worse than an initial, because it looks
- * official. Until the real file is in public/ this falls back to a lettered
- * tile, and adding the asset is a one line change here.
+ * Both are the networks' own artwork rather than anything drawn here, because a
+ * wrong mark on a network selector reads as official and is worse than no mark
+ * at all. Base's square is already in public/. Robinhood's is the icon its own
+ * Blockscout instance serves at /assets/configs/network_icon_dark.svg, saved to
+ * public/robinhood-chain.svg; the dark variant, because it is white artwork and
+ * this nav is dark, while the light one is near black and would disappear.
+ *
+ * A chain with no artwork falls back to a lettered tile in the same box, so a
+ * third network does not shift the nav while someone finds its logo.
  */
-function chainMark(key: ChainKey): { src?: string; letter: string } {
+export function chainMark(key: ChainKey): { src?: string; letter: string } {
   if (key === 'base') return { src: '/Base_square_blue.png', letter: 'B' };
-  return { letter: 'R' };
+  if (key === 'robinhood') return { src: '/robinhood-chain.svg', letter: 'R' };
+  return { letter: key.slice(0, 1).toUpperCase() };
 }
 
 export function ChainSwitcher() {

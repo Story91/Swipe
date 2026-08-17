@@ -34,7 +34,17 @@ export interface HybridPrediction {
     totalPool: number;
     participantCount: number;
   };
-  
+  /**
+   * Who is in the collateral market, and how many.
+   *
+   * Separate from `participants` below, which is the V2 array. /api/sync/usdc
+   * writes these two, so a market on the current contract has its backers here
+   * and nothing in the other one. The active swipers panel read only the other
+   * one, which is why it stayed empty after a real bet landed.
+   */
+  usdcParticipants?: string[];
+  usdcParticipantCount?: number;
+
   // Enhanced data from Redis
   includeChart?: boolean;
   selectedCrypto?: string;
@@ -109,6 +119,8 @@ export function useHybridPredictions() {
         usdcYesTotalAmount: pred.usdcYesTotalAmount || 0,
         usdcNoTotalAmount: pred.usdcNoTotalAmount || 0,
         usdcMarketStats: pred.usdcMarketStats,
+        usdcParticipants: (pred as { usdcParticipants?: string[] }).usdcParticipants,
+        usdcParticipantCount: (pred as { usdcParticipantCount?: number }).usdcParticipantCount,
         
         // Enhanced data
         includeChart: pred.includeChart,

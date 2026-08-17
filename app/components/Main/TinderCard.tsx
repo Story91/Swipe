@@ -1057,7 +1057,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
             const syncResponse = await fetch('/api/sync/usdc', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ predictionIds: [stakeRedisId] })
+              body: JSON.stringify({ chain: chainKey, predictionIds: [stakeRedisId] })
             });
 
             if (syncResponse.ok) {
@@ -1286,7 +1286,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
         const syncResponse = await fetch('/api/sync/usdc', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ predictionIds: [stakeRedisId] })
+          body: JSON.stringify({ chain: chainKey, predictionIds: [stakeRedisId] })
         });
 
         if (syncResponse.ok) {
@@ -2101,8 +2101,18 @@ KEY USER-FACING CHANGES: V1 → V2
       ? hybridPredictions.find(hp => parseMarketId(hp.id)?.redisId === currentCard.redisId)
       : undefined;
 
-    // Remove duplicates from participants array to avoid React key conflicts
-    const participants = currentPrediction?.participants || [];
+    /**
+     * The collateral market's backers first, the V2 array as the fallback.
+     *
+     * This read only `participants`, which /api/sync/v2 fills. Markets on the
+     * current contract get `usdcParticipants` instead, so a bet that had really
+     * landed, and that the pool figures above were already showing, left this
+     * panel saying nobody was here.
+     */
+    const participants =
+      currentPrediction?.usdcParticipants?.length
+        ? currentPrediction.usdcParticipants
+        : currentPrediction?.participants || [];
     const uniqueParticipants = [...new Set(participants)];
     
     // console.log(`🔍 currentCardParticipants: cardId=${currentCard.id}, participants=${uniqueParticipants.length}`, uniqueParticipants);
