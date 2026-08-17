@@ -724,4 +724,46 @@ describe("PredictionMarket_V3", function () {
       }
     });
   });
+
+  describe("V3 additions do not weaken the audit fixes", function () {
+    it("still refuses to resolve before the deadline", async function () {
+      await openMarket(1, DAY);
+      await market.connect(alice).placeBet(1, true, usd(10));
+      await expect(
+        market.connect(resolver).resolvePrediction(1, true)
+      ).to.be.revertedWith("Deadline not reached");
+    });
+
+    it("still lets anyone open refunds past the grace period", async function () {
+      const deadline = await openMarket(1, DAY);
+      await market.connect(alice).placeBet(1, true, usd(10));
+      await warpPast(deadline + 31 * DAY);
+
+      await market.connect(alice).enableRefundsAfterGrace(1);
+      expect((await market.predictions(1)).refundable).to.equal(true);
+    });
+
+    it("never lets the platform withdraw a live stake", async function () {
+      await openMarket(1, DAY);
+      await market.connect(alice).placeBet(1, true, usd(100));
+      await market.connect(bob).placeBet(1, false, usd(100));
+
+      // Only the bond has accrued to the platform so far.
+      expect(await market.platformFeeBalance()).to.equal(0);
+    });
+
+    it("keeps a forfeited bond out of the players' refunds", async function () {
+      const deadline = await openMarket(1, DAY);
+      await market.connect(alice).placeBet(1, true, usd(100));
+      await market.connect(bob).placeBet(1, true, usd(50));
+      await warpPast(deadline);
+      await market.connect(resolver).resolvePrediction(1, false);
+
+      await market.connect(alice).claimRefund(1);
+      await market.connect(bob).claimRefund(1);
+
+      // Both got exactly their stakes; the bond went to fees, not to them.
+      expect(await market.platformFeeBalance()).to.equal(usd(10));
+    });
+  });
 });
