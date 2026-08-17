@@ -1,0 +1,116 @@
+/**
+ * Your own stake, under the swipe card.
+ *
+ * Same lime card language as MarketPools, because it sits in the same column on
+ * the same surface, but inverted: dark face with lime ink. It is the one panel
+ * there that is about you rather than about the market, and it only appears
+ * when you actually hold a position, so it can afford to stand out.
+ */
+
+.yourpos {
+  background: #0d0d0d;
+  border: 2px solid var(--sheet-lime);
+  border-radius: 12px;
+  padding: 14px 16px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.yourpos__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+h3.yourpos__title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--sheet-lime);
+}
+
+.yourpos__side {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.yourpos__side--yes {
+  color: #052e1a;
+  background: #10b981;
+}
+
+.yourpos__side--no {
+  color: #2e0505;
+  background: #ef4444;
+}
+
+.yourpos__figures {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.yourpos__figure {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.yourpos__figure--wide {
+  grid-column: 1 / -1;
+  margin-top: 8px;
+  border-color: var(--sheet-lime-line);
+  background: rgba(212, 255, 0, 0.06);
+}
+
+.yourpos__key {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.yourpos__val {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 16px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  font-variant-numeric: tabular-nums;
+}
+
+.yourpos__val--win {
+  font-size: 20px;
+  color: var(--sheet-lime);
+}
+
+.yourpos__mult {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--sheet-lime);
+}
+
+.yourpos__note {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.yourpos__note--quiet {
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.5);
+}

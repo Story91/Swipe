@@ -39,6 +39,7 @@ import GradientText from '@/components/GradientText';
 import TextType from '@/components/TextType';
 import { SharePreviewModal } from '../Modals/SharePreviewModal';
 import { MarketPools } from './MarketPools';
+import { YourPosition } from './YourPosition';
 
 // Just the two entry points the collateral needs. Kept minimal on purpose: the
 // spender and the token address are never literals here, they come from
@@ -2885,6 +2886,25 @@ KEY USER-FACING CHANGES: V1 → V2
         </table>
            </div>
            
+      {/* Your own stake, read from the contract rather than from Redis, so it
+          appears the moment the bet mines instead of waiting for a sync and a
+          snapshot rebuild. Renders nothing until you hold a position. */}
+      {marketWrite.market && transformedPredictions[currentIndex]?.id > 0 && (
+        <YourPosition
+          marketAddress={marketWrite.market.address}
+          abi={marketWrite.market.abi as readonly unknown[]}
+          chainId={marketWrite.market.chainId}
+          numericId={transformedPredictions[currentIndex].id}
+          decimals={collateralDecimals}
+          symbol={collateralSymbol || 'USDC'}
+          platformFeeBps={platformFeeBps}
+          creatorFeeBps={creatorFeeBps}
+          resolved={Boolean(transformedPredictions[currentIndex]?.resolved)}
+          outcome={Boolean(transformedPredictions[currentIndex]?.outcome)}
+          cancelled={Boolean(transformedPredictions[currentIndex]?.cancelled)}
+        />
+      )}
+
       {/* Pools and rules. Was two panels reading the archived V2 fields, so on
           every market this app now makes they showed an empty ETH pool and an
           empty SWIPE pool while the real collateral pool was nowhere on screen.
