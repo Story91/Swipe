@@ -454,6 +454,39 @@ export function AdminDashboard({
   const handleCancel = async (predictionId: string | number) => {
     const reason = prompt('Reason for emergency cancellation:');
     if (reason) {
+      // V3 cancels on the live market, same guarded path as resolve. A cancelled
+      // market becomes refundable, so every backer gets their raw stake back.
+      const v3 = parseMarketId(predictionId);
+      if (v3?.generation === 'v3') {
+        if (!marketWrite.ready) {
+          alert('❌ The selected network has no Swipe market deployed.');
+          return;
+        }
+        try {
+          const hash = await marketWrite.write({
+            functionName: 'cancelPrediction',
+            args: [BigInt(v3.numericId), reason],
+          });
+          const receipt = await publicClient?.waitForTransactionReceipt({ hash });
+          if (receipt && receipt.status !== 'success') {
+            alert(`❌ Cancellation reverted on chain.\nTransaction: ${hash}`);
+            return;
+          }
+          alert(`✅ Market ${v3.numericId} cancelled. Everyone can claim a refund.\nTransaction: ${hash}`);
+          await fetch('/api/sync/usdc', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ predictionIds: [v3.redisId] }),
+          }).catch((e) => console.warn('Sync after cancellation failed:', e));
+          handleRefresh();
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error);
+          console.error('❌ V3 cancellation failed:', error);
+          alert(`❌ Failed: ${message}`);
+        }
+        return;
+      }
+
       // Check if this is a synced on-chain prediction (string ID starting with 'pred_v1_' or 'pred_v2_') or on-chain prediction (number ID)
       if (typeof predictionId === 'string' && (predictionId.startsWith('pred_v1_') || predictionId.startsWith('pred_v2_'))) {
         // This is a synced on-chain prediction - call the contract directly
@@ -533,7 +566,48 @@ export function AdminDashboard({
     const side = outcome ? 'YES' : 'NO';
     let numericId: number | null = null;
     let contractVersion: 'V1' | 'V2' = 'V2'; // Default to V2
-    
+
+    // V3 settles on the live market, through the same guarded path registration
+    // uses. Without this branch a V3 market could be created and bet on and then
+    // never settled: every other resolve here targets V1, V2 or the archived
+    // pool, so the money would sit until the 30 day permissionless refund.
+    const v3 = parseMarketId(predictionId);
+    if (v3?.generation === 'v3') {
+      if (!marketWrite.ready) {
+        alert('❌ The selected network has no Swipe market deployed.');
+        return;
+      }
+      if (!confirm(`Resolve market ${v3.numericId} as ${side}?\n\nThis pays out. It cannot be undone.`)) {
+        return;
+      }
+      try {
+        const hash = await marketWrite.write({
+          functionName: 'resolvePrediction',
+          args: [BigInt(v3.numericId), outcome],
+        });
+        // The receipt, not the hash. Announcing success on a hash and writing
+        // Redis before the transaction mines is what left registration claiming
+        // a market existed when it did not.
+        const receipt = await publicClient?.waitForTransactionReceipt({ hash });
+        if (receipt && receipt.status !== 'success') {
+          alert(`❌ Resolution reverted on chain.\nTransaction: ${hash}`);
+          return;
+        }
+        alert(`✅ Market ${v3.numericId} resolved as ${side}.\nTransaction: ${hash}`);
+        await fetch('/api/sync/usdc', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ predictionIds: [v3.redisId] }),
+        }).catch((e) => console.warn('Sync after resolution failed:', e));
+        handleRefresh();
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error('❌ V3 resolution failed:', error);
+        alert(`❌ Failed: ${message}`);
+      }
+      return;
+    }
+
     if (typeof predictionId === 'string' && (predictionId.startsWith('pred_v1_') || predictionId.startsWith('pred_v2_'))) {
       // V1 or V2 synced prediction
       contractVersion = predictionId.startsWith('pred_v1_') ? 'V1' : 'V2';
