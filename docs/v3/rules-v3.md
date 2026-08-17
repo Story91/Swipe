@@ -32,8 +32,16 @@ risk in every market.
 collateralised in Base USDC, with platform fee 3%, creator fee 0.5%, early exit
 fee 5% and a minimum bet of 0.1 USDC, all confirmed on-chain.
 
-Robinhood Chain has no market contract yet. Its testnet runs V3's audited
-predecessor, which has no time weighting.
+**V3 is deployed on Robinhood Chain too**, at
+[`0x1AD8DD99C31EA51c1bCE99fB10d609485937C7DA`](https://robinhoodchain.blockscout.com/address/0x1AD8DD99C31EA51c1bCE99fB10d609485937C7DA),
+collateralised in Paxos USDG, with the same rates read back from chain: platform
+3%, creator 0.5%, early exit 5%, minimum bet 0.1 USDG. Its testnet still runs
+V3's audited predecessor, which has no time weighting.
+
+**Robinhood is not reachable from the app yet, deliberately.** Its address is
+server-side only, so the interface reads the zero address for that chain and
+every write guard refuses. Making the address client-visible is a separate,
+deliberate step; see the handoff.
 
 **One source, one deployment per chain.** A contract lives at one address on one
 chain, so Base and Robinhood get separate instances of the same audited source,
