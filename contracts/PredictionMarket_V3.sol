@@ -202,6 +202,16 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
         pred.deadline = deadline;
         pred.createdAt = block.timestamp;
 
+        // Registration is onlyResolver, so the creator is a parameter rather
+        // than msg.sender: the bond is pulled from their address and they must
+        // have approved it first. The backend checks the allowance before
+        // calling, because a missing approval reverts the whole batch.
+        uint256 bond = bondExempt[creator] ? 0 : creatorBondAmount;
+        if (bond > 0) {
+            pred.creatorBond = bond;
+            collateral.safeTransferFrom(creator, address(this), bond);
+        }
+
         emit PredictionRegistered(predictionId, creator, deadline);
     }
 

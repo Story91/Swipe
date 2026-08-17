@@ -34,7 +34,7 @@ describe("PredictionMarket_V3", function () {
     market = await Market.deploy(await token.getAddress());
     await market.waitForDeployment();
 
-    for (const user of [alice, bob]) {
+    for (const user of [alice, bob, creator]) {
       await token.mint(user.address, usd(10000));
       await token.connect(user).approve(await market.getAddress(), usd(10000));
     }
@@ -185,9 +185,14 @@ describe("PredictionMarket_V3", function () {
       await market.connect(bob).placeBet(1, false, usd(100));
       await market.connect(alice).exitEarly(1, true, usd(50));
 
-      const pred = await market.getPrediction(1);
+      // predictions(), not getPrediction(): the latter predates the creator
+      // bond and does not return it, but the bond is real collateral the
+      // contract now holds (pulled at registration, returned/forfeited only
+      // in a later task) and belongs in what the contract is holding "for".
+      const pred = await market.predictions(1);
       const balance = await token.balanceOf(await market.getAddress());
-      const owed = pred.yesPool + pred.noPool + (await market.platformFeeBalance());
+      const owed =
+        pred.yesPool + pred.noPool + pred.creatorBond + (await market.platformFeeBalance());
 
       expect(balance).to.equal(owed);
     });
@@ -509,6 +514,49 @@ describe("PredictionMarket_V3", function () {
     it("refuses both setters from a non-owner", async function () {
       await expect(market.connect(alice).setCreatorBondAmount(usd(1))).to.be.reverted;
       await expect(market.connect(alice).setBondExempt(alice.address, true)).to.be.reverted;
+    });
+  });
+
+  describe("posting the creator bond", function () {
+    it("pulls the bond from the creator, not the caller", async function () {
+      const before = await token.balanceOf(creator.address);
+      await openMarket(1, DAY);
+
+      expect(before - (await token.balanceOf(creator.address))).to.equal(usd(10));
+      expect((await market.predictions(1)).creatorBond).to.equal(usd(10));
+    });
+
+    it("pulls nothing from an exempt creator", async function () {
+      await market.setBondExempt(creator.address, true);
+      const before = await token.balanceOf(creator.address);
+      await openMarket(1, DAY);
+
+      expect(await token.balanceOf(creator.address)).to.equal(before);
+      expect((await market.predictions(1)).creatorBond).to.equal(0);
+    });
+
+    it("reverts registration when the creator has not approved", async function () {
+      await token.connect(creator).approve(await market.getAddress(), 0);
+      const deadline = await deadlineIn(DAY);
+      await expect(
+        market.registerPrediction(1, creator.address, deadline)
+      ).to.be.reverted;
+    });
+
+    it("reverts the whole batch when one creator has not approved", async function () {
+      // `resolver` holds no collateral and has approved nothing — alice and bob
+      // are both funded and approved in the top-level beforeEach, so using
+      // either here would make the batch succeed and pass for the wrong reason.
+      const deadline = await deadlineIn(DAY);
+      await expect(
+        market.registerPredictionsBatch(
+          [1, 2],
+          [creator.address, resolver.address],
+          [deadline, deadline]
+        )
+      ).to.be.reverted;
+
+      expect((await market.predictions(1)).registered).to.equal(false);
     });
   });
 
