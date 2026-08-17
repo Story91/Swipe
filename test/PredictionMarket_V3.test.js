@@ -490,4 +490,87 @@ describe("PredictionMarket_V3", function () {
       expect(paid).to.be.lte(predAfter.yesPool + predAfter.netLosersPool);
     });
   });
+
+  describe("conservation", function () {
+    it("never pays out more than the market took in, across random mixes", async function () {
+      const HOUR = 60 * 60;
+      const actors = [alice, bob, creator];
+
+      for (const user of actors) {
+        await token.mint(user.address, usd(100000));
+        await token.connect(user).approve(await market.getAddress(), usd(100000));
+      }
+
+      // Deterministic pseudo-random, so a failure is reproducible.
+      let seed = 42;
+      const rand = (n) => {
+        seed = (seed * 1103515245 + 12345) % 2147483648;
+        return seed % n;
+      };
+
+      for (let round = 0; round < 12; round++) {
+        const id = 100 + round;
+        const window = (1 + rand(6)) * HOUR;
+        const deadline = await deadlineIn(window);
+        await market.registerPrediction(id, creator.address, deadline);
+        // From the contract, not derived: registration mines its own block.
+        const createdAt = Number((await market.predictions(id)).createdAt);
+
+        const marketBefore = await token.balanceOf(await market.getAddress());
+        let staked = 0n;
+
+        for (let i = 0; i < 6; i++) {
+          const user = actors[rand(actors.length)];
+          const amount = usd(1 + rand(50));
+          const isYes = rand(2) === 0;
+
+          const at = createdAt + rand(window - 1);
+          const now = (await ethers.provider.getBlock("latest")).timestamp;
+          if (at > now) {
+            await ethers.provider.send("evm_setNextBlockTimestamp", [at]);
+            await ethers.provider.send("evm_mine", []);
+          }
+
+          await market.connect(user).placeBet(id, isYes, amount);
+          staked += amount;
+
+          // Sometimes leave again.
+          if (rand(3) === 0) {
+            const pos = await market.positions(id, user.address);
+            const held = isYes ? pos.yesAmount : pos.noAmount;
+            if (held > 0n) {
+              const out = held / 2n > 0n ? held / 2n : held;
+              try {
+                await market.connect(user).exitEarly(id, isYes, out);
+              } catch {
+                // "Exit value too small" is a legitimate refusal, not a failure.
+              }
+            }
+          }
+        }
+
+        await warpPast(deadline);
+        await market.connect(resolver).resolvePrediction(id, rand(2) === 0);
+
+        const pred = await market.predictions(id);
+        for (const user of actors) {
+          try {
+            if (pred.refundable) {
+              await market.connect(user).claimRefund(id);
+            } else {
+              await market.connect(user).claimWinnings(id);
+            }
+          } catch {
+            // Nothing to claim for this actor in this market.
+          }
+        }
+
+        const marketAfter = await token.balanceOf(await market.getAddress());
+        // The contract may keep dust and fees, but must never have paid out
+        // more than this market's stakes brought in.
+        expect(marketAfter).to.be.gte(marketBefore);
+        expect(marketAfter - marketBefore).to.be.lte(staked);
+      }
+    });
+  });
 });
