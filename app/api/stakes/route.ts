@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { redis, redisHelpers } from '../../../lib/redis';
+import { redis, redisHelpers, REDIS_KEYS } from '../../../lib/redis';
 import { RedisUserStake } from '../../../lib/types/redis';
 
 // GET /api/stakes - Get stakes for a specific prediction or all user stakes
@@ -15,7 +15,10 @@ export async function GET(request: NextRequest) {
       console.log(`🔍 Getting all stakes for user: ${userId}`);
       
       // Get all stake keys for this user
-      const userStakePattern = `user_stakes:${userId}:*`;
+      // Built from REDIS_KEYS so it follows the chain namespace. A literal
+      // pattern here would match zero keys the moment a namespace exists, and
+      // the route would answer 200 with an empty position list.
+      const userStakePattern = REDIS_KEYS.USER_STAKES_PATTERN(userId);
       const stakeKeys = await redis.keys(userStakePattern);
       
       console.log(`📊 Found ${stakeKeys.length} stake keys for user ${userId}`);
@@ -105,7 +108,7 @@ export async function GET(request: NextRequest) {
     
     if (userId) {
       // Get specific user's stake for this prediction
-      const stakeKey = `user_stakes:${userId}:${predictionId}`;
+      const stakeKey = REDIS_KEYS.USER_STAKES(userId, predictionId);
       const data = await redis.get(stakeKey);
       
       
@@ -153,7 +156,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get prediction data to calculate canClaim
-    const predictionData = await redis.get(`prediction:${predictionId}`);
+    const predictionData = await redis.get(REDIS_KEYS.PREDICTION(predictionId));
     let prediction: any = null;
     if (predictionData) {
       prediction = typeof predictionData === 'string' ? JSON.parse(predictionData) : predictionData;
@@ -225,7 +228,7 @@ export async function PUT(request: NextRequest) {
     }
     
     // Get existing stake
-    const stakeKey = `user_stakes:${userId}:${predictionId}`;
+    const stakeKey = REDIS_KEYS.USER_STAKES(userId, predictionId);
     const existingData = await redis.get(stakeKey);
     
     if (!existingData) {

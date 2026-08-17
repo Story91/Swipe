@@ -56,6 +56,8 @@ describe('chain abstraction is not bypassed', () => {
     ['app', 'components', 'Main', 'TinderCard.tsx'],
     ['app', 'components', 'Markets', 'SwipeMarkets.tsx'],
     ['app', 'components', 'Modals', 'CreatePredictionModal.tsx'],
+    // Sends native ETH. It was missing from this list and had no guard at all.
+    ['app', 'components', 'Portfolio', 'UserDashboard.tsx'],
     // The one surface that registers markets on a new chain, and it was absent
     // from this list while carrying four unguarded writes to the archived pool.
     ['app', 'components', 'Admin', 'AdminDashboard.tsx'],
@@ -78,6 +80,43 @@ describe('chain abstraction is not bypassed', () => {
       .not.toMatch(/if\s*\(\s*!\s*getWritableMarket\s*\(/);
     expect(src, `${rel} must not gate a write on the build-time default chain`)
       .not.toMatch(/if\s*\(\s*!?\s*isReadOnlyChain\s*\(\s*\)/);
+  });
+
+  /**
+   * The list above is maintained by hand, which is how it missed the worst one.
+   * UserDashboard.tsx sent native ETH to the archived V2 contract with no guard
+   * at all, and the suite stayed green because that file was simply not on the
+   * list. So this one discovers its own subjects.
+   *
+   * Native value is the right thing to key on. V3 is collateralised in an ERC-20
+   * and takes no ether at all, so any `value:` on a market write is by
+   * construction aimed at an archived contract. And unlike a failed token
+   * transfer, ether sent to an address with no code does not revert: it lands,
+   * and nobody holds the key.
+   */
+  it('every native-value send is guarded, whoever wrote it', () => {
+    const NATIVE_VALUE = /value:\s*(ethers\.)?parseEther\s*\(/;
+
+    const files = SCAN_DIRS
+      .map(d => path.join(ROOT, d))
+      .filter(existsSync)
+      .flatMap(d => walk(d))
+      .filter(f => !f.endsWith('.test.ts') && !f.endsWith('.test.tsx'));
+
+    const unguarded = files
+      .filter(file => {
+        const rel = path.relative(ROOT, file);
+        if (rel.startsWith(ALLOWED)) return false;
+        const src = readFileSync(file, 'utf8');
+        if (!NATIVE_VALUE.test(src)) return false;
+        return !src.includes('isWritableMarket(') && !src.includes('useMarketWrite(');
+      })
+      .map(f => path.relative(ROOT, f));
+
+    expect(
+      unguarded,
+      'these send native ether without comparing the address they send it to'
+    ).toEqual([]);
   });
 
   it('no module hardcodes the public Base RPC as a fallback', () => {

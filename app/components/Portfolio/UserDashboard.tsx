@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAccount, useReadContract, useWriteContract, usePublicClient } from 'wagmi';
 import { CONTRACTS, getV2Contract } from '../../../lib/contract';
+import { isWritableMarket } from '@/lib/chains';
+import { useActiveChain } from '@/lib/chains/activeChain';
 import { ethers } from 'ethers';
 
 // Transaction history utilities
@@ -123,6 +125,8 @@ interface UserDashboardProps {
 
 export function UserDashboard({ predictions, onClaimReward }: UserDashboardProps) {
   const { address } = useAccount();
+  // The chain the user actually selected. The stake guard below gates on it.
+  const { chainKey } = useActiveChain();
   const [selectedStakeAmounts, setSelectedStakeAmounts] = useState<{ [key: number]: number }>({});
   const [realPredictions, setRealPredictions] = useState<Prediction[]>([]);
   const [loading, setLoading] = useState(false);
@@ -185,6 +189,24 @@ export function UserDashboard({ predictions, onClaimReward }: UserDashboardProps
   }, []);
 
   const handleStakeBet = (predictionId: number, isYes: boolean) => {
+    // This path sends NATIVE ETH to CONTRACTS.V2, whose owner key is gone. A
+    // stake landing there can never be resolved or claimed, so the money is
+    // simply lost, and unlike every other bet path in the app this one had no
+    // guard and no pinned chainId at all.
+    //
+    // The guard compares the address it is about to write to against the
+    // selected chain's live market. V2's address can never be that, so this
+    // refuses. It stays as a refusal rather than being rewired because V3 has
+    // no placeStake and takes USDC, not ETH: there is nothing here to port.
+    if (!isWritableMarket(chainKey, CONTRACTS.V2.address)) {
+      alert(
+        'Betting moved to V3.\n\n' +
+        'These ETH markets are archived and take no new stakes. Use the markets ' +
+        'view to bet with USDC.'
+      );
+      return;
+    }
+
     const amount = selectedStakeAmounts[predictionId] || 0;
     if (amount < 0.001) {
       alert('❌ Minimum stake is 0.001 ETH');

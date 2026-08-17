@@ -1,9 +1,11 @@
 import { Redis } from "@upstash/redis";
-import type { 
-  RedisPrediction, 
-  RedisUserStake, 
-  UserTransaction, 
-  RedisMarketStats 
+import { DEFAULT_CHAIN_KEY } from './chains';
+import type { ChainKey } from './chains/types';
+import type {
+  RedisPrediction,
+  RedisUserStake,
+  UserTransaction,
+  RedisMarketStats
 } from './types/redis';
 
 // Initialize Redis with environment variables
@@ -21,22 +23,58 @@ export const redis = new Redis({
   token: redisToken,
 });
 
-// Redis key patterns for predictions
+/**
+ * The chain a key belongs to, as a leading prefix.
+ *
+ * Every market key is per chain: two contracts number their markets from 1
+ * independently, so Base market 1 and Robinhood market 1 are different markets
+ * that would otherwise share one Redis record and overwrite each other.
+ *
+ * Base is the identity. Its keys keep exactly the shape they have today, so the
+ * 244 live records need no migration, no dual read and no backfill, and this
+ * change is a no-op until a second chain exists.
+ *
+ * Leading, not in the middle, and that is not a style choice. Redis glob `*`
+ * matches `:` as well as anything else, so with the chain in the middle
+ * `user_stakes:*:pred_1` would match both chains and merge another chain's
+ * money into one user's answer. A leading prefix cannot do that. The rebuild
+ * spec proposes the infix form; it is wrong for this reason.
+ */
+export function chainNamespace(chain: ChainKey = DEFAULT_CHAIN_KEY): string {
+  return chain === DEFAULT_CHAIN_KEY ? '' : `${chain}:`;
+}
+
+// Redis key patterns for predictions.
+//
+// Keys that describe a market take a chain. Keys that describe a person do not:
+// splitting USER_TRANSACTIONS would cut one user's history in half against a
+// reader that reads one list, and it is capped at 50 entries. Those carry the
+// chain inside the record instead.
 export const REDIS_KEYS = {
-  PREDICTIONS: 'predictions',
-  PREDICTION: (id: string) => `prediction:${id}`,
-  PREDICTIONS_BY_CATEGORY: (category: string) => `predictions:category:${category}`,
-  PREDICTIONS_BY_CREATOR: (creator: string) => `predictions:creator:${creator}`,
-  PREDICTIONS_ACTIVE: 'predictions:active',
-  PREDICTIONS_RESOLVED: 'predictions:resolved',
-  PREDICTIONS_PENDING_APPROVAL: 'predictions:pending_approval',
-  PREDICTIONS_COUNT: 'predictions:count',
+  PREDICTIONS: (chain?: ChainKey) => `${chainNamespace(chain)}predictions`,
+  PREDICTION: (id: string, chain?: ChainKey) => `${chainNamespace(chain)}prediction:${id}`,
+  PREDICTIONS_BY_CATEGORY: (category: string, chain?: ChainKey) =>
+    `${chainNamespace(chain)}predictions:category:${category}`,
+  PREDICTIONS_BY_CREATOR: (creator: string, chain?: ChainKey) =>
+    `${chainNamespace(chain)}predictions:creator:${creator}`,
+  PREDICTIONS_ACTIVE: (chain?: ChainKey) => `${chainNamespace(chain)}predictions:active`,
+  PREDICTIONS_RESOLVED: (chain?: ChainKey) => `${chainNamespace(chain)}predictions:resolved`,
+  PREDICTIONS_PENDING_APPROVAL: (chain?: ChainKey) =>
+    `${chainNamespace(chain)}predictions:pending_approval`,
+  PREDICTIONS_COUNT: (chain?: ChainKey) => `${chainNamespace(chain)}predictions:count`,
   /** Denormalised snapshot of every prediction, so a listing is one read. */
-  PREDICTIONS_INDEX: 'predictions:index',
-  USER_STAKES: (userId: string, predictionId: string) => `user_stakes:${userId}:${predictionId}`,
+  PREDICTIONS_INDEX: (chain?: ChainKey) => `${chainNamespace(chain)}predictions:index`,
+  USER_STAKES: (userId: string, predictionId: string, chain?: ChainKey) =>
+    `${chainNamespace(chain)}user_stakes:${userId}:${predictionId}`,
+  /**
+   * Every stake key for one user on one chain. The prefix is leading precisely
+   * so this cannot reach across chains.
+   */
+  USER_STAKES_PATTERN: (userId: string, chain?: ChainKey) =>
+    `${chainNamespace(chain)}user_stakes:${userId}:*`,
   USER_TRANSACTIONS: (userId: string) => `user_transactions:${userId}`,
-  MARKET_STATS: 'market:stats',
-  COMPACT_STATS: 'market:compact_stats',
+  MARKET_STATS: (chain?: ChainKey) => `${chainNamespace(chain)}market:stats`,
+  COMPACT_STATS: (chain?: ChainKey) => `${chainNamespace(chain)}market:compact_stats`,
   REAL_LEADERBOARD: 'leaderboard:real_data',
   USER_PORTFOLIO: (userId: string) => `user:portfolio:${userId}`,
   SWIPE_CLAIM_HISTORY: (userId: string) => `swipe_claim_history:${userId}`,
@@ -45,7 +83,7 @@ export const REDIS_KEYS = {
   // PNL OG image URL cache
   USER_PNL_OG_IMAGE: (address: string) => `user:pnl:ogImageUrl:${address.toLowerCase()}`,
   // USDC Price history for charts
-  USDC_PRICE_HISTORY: (predictionId: string) => `usdc:price_history:${predictionId}`,
+  USDC_PRICE_HISTORY: (predictionId: string, chain?: ChainKey) => `${chainNamespace(chain)}usdc:price_history:${predictionId}`,
 } as const;
 
 // Farcaster profile cache type
@@ -100,7 +138,14 @@ function isTestPrediction(id: string, prediction: RedisPrediction): boolean {
  * Writes invalidate it, so a change is never hidden behind the TTL.
  */
 const ALL_PREDICTIONS_TTL_MS = 10_000;
-let allPredictionsCache: { at: number; data: RedisPrediction[] } | null = null;
+/**
+ * Keyed by chain, not one shared slot.
+ *
+ * Vercel keeps a function warm across requests, so a single slot would serve a
+ * Robinhood request whatever a Base request left there ten seconds earlier: a
+ * 200, another chain's markets, and nothing in the logs to say so.
+ */
+const allPredictionsCache = new Map<ChainKey, { at: number; data: RedisPrediction[] }>();
 
 /**
  * Reading a listing used to mean one Redis round trip per prediction. Batching
@@ -108,15 +153,15 @@ let allPredictionsCache: { at: number; data: RedisPrediction[] } | null = null;
  * only when a prediction is written or deleted, so steady-state reads never
  * touch the individual keys at all.
  */
-function invalidatePredictionsCache(): void {
-  allPredictionsCache = null;
+function invalidatePredictionsCache(chain: ChainKey = DEFAULT_CHAIN_KEY): void {
+  allPredictionsCache.delete(chain);
   // Fire-and-forget: a failed delete only costs us a rebuild on the next read.
-  void redis.del(REDIS_KEYS.PREDICTIONS_INDEX).catch(() => {});
+  void redis.del(REDIS_KEYS.PREDICTIONS_INDEX(chain)).catch(() => {});
 }
 
-async function readPredictionsIndex(): Promise<RedisPrediction[] | null> {
+async function readPredictionsIndex(chain: ChainKey = DEFAULT_CHAIN_KEY): Promise<RedisPrediction[] | null> {
   try {
-    const raw = await redis.get(REDIS_KEYS.PREDICTIONS_INDEX);
+    const raw = await redis.get(REDIS_KEYS.PREDICTIONS_INDEX(chain));
     if (!raw) return null;
     const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
     return Array.isArray(parsed) ? (parsed as RedisPrediction[]) : null;
@@ -125,9 +170,9 @@ async function readPredictionsIndex(): Promise<RedisPrediction[] | null> {
   }
 }
 
-async function writePredictionsIndex(predictions: RedisPrediction[]): Promise<void> {
+async function writePredictionsIndex(predictions: RedisPrediction[], chain: ChainKey = DEFAULT_CHAIN_KEY): Promise<void> {
   try {
-    await redis.set(REDIS_KEYS.PREDICTIONS_INDEX, JSON.stringify(predictions));
+    await redis.set(REDIS_KEYS.PREDICTIONS_INDEX(chain), JSON.stringify(predictions));
   } catch (error) {
     // The index is an optimisation; failing to store it must not fail the read.
     console.error('⚠️ Failed to store predictions index:', error);
@@ -142,14 +187,14 @@ async function writePredictionsIndex(predictions: RedisPrediction[]): Promise<vo
  * requests — measured at ~73s for /api/market/compact-stats and ~153s for
  * /api/activity. mget in chunks turns that into a handful of round trips.
  */
-async function getPredictionsByIds(ids: string[]): Promise<RedisPrediction[]> {
+async function getPredictionsByIds(ids: string[], chain: ChainKey = DEFAULT_CHAIN_KEY): Promise<RedisPrediction[]> {
   if (ids.length === 0) return [];
 
   const out: RedisPrediction[] = [];
 
   for (let i = 0; i < ids.length; i += MGET_CHUNK_SIZE) {
     const chunk = ids.slice(i, i + MGET_CHUNK_SIZE);
-    const keys = chunk.map((id) => REDIS_KEYS.PREDICTION(id));
+    const keys = chunk.map((id) => REDIS_KEYS.PREDICTION(id, chain));
     const rows = (await redis.mget(...keys)) as unknown[];
 
     rows.forEach((row, index) => {
@@ -175,7 +220,7 @@ export const redisHelpers = {
       
       // Add to predictions list. sadd returns the number of NEW members, so a
       // non-zero result means this is a first-time insert rather than a re-sync.
-      const addedCount = await redis.sadd(REDIS_KEYS.PREDICTIONS, prediction.id);
+      const addedCount = await redis.sadd(REDIS_KEYS.PREDICTIONS(), prediction.id);
 
       // Add to category index
       await redis.sadd(REDIS_KEYS.PREDICTIONS_BY_CATEGORY(prediction.category), prediction.id);
@@ -187,9 +232,9 @@ export const redisHelpers = {
       // lifetime (pending -> active -> resolved), so the stale memberships must be
       // removed, otherwise it lingers in every set it has ever been in.
       const statusSets = {
-        pending: REDIS_KEYS.PREDICTIONS_PENDING_APPROVAL,
-        resolved: REDIS_KEYS.PREDICTIONS_RESOLVED,
-        active: REDIS_KEYS.PREDICTIONS_ACTIVE,
+        pending: REDIS_KEYS.PREDICTIONS_PENDING_APPROVAL(),
+        resolved: REDIS_KEYS.PREDICTIONS_RESOLVED(),
+        active: REDIS_KEYS.PREDICTIONS_ACTIVE(),
       };
       const targetSet = prediction.needsApproval
         ? statusSets.pending
@@ -207,7 +252,7 @@ export const redisHelpers = {
       // Update count only on first insert; savePrediction is also the update path
       // and re-syncs would otherwise inflate this forever.
       if (addedCount) {
-        await redis.incr(REDIS_KEYS.PREDICTIONS_COUNT);
+        await redis.incr(REDIS_KEYS.PREDICTIONS_COUNT());
       }
 
       // Invalidate last, once the record and its indexes are all in place.
@@ -245,29 +290,32 @@ export const redisHelpers = {
   },
 
   // Get all predictions (only live/real predictions, exclude test data)
-  async getAllPredictions(): Promise<RedisPrediction[]> {
+  async getAllPredictions(chain: ChainKey = DEFAULT_CHAIN_KEY): Promise<RedisPrediction[]> {
     try {
       // 1. Same process, same few seconds: nothing to do.
-      const cached = allPredictionsCache;
+      const cached = allPredictionsCache.get(chain);
       if (cached && Date.now() - cached.at < ALL_PREDICTIONS_TTL_MS) {
         return cached.data;
       }
 
       // 2. Prebuilt snapshot: one read instead of one per prediction.
-      const indexed = await readPredictionsIndex();
+      const indexed = await readPredictionsIndex(chain);
       if (indexed) {
-        allPredictionsCache = { at: Date.now(), data: indexed };
+        allPredictionsCache.set(chain, { at: Date.now(), data: indexed });
         return indexed;
       }
 
       // 3. Cold: rebuild from the individual keys and store the snapshot.
-      const predictionIds = await redis.smembers(REDIS_KEYS.PREDICTIONS);
-      const predictions = await getPredictionsByIds(predictionIds);
+      const predictionIds = await redis.smembers(REDIS_KEYS.PREDICTIONS(chain));
+      // The chain has to travel with the ids. Collecting them from one
+      // namespace and reading them out of another is the exact collision the
+      // prefix exists to prevent.
+      const predictions = await getPredictionsByIds(predictionIds, chain);
 
       // Sort by creation date (newest first)
       const sorted = predictions.sort((a, b) => b.createdAt - a.createdAt);
-      allPredictionsCache = { at: Date.now(), data: sorted };
-      await writePredictionsIndex(sorted);
+      allPredictionsCache.set(chain, { at: Date.now(), data: sorted });
+      await writePredictionsIndex(sorted, chain);
       return sorted;
     } catch (error) {
       console.error('❌ Failed to get all predictions from Redis:', error);
@@ -278,7 +326,7 @@ export const redisHelpers = {
   // Get active predictions (only live/real predictions, exclude test data)
   async getActivePredictions(): Promise<RedisPrediction[]> {
     try {
-      const activeIds = await redis.smembers(REDIS_KEYS.PREDICTIONS_ACTIVE);
+      const activeIds = await redis.smembers(REDIS_KEYS.PREDICTIONS_ACTIVE());
       const currentTime = Math.floor(Date.now() / 1000);
 
       // getPredictionsByIds already drops test predictions.
@@ -333,10 +381,13 @@ export const redisHelpers = {
   },
 
   // Get user stakes for a prediction (supports both single and multi-token format)
-  async getUserStakes(predictionId: string): Promise<RedisUserStake[]> {
+  async getUserStakes(predictionId: string, chain: ChainKey = DEFAULT_CHAIN_KEY): Promise<RedisUserStake[]> {
     try {
       // This is a simplified approach - in production you might want to use a different pattern
-      const pattern = `user_stakes:*:${predictionId}`;
+      // Built from REDIS_KEYS so it carries the chain prefix. A literal here
+      // matches nothing once a namespace exists, and the caller reads that as
+      // "no stakes" rather than as an error.
+      const pattern = `${chainNamespace(chain)}user_stakes:*:${predictionId}`;
       console.log(`🔍 Searching for stakes with pattern: ${pattern}`);
       const keys = await redis.keys(pattern);
       console.log(`🔍 Found keys:`, keys);
@@ -409,7 +460,7 @@ export const redisHelpers = {
         lastUpdated: Date.now()
       };
       
-      await redis.set(REDIS_KEYS.MARKET_STATS, JSON.stringify(stats));
+      await redis.set(REDIS_KEYS.MARKET_STATS(), JSON.stringify(stats));
       console.log('✅ Market stats updated in Redis');
       
       // Also update compact stats cache
@@ -422,7 +473,7 @@ export const redisHelpers = {
   // Get market stats
   async getMarketStats(): Promise<RedisMarketStats | null> {
     try {
-      const data = await redis.get(REDIS_KEYS.MARKET_STATS);
+      const data = await redis.get(REDIS_KEYS.MARKET_STATS());
       
       if (!data) return null;
       
@@ -478,18 +529,18 @@ export const redisHelpers = {
       if (!prediction) return;
 
       // Remove from all indexes
-      await redis.srem(REDIS_KEYS.PREDICTIONS, id);
+      await redis.srem(REDIS_KEYS.PREDICTIONS(), id);
       await redis.srem(REDIS_KEYS.PREDICTIONS_BY_CATEGORY(prediction.category), id);
       await redis.srem(REDIS_KEYS.PREDICTIONS_BY_CREATOR(prediction.creator), id);
-      await redis.srem(REDIS_KEYS.PREDICTIONS_ACTIVE, id);
-      await redis.srem(REDIS_KEYS.PREDICTIONS_RESOLVED, id);
-      await redis.srem(REDIS_KEYS.PREDICTIONS_PENDING_APPROVAL, id);
+      await redis.srem(REDIS_KEYS.PREDICTIONS_ACTIVE(), id);
+      await redis.srem(REDIS_KEYS.PREDICTIONS_RESOLVED(), id);
+      await redis.srem(REDIS_KEYS.PREDICTIONS_PENDING_APPROVAL(), id);
       
       // Delete individual prediction
       await redis.del(REDIS_KEYS.PREDICTION(id));
       
       // Update count
-      await redis.decr(REDIS_KEYS.PREDICTIONS_COUNT);
+      await redis.decr(REDIS_KEYS.PREDICTIONS_COUNT());
 
       // Invalidate last, so a concurrent read cannot cache the pre-delete state.
       invalidatePredictionsCache();
@@ -650,7 +701,7 @@ export const redisHelpers = {
         lastUpdated: Date.now()
       };
 
-      await redis.set(REDIS_KEYS.COMPACT_STATS, JSON.stringify(compactStats));
+      await redis.set(REDIS_KEYS.COMPACT_STATS(), JSON.stringify(compactStats));
       console.log('✅ Compact stats updated in Redis');
     } catch (error) {
       console.error('❌ Failed to update compact stats in Redis:', error);
@@ -660,7 +711,7 @@ export const redisHelpers = {
   // Get compact stats from cache
   async getCompactStats(): Promise<any | null> {
     try {
-      const data = await redis.get(REDIS_KEYS.COMPACT_STATS);
+      const data = await redis.get(REDIS_KEYS.COMPACT_STATS());
       
       if (!data) return null;
       
