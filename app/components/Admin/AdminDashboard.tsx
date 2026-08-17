@@ -251,6 +251,59 @@ export function AdminDashboard(_props: AdminDashboardProps) {
   );
 
   /**
+   * Turn a proposal down.
+   *
+   * Redis only. The proposal has no pool, no positions and no contract behind
+   * it, so this deletes the record rather than parking it: clearing the pending
+   * flag on an unresolved record with a future deadline would file it under the
+   * ACTIVE set and put it in the live feed as a bettable market.
+   *
+   * The server refuses if the market turns out to be registered on chain, and
+   * refuses again if it cannot reach the chain to find out, so a slow node
+   * cannot talk it into deleting something real.
+   */
+  const declineProposal = useCallback(
+    async (market: AdminMarket) => {
+      const reason = window.prompt(
+        `Decline this proposal?
+
+${market.question}
+
+It leaves the queue and the market number is burned. Give a reason, for the record:`
+      );
+      if (reason === null) return;
+
+      setBusyId(market.id);
+      setNotice(null);
+      try {
+        const response = await fetch(`/api/predictions/decline?chain=${chainKey}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(await signAdminRequest('decline')),
+          },
+          body: JSON.stringify({ predictionId: market.id, chain: chainKey, reason }),
+        });
+        const answer = await response.json().catch(() => ({}));
+        if (!response.ok || !answer?.success) {
+          setNotice({
+            tone: 'bad',
+            text: answer?.error || `The server refused with ${response.status}.`,
+          });
+          return;
+        }
+        await refreshData();
+        setNotice({ tone: 'ok', text: 'Proposal declined and removed from the queue.' });
+      } catch (apiError) {
+        setNotice({ tone: 'bad', text: messageOf(apiError) });
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [chainKey, signAdminRequest, refreshData]
+  );
+
+  /**
    * Nothing on an archived contract can be settled, from here or anywhere.
    *
    * The bucketing already keeps those markets off the screen, so this should be
@@ -412,6 +465,7 @@ export function AdminDashboard(_props: AdminDashboardProps) {
                     busy={busyId === market.id}
                     disabled={lockedFor(market)}
                     onRegister={registerProposal}
+                    onDecline={declineProposal}
                   />
                 ))}
               </div>

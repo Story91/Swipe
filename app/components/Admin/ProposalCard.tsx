@@ -25,6 +25,8 @@ interface ProposalCardProps {
   /** Some other row is working, or there is nothing to write to. */
   disabled: boolean;
   onRegister: (market: AdminMarket) => void;
+  /** Turn it down. Redis only, and refused server side if it is on chain. */
+  onDecline: (market: AdminMarket) => void;
 }
 
 export function ProposalCard({
@@ -34,6 +36,7 @@ export function ProposalCard({
   busy,
   disabled,
   onRegister,
+  onDecline,
 }: ProposalCardProps) {
   const creator = shortAddress(market.creator);
   const readable = market.number !== null;
@@ -97,6 +100,17 @@ export function ProposalCard({
           {busy && <span className="adm-busy">Waiting for the receipt</span>}
           {!busy && readable && `Register market ${market.number}`}
           {!busy && !readable && 'Nothing to register'}
+        </button>
+        {/* The way to say no. Without it the only exit for a spam proposal was
+            to register it and cancel it, two transactions and real gas to
+            dispose of something that had never left Redis. */}
+        <button
+          type="button"
+          className="sheet-action adm-action adm-action--no"
+          disabled={disabled || busy}
+          onClick={() => onDecline(market)}
+        >
+          Decline
         </button>
       </div>
     </article>

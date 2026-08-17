@@ -196,3 +196,20 @@
     transition: none;
   }
 }
+
+/**
+ * Decline, beside register on a proposal card.
+ *
+ * Quieter than both the go and the stop variants on purpose. It is a normal
+ * part of working the queue rather than a destructive act on anything live:
+ * the record it removes has no pool, no positions and no contract, and the
+ * server refuses the call outright if that turns out not to be true.
+ */
+.adm-action--no {
+  color: var(--sheet-paper-3);
+}
+
+.adm-action--no:hover:not(:disabled) {
+  color: var(--sheet-paper);
+  border-color: var(--sheet-rule-strong);
+}
