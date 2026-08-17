@@ -1,0 +1,310 @@
+/*
+ * The live standings, on the shared sheet (app/styles/sheet.css).
+ *
+ * Sheet language, not the lime card face of MarketPools.css and not the #0d0d0d
+ * panel of MarketChooserModal. This is a full dashboard panel with a hero above
+ * it, the same slot Help & FAQ and Recent activity occupy, and the sheet is what
+ * that slot is made of. The lime face is for things sitting on the swipe card,
+ * where a dark slab would read as a hole in the page, and the dark panel is for
+ * dialogs floating over the app.
+ *
+ * The file this pairs with previously had no stylesheet at all. Every class it
+ * named was undefined, so the screen was a column of unstyled text.
+ *
+ * Mobile first. The base rules are the narrow layout, one column, nothing that
+ * can push the page sideways, and the five column grid arrives only when the
+ * container is wide enough to hold it. Width is asked of the container rather
+ * than the viewport, because this renders both as a ~528px dashboard panel and
+ * as a full width route at the same viewport size; sheet.css has the long
+ * version of why that distinction matters.
+ *
+ * Every figure is mono and tabular so a reader can run an eye down a column.
+ */
+
+/* ------------------------------------------------------------------ controls */
+
+.lbnow__controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.lbnow__control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.lbnow__control-label {
+  font-family: var(--sheet-display);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sheet-paper-3);
+}
+
+/* A failed refresh keeps the rows and says so here, rather than replacing them. */
+.lbnow__banner {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-left: 2px solid var(--sheet-loss);
+  background: var(--sheet-surface);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sheet-paper-2);
+}
+
+/* -------------------------------------------------------------------- table */
+
+.lbnow__table {
+  border-top: 1px solid var(--sheet-rule);
+}
+
+/* Narrow: rank and identity on the top line, the figures wrapping beneath as a
+   labelled strip. The header row is off, because each figure carries its own
+   label down here. */
+.lbnow__head {
+  display: none;
+}
+
+.lbnow__row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 8px 12px;
+  align-items: start;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--sheet-rule);
+}
+
+.lbnow__row--you {
+  background: var(--sheet-wash);
+  padding-left: 12px;
+  padding-right: 12px;
+  margin-left: -12px;
+  margin-right: -12px;
+}
+
+.lbnow__rank {
+  font-family: var(--sheet-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  color: var(--sheet-paper-3);
+  padding-top: 8px;
+}
+
+.lbnow__rank--top {
+  color: var(--sheet-lime);
+  font-weight: 600;
+}
+
+/* ----------------------------------------------------------------- identity */
+
+.lbnow__who {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.lbnow__avatar {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 0;
+  border: 1px solid var(--sheet-rule-strong);
+}
+
+.lbnow__avatar img {
+  border-radius: 0;
+}
+
+/* A wallet with no Farcaster profile is dimmer than one with, so the board shows
+   at a glance which names are accounts and which are just addresses. */
+.lbnow__avatar--wallet {
+  opacity: 0.65;
+}
+
+.lbnow__who-text {
+  min-width: 0;
+}
+
+.lbnow__name {
+  font-family: var(--sheet-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  overflow-wrap: anywhere;
+}
+
+.lbnow__handle {
+  font-family: var(--sheet-data);
+  font-size: 11px;
+  color: var(--sheet-paper-3);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* History on the dead contracts, beside the name and never inside a total. */
+.lbnow__archived {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--sheet-paper-3);
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+.lbnow__you-badge {
+  font-family: var(--sheet-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sheet-lime);
+  border: 1px solid var(--sheet-lime-line);
+  padding: 1px 5px;
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ figures */
+
+.lbnow__stats {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 10px 14px;
+  margin-top: 8px;
+}
+
+.lbnow__stat-label {
+  display: block;
+  font-family: var(--sheet-display);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sheet-paper-3);
+  margin-bottom: 3px;
+}
+
+.lbnow__figure {
+  display: block;
+  font-family: var(--sheet-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.lbnow__figure-unit {
+  color: var(--sheet-paper-3);
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+.lbnow__figure--gain {
+  color: var(--sheet-lime);
+}
+
+.lbnow__figure--loss {
+  color: var(--sheet-loss);
+}
+
+/* Nothing has settled, which is not the same fact as a profit of zero, so it is
+   not set in the figure colour or the figure weight. */
+.lbnow__figure--none {
+  font-family: var(--sheet-body);
+  font-size: 13px;
+  color: var(--sheet-paper-3);
+}
+
+/* --------------------------------------------------------------- wide layout */
+
+@container sheet (min-width: 861px) {
+  .lbnow__controls {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .lbnow__head,
+  .lbnow__row {
+    display: grid;
+    grid-template-columns:
+      40px                /* position */
+      minmax(0, 1fr)      /* who */
+      minmax(0, 118px)    /* staked */
+      minmax(0, 108px)    /* settled */
+      minmax(0, 118px);   /* profit */
+    gap: 16px;
+    align-items: center;
+  }
+
+  .lbnow__head {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--sheet-rule);
+  }
+
+  .lbnow__head span {
+    font-family: var(--sheet-display);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--sheet-paper-3);
+  }
+
+  .lbnow__head span:nth-child(3),
+  .lbnow__head span:nth-child(4),
+  .lbnow__head span:nth-child(5) {
+    text-align: right;
+  }
+
+  .lbnow__row {
+    padding: 12px 0;
+  }
+
+  .lbnow__rank {
+    padding-top: 0;
+  }
+
+  .lbnow__who {
+    align-items: center;
+  }
+
+  .lbnow__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The per figure labels would duplicate the header, so they go, and the stat
+     wrapper dissolves into the row's own grid. */
+  .lbnow__stat-label {
+    display: none;
+  }
+
+  .lbnow__stats {
+    display: contents;
+  }
+
+  .lbnow__figure {
+    text-align: right;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lbnow__row,
+  .lbnow__figure {
+    transition: none;
+    animation: none;
+  }
+}

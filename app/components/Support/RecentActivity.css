@@ -119,6 +119,15 @@
   padding-top: 2px;
 }
 
+/* A time the route placed rather than read. Set quieter than a real one and
+   carried by the tilde in the text, so the marking survives a screen reader and
+   a stylesheet that fails to load. */
+.ra-approx {
+  color: var(--sheet-paper-3);
+  font-style: italic;
+  cursor: help;
+}
+
 .ra-you-badge {
   font-family: var(--sheet-display);
   font-size: 9px;
@@ -129,6 +138,33 @@
   border: 1px solid var(--sheet-lime-line);
   padding: 1px 5px;
   margin-left: 8px;
+}
+
+/* An amount on one of the dead contracts. Same shape as the "you" badge so the
+   two read as one family of tags, in the quiet colour rather than the accent,
+   because this one is a caveat and not a highlight. */
+.ra-archived {
+  font-family: var(--sheet-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sheet-paper-3);
+  border: 1px solid var(--sheet-rule-strong);
+  padding: 1px 5px;
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+/* A failed refresh over a feed that is still worth reading. */
+.ra-banner {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-left: 2px solid var(--sheet-loss);
+  background: var(--sheet-surface);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sheet-paper-2);
 }
 
 /* Controls above the feed. */

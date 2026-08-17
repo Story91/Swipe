@@ -1,5 +1,16 @@
 /*
- * Top stakers, on the shared sheet (app/styles/sheet.css).
+ * The archived board, on the shared sheet (app/styles/sheet.css).
+ *
+ * These `lb-` classes now dress only the lower half of the Leaderboard tab, the
+ * cached scan of the old ETH and SWIPE contracts. The live standings above it
+ * are Support/Leaderboard and bring their own `lbnow-` stylesheet. Two blocks
+ * rather than one shared set, because the two boards do not have the same
+ * columns and never will: the archived one has no profit, since those markets
+ * can no longer be settled by anybody.
+ *
+ * Sheet language, not the lime card face of MarketPools.css and not the #0d0d0d
+ * panel of MarketChooserModal, because this is a full dashboard panel with a
+ * hero rather than something on the card surface or a floating dialog.
  *
  * A standings list is read down a column, so every figure is mono and tabular
  * and the columns are a real grid rather than a flex row that happens to line

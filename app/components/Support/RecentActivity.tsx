@@ -1,27 +1,49 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAccount } from 'wagmi';
 import { useActiveChain } from '@/lib/chains/activeChain';
+import type { ChainKey } from '@/lib/chains/types';
 import { tokenSymbol, COLLATERAL_LEG, type StakeToken } from '@/lib/userStake';
+import { collateralPayouts, eraSplit } from './boardTotals';
 import '../../styles/sheet.css';
 import './RecentActivity.css';
 
 /**
- * Recent activity, on the shared sheet.
+ * Recent activity, on the shared sheet (app/styles/sheet.css).
  *
- * This screen used to render a hardcoded array: ten invented events, invented
- * wallets, an invented "DexterAdmin" claiming invented payouts, with no fetch
- * anywhere in the file. Not a fallback for when data was missing, which is what
- * the leaderboard had, but the only thing it ever showed, to everyone.
+ * Sheet language rather than the lime card face of MarketPools or the #0d0d0d
+ * panel of MarketChooserModal, for the same reason the other dashboard screens
+ * use it: this is a full panel with its own hero, not something sitting on the
+ * swipe card and not a dialog floating over the app.
  *
- * /api/activity already existed and already built this feed out of real
- * predictions and stakes in Redis. It is simply wired up now.
+ * WHAT THIS FILE USED TO BE
+ *
+ * A hardcoded array. Ten invented events, invented wallets, an invented
+ * "DexterAdmin" claiming invented payouts, with no fetch anywhere in the file.
+ * Not a fallback for when data was missing, which is what the leaderboard had,
+ * but the only thing it ever showed, to everyone. /api/activity already existed
+ * and already built this feed out of real predictions and stakes in Redis.
+ *
+ * WHAT IS STILL NOT EXACT, AND IS MARKED
+ *
+ * Two of the six row types carry a time the route derives rather than reads.
+ * Nothing in Redis records when a market was settled or when a payout was
+ * pulled, so /api/activity places them one second and one hour after the
+ * deadline. That is a placement, not a measurement, and a row built that way is
+ * marked with a tilde instead of being presented as an exact time. Bets and new
+ * markets carry the moment they actually happened.
+ *
+ * The route also fills a `user.avatar` field from a random pick out of twelve
+ * emoji, which changes on every request. Nothing here reads it.
+ *
+ * TOKENS
  *
  * Each row carries the token it happened in, so a bet is one row per token and
  * the figure beside it is labelled from the data. The markup used to print ETH
  * next to every number, which on a collateral market named the wrong token and
- * printed a raw six decimal integer beside it.
+ * printed a raw six decimal integer beside it. Amounts arrive in readable units
+ * already, so nothing here divides again.
  */
 
 interface ActivityItem {
@@ -73,15 +95,34 @@ const RANGES: { key: TimeRange; label: string; ms: number }[] = [
   { key: '30d', label: '30d', ms: 30 * 24 * 60 * 60 * 1000 },
 ];
 
-/** Which accent the row's marker takes. */
+/**
+ * Which accent the row's marker takes.
+ *
+ * Whole class names rather than the accent word alone, so each one appears in
+ * this file as text. `ra-item--${accent}` reached the same five rules, but only
+ * the dead-CSS scan's interpolation heuristic kept them off the delete list, and
+ * that heuristic depends on backtick pairing across every file in the app. Four
+ * of the five were on the list anyway. A literal is not clever and cannot drift.
+ */
 const MARK: Record<ActivityItem['type'], string> = {
-  prediction_created: 'created',
-  bet_placed: 'bet',
-  prediction_resolved: 'resolved',
-  payout_claimed: 'payout',
-  prediction_approved: 'approved',
-  user_joined: 'created',
+  prediction_created: 'ra-item--created',
+  bet_placed: 'ra-item--bet',
+  prediction_resolved: 'ra-item--resolved',
+  payout_claimed: 'ra-item--payout',
+  prediction_approved: 'ra-item--approved',
+  user_joined: 'ra-item--created',
 };
+
+/** Row types whose timestamp the route derives from the deadline. */
+const DERIVED_TIME = new Set<ActivityItem['type']>(['prediction_resolved', 'payout_claimed']);
+
+const PREDICTION_TYPES = new Set<ActivityItem['type']>([
+  'prediction_created',
+  'prediction_resolved',
+  'prediction_approved',
+]);
+
+const BET_TYPES = new Set<ActivityItem['type']>(['bet_placed', 'payout_claimed']);
 
 function timeAgo(timestamp: number) {
   const diff = Date.now() - timestamp;
@@ -94,78 +135,102 @@ function timeAgo(timestamp: number) {
   return 'just now';
 }
 
+/** What the feed currently holds, and the chain it answers for. */
+interface Loaded {
+  chain: ChainKey;
+  items: ActivityItem[];
+}
+
 export function RecentActivity() {
-  // The active chain travels with every read below. The server defaults to
-  // Base when no chain is sent, which is right for Base and wrong for every
-  // other chain, so without this a user on Robinhood sees Base's numbers.
-  const { chainKey } = useActiveChain();
+  // The active chain travels with every read below. The server defaults to Base
+  // when no chain is sent, which is right for Base and wrong for every other
+  // chain, so without this a user on Robinhood sees Base's numbers.
+  const { chainKey, chain } = useActiveChain();
   const { address } = useAccount();
 
-  // The collateral leg is stored as 'USDC' on every chain, so the symbol comes
-  // from the chain. Otherwise a Robinhood feed announces bets in the wrong
-  // stablecoin.
+  // The collateral leg is stored under the key 'USDC' on every chain, so the
+  // symbol comes from the chain. Otherwise a Robinhood feed announces bets in
+  // the wrong stablecoin.
   const symbolFor = (token: StakeToken | undefined) =>
     tokenSymbol(token ?? COLLATERAL_LEG, chainKey);
+  const stable = tokenSymbol(COLLATERAL_LEG, chainKey);
 
-  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [timeRange, setTimeRange] = useState<TimeRange>('24h');
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const ticketRef = useRef(0);
+
   useEffect(() => {
-    let cancelled = false;
+    const ticket = ++ticketRef.current;
+    const current = () => ticket === ticketRef.current;
 
     const load = async () => {
+      // No loading flag. Events that do not belong to the current chain are
+      // already the state "still waiting", and a second variable saying the
+      // same thing can only disagree with the first.
+      setError(null);
       try {
-        setLoading(true);
-        setError(null);
-
-        // 'me' has no server-side equivalent, so it fetches everything and
-        // narrows below. The other two map straight onto the API's own filter.
-        const type = filter === 'predictions' || filter === 'bets' ? filter : 'all';
-        const response = await fetch(`/api/activity?limit=50&type=${type}&chain=${chainKey}`);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        // Always type=all. The route sorts by time, slices to `limit`, and only
+        // then applies its type filter, so asking it for bets returns the bets
+        // inside the newest fifty events rather than the newest fifty bets. The
+        // filter is a view of what is already here, so it belongs on this side
+        // and it costs no round trip.
+        const response = await fetch(`/api/activity?limit=50&type=all&chain=${chainKey}`);
+        if (!response.ok) throw new Error(`the server answered ${response.status}`);
 
         const result = await response.json();
-        if (cancelled) return;
-
-        if (!result.success) throw new Error(result.error || 'Failed to load activity');
-        setActivities(result.data ?? []);
+        if (!current()) return;
+        if (!result.success) throw new Error(result.error || 'the feed could not be built');
+        setLoaded({ chain: chainKey, items: (result.data ?? []) as ActivityItem[] });
       } catch (err) {
-        if (cancelled) return;
-        console.error('❌ Failed to load activity:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load activity');
-      } finally {
-        if (!cancelled) setLoading(false);
+        if (!current()) return;
+        // Deliberately does not clear `loaded`. Replacing a good feed with an
+        // empty list on a failed fetch is a bug this repo has shipped twice.
+        console.error('Failed to load activity:', err);
+        setError(err instanceof Error ? err.message : 'the request failed');
       }
     };
 
     load();
-    return () => {
-      cancelled = true;
-    };
-  }, [filter, chainKey]);
+    // chainKey only. The filter no longer decides the request, so switching it
+    // does not go back to the network, and the chain is the one thing that
+    // changes which events exist at all.
+  }, [chainKey]);
+
+  // Events count as this screen's answer only while they answer for this chain.
+  const activities = loaded && loaded.chain === chainKey ? loaded.items : null;
 
   const shown = useMemo(() => {
-    const cutoff = Date.now() - (RANGES.find(r => r.key === timeRange)?.ms ?? 0);
+    if (!activities) return [];
+    const cutoff = Date.now() - (RANGES.find((r) => r.key === timeRange)?.ms ?? 0);
     return activities
-      .map(a => ({
+      .map((a) => ({
         ...a,
         isCurrentUser: !!address && a.user.address.toLowerCase() === address.toLowerCase(),
       }))
-      .filter(a => a.timestamp >= cutoff)
-      .filter(a => (filter === 'me' ? a.isCurrentUser : true));
+      .filter((a) => a.timestamp >= cutoff)
+      .filter((a) => {
+        if (filter === 'me') return a.isCurrentUser;
+        if (filter === 'predictions') return PREDICTION_TYPES.has(a.type);
+        if (filter === 'bets') return BET_TYPES.has(a.type);
+        return true;
+      });
   }, [activities, address, filter, timeRange]);
 
-  const betCount = shown.filter(a => a.type === 'bet_placed').length;
-  const marketCount = shown.filter(a => a.type === 'prediction_created').length;
+  const betCount = shown.filter((a) => a.type === 'bet_placed').length;
+  const marketCount = shown.filter((a) => a.type === 'prediction_created').length;
+
+  // Which era the rows in view came from, counted rather than asserted. The
+  // screen used to state in its lede that most of the feed was old ETH markets,
+  // which was a guess about data the component was already holding.
+  const { archived: archivedRows, collateral: collateralRows } = eraSplit(shown);
+
   // Collateral payouts only. Adding an ETH payout to a stablecoin one gives a
   // number in no currency at all, and the row beneath it has to print some
   // symbol, so it would be labelled wrong whichever one it picked.
-  const payouts = shown
-    .filter(a => a.details?.payout && (a.details.token ?? COLLATERAL_LEG) === COLLATERAL_LEG)
-    .reduce((sum, a) => sum + (a.details?.payout || 0), 0);
+  const { count: payoutCount, total: payouts } = collateralPayouts(shown);
 
   const describe = (a: ActivityItem) => {
     const who = a.isCurrentUser ? 'You' : a.user.displayName;
@@ -178,12 +243,20 @@ export function RecentActivity() {
         return (
           <>
             {actor} backed{' '}
-            <span className={`ra-side ra-side--${a.details?.choice === 'YES' ? 'yes' : 'no'}`}>
-              {a.details?.choice ?? '—'}
+            <span
+              className={
+                a.details?.choice === 'YES' ? 'ra-side ra-side--yes' : 'ra-side ra-side--no'
+              }
+            >
+              {a.details?.choice ?? 'a side'}
             </span>
             {a.details?.amount ? (
               <>
-                {' '}with <span className="ra-amount">{a.details.amount.toFixed(4)} {symbolFor(a.details.token)}</span>
+                {' '}
+                with{' '}
+                <span className="ra-amount">
+                  {a.details.amount.toFixed(4)} {symbolFor(a.details.token)}
+                </span>
               </>
             ) : null}
           </>
@@ -192,8 +265,12 @@ export function RecentActivity() {
         return (
           <>
             {actor} settled it{' '}
-            <span className={`ra-side ra-side--${a.details?.outcome === 'YES' ? 'yes' : 'no'}`}>
-              {a.details?.outcome ?? '—'}
+            <span
+              className={
+                a.details?.outcome === 'YES' ? 'ra-side ra-side--yes' : 'ra-side ra-side--no'
+              }
+            >
+              {a.details?.outcome ?? 'one way'}
             </span>
           </>
         );
@@ -201,7 +278,9 @@ export function RecentActivity() {
         return (
           <>
             {actor} claimed{' '}
-            <span className="ra-amount">{(a.details?.payout ?? 0).toFixed(4)} {symbolFor(a.details?.token)}</span>
+            <span className="ra-amount">
+              {(a.details?.payout ?? 0).toFixed(4)} {symbolFor(a.details?.token)}
+            </span>
           </>
         );
       case 'prediction_approved':
@@ -209,7 +288,7 @@ export function RecentActivity() {
       case 'user_joined':
         return <>{actor} joined Swipe</>;
       default:
-        return <>{actor} did something</>;
+        return <>{actor} did something this feed has no wording for</>;
     }
   };
 
@@ -226,10 +305,9 @@ export function RecentActivity() {
             </div>
           </div>
           <p className="sheet-hero-lede">
-            Markets opened, bets taken, outcomes settled and payouts claimed,
-            newest first. Each line says which token it was in. Most of what is
-            here is still from the old ETH markets, because the new contracts
-            have barely been used yet.
+            Markets opened, bets taken, outcomes settled and payouts claimed, newest
+            first. Every line says which token it was in, and anything in ETH or SWIPE is
+            tagged, because those sit on the old contracts and nothing new lands there.
           </p>
         </header>
         <main className="sheet-body">{body}</main>
@@ -237,7 +315,12 @@ export function RecentActivity() {
     </div>
   );
 
-  if (loading) {
+  // No events and no error behind it means the answer is still coming. This is
+  // why there is no separate loading flag. An effect runs after the commit, so
+  // the render that changes chain paints once with no events and any such flag
+  // still false, which is exactly the moment a flag-driven branch would say
+  // "nothing came back" about a request that had not been made.
+  if (activities === null && error === null) {
     return shell(
       <section className="sheet-block">
         <div className="sheet-rail">
@@ -246,14 +329,14 @@ export function RecentActivity() {
         <div>
           <div className="sheet-empty">
             <strong>Reading the feed</strong>
-            Building events from settled markets and stakes.
+            Building events from markets and stakes on {chain.label}.
           </div>
         </div>
       </section>
     );
   }
 
-  if (error) {
+  if (activities === null) {
     return shell(
       <section className="sheet-block">
         <div className="sheet-rail">
@@ -262,7 +345,8 @@ export function RecentActivity() {
         <div>
           <div className="sheet-empty">
             <strong>Could not load the feed</strong>
-            {error}
+            Nothing came back, because {error ?? 'the request failed'}. No events are
+            being shown in place of the real ones.
           </div>
         </div>
       </section>
@@ -283,7 +367,7 @@ export function RecentActivity() {
             <div className="ra-control-group">
               <span className="ra-control-label" id="ra-filter-label">Show</span>
               <div className="sheet-segment" role="group" aria-labelledby="ra-filter-label">
-                {FILTERS.map(f => (
+                {FILTERS.map((f) => (
                   <button
                     key={f.key}
                     type="button"
@@ -300,7 +384,7 @@ export function RecentActivity() {
             <div className="ra-control-group">
               <span className="ra-control-label" id="ra-range-label">Within</span>
               <div className="sheet-segment" role="group" aria-labelledby="ra-range-label">
-                {RANGES.map(r => (
+                {RANGES.map((r) => (
                   <button
                     key={r.key}
                     type="button"
@@ -315,41 +399,70 @@ export function RecentActivity() {
             </div>
           </div>
 
+          {/* A failed refresh is a banner over a feed that is still the last
+              true answer, not a replacement for it. */}
+          {error && (
+            <p className="ra-banner">
+              The last refresh failed, because {error}. These events are from the previous
+              successful read.
+            </p>
+          )}
+
           {shown.length === 0 ? (
             <div className="sheet-empty">
               <strong>Nothing in this window</strong>
               {filter === 'me'
                 ? 'None of your own activity landed here. Widen the window, or switch back to everything.'
-                : 'Widen the window, or come back after the next market settles.'}
+                : 'Widen the window, or come back after the next bet lands.'}
             </div>
           ) : (
             <div className="ra-feed">
-              {shown.map(a => (
-                <div
-                  key={a.id}
-                  className={`ra-item ra-item--${MARK[a.type]}${a.isCurrentUser ? ' ra-item--you' : ''}`}
-                >
-                  <span className="ra-mark" aria-hidden="true" />
+              {shown.map((a) => {
+                const token = a.details?.token;
+                const archived = token === 'ETH' || token === 'SWIPE';
+                const approximate = DERIVED_TIME.has(a.type);
 
-                  <div className="ra-body">
-                    <div className="ra-text">
-                      {describe(a)}
-                      {a.isCurrentUser && <span className="ra-you-badge">You</span>}
+                return (
+                  <div
+                    key={a.id}
+                    className={`ra-item ${MARK[a.type]}${a.isCurrentUser ? ' ra-item--you' : ''}`}
+                  >
+                    <span className="ra-mark" aria-hidden="true" />
+
+                    <div className="ra-body">
+                      <div className="ra-text">
+                        {describe(a)}
+                        {archived && (
+                          <span className="ra-archived" title="On the old contracts">
+                            old contracts
+                          </span>
+                        )}
+                        {a.isCurrentUser && <span className="ra-you-badge">You</span>}
+                      </div>
+
+                      {a.prediction && (
+                        <div className="ra-market">
+                          <span className="ra-category">{a.prediction.category}</span>
+                          <span className="ra-question" title={a.prediction.question}>
+                            {a.prediction.question}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
-                    {a.prediction && (
-                      <div className="ra-market">
-                        <span className="ra-category">{a.prediction.category}</span>
-                        <span className="ra-question" title={a.prediction.question}>
-                          {a.prediction.question}
-                        </span>
-                      </div>
+                    {approximate ? (
+                      <span
+                        className="ra-time ra-approx"
+                        title="No exact time is recorded for this, so it is placed just after the market's deadline"
+                      >
+                        ~{timeAgo(a.timestamp)}
+                      </span>
+                    ) : (
+                      <span className="ra-time">{timeAgo(a.timestamp)}</span>
                     )}
                   </div>
-
-                  <span className="ra-time">{timeAgo(a.timestamp)}</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -375,11 +488,33 @@ export function RecentActivity() {
                 <span className="sheet-settle-key">Markets opened</span>
                 <span className="sheet-settle-val">{marketCount}</span>
               </div>
+              <div className="sheet-settle-row">
+                <span className="sheet-settle-key">Rows on the old contracts</span>
+                <span className="sheet-settle-val">
+                  {archivedRows} of {archivedRows + collateralRows}
+                </span>
+              </div>
               <div className="sheet-settle-row sheet-settle-row--total">
-                <span className="sheet-settle-key">Payouts claimed</span>
-                <span className="sheet-settle-val">{payouts.toFixed(4)} {symbolFor(undefined)}</span>
+                <span className="sheet-settle-key">Claimed in {stable}</span>
+                <span className="sheet-settle-val">
+                  {payoutCount === 0 ? 'none yet' : `${payouts.toFixed(4)} ${stable}`}
+                </span>
               </div>
             </div>
+          </div>
+
+          <div className="sheet-note">
+            <p>
+              The claimed figure counts {stable} only. An ETH payout and a stablecoin one
+              are amounts of different things, and a single number covering both would
+              have to print one symbol next to a sum that is not in it.
+            </p>
+            <p>
+              A time with a tilde in front of it is placed rather than measured. Nothing
+              records when a market was settled or when somebody pulled a payout, so those
+              two kinds of row sit just after the deadline and may be well out of order
+              against the bets around them.
+            </p>
           </div>
         </div>
       </section>
