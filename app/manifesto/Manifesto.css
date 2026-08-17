@@ -30,9 +30,9 @@
   --mf-wash: rgba(212, 255, 0, 0.06);
   --mf-lime-line: rgba(212, 255, 0, 0.22);
 
-  --mf-display: var(--font-display), 'Orbitron', sans-serif;
-  --mf-body: var(--font-body), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --mf-data: var(--font-data), 'Monaco', 'Menlo', monospace;
+  --mf-display: var(--font-display, 'Orbitron'), 'Orbitron', sans-serif;
+  --mf-body: var(--font-body, -apple-system), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mf-data: var(--font-data, 'Monaco'), 'Monaco', 'Menlo', monospace;
 
   --mf-gutter: 24px;
   --mf-rail: 148px;

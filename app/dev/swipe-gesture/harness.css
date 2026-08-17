@@ -4,12 +4,12 @@
   min-height: 100vh;
   background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
   color: rgba(255, 255, 255, 0.92);
-  font-family: var(--font-body), -apple-system, sans-serif;
+  font-family: var(--font-body, -apple-system), -apple-system, sans-serif;
   padding: 32px 24px 64px;
 }
 
 .hz-head h1 {
-  font-family: var(--font-display), 'Orbitron', sans-serif;
+  font-family: var(--font-display, 'Orbitron'), 'Orbitron', sans-serif;
   font-size: 24px;
   text-transform: uppercase;
   letter-spacing: -0.01em;
@@ -29,7 +29,7 @@
 }
 
 .hz-head code {
-  font-family: var(--font-data), monospace;
+  font-family: var(--font-data, ui-monospace), monospace;
   font-size: 12px;
   color: #d4ff00;
 }
@@ -45,7 +45,7 @@
 
 .hz-controls button,
 .hz-buttons button {
-  font-family: var(--font-display), 'Orbitron', sans-serif;
+  font-family: var(--font-display, 'Orbitron'), 'Orbitron', sans-serif;
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.12em;
@@ -139,13 +139,13 @@
 }
 
 .hz-card-w {
-  font-family: var(--font-data), monospace;
+  font-family: var(--font-data, ui-monospace), monospace;
   font-size: 13px;
   color: rgba(255, 255, 255, 0.5);
 }
 
 .hz-hint {
-  font-family: var(--font-display), 'Orbitron', sans-serif;
+  font-family: var(--font-display, 'Orbitron'), 'Orbitron', sans-serif;
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -153,7 +153,7 @@
 }
 
 .hz-armed {
-  font-family: var(--font-display), 'Orbitron', sans-serif;
+  font-family: var(--font-display, 'Orbitron'), 'Orbitron', sans-serif;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -182,7 +182,7 @@
 }
 
 .hz-log h2 {
-  font-family: var(--font-display), 'Orbitron', sans-serif;
+  font-family: var(--font-display, 'Orbitron'), 'Orbitron', sans-serif;
   font-size: 12px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -194,7 +194,7 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  font-family: var(--font-data), monospace;
+  font-family: var(--font-data, ui-monospace), monospace;
   font-size: 12px;
   color: rgba(255, 255, 255, 0.72);
 }

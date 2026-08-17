@@ -40,9 +40,9 @@
   --sheet-lime-line: rgba(212, 255, 0, 0.22);
   --sheet-loss: rgba(255, 138, 128, 0.9);
 
-  --sheet-display: var(--font-display), 'Orbitron', sans-serif;
-  --sheet-body: var(--font-body), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --sheet-data: var(--font-data), 'Monaco', 'Menlo', monospace;
+  --sheet-display: var(--font-display, 'Orbitron'), 'Orbitron', sans-serif;
+  --sheet-body: var(--font-body, -apple-system), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --sheet-data: var(--font-data, 'Monaco'), 'Monaco', 'Menlo', monospace;
 
   --sheet-gutter: 24px;
   --sheet-rail: 148px;
