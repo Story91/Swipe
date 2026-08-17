@@ -5,78 +5,133 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Swipe gesture prototype — V3</title>
 <style>
+  /* Palette matches the real app: bright lime page, black pills/panels on it,
+     lime (or white) text inside the black elements. See app/globals.css,
+     TinderCard.css (.tinder-container), ChainSwitcher.css and WalletPicker.css
+     (black pill + lime text vocabulary), ReadOnlyNotice.css (black panel,
+     lime-tinted border). Brand lime is #d4ff00. */
   :root{
-    --bg:#0a0a0b;
-    --panel:#141416;
-    --panel-2:#1b1b1e;
-    --edge:#2a2a2e;
-    --text:#f3f3f0;
-    --text-dim:#9a9a9f;
+    --bg:#d4ff00;
+    --ink:#0a0a0a;
+    --ink-dim:rgba(10,10,10,0.62);
+    --panel:#0d0d0d;
+    --panel-2:#161616;
+    --edge:rgba(212,255,0,0.32);
+    --edge-strong:rgba(212,255,0,0.55);
+    --text:#f2f2ea;
+    --text-dim:#9a9a9a;
     --lime:#d4ff00;
     --lime-dim:#8fa800;
-    --no:#ff5d5d;
-    --no-dim:#a83c3c;
+    --no:#ff5a5a;
+    --no-dim:#7a2a2a;
     --radius:26px;
+    --stage-w:clamp(560px, 44vw, 680px);
     font-size:16px;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
+  html{background:var(--bg);}
   body{
     background:var(--bg);
-    color:var(--text);
+    color:var(--ink);
     font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     min-height:100vh;
     -webkit-tap-highlight-color:transparent;
   }
   h1,h2,h3,p{margin:0;}
 
-  .app{
-    max-width:1180px;
+  .page{
+    max-width:1160px;
     margin:0 auto;
-    padding:28px 20px 60px;
-    display:grid;
-    grid-template-columns:minmax(0,1fr) 320px;
-    gap:28px;
-    align-items:start;
-  }
-  @media (max-width: 920px){
-    .app{grid-template-columns:1fr;}
+    padding:36px clamp(16px,3vw,40px) 64px;
   }
 
   header.top{
-    grid-column:1/-1;
+    background:var(--panel);
+    color:var(--text);
+    border:2px solid var(--edge);
+    border-radius:20px;
+    padding:22px 28px;
     display:flex;
     flex-direction:column;
-    gap:4px;
-    margin-bottom:4px;
+    gap:6px;
+    margin-bottom:28px;
+    box-shadow:0 18px 40px rgba(0,0,0,0.16);
   }
   header.top h1{
     font-size:1.35rem;
     letter-spacing:-0.01em;
     font-weight:650;
+    color:var(--lime);
   }
   header.top .sub{
     color:var(--text-dim);
     font-size:0.88rem;
     line-height:1.5;
+    max-width:74ch;
   }
   header.top .sub code{
-    background:var(--panel-2);
-    border:1px solid var(--edge);
+    background:#000;
+    color:var(--lime);
+    border:1px solid var(--edge-strong);
     border-radius:5px;
-    padding:1px 5px;
+    padding:1px 6px;
     font-size:0.82em;
   }
 
-  /* ---------- stage / stack ---------- */
-  .stage-col{display:flex; flex-direction:column; gap:18px; min-width:0;}
+  /* ---------- overall grid: stage column + sidebar column, centred as a
+     unit so wide viewports don't strand the demo in a stretched, lopsided
+     column. Both columns are content-sized (no 1fr), so there is no huge
+     empty gutter inside either column. ---------- */
+  .layout{
+    display:grid;
+    grid-template-columns: var(--stage-w) minmax(300px,380px);
+    gap:40px;
+    align-items:start;
+    justify-content:center;
+  }
+  @media (max-width: 1100px){
+    .layout{
+      grid-template-columns: 1fr;
+      justify-content:stretch;
+    }
+    :root{ --stage-w: min(680px, 100%); }
+    .params{ position:static; margin-top:4px; }
+  }
+
+  .stage-col{
+    width:100%;
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+    min-width:0;
+  }
+
+  /* ---------- stage frame: a bounded, clipped "device" the card stack lives
+     in. Cards are positioned relative to #stackWrap (fixed 400x520, never
+     resized here) so the physics/measurements JS relies on are untouched;
+     the frame is purely a decorative, larger box around that fixed box that
+     clips anything dragged toward its edges, so a drag can never visually
+     land on top of the header, chips, or sidebar. ---------- */
+  .stage-frame{
+    width:100%;
+    height:560px;
+    background:var(--panel);
+    border:2px solid var(--edge-strong);
+    border-radius:28px;
+    box-shadow:0 26px 60px rgba(0,0,0,0.28);
+    overflow:hidden;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    position:relative;
+  }
 
   .stack-wrap{
     position:relative;
-    width:100%;
-    max-width:400px;
+    width:400px;
     height:520px;
-    margin:0 auto;
+    flex:none;
     touch-action:none;
   }
   .stage{
@@ -84,26 +139,52 @@
     inset:0;
   }
 
+  /* ---------- stake chips: a dedicated bar below the stage frame, never
+     underneath the card, so it can never be occluded while a card is
+     armed. Both reveal panels sit stacked (position:absolute inset:0)
+     inside this bar and cross-fade via the existing .visible class the JS
+     already toggles — only their location changed, not the toggle logic. ---------- */
+  .chip-bar{
+    position:relative;
+    width:100%;
+    height:132px;
+  }
+  .chip-bar-hint{
+    position:absolute;
+    inset:0;
+    z-index:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    padding:14px 22px;
+    border-radius:20px;
+    border:1.5px dashed var(--edge);
+    color:var(--ink-dim);
+    font-size:0.8rem;
+    line-height:1.4;
+    pointer-events:none;
+  }
+
   .reveal{
     position:absolute;
-    top:8%;
-    bottom:8%;
-    width:38%;
-    border-radius:22px;
+    inset:0;
+    z-index:1;
+    border-radius:20px;
     display:flex;
     flex-direction:column;
     align-items:center;
     justify-content:center;
-    gap:12px;
+    gap:10px;
+    padding:14px 20px;
     opacity:0;
-    transform:scale(0.9);
+    transform:scale(0.94);
     transition:opacity 180ms ease, transform 180ms ease;
     pointer-events:none;
-    background:var(--panel-2);
-    border:1px solid var(--edge);
+    background:var(--panel);
   }
-  .reveal.yes{ right:0; }
-  .reveal.no{ left:0; }
+  .reveal.yes{ border:2px solid rgba(212,255,0,0.55); }
+  .reveal.no{ border:2px solid rgba(255,90,90,0.5); }
   .reveal.visible{ opacity:1; transform:scale(1); pointer-events:auto; }
   .reveal .reveal-label{
     font-size:0.72rem;
@@ -113,14 +194,14 @@
   }
   .reveal.yes .reveal-label{color:var(--lime);}
   .reveal.no .reveal-label{color:var(--no);}
-  .chip-col{display:flex; flex-direction:column; gap:8px; width:76%;}
+  .chip-col{display:flex; flex-direction:row; gap:8px; width:auto;}
   .chip{
     appearance:none;
     border:1px solid var(--edge);
-    background:var(--panel);
+    background:var(--panel-2);
     color:var(--text);
     border-radius:12px;
-    padding:9px 6px;
+    padding:9px 14px;
     font-size:0.92rem;
     font-weight:600;
     cursor:pointer;
@@ -128,22 +209,32 @@
   .chip.selected{
     border-color:var(--lime);
     color:var(--lime);
-    background:rgba(212,255,0,0.08);
+    background:rgba(212,255,0,0.12);
   }
   .chip:focus-visible{outline:2px solid var(--lime); outline-offset:2px;}
 
   .card{
+    /* Centred purely via the transform's translate(-50%,-50%) (see JS
+       render()) — no margin-based centering here. The original prototype
+       combined left:50%+margin-left:-140px (a complete centering trick on
+       its own) with that transform, double-counting the offset and
+       rendering every card shifted a full half-width/half-height up-left
+       of where it belonged. That was the actual cause of the card
+       colliding with the header: confirmed by measuring the unmodified
+       file before touching anything. Fixed in CSS only; the JS transform
+       string is untouched. */
     position:absolute;
     left:50%;
     top:50%;
     width:280px;
     height:400px;
-    margin-left:-140px;
-    margin-top:-200px;
     border-radius:var(--radius);
-    background:linear-gradient(160deg,#1c1c1f,#131315);
-    border:1px solid var(--edge);
-    box-shadow:0 18px 40px rgba(0,0,0,0.45);
+    background:linear-gradient(160deg,#1a1a1d,#0e0e10);
+    border:1px solid rgba(212,255,0,0.14);
+    box-shadow:
+      0 20px 44px rgba(0,0,0,0.55),
+      inset 0 0 0 3px rgba(212,255,0, var(--tint-yes)),
+      inset 0 0 0 3px rgba(255,90,90, var(--tint-no));
     padding:18px;
     display:flex;
     flex-direction:column;
@@ -166,21 +257,28 @@
   .card .tint{
     position:absolute; inset:0; border-radius:inherit; pointer-events:none;
   }
-  .tint-yes{ background:radial-gradient(circle at 88% 50%, rgba(212,255,0,0.55), transparent 65%); opacity:var(--tint-yes); }
-  .tint-no{ background:radial-gradient(circle at 12% 50%, rgba(255,93,93,0.5), transparent 65%); opacity:var(--tint-no); }
+  /* Crisp edge wash instead of a soft radial glow: a flat colour that reads
+     from the relevant edge, not a diffuse blob in the middle of the card. */
+  .tint-yes{ background:linear-gradient(to left, rgba(212,255,0,0.38), rgba(212,255,0,0) 58%); opacity:var(--tint-yes); }
+  .tint-no{ background:linear-gradient(to right, rgba(255,90,90,0.34), rgba(255,90,90,0) 58%); opacity:var(--tint-no); }
 
   .card-face{position:relative; display:flex; flex-direction:column; height:100%; gap:14px;}
   .card-face-armed{
     position:absolute; inset:18px; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:10px; opacity:0; pointer-events:none; text-align:center;
+    gap:12px; opacity:0; pointer-events:none; text-align:center;
   }
   .reduced-motion .card-face{transition:opacity 150ms ease;}
   .reduced-motion .card-face-armed{transition:opacity 150ms ease;}
   .card.armed .card-face{opacity:0; pointer-events:none;}
   .card.armed .card-face-armed{opacity:1; pointer-events:auto;}
-  .card-face-armed .armed-dir{font-size:1.1rem; font-weight:700; letter-spacing:0.02em;}
-  .card-face-armed .armed-dir.yes{color:var(--lime);}
-  .card-face-armed .armed-dir.no{color:var(--no);}
+  /* Solid pill instead of plain coloured text — a decisive, unambiguous
+     "this side is armed" read rather than a wash of colour. */
+  .card-face-armed .armed-dir{
+    font-size:1.1rem; font-weight:800; letter-spacing:0.03em;
+    padding:8px 18px; border-radius:999px;
+  }
+  .card-face-armed .armed-dir.yes{ color:#0d1400; background:var(--lime); }
+  .card-face-armed .armed-dir.no{ color:#1a0a0a; background:var(--no); }
   .card-face-armed .armed-hint{color:var(--text-dim); font-size:0.82rem; max-width:220px; line-height:1.4;}
 
   .row-top{display:flex; align-items:center; justify-content:space-between; gap:8px;}
@@ -207,7 +305,7 @@
     display:flex;align-items:center;justify-content:center;
     font-size:0.62rem;font-weight:800;letter-spacing:0.02em;color:var(--lime);
   }
-  .question{font-size:1.02rem; line-height:1.32; font-weight:600;}
+  .question{font-size:1.02rem; line-height:1.32; font-weight:600; color:var(--text);}
 
   .odds{margin-top:auto; display:flex; flex-direction:column; gap:8px;}
   .odds-row{display:flex; justify-content:space-between; font-size:0.82rem; font-weight:700;}
@@ -219,40 +317,45 @@
 
   /* ---------- action bar ---------- */
   .action-bar{
-    max-width:400px;
-    margin:0 auto;
+    width:100%;
     display:grid;
     grid-template-columns:1fr 1fr;
     gap:10px;
   }
+  /* .action-bar{display:grid} above has the same specificity as the
+     browser's built-in [hidden]{display:none} and, being an author rule,
+     wins the tie — so the armed/neutral bar JS hides via the `hidden`
+     attribute was rendering anyway, stacking both rows at once. Restore
+     the hide explicitly with a rule specific enough to win. */
+  .action-bar[hidden]{display:none;}
   .action-bar.armed-row{grid-template-columns:1fr 1fr;}
   .btn{
     appearance:none;
     border-radius:16px;
-    border:1px solid var(--edge);
+    border:2px solid transparent;
     background:var(--panel);
     color:var(--text);
     font-size:0.95rem;
     font-weight:700;
     padding:14px 10px;
     cursor:pointer;
-    transition:transform 90ms ease, background 120ms ease, border-color 120ms ease;
+    box-shadow:0 10px 22px rgba(0,0,0,0.16);
+    transition:transform 90ms ease, background 120ms ease, border-color 120ms ease, filter 120ms ease;
   }
   .btn:active{transform:scale(0.97);}
-  .btn:focus-visible{outline:2px solid var(--lime); outline-offset:2px;}
-  .btn.yes{border-color:rgba(212,255,0,0.4); color:var(--lime);}
-  .btn.yes:hover{background:rgba(212,255,0,0.08);}
-  .btn.no{border-color:rgba(255,93,93,0.4); color:var(--no);}
-  .btn.no:hover{background:rgba(255,93,93,0.08);}
-  .btn.confirm{background:var(--lime); color:#101100; border-color:var(--lime);}
+  .btn:focus-visible{outline:3px solid var(--ink); outline-offset:2px;}
+  .btn.yes{border-color:rgba(212,255,0,0.45); color:var(--lime);}
+  .btn.yes:hover{filter:brightness(1.3);}
+  .btn.no{border-color:rgba(255,90,90,0.45); color:var(--no);}
+  .btn.no:hover{filter:brightness(1.3);}
+  .btn.confirm{background:var(--lime); color:#0d1400; border-color:var(--lime); box-shadow:0 14px 30px rgba(212,255,0,0.3);}
   .btn.confirm:hover{filter:brightness(1.06);}
   .btn.cancel{color:var(--text-dim);}
   .btn[hidden]{display:none;}
 
   .status-line{
-    max-width:400px;
-    margin:0 auto;
-    color:var(--text-dim);
+    width:100%;
+    color:var(--ink-dim);
     font-size:0.72rem;
     font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     text-align:center;
@@ -262,26 +365,28 @@
   /* ---------- instructions ---------- */
   .panel{
     background:var(--panel);
-    border:1px solid var(--edge);
+    border:1.5px solid var(--edge);
     border-radius:18px;
     padding:16px 18px;
+    box-shadow:0 18px 40px rgba(0,0,0,0.18);
   }
   .panel h2{font-size:0.78rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-dim); margin-bottom:10px;}
-  .instructions ul{margin:0; padding-left:1.1em; display:flex; flex-direction:column; gap:7px; font-size:0.86rem; line-height:1.45;}
+  .instructions{width:100%;}
+  .instructions ul{margin:0; padding-left:1.1em; display:flex; flex-direction:column; gap:7px; font-size:0.86rem; line-height:1.45; color:var(--text); max-width:64ch;}
   .instructions li strong{color:var(--lime); font-weight:700;}
   .instructions li.important strong{color:#fff;}
 
-  /* ---------- params panel ---------- */
+  /* ---------- params panel (sidebar) ---------- */
   .params{
     position:sticky;
-    top:20px;
+    top:24px;
     display:flex;
     flex-direction:column;
     gap:14px;
   }
   .field{display:flex; flex-direction:column; gap:4px; margin-bottom:10px;}
   .field:last-child{margin-bottom:0;}
-  .field-head{display:flex; justify-content:space-between; align-items:baseline; font-size:0.78rem;}
+  .field-head{display:flex; justify-content:space-between; align-items:baseline; font-size:0.78rem; color:var(--text);}
   .field-head .val{
     font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     color:var(--lime);
@@ -301,11 +406,11 @@
     width:16px;height:16px;border-radius:50%;
     background:var(--lime);
     cursor:pointer;
-    border:2px solid #0a0a0b;
+    border:2px solid var(--panel);
   }
   .field input[type=range]::-moz-range-thumb{
     width:14px;height:14px;border-radius:50%;
-    background:var(--lime); border:2px solid #0a0a0b; cursor:pointer;
+    background:var(--lime); border:2px solid var(--panel); cursor:pointer;
   }
   .group-title{font-size:0.72rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-dim); margin:12px 0 2px;}
   .group-title:first-child{margin-top:0;}
@@ -327,16 +432,15 @@
   .reset-btn:focus-visible{outline:2px solid var(--lime); outline-offset:2px;}
 
   footer.note{
-    grid-column:1/-1;
-    color:var(--text-dim);
+    color:var(--ink-dim);
     font-size:0.72rem;
     text-align:center;
-    padding-top:10px;
+    padding-top:22px;
   }
 </style>
 </head>
 <body>
-<div class="app">
+<div class="page">
 
   <header class="top">
     <h1>Swipe gesture prototype <span style="color:var(--text-dim);font-weight:400;">— V3 §7.6</span></h1>
@@ -344,10 +448,20 @@
       gate before the gesture is written into <code>the real app</code>. Judge it with a finger, not by reading.</p>
   </header>
 
-  <div class="stage-col">
+  <div class="layout">
 
-    <div class="stack-wrap" id="stackWrap">
-      <div class="stage" id="stage">
+    <div class="stage-col">
+
+      <div class="stage-frame">
+        <div class="stack-wrap" id="stackWrap">
+          <div class="stage" id="stage">
+            <!-- 4 card elements injected here by JS -->
+          </div>
+        </div>
+      </div>
+
+      <div class="chip-bar">
+        <div class="chip-bar-hint">Swipe (or press YES / NO below) to arm a side — its stake chips appear here.</div>
         <div class="reveal yes" id="revealYes">
           <div class="reveal-label">YES · stake</div>
           <div class="chip-col">
@@ -364,87 +478,87 @@
             <button class="chip" data-amount="25">25 USDC</button>
           </div>
         </div>
-        <!-- 4 card elements injected here by JS -->
+      </div>
+
+      <div class="action-bar" id="actionBarNeutral">
+        <button class="btn no" id="btnNo" type="button">Swipe NO</button>
+        <button class="btn yes" id="btnYes" type="button">Swipe YES</button>
+      </div>
+      <div class="action-bar armed-row" id="actionBarArmed" hidden>
+        <button class="btn cancel" id="btnCancel" type="button">Cancel</button>
+        <button class="btn confirm" id="btnConfirm" type="button">Confirm bet</button>
+      </div>
+
+      <div class="status-line" id="statusLine" aria-live="polite">stage: neutral</div>
+
+      <div class="panel instructions">
+        <h2>Try this</h2>
+        <ul>
+          <li>Drag the top card left or right — it tracks your finger 1:1, and the YES/NO side tints as you go.</li>
+          <li>Release past the halfway point, or <strong>flick</strong> quickly — the card <strong>docks</strong>
+            to that side instead of flying away, and stake chips appear. Feel for the light haptic on phones.</li>
+          <li>Swipe the <strong>same direction again</strong> to commit — the card flies off carrying your throw's speed.</li>
+          <li>Swipe the <strong>opposite direction</strong> while armed to cancel — it springs back to centre.</li>
+          <li class="important"><strong>Grab a card mid-flight and reverse it</strong> — mid-dock, mid-return, or even
+            mid fly-off. Nothing should ever be locked in; catching a committed card un-commits it.</li>
+          <li>No gesture required: the YES / NO / Cancel / Confirm buttons above do the same thing, with real
+            keyboard focus.</li>
+          <li>Tune the spring feel live in the panel on the right — nothing needs a reload.</li>
+        </ul>
       </div>
     </div>
 
-    <div class="action-bar" id="actionBarNeutral">
-      <button class="btn no" id="btnNo" type="button">Swipe NO</button>
-      <button class="btn yes" id="btnYes" type="button">Swipe YES</button>
-    </div>
-    <div class="action-bar armed-row" id="actionBarArmed" hidden>
-      <button class="btn cancel" id="btnCancel" type="button">Cancel</button>
-      <button class="btn confirm" id="btnConfirm" type="button">Confirm bet</button>
-    </div>
+    <aside class="panel params" id="paramsPanel">
+      <h2>Live physics panel</h2>
 
-    <div class="status-line" id="statusLine" aria-live="polite">stage: neutral</div>
+      <div class="group-title">Return to centre <span style="opacity:.6;">(disarm / release below threshold)</span></div>
+      <div class="field">
+        <div class="field-head"><span>Damping</span><span class="val" id="v_returnDamping">1.00</span></div>
+        <input type="range" id="s_returnDamping" min="0.4" max="1.4" step="0.01" value="1.0">
+      </div>
+      <div class="field">
+        <div class="field-head"><span>Response</span><span class="val" id="v_returnResponse">0.30s</span></div>
+        <input type="range" id="s_returnResponse" min="0.10" max="0.80" step="0.01" value="0.30">
+      </div>
 
-    <div class="panel instructions">
-      <h2>Try this</h2>
-      <ul>
-        <li>Drag the top card left or right — it tracks your finger 1:1, and the YES/NO side tints as you go.</li>
-        <li>Release past the halfway point, or <strong>flick</strong> quickly — the card <strong>docks</strong>
-          to that side instead of flying away, and stake chips appear. Feel for the light haptic on phones.</li>
-        <li>Swipe the <strong>same direction again</strong> to commit — the card flies off carrying your throw's speed.</li>
-        <li>Swipe the <strong>opposite direction</strong> while armed to cancel — it springs back to centre.</li>
-        <li class="important"><strong>Grab a card mid-flight and reverse it</strong> — mid-dock, mid-return, or even
-          mid fly-off. Nothing should ever be locked in; catching a committed card un-commits it.</li>
-        <li>No gesture required: the YES / NO / Cancel / Confirm buttons on the left do the same thing, with real
-          keyboard focus.</li>
-        <li>Tune the spring feel live in the panel — nothing needs a reload.</li>
-      </ul>
-    </div>
+      <div class="group-title">Dock to armed <span style="opacity:.6;">(momentum)</span></div>
+      <div class="field">
+        <div class="field-head"><span>Damping</span><span class="val" id="v_dockDamping">0.80</span></div>
+        <input type="range" id="s_dockDamping" min="0.4" max="1.4" step="0.01" value="0.8">
+      </div>
+      <div class="field">
+        <div class="field-head"><span>Response</span><span class="val" id="v_dockResponse">0.35s</span></div>
+        <input type="range" id="s_dockResponse" min="0.10" max="0.80" step="0.01" value="0.35">
+      </div>
+
+      <div class="group-title">Commit fly-off</div>
+      <div class="field">
+        <div class="field-head"><span>Damping</span><span class="val" id="v_commitDamping">1.00</span></div>
+        <input type="range" id="s_commitDamping" min="0.4" max="1.4" step="0.01" value="1.0">
+      </div>
+      <div class="field">
+        <div class="field-head"><span>Response</span><span class="val" id="v_commitResponse">0.40s</span></div>
+        <input type="range" id="s_commitResponse" min="0.10" max="0.80" step="0.01" value="0.40">
+      </div>
+
+      <div class="group-title">Gesture</div>
+      <div class="field">
+        <div class="field-head"><span>Projection constant (d)</span><span class="val" id="v_projection">0.998</span></div>
+        <input type="range" id="s_projection" min="0.90" max="0.999" step="0.001" value="0.998">
+      </div>
+      <div class="field">
+        <div class="field-head"><span>Arm threshold</span><span class="val" id="v_threshold">110px</span></div>
+        <input type="range" id="s_threshold" min="40" max="220" step="2" value="110">
+      </div>
+
+      <div class="toggles">
+        <label class="toggle-row"><input type="checkbox" id="toggleReduced"> Simulate <code>prefers-reduced-motion</code></label>
+        <label class="toggle-row"><input type="checkbox" id="toggleDebug" checked> Show live status line</label>
+      </div>
+      <button class="reset-btn" id="resetParams" type="button">Reset to spec defaults</button>
+    </aside>
+
   </div>
-
-  <aside class="panel params" id="paramsPanel">
-    <h2>Live physics panel</h2>
-
-    <div class="group-title">Return to centre <span style="opacity:.6;">(disarm / release below threshold)</span></div>
-    <div class="field">
-      <div class="field-head"><span>Damping</span><span class="val" id="v_returnDamping">1.00</span></div>
-      <input type="range" id="s_returnDamping" min="0.4" max="1.4" step="0.01" value="1.0">
-    </div>
-    <div class="field">
-      <div class="field-head"><span>Response</span><span class="val" id="v_returnResponse">0.30s</span></div>
-      <input type="range" id="s_returnResponse" min="0.10" max="0.80" step="0.01" value="0.30">
-    </div>
-
-    <div class="group-title">Dock to armed <span style="opacity:.6;">(momentum)</span></div>
-    <div class="field">
-      <div class="field-head"><span>Damping</span><span class="val" id="v_dockDamping">0.80</span></div>
-      <input type="range" id="s_dockDamping" min="0.4" max="1.4" step="0.01" value="0.8">
-    </div>
-    <div class="field">
-      <div class="field-head"><span>Response</span><span class="val" id="v_dockResponse">0.35s</span></div>
-      <input type="range" id="s_dockResponse" min="0.10" max="0.80" step="0.01" value="0.35">
-    </div>
-
-    <div class="group-title">Commit fly-off</div>
-    <div class="field">
-      <div class="field-head"><span>Damping</span><span class="val" id="v_commitDamping">1.00</span></div>
-      <input type="range" id="s_commitDamping" min="0.4" max="1.4" step="0.01" value="1.0">
-    </div>
-    <div class="field">
-      <div class="field-head"><span>Response</span><span class="val" id="v_commitResponse">0.40s</span></div>
-      <input type="range" id="s_commitResponse" min="0.10" max="0.80" step="0.01" value="0.40">
-    </div>
-
-    <div class="group-title">Gesture</div>
-    <div class="field">
-      <div class="field-head"><span>Projection constant (d)</span><span class="val" id="v_projection">0.998</span></div>
-      <input type="range" id="s_projection" min="0.90" max="0.999" step="0.001" value="0.998">
-    </div>
-    <div class="field">
-      <div class="field-head"><span>Arm threshold</span><span class="val" id="v_threshold">110px</span></div>
-      <input type="range" id="s_threshold" min="40" max="220" step="2" value="110">
-    </div>
-
-    <div class="toggles">
-      <label class="toggle-row"><input type="checkbox" id="toggleReduced"> Simulate <code>prefers-reduced-motion</code></label>
-      <label class="toggle-row"><input type="checkbox" id="toggleDebug" checked> Show live status line</label>
-    </div>
-    <button class="reset-btn" id="resetParams" type="button">Reset to spec defaults</button>
-  </aside>
 
   <footer class="note">Pointer Events + a hand-rolled spring integrator. No CSS keyframes, no animation library, no network requests.</footer>
 </div>
