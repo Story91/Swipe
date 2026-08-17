@@ -1,0 +1,205 @@
+/*
+ * Settled positions, on the shared sheet (app/styles/sheet.css).
+ *
+ * Same row grammar as the portfolio and open positions, with one thing this
+ * screen alone needs: the call and the result side by side, so a row says at a
+ * glance what you picked and what happened, rather than making the reader infer
+ * it from a won/lost badge.
+ */
+
+.bh-list {
+  border-top: 1px solid var(--sheet-rule);
+}
+
+.bh-head,
+.bh-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) minmax(0, 128px) minmax(0, 116px);
+  gap: 16px;
+  align-items: center;
+}
+
+.bh-head {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--sheet-rule);
+}
+
+.bh-head span {
+  font-family: var(--sheet-display);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sheet-paper-3);
+}
+
+.bh-head span:nth-child(4) {
+  text-align: right;
+}
+
+.bh-row {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--sheet-rule);
+}
+
+.bh-thumb {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border: 1px solid var(--sheet-rule-strong);
+  background: var(--sheet-surface);
+}
+
+.bh-main {
+  min-width: 0;
+}
+
+.bh-question {
+  font-family: var(--sheet-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.bh-sub {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 5px;
+}
+
+.bh-category {
+  font-family: var(--sheet-display);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sheet-paper-3);
+  border: 1px solid var(--sheet-rule);
+  padding: 2px 6px;
+}
+
+.bh-age {
+  font-family: var(--sheet-data);
+  font-size: 11px;
+  color: var(--sheet-paper-3);
+}
+
+/* The call and the result, read left to right as one phrase. */
+.bh-call {
+  font-family: var(--sheet-data);
+  font-size: 12px;
+  color: var(--sheet-paper-3);
+  white-space: nowrap;
+}
+
+.bh-side {
+  font-family: var(--sheet-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.bh-side--yes { color: var(--sheet-lime); }
+.bh-side--no { color: var(--sheet-loss); }
+.bh-side--unknown { color: var(--sheet-paper-3); }
+
+.bh-verdict {
+  display: block;
+  font-family: var(--sheet-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+.bh-verdict--won { color: var(--sheet-lime); }
+.bh-verdict--lost { color: var(--sheet-loss); }
+
+.bh-figure {
+  font-family: var(--sheet-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.bh-figure--gain { color: var(--sheet-lime); }
+.bh-figure--loss { color: var(--sheet-loss); }
+
+.bh-figure-sub {
+  display: block;
+  font-family: var(--sheet-data);
+  font-size: 11px;
+  color: var(--sheet-paper-3);
+  margin-top: 3px;
+  text-align: right;
+}
+
+.bh-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.bh-control-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bh-control-label {
+  font-family: var(--sheet-display);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sheet-paper-3);
+}
+
+@container sheet (max-width: 860px) {
+  .bh-head {
+    display: none;
+  }
+
+  .bh-row {
+    grid-template-columns: 44px 1fr;
+    gap: 8px 12px;
+  }
+
+  .bh-result,
+  .bh-figures {
+    grid-column: 2;
+  }
+
+  .bh-result {
+    margin-top: 8px;
+  }
+
+  .bh-figures {
+    margin-top: 6px;
+  }
+
+  .bh-figure,
+  .bh-figure-sub {
+    text-align: left;
+  }
+
+  .bh-controls {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}

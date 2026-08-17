@@ -25,6 +25,15 @@ interface PortfolioItem {
   /** Both sides of the pool, so odds can be shown rather than assumed 50/50. */
   yesPool: number;
   noPool: number;
+  /**
+   * How the market actually settled, once it has. Undefined while it is still
+   * running.
+   *
+   * Added because BetHistory was deriving the outcome from the user's own
+   * choice, which made every settled row claim the user had called it right,
+   * including the ones it simultaneously labelled "lost".
+   */
+  outcome?: 'YES' | 'NO';
 }
 
 interface PortfolioStats {
@@ -138,7 +147,13 @@ export async function GET(request: NextRequest) {
               imageUrl: prediction.imageUrl || 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=400&h=300&fit=crop',
               deadline: prediction.deadline,
               yesPool: prediction.yesTotalAmount,
-              noPool: prediction.noTotalAmount
+              noPool: prediction.noTotalAmount,
+              outcome:
+                prediction.resolved && prediction.outcome !== undefined
+                  ? prediction.outcome
+                    ? 'YES'
+                    : 'NO'
+                  : undefined
             });
           }
         }
