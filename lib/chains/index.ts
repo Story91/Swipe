@@ -85,13 +85,22 @@ export const CHAINS: Record<ChainKey, ChainConfig> = {
     rpcUrl: process.env.ROBINHOOD_RPC_URL || 'https://rpc.mainnet.chain.robinhood.com',
     explorer: 'https://robinhoodchain.blockscout.com',
     contracts: {
-      // Nothing is deployed here yet, so this is the zero address in practice.
-      // Server-only, exactly as on the testnet above: the browser reads zero no
-      // matter what this env var is set to. When V3 does land on Robinhood, this
-      // has to become NEXT_PUBLIC_ with a literal fallback, the way Base's
-      // market above is, or the UI will refuse every bet while the server
-      // insists the market exists.
-      market: (process.env.ROBINHOOD_USDG_DUALPOOL || ZERO) as `0x${string}`,
+      // PredictionMarket_V3, deployed and configured on Robinhood mainnet
+      // 2026-08-17, collateralised in the USDG below. Same owner and first
+      // resolver as Base.
+      //
+      // NEXT_PUBLIC_ and a literal fallback, matching Base's form above. This
+      // is the line that makes the address reachable from the browser at all:
+      // without the prefix Next.js leaves it undefined there, so the UI reads
+      // the zero address, getWritableMarket returns null and every write guard
+      // refuses while the server insists the market exists.
+      //
+      // It is only safe because the guards do not trust reachability. Every
+      // market write goes through useMarketWrite, which compares the address it
+      // is about to write to against this chain's market at send time, moves
+      // the wallet onto the matching chain and pins chainId.
+      market: (process.env.NEXT_PUBLIC_ROBINHOOD_V3_CONTRACT
+        || '0x1AD8DD99C31EA51c1bCE99fB10d609485937C7DA') as `0x${string}`,
     },
     stable: {
       // Paxos USDG. Verified on-chain: symbol() == "USDG", decimals() == 6.

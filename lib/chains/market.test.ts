@@ -16,9 +16,22 @@ describe('resolving one chain\'s market', () => {
   });
 
   it('never hands back a chain with no market instead of null', () => {
-    // Robinhood has nothing deployed. Returning some other chain's contract
-    // here, or a zero address, is how a bet reaches the wrong network.
-    expect(getMarketContract('robinhood')).toBeNull();
+    // The Robinhood testnet has nothing deployed. Returning some other chain's
+    // contract here, or a zero address, is how a bet reaches the wrong network.
+    expect(getMarketContract('robinhoodTestnet')).toBeNull();
+  });
+
+  it('gives Robinhood mainnet its own contract, collateral and explorer', () => {
+    // V3 is deployed there now, so this is a live assertion rather than the
+    // stubbed one below. The address must not be Base's: pasting it into the
+    // Robinhood slot is the mistake this migration invites, and nothing in the
+    // type system would object to it.
+    const rh = getMarketContract('robinhood');
+    expect(rh).not.toBeNull();
+    expect(rh!.chainId).toBe(4663);
+    expect(rh!.collateral.symbol).toBe('USDG');
+    expect(rh!.explorer).toBe('https://robinhoodchain.blockscout.com');
+    expect(rh!.address).not.toBe(getMarketContract('base')!.address);
   });
 
   it('takes collateral from the same chain as the address, never a Base literal', async () => {
