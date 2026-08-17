@@ -1,3 +1,5 @@
+// Proprietary — not covered by the repository's MIT LICENSE. All rights reserved.
+// See /NOTICE for the licensing split.
 "use client";
 
 import { useState, useEffect } from 'react';

@@ -1,0 +1,40 @@
+Swipe — licensing notice
+=========================
+
+This repository is not single-licensed. Three different grants apply,
+scoped by directory:
+
+1. Application, frontend, and SDK (everything not listed below)
+   License:  MIT
+   File:     /LICENSE
+
+2. Smart contracts
+   Path:     contracts/*.sol  (excluding contracts/mocks/)
+   License:  Business Source License 1.1 (BUSL-1.1)
+   File:     contracts/LICENSE
+   Converts to Apache License 2.0 on 2030-08-17 (or four years after a given
+   version's first public release, whichever is earlier for that version).
+   contracts/mocks/ contains test-only mocks and stays MIT — see the SPDX
+   header in each mock file.
+
+3. AI market-analysis assistant ("Swiper")
+   Paths:    app/components/AIAssistant/, app/api/ai-assistant/
+   License:  Proprietary. All rights reserved. Not covered by the MIT grant
+   in /LICENSE, and not open source at this time.
+
+Why the split
+--------------
+- The frontend and SDK are open immediately so anyone can read, audit, run,
+  and build against Swipe.
+- The contracts are source-available and auditable on day one, but BUSL-1.1
+  stops a verbatim fork from being redeployed as a competing product before
+  the protocol has had time to establish itself — the same model used by
+  Uniswap v3 and Aave v3. The license converts to Apache 2.0 on the Change
+  Date above, after which the contracts become fully permissive.
+- The AI assistant is the one piece of the stack that is a genuine product
+  differentiator today, so it stays closed for now. This may change later;
+  it is not a permanent design decision.
+
+Questions about any of the above, or about commercial licensing of the
+contracts ahead of the Change Date, should be opened as an issue at
+https://github.com/Story91/Swipe.
