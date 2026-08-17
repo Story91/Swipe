@@ -2,8 +2,8 @@
 
 **Tinder-style prediction markets.** Swipe right for YES, left for NO, stake
 crypto, win proportional rewards. Live today at [theswipe.app](https://theswipe.app)
-on Base, with USDC and $SWIPE markets, a Farcaster mini-app, and a testnet
-deployment on Robinhood Chain.
+on Base, with a Farcaster mini-app and a testnet deployment on Robinhood
+Chain.
 
 Most prediction-market projects that go open source stop at the protocol
 layer — infrastructure other people build apps on top of. Swipe is going
@@ -37,43 +37,20 @@ swipe UI). Everything else — the interface, the SDK, the contracts — is
 open. This isn't permanent; it's a call we made for the current stage of
 the project, not a line in the sand.
 
-**This is not legal advice.** Prediction markets that combine staking,
-governance tokens, and community-driven resolution sit in a regulatory grey
-area in several jurisdictions, the US in particular. If you're deploying a
-fork commercially, get your own compliance review — don't treat this
-README as one.
+**This is not legal advice.** Prediction markets that combine staking and
+community-driven resolution sit in a regulatory grey area in several
+jurisdictions, the US in particular. If you're deploying a fork
+commercially, get your own compliance review — don't treat this README as
+one.
 
-## 🏛️ Governance — progressive decentralization
+## 🏛️ Governance
 
-We're not launching a DAO on day one. Empty quorums and governance theater
-are a well-worn failure mode. Instead:
-
-1. **Now — core team.** GitHub is open for issues and PRs. Merge and
-   release decisions sit with the core maintainers while the protocol is
-   young. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
-2. **Next (targeting a few months out) — Snapshot signaling.** $SWIPE
-   holders vote off-chain on direction: new market categories, fee changes,
-   priorities. Cheap to run, and it tells us honestly whether the community
-   wants to vote before we build anything heavier.
-3. **Eventually — on-chain governance.** A governor contract (in the spirit
-   of Compound/OpenZeppelin Governor) controls the treasury and protocol
-   parameters, with a multisig as an emergency brake.
-
-## 🪙 $SWIPE token
-
-Utility (subject to change via governance once Snapshot is live):
-- **Governance** — voting weight once Snapshot/on-chain voting ships.
-- **Staking** — a share of platform fees for stakers.
-- **Fee discounts** on platform fees for holders.
-- **Reputation** for market creators, to keep public market creation from
-  turning into spam.
-
-Planned allocation shape (not final, will be published in full before any
-claim/vesting goes live):
-- **Community / tasks** — the in-app Tasks system already live today.
-- **Treasury** — grants for open-source contributors and, once funded, the
-  bug bounty described in [`SECURITY.md`](SECURITY.md).
-- **Team** — vested over 2–4 years with a cliff, standard for the space.
+For now, Swipe is maintained by the core team: GitHub is open for issues
+and PRs, but merge and release decisions sit with the core maintainers
+while the protocol is young. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for
+the workflow. We're not launching a DAO on day one — empty quorums and
+governance theater are a well-worn failure mode — and we're not publishing
+a longer-term governance plan here yet either. More on this later.
 
 ## 🔥 Features
 
@@ -91,8 +68,8 @@ claim/vesting goes live):
 - **Proportional distribution** — bigger stakes mean bigger absolute
   rewards at the same % return
 - **Emergency refund system** — full refunds if a market is cancelled
-- **Dual-pool support** — native ETH markets and a USDC/$SWIPE dual-pool
-  market (`PredictionMarket_USDC_DualPool.sol`)
+- **Dual-pool support** — native ETH markets and a USDC-denominated
+  dual-pool market (`PredictionMarket_USDC_DualPool.sol`)
 
 ### 🛡️ Quality control
 - **Multi-tier creation** — admin / whitelist / public, with community
@@ -140,7 +117,7 @@ ETHERSCAN_API_V2_KEY=your_etherscan_v2_key    # verification on Base
 
 # Frontend — contract addresses (set the ones you've deployed)
 NEXT_PUBLIC_CONTRACT_ADDRESS=0x...            # V1
-NEXT_PUBLIC_CONTRACT_V2_ADDRESS=0x...         # V2 (ETH + SWIPE pools)
+NEXT_PUBLIC_CONTRACT_V2_ADDRESS=0x...         # V2
 NEXT_PUBLIC_USDC_DUALPOOL_CONTRACT=0x...      # USDC dual-pool market
 NEXT_PUBLIC_SWIPE_CLAIM_CONTRACT=0x...
 NEXT_PUBLIC_DAILY_REWARDS_V3_CONTRACT=0x...
@@ -157,7 +134,7 @@ NEXT_PUBLIC_APPROVER_1=0x...
 ### 3. Deploy contracts
 ```bash
 npm run compile              # hardhat compile, viaIR enabled by default
-npm run deploy:v2            # PredictionMarketV2 → Base mainnet
+npm run deploy:v2            # PredictionMarketV2 → Base mainnet (see contracts/README.md)
 npm run deploy:v2:sepolia    # PredictionMarketV2 → Base Sepolia
 npm run deploy:usdc          # USDC dual-pool market → Base mainnet
 npm run deploy:v3:testnet    # V3 → Robinhood Chain testnet
@@ -204,7 +181,7 @@ Dashboard** (portfolio, betting), **Admin Dashboard** (market management),
 ### Key components
 ```
 📁 contracts/
-  ├── PredictionMarket_V2.sol           # ETH + SWIPE pools
+  ├── PredictionMarket_V2.sol
   ├── PredictionMarket_V3.sol           # current generation
   ├── PredictionMarket_USDC_DualPool.sol
   ├── SwipeClaim.sol
