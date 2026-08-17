@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import sdk from '@farcaster/miniapp-sdk';
+import { WalletIcon } from './walletIcons';
 import './WalletPicker.css';
 
 /**
@@ -25,16 +26,29 @@ const LABELS: Record<string, string> = {
   safe: 'Safe',
 };
 
-const ICONS: Record<string, string> = {
-  'farcaster-frame': '🟣',
-  baseAccount: '🔷',
-  injected: '🦊',
-  coinbaseWalletSDK: '🔵',
-  walletConnect: '🔗',
-  metaMask: '🦊',
-  'io.metamask': '🦊',
-  safe: '🔐',
-};
+/**
+ * Menu order, most-recognised first. Deliberately not the order in wagmi.ts:
+ * that one is load-bearing — OnchainKit's <ConnectWallet> connects with
+ * connectors[0], so baseAccount has to stay first there or Sign In breaks
+ * again. Presentation order is ours to choose.
+ *
+ * Anything unlisted — every EIP-6963 wallet the browser announces — sorts
+ * after these, in discovery order.
+ */
+const ORDER = [
+  'io.metamask',
+  'metaMask',
+  'injected',
+  'coinbaseWalletSDK',
+  'walletConnect',
+  'baseAccount',
+  'farcaster-frame',
+];
+
+function rank(id: string): number {
+  const i = ORDER.indexOf(id);
+  return i === -1 ? ORDER.length : i;
+}
 
 function label(id: string, name: string): string {
   return LABELS[id] ?? name ?? id;
@@ -97,12 +111,14 @@ export function WalletPicker() {
    */
   const available = useMemo(() => {
     const seen = new Set<string>();
-    return connectors.filter((c) => {
-      if (c.id === 'farcaster-frame' && !hasFarcasterProvider) return false;
-      if (seen.has(c.id)) return false;
-      seen.add(c.id);
-      return true;
-    });
+    return connectors
+      .filter((c) => {
+        if (c.id === 'farcaster-frame' && !hasFarcasterProvider) return false;
+        if (seen.has(c.id)) return false;
+        seen.add(c.id);
+        return true;
+      })
+      .sort((a, b) => rank(a.id) - rank(b.id));
   }, [connectors, hasFarcasterProvider]);
 
   // Below every hook, so the early return cannot change how many run.
@@ -147,7 +163,7 @@ export function WalletPicker() {
                 setOpen(false);
               }}
             >
-              <span aria-hidden="true">{ICONS[connector.id] ?? '👛'}</span>
+              <WalletIcon id={connector.id} icon={connector.icon} />
               {label(connector.id, connector.name)}
             </button>
           ))}
