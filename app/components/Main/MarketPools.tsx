@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useReadContract } from 'wagmi';
 import { weightBracket } from './weightBracket';
 import './MarketPools.css';
 
@@ -45,6 +46,22 @@ export interface MarketPoolsProps {
   ethNo: number;
   swipeYes: number;
   swipeNo: number;
+  /**
+   * The live market, so the pools can be read from it rather than from Redis.
+   *
+   * The `yes` and `no` above come through the listing, which is served from a
+   * denormalised snapshot rebuilt only when something invalidates it. That is
+   * why a bet used to need a manual refresh before it showed up here. Given
+   * these, the contract is asked directly and the snapshot becomes the fallback
+   * for the first paint and for a chain that will not answer.
+   *
+   * wagmi keys a read by address, function, args and chain, so the identical
+   * read in YourPosition is the same query and costs one request, not two.
+   */
+  marketAddress?: `0x${string}`;
+  abi?: readonly unknown[];
+  chainId?: number;
+  numericId?: number;
 }
 
 const WEIGHTS = [
@@ -55,6 +72,51 @@ const WEIGHTS = [
 
 function units(raw: number, decimals: number): number {
   return raw / 10 ** decimals;
+}
+
+/**
+ * The pools as the contract has them, or null until it answers.
+ *
+ * predictions(id) returns sixteen values; the four read here are yesPool at 3,
+ * noPool at 4, createdAt at 11 and participantCount at 15. Indexed rather than
+ * named because the ABI returns a tuple, which is why marketPools.test.ts
+ * asserts the struct's field order against the .sol file: an inserted field
+ * would otherwise shift these silently and put a timestamp where a pool goes.
+ */
+function useLivePools(params: {
+  marketAddress?: `0x${string}`;
+  abi?: readonly unknown[];
+  chainId?: number;
+  numericId?: number;
+}): { yes: number; no: number; createdAt: number; participants: number } | null {
+  const { marketAddress, abi, chainId, numericId } = params;
+  const enabled = Boolean(marketAddress && abi && numericId && numericId > 0);
+
+  const { data } = useReadContract({
+    address: marketAddress,
+    abi: abi as never,
+    functionName: 'predictions',
+    args: numericId ? [BigInt(numericId)] : undefined,
+    chainId,
+    query: {
+      enabled,
+      // Someone else betting changes these, so a poll is the only way the card
+      // stays honest while it sits open.
+      refetchInterval: 15_000,
+    },
+  });
+
+  if (!data) return null;
+  const row = data as readonly bigint[];
+  if (row.length < 16) return null;
+  if (!row[0]) return null; // not registered on chain
+
+  return {
+    yes: Number(row[3]),
+    no: Number(row[4]),
+    createdAt: Number(row[11]),
+    participants: Number(row[15]),
+  };
 }
 
 /** Two sides and the bar between them, for one token. */
@@ -159,14 +221,29 @@ export function MarketPools({
   ethNo,
   swipeYes,
   swipeNo,
+  marketAddress,
+  abi,
+  chainId,
+  numericId,
 }: MarketPoolsProps) {
+  const live = useLivePools({ marketAddress, abi, chainId, numericId });
+  // The chain when it answers, the snapshot until it does. Both are raw units
+  // in the same decimals, so nothing downstream has to know which it got.
+  const yesNow = live?.yes ?? yes;
+  const noNow = live?.no ?? no;
+  const backersNow = live?.participants ?? participants;
+  // createdAt from the contract is the real one. The record's is fabricated as
+  // deadline minus a day on some paths, and the weighting strip is exactly the
+  // thing that must not be computed from a guess.
+  const openedAt = live?.createdAt ?? createdAt;
+
   const now = Math.floor(Date.now() / 1000);
-  const bracket = weightBracket(now, createdAt, deadline);
+  const bracket = weightBracket(now, openedAt, deadline);
   const settled = deadline > 0 && now >= deadline;
 
   const collateral = (n: number) =>
     units(n, decimals).toLocaleString(undefined, { maximumFractionDigits: 2 });
-  const total = units(yes + no, decimals);
+  const total = units(yesNow + noNow, decimals);
 
   const hasEth = ethYes + ethNo > 0;
   const hasSwipe = swipeYes + swipeNo > 0;
@@ -190,9 +267,9 @@ export function MarketPools({
     <div className="mkpools">
       <Pool
         title={`${symbol} pool`}
-        total={`${collateral(yes + no)} ${symbol}`}
-        yes={yes}
-        no={no}
+        total={`${collateral(yesNow + noNow)} ${symbol}`}
+        yes={yesNow}
+        no={noNow}
         format={collateral}
         emptyNote={
           total === 0
@@ -205,7 +282,7 @@ export function MarketPools({
         <header className="mkpool__head">
           <h3 className="mkpool__title">How this one pays</h3>
           <span className="mkpool__total">
-            {participants} {participants === 1 ? 'backer' : 'backers'}
+            {backersNow} {backersNow === 1 ? 'backer' : 'backers'}
           </span>
         </header>
 

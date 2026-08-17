@@ -2925,6 +2925,10 @@ KEY USER-FACING CHANGES: V1 → V2
         ethNo={transformedPredictions[currentIndex]?.noTotalAmount || 0}
         swipeYes={transformedPredictions[currentIndex]?.swipeYesTotalAmount || 0}
         swipeNo={transformedPredictions[currentIndex]?.swipeNoTotalAmount || 0}
+        marketAddress={marketWrite.market?.address}
+        abi={marketWrite.market?.abi as readonly unknown[] | undefined}
+        chainId={marketWrite.market?.chainId}
+        numericId={transformedPredictions[currentIndex]?.id}
       />
 
       {/* Active Swipers - Hacker Style */}
