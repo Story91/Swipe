@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { parseMarketId, marketNumber, canonicalMarketId, isV3MarketId } from './marketId';
+import {
+  parseMarketId,
+  marketNumber,
+  canonicalMarketId,
+  isV3MarketId,
+  isCurrentMarketId,
+  CURRENT_GENERATION,
+} from './marketId';
 
 describe('reading a market number out of a Redis id', () => {
   it('reads every generation, including the bare legacy form', () => {
@@ -36,7 +43,10 @@ describe('reading a market number out of a Redis id', () => {
 
 describe('refusing rather than guessing', () => {
   it('returns null for anything it cannot read', () => {
-    for (const bad of ['', 'pred_', 'pred_v4_1', 'prediction:1', 'pred_v2_', 'pred_v2_x', 'v2_1', null, undefined, {}, []]) {
+    // pred_v5_1 stands in for a generation that does not exist yet. It used to
+    // be pred_v4_1, and adding V4 turned this assertion red, which is the test
+    // doing its job rather than a problem with it.
+    for (const bad of ['', 'pred_', 'pred_v5_1', 'prediction:1', 'pred_v2_', 'pred_v2_x', 'v2_1', null, undefined, {}, []]) {
       expect(parseMarketId(bad as unknown)).toBeNull();
     }
   });
@@ -72,7 +82,7 @@ describe('refusing rather than guessing', () => {
 
 describe('building an id', () => {
   it('round-trips every generation', () => {
-    for (const g of ['v1', 'v2', 'v3', 'legacy'] as const) {
+    for (const g of ['v1', 'v2', 'v3', 'v4', 'legacy'] as const) {
       const id = canonicalMarketId(g, 9);
       const parsed = parseMarketId(id)!;
       expect(parsed.generation).toBe(g);
@@ -85,5 +95,29 @@ describe('building an id', () => {
     expect(isV3MarketId('pred_v2_1')).toBe(false);
     expect(isV3MarketId('pred_1')).toBe(false);
     expect(isV3MarketId(1)).toBe(false);
+  });
+
+  it('parses a v4 id, which is the generation the app writes to', () => {
+    const parsed = parseMarketId('pred_v4_12')!;
+    expect(parsed.generation).toBe('v4');
+    expect(parsed.numericId).toBe(12);
+    expect(parsed.redisId).toBe('pred_v4_12');
+  });
+
+  it('treats v4 as current and everything older as history', () => {
+    expect(CURRENT_GENERATION).toBe('v4');
+    expect(isCurrentMarketId('pred_v4_1')).toBe(true);
+    // V3 carries four real markets, so it must parse, and must not be current.
+    expect(isCurrentMarketId('pred_v3_1')).toBe(false);
+    expect(isCurrentMarketId('pred_v2_1')).toBe(false);
+    expect(isCurrentMarketId('pred_1')).toBe(false);
+    expect(isCurrentMarketId('not an id')).toBe(false);
+  });
+
+  it('does not let a v4 id collide with the v3 market of the same number', () => {
+    // The four V3 markets were abandoned when the contract was redeployed with
+    // the role split. Market 1 exists on both contracts and they are different
+    // markets, so the ids must stay distinct.
+    expect(parseMarketId('pred_v4_1')!.redisId).not.toBe(parseMarketId('pred_v3_1')!.redisId);
   });
 });

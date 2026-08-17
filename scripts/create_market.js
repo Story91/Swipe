@@ -6,9 +6,9 @@ const { Redis } = require("@upstash/redis");
  * Creates one market end to end: allocates its number, registers it on chain,
  * and writes the Redis record the app reads.
  *
- * registerPrediction is onlyResolver, so a market cannot be minted from the app.
- * This is the operator's tool for making them by hand, and that is the whole of
- * market creation until permissionless creation lands.
+ * registerPrediction is onlyRegistrar on V4, so a market cannot be minted
+ * straight from a user's wallet. This is the operator's tool for making them by
+ * hand; the server does the same thing for markets people propose.
  *
  *   QUESTION="Will ETH close above $4,000 on 31 Dec?" HOURS=168 \
  *     npx hardhat run scripts/create_market.js --network base
@@ -30,7 +30,7 @@ const { Redis } = require("@upstash/redis");
 const CHAINS = {
   base: {
     key: "base",
-    market: process.env.NEXT_PUBLIC_BASE_V3_CONTRACT || "0x5C4078BB24f352809B93FF395cA7655835D1CA4a",
+    market: process.env.NEXT_PUBLIC_BASE_V4_CONTRACT || "0x4129d706c283e6bAC749CFe9221AD322981917E6",
     collateral: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
     explorer: "https://basescan.org",
     /** Base is the identity namespace, so its keys keep the shape they have. */
@@ -38,14 +38,25 @@ const CHAINS = {
   },
   robinhood: {
     key: "robinhood",
-    market: process.env.NEXT_PUBLIC_ROBINHOOD_V3_CONTRACT || "0x1AD8DD99C31EA51c1bCE99fB10d609485937C7DA",
+    market: process.env.NEXT_PUBLIC_ROBINHOOD_V4_CONTRACT || "0x41a6Fd3d35C0F9DD13773A763358E35B5216eEe4",
     collateral: "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
     explorer: "https://robinhoodchain.blockscout.com",
     prefix: "robinhood:",
   },
 };
 
-const V3_ID_COUNTER = "market:v3:next_id";
+/**
+ * The same counter lib/marketAllocator.ts allocates from, written out because
+ * hardhat runs this file untranspiled and it cannot import a .ts module.
+ *
+ * These two were briefly different. The web proposal path counted from
+ * market:v3:next_id and stamped pred_v3_, this script counted from
+ * market:v4:next_id and stamped pred_v4_, and both registered against the same
+ * V4 contract. Neither probe could see the other's records, so the two of them
+ * could hand out one on-chain market number twice. marketAllocator.test.ts
+ * asserts this exact string, so changing it there fails the suite here.
+ */
+const V4_ID_COUNTER = "market:v4:next_id";
 const MAX_PROBES = 50;
 
 /**
@@ -90,7 +101,7 @@ async function readBack(market, numericId) {
   }
   throw new Error(
     `Market ${numericId} still reads as unregistered after ${READBACK_ATTEMPTS} tries. ` +
-      `If the registration transaction succeeded, re-run with ADOPT_ID=${numericId} rather than creating it again.`
+      `If the registration transaction succeeded, re-run with ADOPT_ID= rather than creating it again.`
   );
 }
 
@@ -103,12 +114,12 @@ function requireEnv(name) {
 /** Same rule as lib/marketAllocator.ts: INCR, never a scan for the highest id. */
 async function allocateId(redis, prefix) {
   for (let attempt = 0; attempt < MAX_PROBES; attempt++) {
-    const candidate = await redis.incr(V3_ID_COUNTER);
+    const candidate = await redis.incr(V4_ID_COUNTER);
     if (!Number.isSafeInteger(candidate) || candidate < 1) break;
-    const existing = await redis.get(`${prefix}prediction:pred_v3_${candidate}`);
+    const existing = await redis.get(`${prefix}prediction:pred_v4_${candidate}`);
     if (existing === null || existing === undefined) return candidate;
   }
-  throw new Error(`Could not find a free market id. The counter ${V3_ID_COUNTER} is behind.`);
+  throw new Error(`Could not find a free market id. The counter ${V4_ID_COUNTER} is behind.`);
 }
 
 async function main() {
@@ -127,7 +138,7 @@ async function main() {
   const creator = (process.env.CREATOR ?? signer.address).toLowerCase();
   if (!/^0x[0-9a-f]{40}$/.test(creator)) throw new Error("CREATOR must be an address");
 
-  const market = await ethers.getContractAt("PredictionMarket_V3", chain.market, signer);
+  const market = await ethers.getContractAt("PredictionMarket_V4", chain.market, signer);
 
   // Confirms the address holds the contract we think it does, on the chain we
   // think we are on. This is what catches the address copy above drifting from
@@ -139,10 +150,22 @@ async function main() {
     );
   }
 
-  // Refuse early rather than reverting. registerPrediction is onlyResolver, and
-  // a revert is indistinguishable from a dozen other failures.
-  if (!(await market.resolvers(signer.address))) {
-    throw new Error(`${signer.address} is not a resolver on ${chain.market}`);
+  // Refuse early rather than reverting, because a revert is indistinguishable
+  // from a dozen other failures.
+  //
+  // The role to check is registrar, not resolver. V4 split them: a resolver
+  // settles markets and cannot open one. Checking the wrong role here would
+  // pass for a key that then reverts, and fail for a key that would have
+  // worked.
+  const [isOwner, isRegistrar] = await Promise.all([
+    market.owner().then((o) => o.toLowerCase() === signer.address.toLowerCase()),
+    market.registrars(signer.address),
+  ]);
+  if (!isOwner && !isRegistrar) {
+    throw new Error(
+      `${signer.address} cannot open markets on ${chain.market}. ` +
+        `It is neither the owner nor a registrar. Grant it with setRegistrar.`
+    );
   }
 
   const redis = new Redis({
@@ -156,7 +179,7 @@ async function main() {
   // on chain and cannot be seen in the app. Registering again would revert.
   const adopt = process.env.ADOPT_ID ? Number(process.env.ADOPT_ID) : null;
   const numericId = adopt ?? (await allocateId(redis, chain.prefix));
-  const id = `pred_v3_${numericId}`;
+  const id = `pred_v4_${numericId}`;
   let deadline = Math.floor(Date.now() / 1000) + Math.round(hours * 3600);
 
   console.log(`Creating ${id} on ${chain.key}`);
@@ -223,7 +246,10 @@ async function main() {
     needsApproval: false,
     participants: [],
     totalStakes: 0,
-    contractVersion: "V3",
+    // The contract this was actually registered on, which is the V4 address in
+    // CHAINS above. It said "V3" while minting pred_v4_ ids, so the record
+    // disagreed with its own id about which contract holds the money.
+    contractVersion: "V4",
   };
 
   const p = chain.prefix;

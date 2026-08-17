@@ -24,6 +24,10 @@ export interface RedisPrediction {
   usdcResolved?: boolean; // Whether prediction is resolved on USDC contract
   usdcCancelled?: boolean; // Whether prediction is cancelled on USDC contract
   usdcOutcome?: boolean; // Outcome on USDC contract (true = YES, false = NO)
+  // Resolved with nobody on the winning side, so everyone gets their raw stake
+  // back. /api/sync/usdc has written this since V3 and nothing declared it, so
+  // the claim path could not read it and sent claimWinnings into a revert.
+  usdcRefundable?: boolean;
   resolved: boolean;
   outcome?: boolean;
   cancelled: boolean;
@@ -48,7 +52,9 @@ export interface RedisPrediction {
     totalPool: number; // in USDC (6 decimals)
     participantCount: number;
   };
-  contractVersion?: 'V1' | 'V2'; // Contract version for hybrid migration
+  // Which contract generation minted this market. V3 registered four empty
+  // markets on Base and nothing else; V4 is what the app writes to now.
+  contractVersion?: 'V1' | 'V2' | 'V3' | 'V4';
 }
 
 export interface RedisUserStake {
@@ -58,7 +64,7 @@ export interface RedisUserStake {
   noAmount: number;
   claimed: boolean;
   stakedAt: number;
-  contractVersion?: 'V1' | 'V2' | 'V3'; // Which contract generation minted it
+  contractVersion?: 'V1' | 'V2' | 'V3' | 'V4'; // Which contract generation minted it
   isWinner?: boolean; // V2 only
   tokenType?: 'ETH' | 'SWIPE' | 'USDC'; // Token type for multi-token support
   canClaim?: boolean; // Calculated property - whether stake is ready to claim

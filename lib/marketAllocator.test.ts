@@ -1,13 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import {
-  allocateV3MarketId,
-  seedV3Counter,
+  allocateMarketId,
+  seedMarketCounter,
   MarketIdUnavailableError,
-  V3_ID_COUNTER,
+  MARKET_ID_COUNTER,
   type AllocatorStore,
 } from './marketAllocator';
+import { canonicalMarketId, CURRENT_GENERATION } from './marketId';
 
 const predictionKey = (id: string) => `prediction:${id}`;
+
+/** The id this allocator would mint for `n`, so the tests follow the constant. */
+const idFor = (n: number) => canonicalMarketId(CURRENT_GENERATION, n);
 
 /** An in-memory stand-in whose INCR is atomic the way Redis's is. */
 function makeStore(seed: Record<string, unknown> = {}): AllocatorStore & { data: Record<string, unknown> } {
@@ -29,11 +33,11 @@ function makeStore(seed: Record<string, unknown> = {}): AllocatorStore & { data:
   };
 }
 
-describe('allocating a V3 market number', () => {
+describe('allocating a market number', () => {
   it('starts at 1 and never repeats', async () => {
     const store = makeStore();
     const ids = [];
-    for (let i = 0; i < 5; i++) ids.push(await allocateV3MarketId(store, predictionKey));
+    for (let i = 0; i < 5; i++) ids.push(await allocateMarketId(store, predictionKey));
     expect(ids).toEqual([1, 2, 3, 4, 5]);
     expect(new Set(ids).size).toBe(ids.length);
   });
@@ -44,7 +48,7 @@ describe('allocating a V3 market number', () => {
     // and bets from either card settle against the same on-chain market.
     const store = makeStore();
     const ids = await Promise.all(
-      Array.from({ length: 20 }, () => allocateV3MarketId(store, predictionKey))
+      Array.from({ length: 20 }, () => allocateMarketId(store, predictionKey))
     );
     expect(new Set(ids).size).toBe(20);
   });
@@ -52,20 +56,20 @@ describe('allocating a V3 market number', () => {
   it('steps over a number that already has a record', async () => {
     // Any environment where markets were written before the counter existed.
     const store = makeStore({
-      [predictionKey('pred_v3_1')]: '{}',
-      [predictionKey('pred_v3_2')]: '{}',
+      [predictionKey(idFor(1))]: '{}',
+      [predictionKey(idFor(2))]: '{}',
     });
-    expect(await allocateV3MarketId(store, predictionKey)).toBe(3);
+    expect(await allocateMarketId(store, predictionKey)).toBe(3);
   });
 
   it('throws rather than returning a colliding number', async () => {
     // Every candidate taken. Refusing is correct: a caller that gets an error
     // writes nothing, a caller handed a taken number overwrites a live market.
     const taken: Record<string, unknown> = {};
-    for (let i = 1; i <= 200; i++) taken[predictionKey(`pred_v3_${i}`)] = '{}';
+    for (let i = 1; i <= 200; i++) taken[predictionKey(idFor(i))] = '{}';
     const store = makeStore(taken);
 
-    await expect(allocateV3MarketId(store, predictionKey)).rejects.toBeInstanceOf(
+    await expect(allocateMarketId(store, predictionKey)).rejects.toBeInstanceOf(
       MarketIdUnavailableError
     );
   });
@@ -73,22 +77,48 @@ describe('allocating a V3 market number', () => {
   it('does not confuse an existing record with an empty one', async () => {
     // A record stored as an empty string is still a record. Treating a falsy
     // value as absent would hand out its id again.
-    const store = makeStore({ [predictionKey('pred_v3_1')]: '' });
-    expect(await allocateV3MarketId(store, predictionKey)).toBe(2);
+    const store = makeStore({ [predictionKey(idFor(1))]: '' });
+    expect(await allocateMarketId(store, predictionKey)).toBe(2);
+  });
+});
+
+describe('the counter and the id prefix name the same generation', () => {
+  // The bug this pins down: the counter said v3 and create_market.js said v4,
+  // so two allocators handed out numbers into one on-chain id space. Neither
+  // one saw the other's records, because each probed a prefix the other never
+  // wrote. Checking the two names agree is what makes that impossible to
+  // reintroduce by editing one of them.
+  it('derives the counter key from the generation it mints', () => {
+    expect(MARKET_ID_COUNTER).toBe(`market:${CURRENT_GENERATION}:next_id`);
+  });
+
+  it('probes the prefix it is about to write', async () => {
+    // Seed a record under the id the allocator will produce for 1. If the probe
+    // looked at a different generation's prefix it would not see this and would
+    // return 1 anyway.
+    const store = makeStore({ [predictionKey(idFor(1))]: '{}' });
+    expect(await allocateMarketId(store, predictionKey)).toBe(2);
+    expect(idFor(1)).toContain(CURRENT_GENERATION);
+  });
+
+  it('matches the counter scripts/create_market.js hardcodes', () => {
+    // That script cannot import this file, so it writes the string out. If this
+    // assertion fails, the script is allocating from a different counter again.
+    expect(MARKET_ID_COUNTER).toBe('market:v4:next_id');
   });
 });
 
 describe('seeding the counter', () => {
   it('raises it above existing records', async () => {
     const store = makeStore();
-    await seedV3Counter(store, 41);
-    expect(await allocateV3MarketId(store, predictionKey)).toBe(42);
+    await seedMarketCounter(store, 41);
+    expect(await allocateMarketId(store, predictionKey)).toBe(42);
   });
 
   it('never lowers it, because that hands out a number twice', async () => {
-    const store = makeStore({ [V3_ID_COUNTER]: 100 });
-    const after = await seedV3Counter(store, 5);
+    const store = makeStore({ [MARKET_ID_COUNTER]: 100 });
+    const after = await seedMarketCounter(store, 5);
     expect(after).toBe(100);
-    expect(await allocateV3MarketId(store, predictionKey)).toBe(101);
+    expect(await allocateMarketId(store, predictionKey)).toBe(101);
   });
 });

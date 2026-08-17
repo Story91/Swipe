@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useActiveChain } from '@/lib/chains/activeChain';
 import { getMarketContract, txUrl } from '@/lib/chains/market';
-import { parseMarketId } from '@/lib/marketId';
+import { parseMarketId, CURRENT_GENERATION } from '@/lib/marketId';
 import { CONTRACTS, getV1Contract, getV2Contract, getContractForPrediction, USDC_DUALPOOL_CONTRACT_ADDRESS, USDC_DUALPOOL_ABI } from '../../../lib/contract';
 import { ethers } from 'ethers';
 import { useHybridPredictions } from '../../../lib/hooks/useHybridPredictions';
@@ -90,6 +90,10 @@ interface PredictionWithStakes {
   usdcResolved?: boolean;
   usdcCancelled?: boolean;
   usdcOutcome?: boolean;
+  // Resolved, but with an empty winning side, so it pays refunds rather than
+  // winnings. A separate flag from cancelled because the contract treats them
+  // separately and they take different claim calls.
+  usdcRefundable?: boolean;
   status: 'active' | 'resolved' | 'expired' | 'cancelled';
 }
 
@@ -1272,24 +1276,21 @@ export function EnhancedUserDashboard() {
     try {
       // Check if this is a blockchain prediction (starts with pred_)
       if (predictionId.startsWith('pred_')) {
-        // Extract numeric ID for blockchain transaction
-        let numericId: number;
-        
-        if (predictionId.startsWith('pred_v1_')) {
-          // V1 prediction: pred_v1_9 -> 9
-          numericId = parseInt(predictionId.replace('pred_v1_', ''));
-        } else if (predictionId.startsWith('pred_v2_')) {
-          // V2 prediction: pred_v2_9 -> 9
-          numericId = parseInt(predictionId.replace('pred_v2_', ''));
-        } else {
-          // Legacy prediction: pred_9 -> 9
-          numericId = parseInt(predictionId.replace('pred_', ''));
-        }
-        
-        if (isNaN(numericId)) {
+        // One parser, not a ladder of string strips.
+        //
+        // The ladder handled pred_v1_, pred_v2_ and bare pred_N, and everything
+        // else fell into its last arm, where `pred_v3_9`.replace('pred_','')
+        // yields 'v3_9' and parseInt yields NaN. So every market on V3 and then
+        // on V4 alerted "Invalid prediction ID" and returned, which made the
+        // routing below unreachable code and made claiming impossible on the
+        // only contracts that take bets. parseMarketId knows every generation
+        // and gains new ones without another arm being added here.
+        const claimRef = parseMarketId(predictionId);
+        if (!claimRef) {
           alert('❌ Invalid prediction ID');
           return;
         }
+        const numericId = claimRef.numericId;
 
         console.log(`🎯 Attempting to claim reward for prediction ${numericId}...`);
 
@@ -1297,18 +1298,24 @@ export function EnhancedUserDashboard() {
         if (tokenType === 'USDC') {
           console.log(`🎯 Using USDC DualPool contract for claim`);
           
-          // Determine function: claimWinnings for resolved, claimRefund for cancelled
-          const functionName = prediction.cancelled || prediction.usdcCancelled ? 'claimRefund' : 'claimWinnings';
+          // Three ways a position pays out, not two. Cancelled refunds, and so
+          // does a market that resolved with nobody on the winning side, which
+          // the contract flags as refundable and which claimWinnings rejects
+          // with "Not claimable". /api/sync/usdc has always stored that flag;
+          // this line just never read it, so the one case where every backer is
+          // owed their stake back was the one case the button could not pay.
+          const isRefund =
+            prediction.cancelled || prediction.usdcCancelled || prediction.usdcRefundable;
+          const functionName = isRefund ? 'claimRefund' : 'claimWinnings';
           console.log(`🎯 Claiming USDC reward using function: ${functionName}`);
 
           // Two contract generations hold positions at once, and a claim has to
-          // go to the one that actually holds this market's money. Sending a V3
-          // claim to the archived pool reverts, and reads to the user as their
-          // winnings being unavailable.
-          const claimRef = parseMarketId(predictionId);
+          // go to the one that actually holds this market's money. Sending a
+          // claim for a live market to the archived pool reverts, and reads to
+          // the user as their winnings being unavailable.
           const liveMarket = getMarketContract(claimChainKey);
           const claimTarget =
-            claimRef?.generation === 'v3' && liveMarket
+            claimRef.generation === CURRENT_GENERATION && liveMarket
               ? { address: liveMarket.address, abi: liveMarket.abi, chainId: liveMarket.chainId }
               : {
                   address: USDC_DUALPOOL_CONTRACT_ADDRESS as `0x${string}`,

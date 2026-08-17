@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { redis, REDIS_KEYS } from '@/lib/redis';
 import { USDCPricePoint, USDCPriceHistory } from '@/lib/types/redis';
-import { createChainPublicClient, DEFAULT_CHAIN_KEY } from '@/lib/chains';
+import { createChainPublicClient } from '@/lib/chains';
+import { chainFromRequest, chainFromRequestOrBody } from '@/lib/chains/requestChain';
 import { getMarketContract } from '@/lib/chains/market';
-import { parseMarketId } from '@/lib/marketId';
+import { parseMarketId, CURRENT_GENERATION } from '@/lib/marketId';
 
 /**
  * The price history behind the odds chart.
@@ -26,10 +27,17 @@ export async function GET(
 ) {
   try {
     const { id: predictionId } = await params;
-    
+
+    // Market 1 has a price history on each chain and they are different lines.
+    // Absent ?chain= means Base, where the existing histories were written.
+    const requested = chainFromRequest(request);
+    if (!requested.ok) {
+      return NextResponse.json({ success: false, error: requested.error }, { status: 400 });
+    }
+
     // Get price history from Redis
-    const historyData = await redis.get(REDIS_KEYS.USDC_PRICE_HISTORY(predictionId));
-    
+    const historyData = await redis.get(REDIS_KEYS.USDC_PRICE_HISTORY(predictionId, requested.chain));
+
     if (!historyData) {
       // Return empty history if none exists
       return NextResponse.json({
@@ -78,17 +86,30 @@ export async function POST(
     const betAmount = typeof body.betAmount === 'number' ? body.betAmount : undefined;
     const betSide = body.betSide === 'yes' || body.betSide === 'no' ? body.betSide : undefined;
 
-    // Only V3 markets have pools this can read. V1 and V2 are archived and take
-    // no new stakes, so there is no honest point to append to their history.
+    // The chain decides three things at once here: which contract the pools are
+    // read from, which market address that is, and which Redis key the point
+    // lands in. They have to be the same chain or the chart shows one market's
+    // odds under another market's name. Query string first, then the body,
+    // because the client posts a JSON body and older callers send neither.
+    const requested = chainFromRequestOrBody(request, body);
+    if (!requested.ok) {
+      return NextResponse.json({ success: false, error: requested.error }, { status: 400 });
+    }
+    const chain = requested.chain;
+
+    // Only markets on the live contract have pools this can read. Everything
+    // older is archived and takes no new stakes, so there is no honest point to
+    // append to their history. Asked against CURRENT_GENERATION rather than a
+    // literal, because a literal here is what left V4 markets with no chart.
     const parsed = parseMarketId(predictionId);
-    if (!parsed || parsed.generation !== 'v3') {
+    if (!parsed || parsed.generation !== CURRENT_GENERATION) {
       return NextResponse.json(
-        { success: false, error: 'Price history is only recorded for V3 markets' },
+        { success: false, error: 'Price history is only recorded for markets on the live contract' },
         { status: 400 }
       );
     }
 
-    const market = getMarketContract(DEFAULT_CHAIN_KEY);
+    const market = getMarketContract(chain);
     if (!market) {
       return NextResponse.json(
         { success: false, error: 'No market contract on this chain' },
@@ -98,7 +119,7 @@ export async function POST(
 
     // The pools come from the contract. This is the whole point of the route:
     // the caller says which market, and nothing else.
-    const client = createChainPublicClient(DEFAULT_CHAIN_KEY);
+    const client = createChainPublicClient(chain);
     const onChain = (await client.readContract({
       address: market.address,
       abi: market.abi,
@@ -134,7 +155,7 @@ export async function POST(
     };
 
     // Get existing history
-    const historyData = await redis.get(REDIS_KEYS.USDC_PRICE_HISTORY(predictionId));
+    const historyData = await redis.get(REDIS_KEYS.USDC_PRICE_HISTORY(predictionId, chain));
     let history: USDCPricePoint[] = [];
     
     if (historyData) {
@@ -171,7 +192,7 @@ export async function POST(
     };
     
     await redis.set(
-      REDIS_KEYS.USDC_PRICE_HISTORY(predictionId),
+      REDIS_KEYS.USDC_PRICE_HISTORY(predictionId, chain),
       JSON.stringify(updatedHistory)
     );
     

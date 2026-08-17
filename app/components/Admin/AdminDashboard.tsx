@@ -5,7 +5,7 @@ import { useReadContract, usePublicClient, useWriteContract } from 'wagmi';
 import { CONTRACTS, getV2Contract, USDC_DUALPOOL_CONTRACT_ADDRESS, USDC_DUALPOOL_ABI } from '../../../lib/contract';
 import { useAdminPredictions } from '../../../lib/hooks/useAdminPredictions';
 import { useAdminRequest } from '../../../lib/auth/useAdminRequest';
-import { marketNumber, parseMarketId } from '@/lib/marketId';
+import { marketNumber, parseMarketId, CURRENT_GENERATION } from '@/lib/marketId';
 import { useMarketWrite } from '@/lib/chains/useMarketWrite';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 
@@ -454,10 +454,12 @@ export function AdminDashboard({
   const handleCancel = async (predictionId: string | number) => {
     const reason = prompt('Reason for emergency cancellation:');
     if (reason) {
-      // V3 cancels on the live market, same guarded path as resolve. A cancelled
-      // market becomes refundable, so every backer gets their raw stake back.
-      const v3 = parseMarketId(predictionId);
-      if (v3?.generation === 'v3') {
+      // A market on the live contract cancels there, same guarded path as
+      // resolve. Cancelling makes it refundable, so every backer gets their raw
+      // stake back. Matched against CURRENT_GENERATION rather than a literal:
+      // this branch said 'v3' and stopped firing the day the config moved to V4.
+      const live = parseMarketId(predictionId);
+      if (live?.generation === CURRENT_GENERATION) {
         if (!marketWrite.ready) {
           alert('❌ The selected network has no Swipe market deployed.');
           return;
@@ -465,18 +467,18 @@ export function AdminDashboard({
         try {
           const hash = await marketWrite.write({
             functionName: 'cancelPrediction',
-            args: [BigInt(v3.numericId), reason],
+            args: [BigInt(live.numericId), reason],
           });
           const receipt = await publicClient?.waitForTransactionReceipt({ hash });
           if (receipt && receipt.status !== 'success') {
             alert(`❌ Cancellation reverted on chain.\nTransaction: ${hash}`);
             return;
           }
-          alert(`✅ Market ${v3.numericId} cancelled. Everyone can claim a refund.\nTransaction: ${hash}`);
+          alert(`✅ Market ${live.numericId} cancelled. Everyone can claim a refund.\nTransaction: ${hash}`);
           await fetch('/api/sync/usdc', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ predictionIds: [v3.redisId] }),
+            body: JSON.stringify({ predictionIds: [live.redisId] }),
           }).catch((e) => console.warn('Sync after cancellation failed:', e));
           handleRefresh();
         } catch (error: unknown) {
@@ -567,23 +569,25 @@ export function AdminDashboard({
     let numericId: number | null = null;
     let contractVersion: 'V1' | 'V2' = 'V2'; // Default to V2
 
-    // V3 settles on the live market, through the same guarded path registration
-    // uses. Without this branch a V3 market could be created and bet on and then
-    // never settled: every other resolve here targets V1, V2 or the archived
-    // pool, so the money would sit until the 30 day permissionless refund.
-    const v3 = parseMarketId(predictionId);
-    if (v3?.generation === 'v3') {
+    // A market on the live contract settles there, through the same guarded path
+    // registration uses. Without this branch it could be created and bet on and
+    // then never settled: every other resolve here targets V1, V2 or the
+    // archived pool, so the money would sit until the 30 day permissionless
+    // refund. The generation is read from the config for that reason, because a
+    // literal 'v3' here silently stopped matching anything the app now mints.
+    const live = parseMarketId(predictionId);
+    if (live?.generation === CURRENT_GENERATION) {
       if (!marketWrite.ready) {
         alert('❌ The selected network has no Swipe market deployed.');
         return;
       }
-      if (!confirm(`Resolve market ${v3.numericId} as ${side}?\n\nThis pays out. It cannot be undone.`)) {
+      if (!confirm(`Resolve market ${live.numericId} as ${side}?\n\nThis pays out. It cannot be undone.`)) {
         return;
       }
       try {
         const hash = await marketWrite.write({
           functionName: 'resolvePrediction',
-          args: [BigInt(v3.numericId), outcome],
+          args: [BigInt(live.numericId), outcome],
         });
         // The receipt, not the hash. Announcing success on a hash and writing
         // Redis before the transaction mines is what left registration claiming
@@ -593,11 +597,11 @@ export function AdminDashboard({
           alert(`❌ Resolution reverted on chain.\nTransaction: ${hash}`);
           return;
         }
-        alert(`✅ Market ${v3.numericId} resolved as ${side}.\nTransaction: ${hash}`);
+        alert(`✅ Market ${live.numericId} resolved as ${side}.\nTransaction: ${hash}`);
         await fetch('/api/sync/usdc', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ predictionIds: [v3.redisId] }),
+          body: JSON.stringify({ predictionIds: [live.redisId] }),
         }).catch((e) => console.warn('Sync after resolution failed:', e));
         handleRefresh();
       } catch (error: unknown) {

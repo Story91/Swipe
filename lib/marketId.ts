@@ -21,7 +21,19 @@
  * canonical id so nothing has to rebuild a prefix by hand.
  */
 
-export type MarketGeneration = 'v1' | 'v2' | 'v3' | 'legacy';
+export type MarketGeneration = 'v1' | 'v2' | 'v3' | 'v4' | 'legacy';
+
+/**
+ * The generation the app writes to. Everything older is history.
+ *
+ * Read this rather than writing 'v4' at a call site. Every place that spelled
+ * out the then-current generation as a literal, and there were seven, silently
+ * stopped matching the day the config moved on: sync read a dead contract, the
+ * resolver treated an on-chain market as Redis-only, and the claim button could
+ * not find the contract holding the money. A literal here is a bug with a delay
+ * on it.
+ */
+export const CURRENT_GENERATION: MarketGeneration = 'v4';
 
 export interface MarketRef {
   /** Which contract generation minted this market. */
@@ -32,7 +44,7 @@ export interface MarketRef {
   redisId: string;
 }
 
-const PATTERN = /^pred_(?:(v1|v2|v3)_)?(\d+)$/;
+const PATTERN = /^pred_(?:(v1|v2|v3|v4)_)?(\d+)$/;
 
 /**
  * Parse a Redis prediction id, or null if it is not one.
@@ -76,6 +88,23 @@ export function canonicalMarketId(generation: MarketGeneration, numericId: numbe
 }
 
 /** True when this id belongs to the current contract generation. */
+export function isCurrentMarketId(id: unknown): boolean {
+  return parseMarketId(id)?.generation === CURRENT_GENERATION;
+}
+
+/**
+ * True for the generation the app used before the role split.
+ *
+ * Four markets were registered on V3 and all four are empty: measured on chain,
+ * zero pooled and zero participants on Base, nothing at all on Robinhood. The
+ * config no longer carries a V3 address either, so nothing can read them and
+ * there is no money to lose by not reading them.
+ *
+ * Kept only so the four ids stay recognisable rather than parsing as something
+ * they are not. Anything deciding where a bet or a claim goes must ask
+ * isCurrentMarketId. There are no production callers of this and there should
+ * not be new ones.
+ */
 export function isV3MarketId(id: unknown): boolean {
   return parseMarketId(id)?.generation === 'v3';
 }

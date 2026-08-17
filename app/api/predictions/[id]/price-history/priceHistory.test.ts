@@ -41,20 +41,31 @@ vi.mock('@/lib/chains/market', () => ({
 }));
 
 const { POST } = await import('./route');
+const { canonicalMarketId, CURRENT_GENERATION } = await import('@/lib/marketId');
+
+/**
+ * An id on whatever generation the app currently writes to.
+ *
+ * Spelled `pred_v3_N` here until the config moved to V4, at which point every
+ * one of these tests was exercising a rejected id and the suite went red. The
+ * route's job is "record the chart for markets on the live contract", so the
+ * fixture should say that rather than naming a generation that was live once.
+ */
+const liveId = (n: number) => canonicalMarketId(CURRENT_GENERATION, n);
 
 /** getPrediction's tuple: registered, creator, deadline, yesPool, noPool, ... */
 function onChainPools(yes: bigint, no: bigint, registered = true) {
   return [
     registered,
     '0xd4885a5aa53446843cabcde1f35de9b4e906030e',
-    123n,
+    BigInt(123),
     yes,
     no,
     false,
     false,
     false,
     false,
-    0n,
+    BigInt(0),
   ] as const;
 }
 
@@ -77,10 +88,10 @@ beforeEach(() => {
 
 describe('price history POST', () => {
   it('records the pools from the contract, not the ones in the body', async () => {
-    readContract.mockResolvedValue(onChainPools(400_000_000n, 1_000_000_000n));
+    readContract.mockResolvedValue(onChainPools(BigInt(400_000_000), BigInt(1_000_000_000)));
 
     // A caller claiming a wildly different market shape.
-    const response = await post('pred_v3_1', {
+    const response = await post(liveId(1), {
       yesPool: 999_999_999_999,
       noPool: 1,
       betSide: 'yes',
@@ -89,7 +100,7 @@ describe('price history POST', () => {
 
     expect(response.status).toBe(200);
 
-    const point = storedHistory('pred_v3_1').history[0];
+    const point = storedHistory(liveId(1)).history[0];
     expect(point.yesPool).toBe(400_000_000);
     expect(point.noPool).toBe(1_000_000_000);
     // 400 / 1400 is 28.57%, so 29 cents. The body asked for ~100.
@@ -98,10 +109,10 @@ describe('price history POST', () => {
   });
 
   it('keeps betSide and betAmount as annotations, since they decide nothing', async () => {
-    readContract.mockResolvedValue(onChainPools(100n, 100n));
-    await post('pred_v3_2', { betSide: 'no', betAmount: 250_000 });
+    readContract.mockResolvedValue(onChainPools(BigInt(100), BigInt(100)));
+    await post(liveId(2), { betSide: 'no', betAmount: 250_000 });
 
-    const point = storedHistory('pred_v3_2').history[0];
+    const point = storedHistory(liveId(2)).history[0];
     expect(point.betSide).toBe('no');
     expect(point.betAmount).toBe(250_000);
     // Equal pools, so the implied odds are even regardless of the annotation.
@@ -109,26 +120,30 @@ describe('price history POST', () => {
   });
 
   it('works without a body at all', async () => {
-    readContract.mockResolvedValue(onChainPools(300n, 100n));
+    readContract.mockResolvedValue(onChainPools(BigInt(300), BigInt(100)));
     const response = await POST(
       { json: async () => { throw new Error('no body'); } } as never,
-      { params: Promise.resolve({ id: 'pred_v3_3' }) }
+      { params: Promise.resolve({ id: liveId(3) }) }
     );
 
     expect(response.status).toBe(200);
-    expect(storedHistory('pred_v3_3').history[0].yesPrice).toBe(75);
+    expect(storedHistory(liveId(3)).history[0].yesPrice).toBe(75);
   });
 
   it('refuses a market that is not registered on chain', async () => {
-    readContract.mockResolvedValue(onChainPools(0n, 0n, false));
-    const response = await post('pred_v3_9', { yesPool: 1, noPool: 1 });
+    readContract.mockResolvedValue(onChainPools(BigInt(0), BigInt(0), false));
+    const response = await post(liveId(9), { yesPool: 1, noPool: 1 });
 
     expect(response.status).toBe(404);
-    expect(storedHistory('pred_v3_9')).toBeNull();
+    expect(storedHistory(liveId(9))).toBeNull();
   });
 
-  it('refuses archived V1 and V2 ids, which have no pools to read', async () => {
-    for (const id of ['pred_v2_7', 'pred_v1_7', 'pred_7']) {
+  it('refuses every superseded generation, which has no pools to read here', async () => {
+    // pred_v3_ is in this list rather than the live one. Its markets sit on a
+    // contract the config no longer carries an address for, so reading them
+    // through getMarketContract would fetch the V4 market with the same number
+    // and write those pools onto a V3 chart.
+    for (const id of ['pred_v3_7', 'pred_v2_7', 'pred_v1_7', 'pred_7']) {
       const response = await post(id, { yesPool: 1, noPool: 1 });
       expect(response.status).toBe(400);
       expect(storedHistory(id)).toBeNull();
@@ -143,23 +158,23 @@ describe('price history POST', () => {
   });
 
   it('does not append a second point when the pools have not moved', async () => {
-    readContract.mockResolvedValue(onChainPools(500n, 500n));
+    readContract.mockResolvedValue(onChainPools(BigInt(500), BigInt(500)));
 
-    await post('pred_v3_4', {});
-    await post('pred_v3_4', {});
-    await post('pred_v3_4', {});
+    await post(liveId(4), {});
+    await post(liveId(4), {});
+    await post(liveId(4), {});
 
-    expect(storedHistory('pred_v3_4').history).toHaveLength(1);
+    expect(storedHistory(liveId(4)).history).toHaveLength(1);
   });
 
   it('appends once the pools actually move', async () => {
-    readContract.mockResolvedValue(onChainPools(500n, 500n));
-    await post('pred_v3_5', {});
+    readContract.mockResolvedValue(onChainPools(BigInt(500), BigInt(500)));
+    await post(liveId(5), {});
 
-    readContract.mockResolvedValue(onChainPools(900n, 500n));
-    await post('pred_v3_5', {});
+    readContract.mockResolvedValue(onChainPools(BigInt(900), BigInt(500)));
+    await post(liveId(5), {});
 
-    const history = storedHistory('pred_v3_5').history;
+    const history = storedHistory(liveId(5)).history;
     expect(history).toHaveLength(2);
     expect(history[1].yesPool).toBe(900);
   });

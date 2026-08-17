@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { redis, REDIS_KEYS, redisHelpers } from '@/lib/redis';
+import { chainFromRequestOrBody } from '@/lib/chains/requestChain';
+import { getWritableMarket } from '@/lib/chains';
 import { verifyMessage } from 'viem';
 import {
   PROPOSAL_HEADERS,
@@ -7,18 +9,18 @@ import {
   buildProposalMessage,
   checkProposalTimestamp,
 } from '@/lib/auth/proposalMessage';
-import { allocateV3MarketId, MarketIdUnavailableError } from '@/lib/marketAllocator';
-import { canonicalMarketId } from '@/lib/marketId';
+import { allocateMarketId, MarketIdUnavailableError } from '@/lib/marketAllocator';
+import { canonicalMarketId, CURRENT_GENERATION } from '@/lib/marketId';
 import type { RedisPrediction } from '@/lib/types/redis';
 
 /**
- * Creates a V3 market proposal.
+ * Creates a market proposal on the current contract generation.
  *
  * V2 minted markets on chain: the modal called a public `createPrediction`, paid
- * a fee, and the contract's own counter produced the id. V3 has no public
- * creation and no fee. `registerPrediction` is `onlyResolver` and takes both the
- * id and the creator as parameters, so a market now comes into existence in two
- * separate commits: a proposal here, and a registration by the resolver later.
+ * a fee, and the contract's own counter produced the id. V4 has no public
+ * creation and no fee. `registerPrediction` is `onlyRegistrar` and takes both
+ * the id and the creator as parameters, so a market now comes into existence in
+ * two separate commits: a proposal here, and a registration later.
  *
  * That split is the dangerous part, and everything below is arranged around it:
  *
@@ -57,6 +59,8 @@ interface ProposeBody {
   deadline?: number;
   /** The address credited as creator on chain, and paid the creator fee. */
   creator?: string;
+  /** Which chain the market is proposed for. Absent means Base. */
+  chain?: string;
 }
 
 const MAX_QUESTION = 200;
@@ -73,6 +77,20 @@ export async function POST(request: NextRequest) {
     body = await request.json();
   } catch {
     return bad('Body must be JSON');
+  }
+
+  // Which chain this market is being proposed for. It decides the whole
+  // keyspace the proposal is written into, so it is validated before anything
+  // is written and an unknown value is refused rather than defaulted.
+  const requestedChain = chainFromRequestOrBody(request, body);
+  if (!requestedChain.ok) return bad(requestedChain.error);
+  const chain = requestedChain.chain;
+
+  // And it has to be a chain that can actually hold the market. A proposal on a
+  // chain with no V3 contract can never be registered, so it would sit in the
+  // pending queue forever and count against the global cap.
+  if (!getWritableMarket(chain)) {
+    return bad('That chain has no market contract, so nothing could register this');
   }
 
   const question = body.question?.trim();
@@ -129,20 +147,25 @@ export async function POST(request: NextRequest) {
   // And a global cap, because a fresh address costs nothing, so a per-address
   // limit alone only forces an attacker to make more wallets. This bounds the
   // queue a human has to review rather than the wallets that can reach it.
-  const pending = await redis.scard(REDIS_KEYS.PREDICTIONS_PENDING_APPROVAL());
+  const pending = await redis.scard(REDIS_KEYS.PREDICTIONS_PENDING_APPROVAL(chain));
   if (pending >= PROPOSAL_LIMITS.maxPending) {
     return bad('Too many markets are waiting for review. Try again later.', 503);
   }
 
   let numericId: number;
   try {
-    numericId = await allocateV3MarketId(
+    numericId = await allocateMarketId(
       {
         incr: (key) => redis.incr(key),
         get: (key) => redis.get(key),
         set: (key, value) => redis.set(key, value),
       },
-      REDIS_KEYS.PREDICTION
+      // The counter itself stays global, matching scripts/create_market.js, so
+      // a number is never handed out twice on either chain. What has to be per
+      // chain is the "is this number already taken" probe: asking Base whether
+      // pred_v4_5 exists tells you nothing about Robinhood, and a shared probe
+      // would refuse free numbers on one chain because the other had used them.
+      (id) => REDIS_KEYS.PREDICTION(id, chain)
     );
   } catch (error) {
     if (error instanceof MarketIdUnavailableError) {
@@ -152,7 +175,11 @@ export async function POST(request: NextRequest) {
     throw error;
   }
 
-  const id = canonicalMarketId('v3', numericId);
+  // The generation the app writes to, not a literal. A proposal stamped with a
+  // generation the rest of the app does not treat as live reads as a market on
+  // a contract nobody is pointing at, which is how the v3 and v4 id spaces came
+  // apart in the first place.
+  const id = canonicalMarketId(CURRENT_GENERATION, numericId);
 
   const endsAt = new Date(deadline * 1000);
   const prediction: RedisPrediction = {
@@ -187,14 +214,15 @@ export async function POST(request: NextRequest) {
     totalStakes: 0,
   };
 
-  await redisHelpers.savePrediction(prediction);
+  await redisHelpers.savePrediction(prediction, chain);
 
-  console.log(`[propose] ${id} allocated for ${creator}`);
+  console.log(`[propose] ${id} allocated for ${creator} on ${chain}`);
 
   return NextResponse.json({
     success: true,
     id,
     numericId,
+    chain,
     // The registration step needs exactly these three, and taking them from
     // here rather than re-deriving them is what keeps the two commits agreeing.
     register: { predictionId: numericId, creator, deadline },

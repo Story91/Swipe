@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { redisHelpers } from '../../../../lib/redis';
+import { chainFromRequestOrBody } from '@/lib/chains/requestChain';
 import { requireAdmin } from '../../../../lib/auth/requireAdmin';
-import { parseMarketId } from '@/lib/marketId';
+import { parseMarketId, type MarketGeneration } from '@/lib/marketId';
 
 // This endpoint is the sole resolution authority for predictions that live only in
 // Redis and were never registered on-chain. Anything backed by a contract must be
@@ -10,15 +11,31 @@ import { parseMarketId } from '@/lib/marketId';
 // calls resolved while the chain does not is one where the claim button appears
 // and every claim reverts.
 //
-// The list used to be spelled out as v1 and v2, so pred_v3_ fell through it and a
-// V3 market could have been resolved here. Asking the id parser which generation
-// minted it means a future generation cannot be forgotten the same way.
-const CONTRACT_BACKED: ReadonlySet<string> = new Set(['v1', 'v2', 'v3']);
+// This was a Set of string literals, and it was written twice: first as v1 and
+// v2, so pred_v3_ fell through it, then as v1, v2 and v3 with a comment saying a
+// future generation could not be forgotten the same way. v4 was forgotten the
+// same way, three commits later, and a V4 market could be marked resolved here
+// while its money sat untouched on the contract.
+//
+// A comment cannot enforce that. A total Record over MarketGeneration can: add a
+// generation to the union and this stops compiling until someone says whether it
+// settles on chain. That is the only reason it is a Record and not a Set.
+const RESOLVES_ON_CHAIN: Record<MarketGeneration, boolean> = {
+  v1: true,
+  v2: true,
+  v3: true,
+  v4: true,
+  // A bare pred_N id predates the generation prefixes and was never registered
+  // on any contract, so this endpoint is the only thing that can resolve it.
+  legacy: false,
+};
 
 function isPureRedisPrediction(predictionId: string): boolean {
   if (typeof predictionId !== 'string' || !predictionId.startsWith('pred_')) return false;
   const generation = parseMarketId(predictionId)?.generation;
-  return generation === undefined || !CONTRACT_BACKED.has(generation);
+  // Unparseable is not the same as legacy, but both end up here, and refusing to
+  // guess is wrong in the safe direction only for ids we do understand.
+  return generation === undefined || !RESOLVES_ON_CHAIN[generation];
 }
 
 // POST /api/predictions/resolve - Resolve a Redis-based prediction
@@ -53,9 +70,17 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    
+
+    // Resolution is the one write here that decides who gets paid, so the chain
+    // it lands on is not something to leave implicit. Absent means Base.
+    const requested = chainFromRequestOrBody(request, body);
+    if (!requested.ok) {
+      return NextResponse.json({ success: false, error: requested.error }, { status: 400 });
+    }
+    const chain = requested.chain;
+
     // Get existing prediction
-    const existingPrediction = await redisHelpers.getPrediction(predictionId);
+    const existingPrediction = await redisHelpers.getPrediction(predictionId, chain);
     if (!existingPrediction) {
       return NextResponse.json(
         { success: false, error: 'Prediction not found' },
@@ -98,19 +123,19 @@ export async function POST(request: NextRequest) {
     };
     
     // Save updated prediction
-    await redisHelpers.savePrediction(updatedPrediction);
-    
+    await redisHelpers.savePrediction(updatedPrediction, chain);
+
     // Update market stats
-    await redisHelpers.updateMarketStats();
-    
-    console.log(`✅ Prediction ${predictionId} resolved as ${outcome ? 'YES' : 'NO'}`);
+    await redisHelpers.updateMarketStats(chain);
+
+    console.log(`✅ Prediction ${predictionId} on ${chain} resolved as ${outcome ? 'YES' : 'NO'}`);
     
     // Update user stakes in Redis immediately after resolve
     try {
       console.log('🔄 Updating user stakes after prediction resolve...');
       
       // Get all stakes for this prediction
-      const stakes = await redisHelpers.getUserStakes(predictionId);
+      const stakes = await redisHelpers.getUserStakes(predictionId, chain);
       console.log(`📊 Found ${stakes.length} stakes for prediction ${predictionId}`);
       
       let updatedStakes = 0;
@@ -152,7 +177,7 @@ export async function POST(request: NextRequest) {
             
             // Save the stake only if it needs update
             if (needsUpdate) {
-              await redisHelpers.saveUserStake(updatedStake);
+              await redisHelpers.saveUserStake(updatedStake, chain);
               updatedStakes++;
             }
             
@@ -164,7 +189,7 @@ export async function POST(request: NextRequest) {
             if (isWinner && !stake.claimed) {
               console.log(`🎯 User ${stake.user} won legacy stake for prediction ${predictionId} - marking as ready to claim`);
               stake.claimed = false; // Keep false so it shows in "ready to claim"
-              await redisHelpers.saveUserStake(stake);
+              await redisHelpers.saveUserStake(stake, chain);
               updatedStakes++;
             }
           }
@@ -251,9 +276,16 @@ export async function PUT(request: NextRequest) {
         { status: 400 }
       );
     }
-    
+
+    // Same as the resolve half: the chain decides which record is cancelled.
+    const requested = chainFromRequestOrBody(request, body);
+    if (!requested.ok) {
+      return NextResponse.json({ success: false, error: requested.error }, { status: 400 });
+    }
+    const chain = requested.chain;
+
     // Get existing prediction
-    const existingPrediction = await redisHelpers.getPrediction(predictionId);
+    const existingPrediction = await redisHelpers.getPrediction(predictionId, chain);
     if (!existingPrediction) {
       return NextResponse.json(
         { success: false, error: 'Prediction not found' },
@@ -286,12 +318,12 @@ export async function PUT(request: NextRequest) {
     };
     
     // Save updated prediction
-    await redisHelpers.savePrediction(updatedPrediction);
-    
+    await redisHelpers.savePrediction(updatedPrediction, chain);
+
     // Update market stats
-    await redisHelpers.updateMarketStats();
-    
-    console.log(`✅ Prediction ${predictionId} cancelled: ${reason}`);
+    await redisHelpers.updateMarketStats(chain);
+
+    console.log(`✅ Prediction ${predictionId} on ${chain} cancelled: ${reason}`);
     
     return NextResponse.json({
       success: true,
