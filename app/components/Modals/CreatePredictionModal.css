@@ -80,7 +80,7 @@ p.propose__intro {
 
 .propose__label {
   font-family: var(--sheet-display);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -140,7 +140,7 @@ p.propose__intro {
 .propose__count {
   margin: 0;
   font-family: var(--sheet-data);
-  font-size: 10px;
+  font-size: 12px;
   text-align: right;
   color: var(--sheet-paper-3);
 }
@@ -148,7 +148,7 @@ p.propose__intro {
 .propose__hint {
   margin: 0;
   font-family: var(--sheet-body);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.4;
   color: var(--sheet-paper-3);
 }
@@ -156,7 +156,7 @@ p.propose__intro {
 .propose__error {
   margin: 0;
   font-family: var(--sheet-body);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.4;
   color: var(--sheet-loss);
 }
@@ -243,7 +243,7 @@ p.propose__intro {
 
 .propose__drop-main {
   font-family: var(--sheet-display);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -252,7 +252,7 @@ p.propose__intro {
 
 .propose__drop-sub {
   font-family: var(--sheet-body);
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.4;
   color: var(--sheet-paper-3);
 }
@@ -280,7 +280,7 @@ p.propose__intro {
   left: 0;
   padding: 4px;
   font-family: var(--sheet-display);
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.06em;
   text-align: center;
   text-transform: uppercase;
@@ -294,7 +294,7 @@ p.propose__intro {
   right: 6px;
   padding: 3px 8px;
   font-family: var(--sheet-display);
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -312,7 +312,7 @@ p.propose__intro {
 .propose__or {
   margin: 4px 0 0;
   font-family: var(--sheet-body);
-  font-size: 11px;
+  font-size: 12px;
   text-align: center;
   color: var(--sheet-paper-3);
 }
@@ -365,7 +365,7 @@ p.propose__intro {
   display: grid;
   place-items: center;
   font-family: var(--sheet-body);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--sheet-paper-3);
 }
 
@@ -375,7 +375,7 @@ p.propose__intro {
   left: 6px;
   padding: 2px 6px;
   font-family: var(--sheet-display);
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -400,7 +400,7 @@ h3.propose__card-question {
 .propose__card-when {
   margin: 6px 0 0;
   font-family: var(--sheet-data);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--sheet-paper-3);
 }
 
@@ -415,7 +415,7 @@ h3.propose__card-question {
   display: grid;
   place-items: center;
   font-family: var(--sheet-display);
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -433,7 +433,7 @@ h3.propose__card-question {
 .propose__caption {
   margin: 0;
   font-family: var(--sheet-body);
-  font-size: 10px;
+  font-size: 12px;
   text-align: center;
   color: var(--sheet-paper-3);
 }
@@ -462,7 +462,7 @@ h3.propose__card-question {
   flex: 1 1 50%;
   padding: 10px 12px;
   font-family: var(--sheet-display);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -563,7 +563,7 @@ p.proposed__lede {
 .proposed__note {
   margin: 12px 0 0;
   font-family: var(--sheet-body);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--sheet-paper-3);
 }
@@ -573,7 +573,7 @@ p.proposed__lede {
   margin-top: 16px;
   padding: 11px 12px;
   font-family: var(--sheet-display);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -592,7 +592,7 @@ p.proposed__lede {
 .proposed__later {
   margin-top: 10px;
   font-family: var(--sheet-body);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--sheet-paper-3);
   background: transparent;
   border: none;

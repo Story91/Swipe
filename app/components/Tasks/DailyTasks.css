@@ -60,7 +60,7 @@ h2.daily-tasks__title {
 .daily-tasks__tag {
   flex: 0 0 auto;
   font-family: var(--sheet-display);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -102,7 +102,7 @@ h2.daily-tasks__title {
 h3.daily-tasks__section-title {
   margin: 0 0 6px;
   font-family: var(--sheet-display);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -112,7 +112,7 @@ h3.daily-tasks__section-title {
 .daily-tasks__section-note {
   margin: 0 0 10px;
   font-family: var(--sheet-body);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--sheet-paper-3);
 }
@@ -128,7 +128,7 @@ h3.daily-tasks__section-title {
 .daily-tasks__demo-btn {
   width: 100%;
   font-family: var(--sheet-display);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -161,7 +161,7 @@ h3.daily-tasks__section-title {
 .daily-tasks__demo-note {
   margin: 0;
   font-family: var(--sheet-body);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--sheet-paper-3);
 }
@@ -212,7 +212,7 @@ h3.daily-tasks__section-title {
 
 .daily-tasks__row-desc {
   font-family: var(--sheet-body);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--sheet-paper-2);
 }
@@ -241,7 +241,7 @@ h3.daily-tasks__section-title {
 
 .daily-tasks__state {
   font-family: var(--sheet-data);
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.04em;
   color: var(--sheet-paper-3);
 }
@@ -260,7 +260,7 @@ h3.daily-tasks__section-title {
 /* Dashed, because it is a slot waiting for a number rather than a number. */
 .daily-tasks__reward {
   font-family: var(--sheet-data);
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--sheet-paper-3);
@@ -271,7 +271,7 @@ h3.daily-tasks__section-title {
 .daily-tasks__row-claim {
   flex: 0 0 auto;
   font-family: var(--sheet-display);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -301,7 +301,7 @@ h3.daily-tasks__section-title {
 
 .daily-tasks__claim-label {
   font-family: var(--sheet-display);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -333,7 +333,7 @@ h3.daily-tasks__section-title {
 .daily-tasks__claim-note {
   margin: 0;
   font-family: var(--sheet-body);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--sheet-paper-3);
 }
