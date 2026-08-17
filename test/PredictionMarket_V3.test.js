@@ -51,10 +51,6 @@ describe("PredictionMarket_V3", function () {
   // ---------------------------------------------------------------- finding 1
   describe("no house-takes-all when nobody backs the winner", function () {
     it("makes the market refundable instead of seizing the pool", async function () {
-      // Bond-exempt: this test isolates the losers' pool from being seized
-      // (finding 1). Bond forfeiture on an empty side is a separate, later
-      // behavior covered by "settling the creator bond" below.
-      await market.setBondExempt(creator.address, true);
       const deadline = await openMarket();
       await market.connect(alice).placeBet(1, true, usd(100));
       await market.connect(bob).placeBet(1, true, usd(100));
@@ -189,16 +185,28 @@ describe("PredictionMarket_V3", function () {
       await market.connect(bob).placeBet(1, false, usd(100));
       await market.connect(alice).exitEarly(1, true, usd(50));
 
-      // predictions(), not getPrediction(): the latter predates the creator
-      // bond and does not return it, but the bond is real collateral the
-      // contract now holds (pulled at registration, returned/forfeited only
-      // in a later task) and belongs in what the contract is holding "for".
       const pred = await market.predictions(1);
       const balance = await token.balanceOf(await market.getAddress());
-      const owed =
-        pred.yesPool + pred.noPool + pred.creatorBond + (await market.platformFeeBalance());
+      const owed = pred.yesPool + pred.noPool + (await market.platformFeeBalance());
 
       expect(balance).to.equal(owed);
+    });
+  });
+
+  describe("exitEarly cannot be used to dodge a loss", function () {
+    it("refuses an exit that would empty the winning pool", async function () {
+      await openMarket(1, DAY);
+      // Bob rides 500 on NO — a bet he expects to lose — and holds a
+      // token-sized YES position as the sole YES backer. If he could exit
+      // that YES position down to zero, yesPool would go to zero, resolution
+      // would find no winners, the market would become refundable, and he
+      // would recover the full 500 NO stake instead of forfeiting it.
+      await market.connect(bob).placeBet(1, false, usd(500));
+      await market.connect(bob).placeBet(1, true, usd(1));
+
+      await expect(
+        market.connect(bob).exitEarly(1, true, usd(1))
+      ).to.be.revertedWith("Would empty the pool");
     });
   });
 
@@ -428,6 +436,10 @@ describe("PredictionMarket_V3", function () {
     it("zeroes the weight on a full exit", async function () {
       await openMarket(1, DAY);
       await market.connect(alice).placeBet(1, true, usd(100));
+      // A second YES backer, so alice's full exit does not empty the pool and
+      // trip the "Would empty the pool" guard that closes the exploit where
+      // draining a winning side turns resolution into a no-winners refund.
+      await market.connect(creator).placeBet(1, true, usd(10));
       await market.connect(bob).placeBet(1, false, usd(100));
 
       await market.connect(alice).exitEarly(1, true, usd(100));
@@ -436,8 +448,10 @@ describe("PredictionMarket_V3", function () {
       expect(pos.yesAmount).to.equal(0);
       expect(pos.weightedYes).to.equal(0);
 
+      // Only alice's weighted contribution left the pool; creator's remains.
+      const creatorPos = await market.positions(1, creator.address);
       const pred = await market.predictions(1);
-      expect(pred.weightedYesPool).to.equal(0);
+      expect(pred.weightedYesPool).to.equal(creatorPos.weightedYes);
     });
 
     it("removes weight in proportion to a partial exit", async function () {
@@ -452,6 +466,10 @@ describe("PredictionMarket_V3", function () {
       expect(after.yesAmount).to.equal(usd(60));
       // 60% of the stake remains, so at most 60% of the weight may remain.
       expect(after.weightedYes).to.be.lte((before.weightedYes * 60n) / 100n);
+      // Upper bound alone passes for an implementation that wipes the weight
+      // entirely, which would silently confiscate the exiter's share of the
+      // losers' pool. The -1n absorbs the deliberate round-up on removal.
+      expect(after.weightedYes).to.be.gte((before.weightedYes * 60n) / 100n - 1n);
     });
 
     it("rounds weight removal against the exiting user", async function () {
@@ -497,134 +515,6 @@ describe("PredictionMarket_V3", function () {
 
       const predAfter = await market.predictions(1);
       expect(paid).to.be.lte(predAfter.yesPool + predAfter.netLosersPool);
-    });
-  });
-
-  describe("creator bond configuration", function () {
-    it("defaults to 10 tokens", async function () {
-      expect(await market.creatorBondAmount()).to.equal(usd(10));
-    });
-
-    it("lets the owner change the bond and exempt an address", async function () {
-      await market.setCreatorBondAmount(usd(25));
-      expect(await market.creatorBondAmount()).to.equal(usd(25));
-
-      await expect(market.setBondExempt(creator.address, true))
-        .to.emit(market, "BondExemptSet")
-        .withArgs(creator.address, true);
-      expect(await market.bondExempt(creator.address)).to.equal(true);
-    });
-
-    it("refuses both setters from a non-owner", async function () {
-      await expect(market.connect(alice).setCreatorBondAmount(usd(1))).to.be.reverted;
-      await expect(market.connect(alice).setBondExempt(alice.address, true)).to.be.reverted;
-    });
-  });
-
-  describe("posting the creator bond", function () {
-    it("pulls the bond from the creator, not the caller", async function () {
-      const before = await token.balanceOf(creator.address);
-      await openMarket(1, DAY);
-
-      expect(before - (await token.balanceOf(creator.address))).to.equal(usd(10));
-      expect((await market.predictions(1)).creatorBond).to.equal(usd(10));
-    });
-
-    it("pulls nothing from an exempt creator", async function () {
-      await market.setBondExempt(creator.address, true);
-      const before = await token.balanceOf(creator.address);
-      await openMarket(1, DAY);
-
-      expect(await token.balanceOf(creator.address)).to.equal(before);
-      expect((await market.predictions(1)).creatorBond).to.equal(0);
-    });
-
-    it("reverts registration when the creator has not approved", async function () {
-      await token.connect(creator).approve(await market.getAddress(), 0);
-      const deadline = await deadlineIn(DAY);
-      await expect(
-        market.registerPrediction(1, creator.address, deadline)
-      ).to.be.reverted;
-    });
-
-    it("reverts the whole batch when one creator has not approved", async function () {
-      // `resolver` holds no collateral and has approved nothing — alice and bob
-      // are both funded and approved in the top-level beforeEach, so using
-      // either here would make the batch succeed and pass for the wrong reason.
-      const deadline = await deadlineIn(DAY);
-      await expect(
-        market.registerPredictionsBatch(
-          [1, 2],
-          [creator.address, resolver.address],
-          [deadline, deadline]
-        )
-      ).to.be.reverted;
-
-      expect((await market.predictions(1)).registered).to.equal(false);
-    });
-  });
-
-  describe("settling the creator bond", function () {
-    // `creator` is funded and approved in the top-level beforeEach as of Task 7.
-
-    it("returns the bond when the market paid out", async function () {
-      const deadline = await openMarket(1, DAY);
-      await market.connect(alice).placeBet(1, true, usd(100));
-      await market.connect(bob).placeBet(1, false, usd(100));
-      await warpPast(deadline);
-
-      await expect(market.connect(resolver).resolvePrediction(1, true))
-        .to.emit(market, "CreatorBondReturned")
-        .withArgs(1, creator.address, usd(10));
-
-      // Claimable alongside the creator fee, pull-based as before.
-      const before = await token.balanceOf(creator.address);
-      await market.connect(creator).claimCreatorReward();
-      expect((await token.balanceOf(creator.address)) - before).to.equal(
-        usd(10) + usd(0.5)
-      );
-    });
-
-    it("forfeits the bond when one side stayed empty", async function () {
-      const deadline = await openMarket(1, DAY);
-      await market.connect(alice).placeBet(1, true, usd(100));
-      await warpPast(deadline);
-
-      const feesBefore = await market.platformFeeBalance();
-      await expect(market.connect(resolver).resolvePrediction(1, false))
-        .to.emit(market, "CreatorBondForfeited")
-        .withArgs(1, creator.address, usd(10));
-
-      expect((await market.platformFeeBalance()) - feesBefore).to.equal(usd(10));
-      // Stakes are still fully refundable — the bond is not taken from players.
-      const before = await token.balanceOf(alice.address);
-      await market.connect(alice).claimRefund(1);
-      expect((await token.balanceOf(alice.address)) - before).to.equal(usd(100));
-    });
-
-    it("returns the bond when the platform cancels", async function () {
-      await openMarket(1, DAY);
-      await expect(market.connect(resolver).cancelPrediction(1, "bad question"))
-        .to.emit(market, "CreatorBondReturned")
-        .withArgs(1, creator.address, usd(10));
-    });
-
-    it("returns the bond when the platform abandons the market", async function () {
-      const deadline = await openMarket(1, DAY);
-      await warpPast(deadline + 31 * DAY);
-      await expect(market.enableRefundsAfterGrace(1))
-        .to.emit(market, "CreatorBondReturned")
-        .withArgs(1, creator.address, usd(10));
-    });
-
-    it("settles the bond only once", async function () {
-      const deadline = await openMarket(1, DAY);
-      await market.connect(alice).placeBet(1, true, usd(100));
-      await market.connect(bob).placeBet(1, false, usd(100));
-      await warpPast(deadline);
-      await market.connect(resolver).resolvePrediction(1, true);
-
-      expect((await market.predictions(1)).creatorBond).to.equal(0);
     });
   });
 
@@ -748,30 +638,14 @@ describe("PredictionMarket_V3", function () {
       await market.connect(alice).placeBet(1, true, usd(100));
       await market.connect(bob).placeBet(1, false, usd(100));
 
-      // Only the bond has accrued to the platform so far.
+      // 200 tokens sit in the contract, all of it live stake — no bet has
+      // resolved, exited, or accrued a fee yet. platformFeeBalance is what
+      // withdrawPlatformFees actually moves, so it being zero here, and the
+      // withdrawal reverting, is the proof the platform cannot reach the stake.
       expect(await market.platformFeeBalance()).to.equal(0);
-    });
-
-    it("keeps a forfeited bond out of the players' refunds", async function () {
-      const deadline = await openMarket(1, DAY);
-      await market.connect(alice).placeBet(1, true, usd(100));
-      await market.connect(bob).placeBet(1, true, usd(50));
-      await warpPast(deadline);
-      await market.connect(resolver).resolvePrediction(1, false);
-
-      const aliceBefore = await token.balanceOf(alice.address);
-      const bobBefore = await token.balanceOf(bob.address);
-      await market.connect(alice).claimRefund(1);
-      await market.connect(bob).claimRefund(1);
-
-      // The refunds themselves — the claim this test's name makes. Without
-      // these it only checked where the bond went, never what the players got,
-      // and a claimRefund that underpaid every claimant passed it silently.
-      expect((await token.balanceOf(alice.address)) - aliceBefore).to.equal(usd(100));
-      expect((await token.balanceOf(bob.address)) - bobBefore).to.equal(usd(50));
-
-      // ...and the bond went to fees rather than coming out of those refunds.
-      expect(await market.platformFeeBalance()).to.equal(usd(10));
+      await expect(market.withdrawPlatformFees(owner.address)).to.be.revertedWith(
+        "Nothing to withdraw"
+      );
     });
   });
 });

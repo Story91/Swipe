@@ -19,7 +19,6 @@ const COLLATERAL = {
 
 const PLATFORM_FEE = 300; // 3% of the losing pool
 const MIN_BET = 100_000; // 0.1 token at 6 decimals
-const CREATOR_BOND = 10_000_000; // 10 tokens at 6 decimals
 
 async function main() {
   const collateral = COLLATERAL[network.name];
@@ -51,13 +50,10 @@ async function main() {
   console.log("Applying launch configuration...");
   await (await market.setPlatformFee(PLATFORM_FEE)).wait();
   await (await market.setMinBet(MIN_BET)).wait();
-  await (await market.setCreatorBondAmount(CREATOR_BOND)).wait();
-  await (await market.setBondExempt(deployer.address, true)).wait();
 
   console.log(`  platformFee       ${await market.platformFee()}`);
   console.log(`  creatorFee        ${await market.creatorFee()}`);
   console.log(`  minBet            ${await market.minBet()}`);
-  console.log(`  creatorBondAmount ${await market.creatorBondAmount()}`);
 
   console.log(`\nVerify with:\n  npx hardhat verify --network ${network.name} ${address} ${collateral}`);
 }

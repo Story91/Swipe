@@ -63,10 +63,6 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
     uint256 public earlyExitFee = 500; // 5%
     uint256 public minBet = 1_000_000; // 1 token at 6 decimals
 
-    /// @notice Refundable deposit a market creator puts at risk. Returned when
-    ///         the market turns out to have been a real market; see _settleBond.
-    uint256 public creatorBondAmount = 10_000_000; // 10 tokens at 6 decimals
-
     uint256 public platformFeeBalance;
 
     mapping(address => bool) public resolvers;
@@ -74,10 +70,6 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
     ///         a creator that cannot receive the token could block resolution
     ///         for everyone in that market.
     mapping(address => uint256) public creatorRewards;
-
-    /// @notice Creators that post no bond. The platform creating its own
-    ///         markets would otherwise be posting a bond to itself.
-    mapping(address => bool) public bondExempt;
 
     struct Prediction {
         bool registered;
@@ -104,9 +96,6 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
         ///         the same reason netLosersPool is.
         uint256 weightedWinnersPool;
         uint256 participantCount;
-        /// @notice Bond held for this market. Zeroed when it is returned or
-        ///         forfeited, so it can never be settled twice.
-        uint256 creatorBond;
     }
 
     struct Position {
@@ -133,9 +122,6 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
     event RefundClaimed(uint256 indexed predictionId, address indexed user, uint256 amount);
     event CreatorRewardClaimed(address indexed creator, uint256 amount);
     event ResolverSet(address indexed resolver, bool enabled);
-    event BondExemptSet(address indexed creator, bool exempt);
-    event CreatorBondReturned(uint256 indexed predictionId, address indexed creator, uint256 amount);
-    event CreatorBondForfeited(uint256 indexed predictionId, address indexed creator, uint256 amount);
 
     // ============ Modifiers ============
 
@@ -202,16 +188,6 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
         pred.deadline = deadline;
         pred.createdAt = block.timestamp;
 
-        // Registration is onlyResolver, so the creator is a parameter rather
-        // than msg.sender: the bond is pulled from their address and they must
-        // have approved it first. The backend checks the allowance before
-        // calling, because a missing approval reverts the whole batch.
-        uint256 bond = bondExempt[creator] ? 0 : creatorBondAmount;
-        if (bond > 0) {
-            pred.creatorBond = bond;
-            collateral.safeTransferFrom(creator, address(this), bond);
-        }
-
         emit PredictionRegistered(predictionId, creator, deadline);
     }
 
@@ -271,6 +247,15 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
         uint256 heldWeighted = isYes ? pos.weightedYes : pos.weightedNo;
         require(amount > 0 && amount <= held, "Invalid amount");
 
+        // Refuse an exit that would empty a side. Zeroing the winning pool
+        // turns resolution into a no-winners refund, which is how a bettor
+        // holding a large losing position and a token-sized winning one
+        // converts a certain loss into a full refund.
+        require(
+            (isYes ? pred.yesPool : pred.noPool) - amount > 0,
+            "Would empty the pool"
+        );
+
         uint256 totalPool = pred.yesPool + pred.noPool;
         require(totalPool > 0, "Empty pool");
 
@@ -315,32 +300,6 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
         emit EarlyExit(predictionId, msg.sender, isYes, amount, netValue, retained);
     }
 
-    /**
-     * @notice Return or forfeit a market's creator bond, exactly once.
-     * @dev A market that pays out necessarily had stake on both sides — with
-     *      either pool empty the winning side could be empty and the market
-     *      would be refundable instead. So "the market was a real market" is
-     *      the single condition, and it is the caller's `forfeited` flag.
-     *      Returned bonds go through creatorRewards for the same reason the
-     *      creator fee does: a creator that cannot receive the token must not
-     *      be able to block settlement for everyone else.
-     */
-    function _settleBond(uint256 predictionId, bool forfeited) private {
-        Prediction storage pred = predictions[predictionId];
-        uint256 bond = pred.creatorBond;
-        if (bond == 0) return;
-
-        pred.creatorBond = 0;
-
-        if (forfeited) {
-            platformFeeBalance += bond;
-            emit CreatorBondForfeited(predictionId, pred.creator, bond);
-        } else {
-            creatorRewards[pred.creator] += bond;
-            emit CreatorBondReturned(predictionId, pred.creator, bond);
-        }
-    }
-
     // ============ Resolution ============
 
     function resolvePrediction(
@@ -366,7 +325,6 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
             // losing pool to the platform, which paid a resolver ~99.5% of every
             // pool for choosing the empty side. Everyone gets their stake back.
             pred.refundable = true;
-            _settleBond(predictionId, true);
             emit PredictionRefundable(predictionId, "No winners");
             emit PredictionResolved(predictionId, outcome, 0, 0, 0);
             return;
@@ -382,8 +340,6 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
         pred.netLosersPool = losersPool - platformFeeAmount - creatorReward;
         pred.weightedWinnersPool = outcome ? pred.weightedYesPool : pred.weightedNoPool;
 
-        _settleBond(predictionId, false);
-
         emit PredictionResolved(predictionId, outcome, platformFeeAmount, creatorReward, pred.netLosersPool);
     }
 
@@ -396,8 +352,6 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
 
         pred.cancelled = true;
         pred.refundable = true;
-
-        _settleBond(predictionId, false);
 
         emit PredictionRefundable(predictionId, reason);
     }
@@ -414,7 +368,6 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
         require(block.timestamp > pred.deadline + REFUND_GRACE_PERIOD, "Grace period not over");
 
         pred.refundable = true;
-        _settleBond(predictionId, false);
         emit PredictionRefundable(predictionId, "Abandoned past grace period");
     }
 
@@ -573,16 +526,6 @@ contract PredictionMarket_V3 is Ownable2Step, ReentrancyGuard {
     function setMinBet(uint256 newMinBet) external onlyOwner {
         require(newMinBet >= MIN_BET_FLOOR, "Below floor");
         minBet = newMinBet;
-    }
-
-    function setCreatorBondAmount(uint256 newBond) external onlyOwner {
-        creatorBondAmount = newBond;
-    }
-
-    function setBondExempt(address creator, bool exempt) external onlyOwner {
-        require(creator != address(0), "Zero address");
-        bondExempt[creator] = exempt;
-        emit BondExemptSet(creator, exempt);
     }
 
     function withdrawPlatformFees(address to) external onlyOwner nonReentrant {
