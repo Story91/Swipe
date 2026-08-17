@@ -129,16 +129,22 @@ broken state nobody sees until it is rare and in production.
 Measured: **311 naive, 206 after expansion.** So 105 of the original list were
 live classes the first scan could not see.
 
-**The remaining 206 are still not a delete list**, and the scan cannot fix this
-part: it flags `dragging-live`, which was added to `TinderCard.css` on purpose
-for the gesture engine that has not landed yet. A class staged for work in
-flight is indistinguishable from a dead one by any static measure.
+**A third filter now removes the last judgement call.** A class staged for
+work in flight is indistinguishable from a dead one statically -
+`dragging-live` sits in `TinderCard.css` for a gesture engine that has not
+landed and reads as dead. It is distinguishable *historically*, though: staged
+classes are new. The scan withholds anything whose name was added to a
+stylesheet in the last 30 CSS commits, because nobody writes CSS for something
+they are about to delete.
 
-So the phase runs as: take the 206, remove anything a person recognises as
-staged, delete the rest in one commit, and keep the scan as a test pinned to
-whatever number survives. It needs a human pass over a 206-line list, not a
-scripted sweep — which is why it is not being done at the end of a long
-session.
+Final numbers: **311 naive, 206 after interpolation expansion, 190 after
+recency.** The 16 withheld include `dragging-live`, which is the check that
+the filter works.
+
+Phase 4 is now a mechanical delete of a known 190-name list, plus keeping the
+scan as a test pinned to that number. It is the removal of rule blocks rather
+than the substitution of values, so it wants its own commit and its own
+verification pass, not the tail of another one.
 
 **Phase 5 — per screen.** `TinderCard` and `SwipeMarkets` get rewritten rather
 than converted; both are past the point where conversion is cheaper. The

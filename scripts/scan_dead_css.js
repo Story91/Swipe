@@ -15,6 +15,7 @@
  * expensive than one that keeps something dead.
  */
 const fs = require('fs');
+const { execSync } = require('child_process');
 const path = require('path');
 
 const ROOT = process.cwd();
@@ -56,19 +57,48 @@ for (const f of cssFiles) {
   }
 }
 
+/*
+ * Third filter: recency.
+ *
+ * A class staged for work in flight is indistinguishable from a dead one by
+ * any static measure. `dragging-live` was written into TinderCard.css for a
+ * gesture engine that has not landed yet, and reads as dead here.
+ *
+ * It is not indistinguishable historically, though: staged classes are new.
+ * Anything whose name was added to a stylesheet in the last 30 CSS commits is
+ * withheld, on the assumption that nobody writes CSS for something they are
+ * about to delete. That turns the one judgement call in this scan into a
+ * question with an answer in git.
+ */
+const recentlyTouched = new Set();
+try {
+  const diff = execSync('git log -30 -p --unified=0 -- "*.css"', {
+    maxBuffer: 1 << 28,
+  }).toString();
+  for (const m of diff.matchAll(/^\+[^+][^{]*?\.([a-zA-Z][a-zA-Z0-9_-]{2,})/gm)) {
+    recentlyTouched.add(m[1]);
+  }
+} catch {
+  // No git history reachable; the filter simply does not apply.
+}
+
 const dead = [];
+const staged = [];
 for (const c of classes) {
   if (code.includes(c)) continue;
   let reachable = false;
   for (const p of dynamicPrefixes) {
     if (c.startsWith(p)) { reachable = true; break; }
   }
-  if (!reachable) dead.push(c);
+  if (reachable) continue;
+  if (recentlyTouched.has(c)) { staged.push(c); continue; }
+  dead.push(c);
 }
 
 console.log('css classes defined :', classes.size);
 console.log('interpolation prefixes:', dynamicPrefixes.size);
 console.log('NAIVE dead           :', [...classes].filter(c => !code.includes(c)).length);
-console.log('dead after expansion :', dead.length);
+console.log('withheld as recent   :', staged.length);
+console.log('SAFE to delete       :', dead.length);
 console.log('\nsample of the safe-to-delete set:');
 console.log(dead.slice(0, 25).join(', '));
