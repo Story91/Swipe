@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { CHAINS, DEFAULT_CHAIN_KEY, isReadOnlyChain, hasArchivedMarkets } from './index';
 import type { ChainKey } from './types';
 
@@ -12,11 +12,20 @@ import type { ChainKey } from './types';
  * should follow the switcher must read from this hook rather than those
  * constants.
  *
- * Known limitation: Redis keys are not yet namespaced per chain
- * (prediction:pred_v2_1, not prediction:base:pred_v2_1), so switching changes
- * which contracts the UI talks to but both chains still read the same market
- * records. Namespacing is phase 5 of the rebuild plan and has to land before
- * this is safe for writing markets on two chains at once.
+ * ONE STORE, NOT ONE COPY PER COMPONENT
+ *
+ * This used to be a plain useState inside the hook. Twenty seven call sites
+ * across twenty five files each held their own copy, so pressing the switcher
+ * updated the switcher and nothing else: every other component kept the chain
+ * it had read from localStorage when it mounted, and only picked up the change
+ * if it happened to remount. The visible result was Base's markets rendering
+ * under Robinhood's name, with Base's pools, on a network where those markets
+ * do not exist.
+ *
+ * So the value lives in this module and components subscribe to it. The server
+ * snapshot is the default, and the stored preference is applied once after
+ * mount, which keeps the hydration behaviour the hook already had while making
+ * the change reach everybody at once.
  */
 
 export const ACTIVE_CHAIN_KEY = 'swipe:active-chain';
@@ -37,26 +46,88 @@ export function selectableChains(includeTestnets = false): ChainKey[] {
   );
 }
 
-export function useActiveChain() {
-  // Start from the default so server and first client render agree; the stored
-  // preference is applied after mount to avoid a hydration mismatch.
-  const [chainKey, setChainKey] = useState<ChainKey>(DEFAULT_CHAIN_KEY);
 
-  useEffect(() => {
-    try {
-      setChainKey(parseChainKey(window.localStorage.getItem(ACTIVE_CHAIN_KEY)));
-    } catch {
-      // Storage can throw in private mode; the default is already in state.
+/**
+ * The selected chain, held once for the whole app.
+ *
+ * useSyncExternalStore rather than a context, because the value is read in
+ * twenty five files including several that mount outside any provider this app
+ * currently renders, and a missing provider would fail silently by falling back
+ * to the default, which is exactly the bug this replaces.
+ */
+let currentChain: ChainKey = DEFAULT_CHAIN_KEY;
+const listeners = new Set<() => void>();
+
+function emit(): void {
+  for (const listener of listeners) listener();
+}
+
+/**
+ * Watch the selected chain.
+ *
+ * Exported so the sharing itself can be tested, and so a non-React consumer can
+ * follow the switcher without mounting a component. The hook uses this same
+ * function, so a test that subscribes here is watching what the app watches.
+ */
+export function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function getSnapshot(): ChainKey {
+  return currentChain;
+}
+
+/**
+ * The server has no localStorage, so it always renders the default. Returning
+ * anything else here is a hydration mismatch.
+ */
+function getServerSnapshot(): ChainKey {
+  return DEFAULT_CHAIN_KEY;
+}
+
+/** Set the chain for every subscriber, and remember it. */
+export function setActiveChain(next: ChainKey): void {
+  if (next === currentChain) return;
+  currentChain = next;
+  try {
+    window.localStorage.setItem(ACTIVE_CHAIN_KEY, next);
+  } catch {
+    // Private mode. The session still works, the preference just will not last.
+  }
+  emit();
+}
+
+/** Read the stored preference once, after mount. */
+let hydrated = false;
+function hydrateOnce(): void {
+  if (hydrated) return;
+  hydrated = true;
+  try {
+    const stored = parseChainKey(window.localStorage.getItem(ACTIVE_CHAIN_KEY));
+    if (stored !== currentChain) {
+      currentChain = stored;
+      emit();
     }
+  } catch {
+    // Nothing stored, or storage is unavailable. The default is already set.
+  }
+}
+
+export function useActiveChain() {
+  const chainKey = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+
+  // Start from the default so server and first client render agree; the stored
+  // preference is applied after mount to avoid a hydration mismatch. Whichever
+  // component mounts first does it, and the store tells the rest.
+  useEffect(() => {
+    hydrateOnce();
   }, []);
 
   const changeChain = useCallback((next: ChainKey) => {
-    setChainKey(next);
-    try {
-      window.localStorage.setItem(ACTIVE_CHAIN_KEY, next);
-    } catch {
-      // Preference will not persist; the session still works.
-    }
+    setActiveChain(next);
   }, []);
 
   return {

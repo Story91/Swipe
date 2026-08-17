@@ -298,7 +298,20 @@ export function useHybridPredictions() {
     allPredictionsLoaded, // Flag indicating all predictions (not just active) have been loaded
     fetchPredictions: fetchAllPredictions, // Default: active only
     fetchAllPredictions: fetchAllPredictionsComplete, // All predictions
-    refresh: fetchAllPredictionsComplete, // Refresh all predictions
+    /**
+     * Re-read whatever this hook is currently showing.
+     *
+     * This was wired straight to fetchAllPredictionsComplete, which does not
+     * just fetch, it sets fetchAllModeRef and leaves it set. The swipe card
+     * calls refresh after every bet, so one bet flipped the deck out of
+     * "active markets" and into "every record in Redis", permanently, for the
+     * rest of the session. Unregistered proposals are records in Redis, so a
+     * market that exists only as a proposal started appearing in the deck as
+     * something to bet on. Betting on it reverts with "Prediction not
+     * registered", after the user has already approved the token.
+     */
+    refresh: () =>
+      fetchAllModeRef.current ? fetchAllPredictionsComplete() : fetchAllPredictions(),
     // Manual refresh functions for specific actions
     refreshAfterStake: (predictionId?: string) => {
       // Only refresh active predictions from Redis (fast, no blockchain sync)

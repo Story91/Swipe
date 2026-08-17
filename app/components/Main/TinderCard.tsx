@@ -887,19 +887,33 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   const cardItems = useMemo(() => {
     const allItems = realCardItems.length > 0 ? realCardItems : (items && items.length ? items : []);
 
-    // Filter only active predictions (not resolved, not cancelled, not expired)
-    let activeItems = allItems.filter((item, index) => {
-      const prediction = transformedPredictions[index];
+    /**
+     * Only markets somebody can actually bet on.
+     *
+     * Matched by id, not by array position. This read
+     * transformedPredictions[index] while the category filter immediately below
+     * matched on item.id, and the two arrays are not guaranteed to line up:
+     * allItems falls back to the `items` prop when realCardItems is empty, and
+     * that prop has its own ordering. When they drift, every check here is
+     * asking about somebody else's market, so a card can pass the "is it
+     * approved" test on a different market's answer.
+     *
+     * The approval check is what keeps an unregistered proposal out of the deck.
+     * A proposal is a Redis record with no market behind it, so a bet on one
+     * reverts with "Prediction not registered" after the user has already
+     * approved the token and signed.
+     */
+    const now = Date.now() / 1000;
+    let activeItems = allItems.filter((item) => {
+      const prediction = transformedPredictions.find((p) => p.id === item.id);
       if (!prediction) return false;
 
-      // Check if prediction is active
-      const now = Date.now() / 1000;
-      const isNotExpired = prediction.deadline > now;
-      const isNotResolved = !prediction.resolved;
-      const isNotCancelled = !prediction.cancelled;
-      const isApproved = !prediction.needsApproval;
-
-      return isNotExpired && isNotResolved && isNotCancelled && isApproved;
+      return (
+        prediction.deadline > now &&
+        !prediction.resolved &&
+        !prediction.cancelled &&
+        !prediction.needsApproval
+      );
     });
 
     // Apply category filter if not 'all'
