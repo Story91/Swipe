@@ -89,6 +89,35 @@ The reverse order is the one that fails. **A token launched before the contract
 is live brings users to a product with nothing to do** — and on Robinhood
 Chain, nothing to do at all. So: contract first, token second, rewards third.
 
+**Confirmed plan:** V3 on **Base** first, in USDC. The token goes to
+**Robinhood Chain** once Base is demonstrably working.
+
+### ⚠️ Open risk: markets and token on different chains
+
+That split breaks the reward loop, and it is cheaper to decide before the token
+is deployed than after.
+
+A user bets on Base. Their reward — the fee rebate, a streak payout, a referral
+bonus — is denominated in a token that only exists on Robinhood. To see it they
+must bridge. Most will not. The mechanic is then correctly implemented and
+still inert, which is the most expensive kind of broken: it looks finished.
+
+Three ways out, in rough order of cost:
+
+1. **Token on Base as well** (or instead). Rewards land where the user already
+   is, with no bridge in the path. Robinhood keeps whatever role it has for its
+   own markets.
+2. **Rewards paid in USDC on Base**, with the token reserved for something that
+   does not need to reach an active bettor mid-session — governance, supply,
+   a future Robinhood market.
+3. **Accept the bridge** and design the reward as something claimed rarely and
+   in bulk, never as a per-bet incentive. A rebate a user checks once a month
+   survives a bridge; a streak reward does not.
+
+Undecided. It does not block the Base contract, and it does not block deploying
+a token on Robinhood — it decides whether **rewards for Base betting** can be
+paid in that token at all.
+
 ---
 
 ## Also outstanding, not UI
