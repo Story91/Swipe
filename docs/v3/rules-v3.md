@@ -27,12 +27,19 @@ risk in every market.
 | Base | USDC (6 dec) | V3 target, and first — the user base is here |
 | Robinhood Chain | USDG (6 dec) `0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168` | V3 target, after Base |
 
-**V3 is not deployed on any chain yet.** What is live is V3's predecessor: the
-archived contracts on Base (§8), and the audited USDG dual pool on the
-Robinhood *testnet*. Verified on-chain 2026-08-17 — none of the deployed
-contracts carries `weightBpsAt`, which only V3 has, and Robinhood mainnet has
-no market contract at all. Both chains will run the same contract and the same
-rules once V3 lands.
+**V3 is live on Base.** `PredictionMarket_V3` is deployed and verified at
+[`0x4753685Af9b317db5690E036AeBD4337627A070E`](https://basescan.org/address/0x4753685Af9b317db5690E036AeBD4337627A070E),
+collateralised in Base USDC, with platform fee 3%, creator fee 0.5%, early exit
+fee 5% and a minimum bet of 0.1 USDC, all confirmed on-chain.
+
+Robinhood Chain has no market contract yet. Its testnet runs V3's audited
+predecessor, which has no time weighting. Both chains will run the same
+contract and the same rules once Robinhood follows.
+
+**The app cannot place a V3 bet yet.** The contract exists, but the interface
+still points at the archived Base contracts and refuses every write until the
+V3 address and ABI are wired through `lib/chains`. That is deliberate, not an
+outage.
 
 The app has a network switcher; markets are per-chain and do not share
 liquidity.

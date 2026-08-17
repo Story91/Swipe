@@ -109,13 +109,43 @@ Also confirmed: no bond remnant anywhere in `contracts/`, `scripts/deploy_v3.js`
 
 Merge commit `84c0f1e`, no conflicts, `docs/v3/open-questions.md` auto-merged. Verified after merging: `npx tsc --noEmit` clean, `npx vitest run` 64/64, `npx hardhat test` 72 passing / 13 pending, `npm run build` exit 0, and `docs/v3/HANDOFF.md` plus `docs/v3/ui-backlog.md` both still present. The build check is not optional here: `lib/contract.ts` `require()`s the V3 artifact, and the rename means the merge is the moment that reference changes.
 
-### 4.5 Deploy to Base — in progress
+### 4.5 ✅ Done — V3 is live on Base mainnet
 
-`npm run deploy:v3:base`. Collateral addresses are hardcoded on purpose: searching Robinhood Chain's explorer for "USDC" returns 18-decimal impostors with no liquidity. The script also refuses any token not reporting 6 decimals, and refuses any network it has no vetted address for.
+| | |
+|---|---|
+| Address | [`0x4753685Af9b317db5690E036AeBD4337627A070E`](https://basescan.org/address/0x4753685Af9b317db5690E036AeBD4337627A070E) |
+| Owner and first resolver | `0xD4885A5aa53446843CABcDE1F35DE9b4E906030e` |
+| Collateral | Base USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`, confirmed 6 decimals |
+| Config on-chain | `platformFee` 300, `creatorFee` 50, `earlyExitFee` 500, `minBet` 100000 |
+| Verified | Yes. `PredictionMarket_V3`, solc `v0.8.20+commit.a1b79de6`, optimizer 200 runs, BUSL-1.1 source |
+| Cost | ~0.0000145 ETH of a 0.002879 ETH balance |
 
-Deployer is `0xD4885A5aa53446843CABcDE1F35DE9b4E906030e`, taken from `PRIVATE_KEY`. It becomes the contract's owner, and it is the same address Vercel now has in `NEXT_PUBLIC_ADMIN_1`. It is **not** the compromised `0xF1fa2002…` that owns the old Base contracts. Local `.env.local` still has the old value in `NEXT_PUBLIC_ADMIN_1`, so local dev disagrees with production until that is fixed.
+Read back from three independent RPC endpoints, not from the deploy log.
 
-**A deploy alone does not turn betting on.** The address-comparison guard (§2) refuses every write until Base's V3 address and the V3 ABI both come through `lib/chains`, and Base is still `readOnly: true` in the chain registry because its *old* contracts are archived. Base becomes a chain with one writable contract and two archived ones, which the current per-chain `readOnly` flag cannot express. That is the wiring job, not a config line.
+Two things went wrong and are worth knowing:
+
+1. **The launch configuration only half applied.** `setPlatformFee` landed, then `setMinBet` was refused with `in-flight transaction limit reached for delegated accounts`. The deployer is an EIP-7702 delegated account and the public Base RPC caps concurrent transactions from one. Re-sent on its own afterwards and it went through. If the deploy script is used again, it should send its configuration transactions one at a time with a confirmation between them, and it should re-read and report the final values rather than assuming its own writes stuck.
+2. **A read straight after a write lied.** `minBet` still returned `1000000` immediately after the successful `setMinBet`, because the endpoint answered from a node that had not caught the block. The receipt said status 1 and 29083 gas, which is a real storage write. Trust the receipt, then re-read on more than one endpoint.
+
+`BASE_RPC_URL` in `.env.local` points at the public node, which rate-limits plain view calls. `NEXT_PUBLIC_INFURA_BASE_ENDPOINT` and `NEXT_PUBLIC_BASE_RPC_URL` are keyed and reliable. Prefer those for anything scripted.
+
+The deployer is the same address Vercel now has in `NEXT_PUBLIC_ADMIN_1`, and it is **not** the compromised `0xF1fa2002…` that owns the old Base contracts. Local `.env.local` still has the old value there, so local dev disagrees with production until that is fixed.
+
+`npm run deploy:v3:base` is the command. Collateral addresses are hardcoded on purpose: searching Robinhood Chain's explorer for "USDC" returns 18-decimal impostors with no liquidity. The script refuses any token not reporting 6 decimals and any network it has no vetted address for.
+
+### 4.6 ⚠️ Next: wire the app to V3, and read this before flipping Base
+
+**A deployed contract does not turn betting on.** The address-comparison guard (§2) refuses every write until Base's V3 address and the V3 ABI both come through `lib/chains`. That is deliberate.
+
+**The trap in the obvious first step.** Base is `readOnly: true` in the chain registry because its old contracts are archived. Making Base writable is not a one-line change, because four other places branch on that flag and two of them are writes at the *old* addresses:
+
+- `KalshiMarkets.tsx:875` gates `handlePlaceBet` on `isReadOnlyChain()` and then writes to `USDC_DUALPOOL_CONTRACT_ADDRESS`, the archived pool owned by the lost key. Flip Base to writable and that guard opens onto a contract nobody controls.
+- `CreatePredictionModal.tsx:523` gates market creation the same way and writes to `CONTRACTS.V2`.
+- `app/prediction/[id]/page.tsx` and `ReadOnlyNotice.tsx` use the flag for the "Archived market" copy, which would silently disappear from genuinely archived markets.
+
+So the order matters: **convert those guards to `isWritableMarket(chainKey, target)` first, prove them with a deliberate break, and only then give Base a writable market address.** A per-chain `readOnly` boolean cannot describe a chain with one live contract and two archived ones, which is what Base now is.
+
+Then the real work: V3 takes `placeBet(uint256, bool, uint256)` in USDC with an ERC-20 approval, while `TinderCard`'s stake path is built around `placeStake` / `placeStakeWithToken` in ETH and $SWIPE. Amounts move to 6 decimals and the floor becomes 0.1 USDC. Markets also have to be registered on the new contract by the resolver before anything is bettable.
 
 There is deliberately no `deploy:v3:robinhood` **npm script** — but that is all the "Base first" sequencing is made of. `scripts/deploy_v3.js` has a vetted `robinhood` entry in its `COLLATERAL` map and `hardhat.config.js` defines a `robinhood` mainnet network, so `npx hardhat run scripts/deploy_v3.js --network robinhood` would deploy V3 to Robinhood mainnet today. If that ordering is meant to be enforced rather than merely intended, the script has to refuse the network, not just lack an alias.
 
