@@ -1,8 +1,40 @@
+/*
+ * Dashboard, moved onto the shared sheet's visual language.
+ *
+ * Restyled through CSS rather than by rewriting the markup. This screen holds
+ * the claim flow - a modal with pending, success and error states, transaction
+ * hashes and explorer links - and rewriting 690 lines of JSX around a money
+ * path to change how it looks is a bad trade. The markup here is already
+ * semantic (a real table, real rows), so the language can be changed without
+ * touching a single handler.
+ *
+ * Tokens mirror app/styles/sheet.css. They are redeclared rather than imported
+ * because this file predates the sheet and still carries its own component
+ * styles; if these two ever disagree, the sheet is right.
+ */
+
 .enhanced-user-dashboard {
-  padding: 20px;
-  max-width: 1200px;
+  --sheet-lime: #d4ff00;
+  --sheet-paper: rgba(255, 255, 255, 0.92);
+  --sheet-paper-2: rgba(255, 255, 255, 0.72);
+  --sheet-paper-3: rgba(255, 255, 255, 0.5);
+  --sheet-rule: rgba(255, 255, 255, 0.1);
+  --sheet-rule-strong: rgba(255, 255, 255, 0.18);
+  --sheet-surface: rgba(255, 255, 255, 0.04);
+  --sheet-wash: rgba(212, 255, 0, 0.06);
+  --sheet-lime-line: rgba(212, 255, 0, 0.22);
+  --sheet-loss: rgba(255, 138, 128, 0.9);
+
+  --sheet-display: var(--font-display, 'Orbitron'), 'Orbitron', sans-serif;
+  --sheet-body: var(--font-body, -apple-system), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --sheet-data: var(--font-data, 'Monaco'), 'Monaco', 'Menlo', monospace;
+
+  padding: 32px 24px 64px;
+  max-width: 1000px;
   margin: 0 auto;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--sheet-body);
+  color: var(--sheet-paper);
+  -webkit-font-smoothing: antialiased;
 }
 
 .dashboard-header {
@@ -48,13 +80,16 @@
 }
 
 /* Summary Stats Table */
+/* The board: one bordered surface for the standing, matching the ledger the
+   portfolio and manifesto use. The lime frame, the 16px radius and the drop
+   shadow are gone - a border that shouts competes with the figures inside it. */
 .stats-table-container {
-  margin-bottom: 30px;
-  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0a0a0a 100%);
-  border-radius: 16px;
-  padding: 20px;
-  border: 2px solid #d4ff00;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  margin-bottom: 32px;
+  background: var(--sheet-surface);
+  border-radius: 0;
+  padding: 0;
+  border: 1px solid var(--sheet-rule-strong);
+  box-shadow: none;
   position: relative;
 }
 
@@ -91,44 +126,47 @@
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  font-family: "Exo 2", sans-serif;
+  font-family: var(--sheet-body);
 }
 
+/* A header row is a label, not a banner. The solid lime bar with rounded ends
+   read as a button and pulled the eye away from the numbers underneath it. */
 .stats-table thead tr {
-  background: linear-gradient(135deg, #d4ff00, #c8f000);
+  background: transparent;
 }
 
 .stats-table th {
-  padding: 10px 8px;
-  text-align: center;
+  padding: 14px 16px;
+  text-align: right;
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #000;
-  font-family: "Orbitron", sans-serif;
+  letter-spacing: 0.14em;
+  color: var(--sheet-paper-3);
+  font-family: var(--sheet-display);
+  border-bottom: 1px solid var(--sheet-rule);
 }
 
 .stats-table th:first-child {
-  border-radius: 8px 0 0 8px;
+  border-radius: 0;
   text-align: left;
 }
 
 .stats-table th:last-child {
-  border-radius: 0 8px 8px 0;
+  border-radius: 0;
 }
 
 .stats-table tbody tr {
-  transition: all 0.3s ease;
+  transition: background-color 140ms ease;
 }
 
 .stats-table tbody tr:hover {
-  background: rgba(212, 255, 0, 0.05);
+  background: var(--sheet-wash);
 }
 
 .stats-table td {
-  padding: 12px 8px;
-  border-bottom: 1px solid rgba(212, 255, 0, 0.1);
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--sheet-rule);
 }
 
 .stats-table tbody tr:last-child td {
@@ -703,33 +741,47 @@
     0 0 15px rgba(139, 92, 246, 0.4);
 }
 
-/* Different colors for different value types */
+/*
+ * Figures.
+ *
+ * Mono and tabular, because these sit in a column and a reader compares them
+ * down it; proportional digits make that impossible. The blue/green/red
+ * traffic light is gone: staked and payout are not good or bad, they are just
+ * amounts, so only the one figure that IS directional keeps a colour.
+ *
+ * The 1px text shadow went with it. It was there to lift coloured text off a
+ * pale card that no longer exists.
+ */
 .stat-value-total {
-  color: #3b82f6 !important;
-  text-shadow: 1px 1px 0px #000;
-  font-family: "Exo 2", sans-serif !important;
-  font-weight: 700;
+  color: var(--sheet-paper) !important;
+  text-shadow: none;
+  font-family: var(--sheet-data) !important;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
 }
 
 .stat-value-payout {
-  color: #10b981 !important;
-  text-shadow: 1px 1px 0px #000;
-  font-family: "Exo 2", sans-serif !important;
-  font-weight: 700;
+  color: var(--sheet-paper-2) !important;
+  text-shadow: none;
+  font-family: var(--sheet-data) !important;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
 }
 
 .stat-value-profit.profit {
-  color: #10b981 !important;
-  text-shadow: 1px 1px 0px #000;
-  font-family: "Exo 2", sans-serif !important;
-  font-weight: 700;
+  color: var(--sheet-lime) !important;
+  text-shadow: none;
+  font-family: var(--sheet-data) !important;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
 }
 
 .stat-value-profit.loss {
-  color: #ef4444 !important;
-  text-shadow: 1px 1px 0px #000;
-  font-family: "Exo 2", sans-serif !important;
-  font-weight: 700;
+  color: var(--sheet-loss) !important;
+  text-shadow: none;
+  font-family: var(--sheet-data) !important;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
 }
 
 .stat-value-claim {
@@ -779,16 +831,21 @@
   margin-bottom: 40px;
 }
 
+/* Section labels take the sheet's eyebrow treatment: small caps in the display
+   face, above a hairline. `color: #000` was black text on a dark screen, i.e.
+   invisible wherever a parent did not happen to override it. */
 .section h3 {
-  margin: 0 0 15px 0;
-  color: #000;
-  font-size: 16px;
-  font-weight: 700;
-  padding: 0;
+  margin: 0 0 14px 0;
+  color: var(--sheet-lime);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0 0 12px;
   background: none;
   border: none;
-  font-family: "Orbitron", sans-serif;
-  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--sheet-rule);
+  font-family: var(--sheet-display);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -999,9 +1056,31 @@
 }
 
 /* Loading and Error States */
+/* Empty and loading states. Left-aligned like the rest of the sheet: a centred
+   block of text in the middle of a left-aligned page reads as an error even
+   when it is only telling you to connect a wallet. */
 .loading-container, .error-container {
-  text-align: center;
-  padding: 60px 20px;
+  text-align: left;
+  padding: 48px 0;
+  color: var(--sheet-paper-3);
+  font-size: 15px;
+  max-width: 60ch;
+}
+
+.loading-container h3, .error-container h3,
+.loading-container h2, .error-container h2 {
+  font-family: var(--sheet-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--sheet-paper-2);
+  margin: 0 0 8px;
+}
+
+.loading-container p, .error-container p {
+  margin: 0;
+  color: var(--sheet-paper-3);
+  line-height: 1.6;
 }
 
 .loading-logo {
@@ -1023,30 +1102,40 @@
   100% { transform: rotate(360deg); }
 }
 
+/* The retry action is bordered like every other action on the sheet. A solid
+   red button made a routine "try again" look like a destructive one. */
 .error-container button {
-  background: #ef4444;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 8px;
+  background: transparent;
+  color: var(--sheet-paper-2);
+  border: 1px solid var(--sheet-rule);
+  padding: 11px 16px;
+  border-radius: 0;
   cursor: pointer;
-  font-size: 14px;
+  font-family: var(--sheet-display);
+  font-size: 11px;
   font-weight: 600;
-  margin-top: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-top: 18px;
+  transition: color 140ms ease, border-color 140ms ease;
 }
 
-.error-container button:hover {
-  background: #dc2626;
+.error-container button:hover,
+.error-container button:focus-visible {
+  background: transparent;
+  color: var(--sheet-lime);
+  border-color: var(--sheet-lime-line);
 }
 
 /* No Predictions */
 .no-predictions {
-  text-align: center;
-  padding: 30px 20px;
-  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0a0a0a 100%);
-  border-radius: 16px;
-  border: 2px solid rgba(212, 255, 0, 0.3);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  text-align: left;
+  padding: 32px 0;
+  background: transparent;
+  border-radius: 0;
+  border: 0;
+  border-top: 1px solid var(--sheet-rule);
+  box-shadow: none;
   margin: 20px 0;
 }
 
