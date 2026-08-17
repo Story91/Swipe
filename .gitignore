@@ -36,8 +36,12 @@ yarn-error.log*
 next-env.d.ts
 .env*.local
 
-# verification build output (see next.config.mjs distDir)
+# verification build output (see next.config.mjs distDir). Two names, because
+# scripts/dev_isolated.js defaults to .next-verify while a one-off verification
+# build is pointed at .next-check. Only the second was listed, so the first sat
+# untracked at 312 MB waiting for someone to `git add .`.
 .next-check/
+.next-verify/
 
 # internal / sensitive — kept locally, never published (2026-08-17 audit).
 # Files still exist on disk for local tooling; git just stops tracking them.
