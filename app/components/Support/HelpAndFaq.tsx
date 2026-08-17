@@ -10,8 +10,11 @@ import './HelpAndFaq.css';
  *
  * The worked example carries the same figures the manifesto uses, drawn on the
  * same tote board, because they are the same settlement. Anything factual here
- * comes from docs/v3/rules-v3.md and the rates deployed on Base; see the
- * manifesto's own note for the arithmetic.
+ * is read back from PredictionMarket_V4 as deployed, on Base and on Robinhood
+ * Chain, which carry identical rates: platform 300 bps, creator 50 bps, early
+ * exit 500 bps, minimum bet 100000. docs/v3/rules-v3.md is the intent; the
+ * contract is the authority, and where the two disagree this file follows the
+ * contract.
  *
  * Rendered in two places: as the help-faq dashboard panel in app/page.tsx, and
  * as the standalone /help route the manifesto's footer links to.
@@ -46,45 +49,51 @@ interface FAQGroup {
 const FAQ_GROUPS: FAQGroup[] = [
   {
     label: 'The basics',
-    meta: 'Parimutuel\nUSDC on Base',
+    meta: 'Parimutuel\nUSDC and USDG',
     heading: 'What Swipe is, and where it runs',
     items: [
       {
         id: 1,
         question: 'What is a prediction market?',
         answer:
-          "Swipe is a parimutuel prediction market: you back YES or NO on a question with USDC, and at the deadline the winning side splits what the losing side staked. There's no order book and no market maker. The platform holds no position of its own, so it cannot win or lose on the outcome, only take a fee.",
+          "Swipe is a parimutuel prediction market: you back YES or NO on a question with a stablecoin, and at the deadline the winning side splits what the losing side staked. There's no order book and no market maker. The platform holds no position of its own, so it cannot win or lose on the outcome, only take a fee.",
       },
       {
         id: 2,
         question: 'Which networks does Swipe run on?',
         answer:
-          "Base today, collateralised in USDC. Robinhood Chain is next, in USDG, but V3 isn't deployed there yet. Each chain runs its own instance of the same audited contract, at its own address, and markets don't share liquidity across chains.",
+          'Two, and both are live. Base runs PredictionMarket_V4 at 0x4129d706c283e6bAC749CFe9221AD322981917E6, collateralised in USDC, and Robinhood Chain runs the same contract at 0x41a6Fd3d35C0F9DD13773A763358E35B5216eEe4, collateralised in Paxos USDG. The rates are identical on both, read back from each chain rather than copied from a doc. They are still separate deployments: each one numbers its markets from 1 and shares no liquidity with the other, so pick your network in the top bar before you look for a market.',
+      },
+      {
+        id: 3,
+        question: 'What about the older Swipe markets on Base?',
+        answer:
+          'Base carries three Swipe contracts from before V4, and they are finished. The key that owned them is gone, so a market still open on one of them can never be settled and a stake sitting in it cannot be claimed. We would rather say that plainly than imply a recovery that is not coming. They stay readable so old positions and results are still visible, and nothing new is ever written to them.',
       },
     ],
   },
   {
     label: 'Betting',
-    meta: 'Floor 0.1 USDC\nexit fee 5%',
+    meta: 'Minimum 0.1\nexit fee 5%',
     heading: 'Backing a side, and changing your mind',
     items: [
       {
-        id: 3,
+        id: 4,
         question: 'How do I place a bet?',
         answer:
-          "Betting is temporarily paused while the app finishes moving onto the new V3 contract, which is live and verified on Base. We'd rather refuse a bet than take one on a contract we can't guarantee settlement for. Once it reopens: approve USDC once, pick a side and an amount (0.1 USDC minimum), and confirm.",
-      },
-      {
-        id: 4,
-        question: 'Can I exit a bet before the deadline?',
-        answer:
-          'Yes, part of a position or all of it, for a 5% fee on what the exit is worth. The price comes off the two pools as they stand at that moment, so leaving a side that is winning returns close to your stake and leaving a losing side returns little. One restriction: in a market’s final quarter you cannot exit a side down to exactly zero if you are the only one backing it.',
+          'Connect a wallet, pick the network, then open a market and choose a side and an amount. The floor is 0.1 USDC on Base or 0.1 USDG on Robinhood Chain, which is the contract’s own minimum, and there is no ceiling. Expect two signatures: the first approves exactly the amount you are betting for the market contract, the second is the bet. The app refuses a bet on a market you created yourself, because you already earn the creator fee on it.',
       },
       {
         id: 5,
+        question: 'Can I exit a bet before the deadline?',
+        answer:
+          'Yes, part of a position or all of it, for a 5% fee on what the exit is worth. The price comes off the two pools as they stand at that moment, so leaving a side that is winning returns close to your stake and leaving a losing side returns little. Exiting gives up the weight that stake carried, so you cannot sell out and keep an early multiplier. One restriction: in a market’s final quarter you cannot exit a side down to exactly zero, which in a thin market means the sole backer of a side has to leave before that quarter starts.',
+      },
+      {
+        id: 6,
         question: 'How does the swipe interface work?',
         answer:
-          'Swipe right for YES or left for NO to place a quick bet from the card stack. The swipe path is being rebuilt for the new contract along with the rest of betting, so for now the cards are for reading markets rather than betting on them.',
+          'Swipe right for YES, left for NO. That only picks a side and opens the stake dialog, and nothing has been staked at that point: no amount, no approval, no transaction. The card moves on once the bet is confirmed on chain, and comes back if you close the dialog instead.',
       },
     ],
   },
@@ -94,22 +103,28 @@ const FAQ_GROUPS: FAQGroup[] = [
     heading: 'What you get back, and when',
     items: [
       {
-        id: 6,
+        id: 7,
         question: 'How are payouts calculated?',
         answer:
-          'Winners split what the losing side staked, after a 3% platform fee and a 0.5% creator fee, both taken only from the losing pool. Your own stake always comes back in full. How much of the split you get depends on your stake and when you placed it: bets in a market’s first quarter count for ×1.50 when the losing pool is divided, ×1.25 in the second quarter, ×1.00 after.',
-      },
-      {
-        id: 7,
-        question: 'How long does it take to resolve a prediction?',
-        answer:
-          'A resolver settles the market once its deadline passes; nothing can be resolved while betting is still open. If a market sits unresolved 30 days past its deadline, anyone at all can open refunds for it, so your stake is never stuck waiting on a single key.',
+          'Winners split what the losing side staked, after a 3% platform fee and a 0.5% creator fee, both taken only from the losing pool. Win and your own stake comes back whole on top of your share. How large that share is depends on your stake and on when you placed it: a bet in the market’s first quarter counts for ×1.50 when the losing pool is divided, ×1.25 in the second quarter, ×1.00 after that. The weight is fixed the moment you bet and it only ever changes how the losing pool is split. A refund always returns the raw stake, never the weighted one.',
       },
       {
         id: 8,
+        question: 'Who settles a market, and how long does it take?',
+        answer:
+          'A resolver settles it once the deadline has passed, and nothing can be settled while betting is still open. V4 splits that role from market creation: the key our backend uses to register markets cannot declare a winner, cancel, refund or move a balance. Settling runs on 0xD4885A5aa53446843CABcDE1F35DE9b4E906030e today, which is also the address that owns both contracts. If a market sits unsettled 30 days past its deadline, anyone at all can open refunds on it, so a stake never depends on one key staying available.',
+      },
+      {
+        id: 9,
         question: 'How do I claim my winnings?',
         answer:
-          'Open the resolved market from your dashboard and claim. Payouts are pulled by you rather than sent automatically, and nothing expires. If a market becomes refundable instead, you claim your stake back the same way.',
+          'Open the market from your dashboard and claim. Payouts are pulled by you rather than pushed, and nothing expires, so an unclaimed one waits on the contract until you take it. A cancelled market returns your stake the same way. A market that resolves with nobody on the winning side is refundable too and every backer gets their raw stake back, but that case is a claimRefund call on the contract today rather than a button in the dashboard.',
+      },
+      {
+        id: 10,
+        question: 'I created a market. When do I get the 0.5%?',
+        answer:
+          'It is credited to the creator address the moment the market resolves, out of the losing pool, and it sits there until it is pulled. That is deliberate. Paying it out during resolution meant a creator who could not receive the token could block settlement for everyone else in that market. There is no screen for it yet, so collecting it means calling claimCreatorReward on the market contract yourself.',
       },
     ],
   },
@@ -119,16 +134,16 @@ const FAQ_GROUPS: FAQGroup[] = [
     heading: 'Wallets, and where markets come from',
     items: [
       {
-        id: 9,
+        id: 11,
         question: 'How do I connect my wallet?',
         answer:
           'Use the Sign In button in the top bar and pick your wallet. Inside the Base app or a Farcaster client you are usually connected already, and Swipe will use that session rather than asking again.',
       },
       {
-        id: 10,
+        id: 12,
         question: 'How do I create a prediction?',
         answer:
-          "Markets are added by the Swipe team rather than through a self-serve form right now. Only a resolver can register a market on the contract, which is also what keeps the number of open markets small enough for each one to have real liquidity. Self-serve creation is part of what's still being rebuilt for V3.",
+          'Anyone with a connected wallet can propose one and it costs nothing. Write the question, set a deadline, then sign a message. The signature proves the creator address is yours, which matters because that address earns 0.5% of every losing pool in the market. A proposal does nothing on chain until someone registers it, so each one is read first, and you can send five a day from one address. Few markets open at once is the point rather than a bottleneck: liquidity spread across hundreds of markets is what made the old version show empty pools.',
       },
     ],
   },
@@ -244,7 +259,8 @@ export function HelpAndFaq() {
               <h2 className="hf-h2">A market, from stake to payout</h2>
               <p className="hf-p">
                 Two people back yes, one pool backs no, and no wins nothing. The
-                figures are the real arithmetic at the rates deployed on Base.
+                figures are the real arithmetic at the rates deployed on both
+                chains.
               </p>
 
               <section
@@ -437,7 +453,7 @@ export function HelpAndFaq() {
 
         <footer className="hf-footer">
           <p className="hf-footer-note">
-            Parimutuel prediction markets on Base · contracts under BUSL-1.1
+            Parimutuel prediction markets on Base and Robinhood Chain · contracts under BUSL-1.1
           </p>
           <div className="hf-footer-links">
             <button

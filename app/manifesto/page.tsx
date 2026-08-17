@@ -3,18 +3,37 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useOpenUrl } from '@coinbase/onchainkit/minikit';
 import sdk from '@farcaster/miniapp-sdk';
+import { CHAINS } from '@/lib/chains';
 import './Manifesto.css';
 
-const V3_ADDRESS = '0x5C4078BB24f352809B93FF395cA7655835D1CA4a';
+/**
+ * The live deployments, read from lib/chains rather than written out here.
+ *
+ * This page carried a hardcoded address, and it went on naming the V3 contract
+ * after V4 replaced it on both chains. Both market addresses are NEXT_PUBLIC_
+ * with a literal fallback, so the browser reads the same value the server does.
+ * A chain whose address is unset renders as pending instead of as a blank.
+ */
+const DEPLOYMENTS = (['base', 'robinhood'] as const).map((key) => {
+  const chain = CHAINS[key];
+  return {
+    key,
+    label: chain.label,
+    token: chain.stable.symbol,
+    address: chain.contracts.market,
+    explorer: chain.explorer,
+  };
+});
 
 /**
  * One worked settlement, carried through the whole page.
  *
- * Every figure here is the real V3 arithmetic at the rates deployed on Base:
- * fees come out of the losing pool only, 3% platform and 0.5% creator, and the
- * winning side splits the remainder by weighted stake. The two winners staked at
- * different points in the market's life, which is the only reason their returns
- * differ, and the difference is stated in the copy rather than glossed.
+ * Every figure here is the real V4 arithmetic at the rates deployed on both
+ * chains: fees come out of the losing pool only, 3% platform and 0.5% creator,
+ * and the winning side splits the remainder by weighted stake. The two winners
+ * staked at different points in the market's life, which is the only reason
+ * their returns differ, and the difference is stated in the copy rather than
+ * glossed.
  *
  *   losing pool                     1000.00
  *   platform 3%                      -30.00
@@ -120,10 +139,10 @@ export default function ManifestoPage() {
 
           <p className="mf-hero-lede">
             Swipe is a parimutuel prediction market. You back yes or no on a
-            question with USDC, and at the deadline the winning side splits what
-            the losing side staked. No order book, no market maker, and none of
-            our own money in the pot. We take a cut of the losing pool and
-            nothing else.
+            question with a dollar stablecoin, and at the deadline the winning
+            side splits what the losing side staked. No order book, no market
+            maker, and none of our own money in the pot. We take a cut of the
+            losing pool and nothing else.
           </p>
 
           {/* The signature: one settlement, drawn the way a tote board draws it. */}
@@ -316,21 +335,22 @@ export default function ManifestoPage() {
           <section className="mf-block">
             <div className="mf-rail">
               <p className="mf-eyebrow">Placing a bet</p>
-              <p className="mf-rail-meta">Floor 0.1 USDC</p>
+              <p className="mf-rail-meta">Floor 0.1<br />USDC or USDG</p>
             </div>
             <div className="mf-prose">
               <h2 className="mf-h2">What happens when you back a side</h2>
               <ol className="mf-steps">
                 <li className="mf-step">
                   <p className="mf-step-text">
-                    You approve USDC for the market contract. Once, not per bet.
+                    You approve the chain&apos;s stablecoin for the market
+                    contract. Once, not per bet.
                   </p>
                 </li>
                 <li className="mf-step">
                   <p className="mf-step-text">
-                    You pick a side and an amount. The minimum is{' '}
-                    <strong>0.1 USDC</strong>, which is the contract&apos;s own
-                    floor rather than a policy.
+                    You pick a side and an amount. The minimum is 0.1 USDC on
+                    Base and 0.1 USDG on Robinhood, which is the contract&apos;s
+                    own floor rather than a policy.
                   </p>
                 </li>
                 <li className="mf-step">
@@ -359,13 +379,20 @@ export default function ManifestoPage() {
           <section className="mf-block">
             <div className="mf-rail">
               <p className="mf-eyebrow">Guarantees</p>
-              <p className="mf-rail-meta">Audited<br />8 findings closed</p>
+              <p className="mf-rail-meta">Audited lineage<br />8 findings closed in the predecessor</p>
             </div>
             <div className="mf-prose">
               <h2 className="mf-h2">What the contract will not let anyone do</h2>
               <p className="mf-p">
                 Each of these is a fix for something the previous contract got
                 wrong, and each one is enforced in code rather than promised here.
+              </p>
+              <p className="mf-p">
+                One thing to be straight about. The audit behind those eight
+                closed findings covered the contract these descend from, not the
+                one running now. V4 has had no external audit. What it has is the
+                fixes, the tests, and the refusals listed below, which you can
+                read for yourself at the addresses above.
               </p>
               <div className="mf-rules">
                 <div className="mf-rule-row">
@@ -397,6 +424,15 @@ export default function ManifestoPage() {
                     Ownership transfers in two steps, and settling is a separate,
                     revocable role. Automation runs on a narrow hot key while
                     ownership stays cold.
+                  </p>
+                </div>
+                <div className="mf-rule-row">
+                  <p className="mf-rule-term">Open a market and then decide who won</p>
+                  <p className="mf-rule-def">
+                    Two roles, two keys. The one that opens markets runs on a
+                    server and cannot settle, cancel, refund or move a balance.
+                    Steal it and the worst you get is junk markets, which cost
+                    nothing to make and pay nothing to whoever made them.
                   </p>
                 </div>
                 <div className="mf-rule-row">
@@ -450,26 +486,30 @@ export default function ManifestoPage() {
               <p className="mf-rail-meta">One deployment per chain</p>
             </div>
             <div className="mf-prose">
-              <h2 className="mf-h2">Base now, Robinhood next</h2>
+              <h2 className="mf-h2">It runs on Base and on Robinhood Chain</h2>
               <div className="mf-chains">
-                <div className="mf-chain">
-                  <span className="mf-chain-name">Base</span>
-                  <span className="mf-chain-token">USDC</span>
-                  <span className="mf-chain-where">
-                    <a
-                      href={`https://basescan.org/address/${V3_ADDRESS}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {V3_ADDRESS}
-                    </a>
-                  </span>
-                </div>
-                <div className="mf-chain mf-chain--pending">
-                  <span className="mf-chain-name">Robinhood</span>
-                  <span className="mf-chain-token">USDG</span>
-                  <span className="mf-chain-where">Not deployed yet</span>
-                </div>
+                {DEPLOYMENTS.map((chain) => (
+                  <div
+                    key={chain.key}
+                    className={`mf-chain${chain.address ? '' : ' mf-chain--pending'}`}
+                  >
+                    <span className="mf-chain-name">{chain.label}</span>
+                    <span className="mf-chain-token">{chain.token}</span>
+                    <span className="mf-chain-where">
+                      {chain.address ? (
+                        <a
+                          href={`${chain.explorer}/address/${chain.address}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {chain.address}
+                        </a>
+                      ) : (
+                        'Not deployed yet'
+                      )}
+                    </span>
+                  </div>
+                ))}
               </div>
               <p className="mf-p" style={{ marginTop: 20 }}>
                 A contract lives at one address on one chain, so each chain runs
@@ -490,15 +530,19 @@ export default function ManifestoPage() {
               <h2 className="mf-h2">What is true today</h2>
               <div className="mf-note">
                 <p>
-                  The contract above is deployed and verified on Base. The app is
-                  still being moved onto it, so betting in the interface is
-                  switched off rather than quietly pointed at the old contracts.
-                  We would rather refuse a bet than take one we cannot settle.
+                  Both contracts above are live and both take bets. Before a
+                  transaction is signed it is compared against the market
+                  address for the chain you picked, and refused if it does not
+                  match, so a bet cannot land on a contract we did not point it
+                  at.
                 </p>
                 <p>
-                  Markets created before this contract are archived. They take no
-                  new bets, and your past positions and results stay visible where
-                  they always were.
+                  Three older contracts on Base still hold markets from before
+                  these ones. They take no new bets and your past positions stay
+                  readable, but nobody has the key that could settle what is
+                  still open on them, so anything staked there stays there. That
+                  is the failure the thirty day refund rule above was written to
+                  make impossible on the contracts running now.
                 </p>
               </div>
             </div>
@@ -508,7 +552,8 @@ export default function ManifestoPage() {
 
         <footer className="mf-footer">
           <p className="mf-footer-note">
-            Parimutuel prediction markets on Base · contracts under BUSL-1.1
+            Parimutuel prediction markets on Base and Robinhood Chain ·
+            contracts under BUSL-1.1
           </p>
           <div className="mf-footer-links">
             <button
