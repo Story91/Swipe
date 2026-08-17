@@ -1,0 +1,198 @@
+/*
+ * The admin desk, on the shared sheet (app/styles/sheet.css).
+ *
+ * This screen used to be a grid of twenty coloured sync buttons over a stack of
+ * white glass cards, several of them pointed at contracts nobody owns any more.
+ * What replaced it is a queue: proposals at the top, then the markets whose
+ * deadline has gone, then the ones still taking bets. One column, one action
+ * per row, and nothing on screen that cannot be done.
+ *
+ * There is almost nothing here on purpose. A market is a `sheet-board`, its
+ * facts are `sheet-settle` rows and its buttons are `sheet-action`, so this
+ * file only adds what the sheet has no word for: the action strip under a
+ * board, the two button tints, and the notice that replaced a hundred alert()
+ * calls.
+ */
+
+/* A column of boards. Never a grid: two markets side by side read as a pair to
+   compare, and these are a queue to work through. */
+.adm-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* The question, which is the only thing an operator reads before deciding. */
+.adm-question {
+  font-family: var(--sheet-display);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+  color: var(--sheet-paper);
+  margin: 0;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--sheet-rule);
+  /* A pasted question can be one unbroken string. Wrapping it is what keeps the
+     page from scrolling sideways on a phone. */
+  overflow-wrap: anywhere;
+}
+
+/* A caution inside a board, for a row whose button would be a mistake right
+   now. Amber rather than red, because a stale proposal is a fact about the
+   clock and not an error. */
+.adm-warn {
+  border-top: 1px solid var(--sheet-rule);
+  padding: 12px 20px;
+}
+
+.adm-warn p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sheet-warn);
+}
+
+/* The action strip under a board. */
+.adm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--sheet-rule);
+}
+
+/* Co-class on .sheet-action. Full width on a phone, because a 44px target that
+   sits at the edge of a thumb's reach is the one that gets mistapped. */
+.adm-action {
+  flex: 1 1 auto;
+  justify-content: center;
+  min-height: 44px;
+}
+
+.adm-action--go {
+  color: var(--sheet-lime);
+  border-color: var(--sheet-lime-line);
+  background: var(--sheet-wash);
+}
+
+.adm-action--stop {
+  color: var(--sheet-loss);
+}
+
+.adm-action--stop:hover,
+.adm-action--stop:focus-visible {
+  color: var(--sheet-loss);
+  border-color: var(--sheet-loss);
+}
+
+.adm-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.adm-action:disabled:hover {
+  color: var(--sheet-paper-2);
+  border-color: var(--sheet-rule);
+}
+
+/*
+ * The notice.
+ *
+ * Every outcome on this screen used to be a window.alert, a hundred of them,
+ * which block the page and vanish the moment they are dismissed. This says the
+ * same thing in place and stays there, so a transaction hash can still be
+ * copied a minute later.
+ */
+.adm-notice {
+  border-left: 2px solid var(--sheet-lime);
+  background: var(--sheet-wash);
+  padding: 12px 16px;
+  margin: 0 0 20px;
+}
+
+.adm-notice--bad {
+  border-left-color: var(--sheet-loss);
+  background: transparent;
+}
+
+.adm-notice p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--sheet-paper-2);
+}
+
+.adm-notice__hash {
+  display: block;
+  font-family: var(--sheet-data);
+  font-size: 12px;
+  color: var(--sheet-paper-3);
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+
+/* An address or a hash printed as a fact. Two classes deep on purpose:
+   .sheet-settle-val is nowrap, which is right for a figure and wrong for a
+   42 character address on a 360px screen. */
+.sheet-settle-val.adm-mono {
+  font-family: var(--sheet-data);
+  font-variant-numeric: tabular-nums;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.adm-link {
+  color: var(--sheet-paper);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.adm-link:hover,
+.adm-link:focus-visible {
+  color: var(--sheet-lime);
+}
+
+/* The top strip: which chain, which contract, and the one refresh button. */
+.adm-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.adm-toolbar-note {
+  font-family: var(--sheet-data);
+  font-size: 12px;
+  color: var(--sheet-paper-3);
+  margin: 0;
+}
+
+/*
+ * Motion. The only movement here is the pulse on a row waiting for a receipt,
+ * which is worth having because a wallet round trip can take half a minute and
+ * a dead button looks broken.
+ */
+.adm-busy {
+  animation: adm-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes adm-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .adm-busy {
+    animation: none;
+  }
+
+  .adm-action {
+    transition: none;
+  }
+}
