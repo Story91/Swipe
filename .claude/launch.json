@@ -2,10 +2,13 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "swipe-dev",
+      "name": "swipe-isolated",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "port": 3000
+      "runtimeArgs": [
+        "run",
+        "dev:isolated"
+      ],
+      "port": 3001
     }
   ]
 }
