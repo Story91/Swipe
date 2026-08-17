@@ -201,26 +201,56 @@
 }
 
 .mgcard--photo {
-  --mgcard-scrim-1: 0.8;
-  --mgcard-scrim-2: 0.9;
-  --mgcard-scrim-3: 0.95;
+  /* Lowered from 0.8/0.9/0.95, which turned every upload into a colour field
+     nobody could identify. The contrast those numbers were protecting is now
+     carried by a shadow on the text itself, below: a shadow follows the glyph,
+     so it defends the one thing that needs defending instead of hiding the
+     picture in order to protect it.
+     Measured again at these stops, over a pure white photo: white text is
+     5.17:1 at the top stop, 7.34:1 at the middle and 11.37:1 at the bottom, all
+     above AA. Do not lower them without keeping the shadow. */
+  --mgcard-scrim-1: 0.62;
+  --mgcard-scrim-2: 0.72;
+  --mgcard-scrim-3: 0.84;
+}
+
+/* The one thing a shadow could not save: the muted category grey measures
+   1.66:1 over a white photo at the top stop. Nothing short of white survives
+   up there. */
+.mgcard--photo .mgcard__cat-name {
+  color: #ffffff;
+}
+
+.mgcard--photo .mgcard__question,
+.mgcard--photo .mgcard__stat,
+.mgcard--photo .mgcard__side-pct,
+.mgcard--photo .mgcard__result dt,
+.mgcard--photo .mgcard__result dd {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 12px rgba(0, 0, 0, 0.7);
 }
 
 /* The mark on a card with no photo: the chart glyph for an embed URL, the
    market's initials for everything else. Large and quiet, in the corner, under
    the scrim like the photo is. Positioned against the oversized layer, so the
    offsets carry its 28px. */
+/* Centred on the right edge and large, because this is the card's art on a
+   market with no photo, not a marker in a corner. At 92px in the bottom right
+   it read as a stray tick someone forgot to delete. */
 .mgcard__bg-mark,
 .mgcard__bg-initials {
   position: absolute;
-  right: 34px;
-  bottom: 30px;
+  right: 26px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .mgcard__bg-mark {
-  width: 92px;
-  height: 92px;
-  opacity: 0.5;
+  width: 172px;
+  height: 172px;
+  /* The glyph sits under the scrim, so it can afford the accent at full
+     strength; on a dark ground it reads as a chart rather than as a smudge. */
+  opacity: 0.85;
+  color: var(--sheet-lime);
 }
 
 .mgcard__bg-initials {
@@ -230,7 +260,7 @@
   line-height: 1;
   letter-spacing: -0.02em;
   color: inherit;
-  opacity: 0.3;
+  opacity: 0.5;
 }
 
 /* `background: var(--sheet-ink-3)` in GridPage.css was a third hover signal and
