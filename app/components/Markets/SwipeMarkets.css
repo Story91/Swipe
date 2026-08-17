@@ -38,8 +38,8 @@
 /* Premium USDC Header */
 .usdc-header-card {
   background: linear-gradient(135deg, #0a1628 0%, #1a2744 50%, #0d1929 100%) !important;
-  border: 1px solid rgba(39, 117, 202, 0.3) !important;
-  border-radius: 16px !important;
+  border: 1px solid rgba(39, 117, 202, 0.3);
+  border-radius: 16px;
   padding: 12px 16px !important;
   margin-bottom: 12px;
   box-shadow: 
@@ -183,12 +183,12 @@
 .action-btn:hover {
   background: rgba(255, 255, 255, 0.1) !important;
   color: #fff !important;
-  border-color: rgba(255, 255, 255, 0.2) !important;
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .usdc-separator {
-  margin-top: 12px !important;
-  background: linear-gradient(90deg, transparent, rgba(39, 117, 202, 0.3), transparent) !important;
+  margin-top: 12px;
+  background: linear-gradient(90deg, transparent, rgba(39, 117, 202, 0.3), transparent);
 }
 
 .wallet-balance-compact {
@@ -244,17 +244,17 @@
 }
 
 .search-input-compact {
-  border: none !important;
-  background: transparent !important;
+  border: none;
+  background: transparent;
   width: 100%;
   height: 28px;
   font-size: 14px;
-  padding: 0 !important;
+  padding: 0;
 }
 
 .search-input-compact:focus {
-  box-shadow: none !important;
-  outline: none !important;
+  box-shadow: none;
+  outline: none;
 }
 
 /* Sort Tags */
@@ -411,22 +411,22 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 2px 5px !important;
-  font-size: 9px !important;
-  background: rgba(16, 185, 129, 0.1) !important;
-  border-color: rgba(16, 185, 129, 0.3) !important;
-  color: #10b981 !important;
+  padding: 2px 5px;
+  font-size: 9px;
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #10b981;
 }
 
 .not-registered-badge {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 2px 5px !important;
-  font-size: 9px !important;
-  background: rgba(156, 163, 175, 0.2) !important;
-  border-color: rgba(156, 163, 175, 0.3) !important;
-  color: #6b7280 !important;
+  padding: 2px 5px;
+  font-size: 9px;
+  background: rgba(156, 163, 175, 0.2);
+  border-color: rgba(156, 163, 175, 0.3);
+  color: #6b7280;
 }
 
 .market-title {
@@ -609,8 +609,8 @@
   display: flex;
   align-items: center;
   gap: 3px;
-  background: #ef4444 !important;
-  color: white !important;
+  background: #ef4444;
+  color: white;
   font-size: 9px;
   padding: 3px 6px;
 }
@@ -619,9 +619,9 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  background: rgba(212, 255, 0, 0.1) !important;
-  border-color: rgba(212, 255, 0, 0.3) !important;
-  color: #7cb800 !important;
+  background: rgba(212, 255, 0, 0.1);
+  border-color: rgba(212, 255, 0, 0.3);
+  color: #7cb800;
   font-size: 11px;
   padding: 4px 10px;
   font-weight: 600;
@@ -631,9 +631,9 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  background: rgba(100, 116, 139, 0.1) !important;
-  border-color: rgba(100, 116, 139, 0.3) !important;
-  color: #64748b !important;
+  background: rgba(100, 116, 139, 0.1);
+  border-color: rgba(100, 116, 139, 0.3);
+  color: #64748b;
   font-size: 11px;
   padding: 4px 10px;
   font-weight: 500;
@@ -990,7 +990,7 @@
 }
 
 .confirm-btn.approve {
-  background: #3b82f6 !important;
+  background: #3b82f6;
 }
 
 /* Modal Header */

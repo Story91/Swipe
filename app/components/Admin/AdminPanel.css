@@ -150,23 +150,23 @@
 
   /* Mobile Sync Controls */
   .refresh-controls {
-    flex-direction: column !important;
-    align-items: stretch !important;
+    flex-direction: column;
+    align-items: stretch;
     gap: 12px !important;
   }
 
   .mobile-sync-btn {
-    width: 100% !important;
-    min-width: unset !important;
+    width: 100%;
+    min-width: unset;
     font-size: 16px !important;
     padding: 16px 20px !important;
     min-height: 50px !important;
     border-radius: 12px !important;
-    box-shadow: 0 3px 6px rgba(0,0,0,0.15) !important;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.15);
   }
 
   .mobile-sync-btn:active {
-    transform: scale(0.98) !important;
+    transform: scale(0.98);
   }
 
   /* Mobile Action Buttons in Prediction Cards - Tablet */

@@ -129,7 +129,7 @@
 .legacy-question {
   font-size: 12px;
   font-weight: 700;
-  color: var(--sheet-lime) !important;
+  color: var(--sheet-lime);
   margin: 0;
   line-height: 1.3;
   display: -webkit-box;

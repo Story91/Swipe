@@ -480,8 +480,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .sheet * {
-    transition-duration: 1ms !important;
-    animation-duration: 1ms !important;
+    transition-duration: 1ms;
+    animation-duration: 1ms;
   }
 }
 

@@ -16,8 +16,8 @@
 .stats-loading-card,
 .stats-error-card,
 .stats-empty-card {
-  background: rgba(0, 0, 0, 0.6) !important;
-  border: 1px solid rgba(212, 255, 0, 0.2) !important;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(212, 255, 0, 0.2);
 }
 
 .loading-container, .error-container, .no-data {
@@ -117,7 +117,7 @@
 
 .metric-card-new {
   background: rgba(0, 0, 0, 0.6) !important;
-  border: 1px solid var(--sheet-rule) !important;
+  border: 1px solid var(--sheet-rule);
   border-radius: 0;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
@@ -129,27 +129,27 @@
 }
 
 .metric-card-new.primary {
-  border-color: rgba(212, 255, 0, 0.3) !important;
-  background: var(--sheet-surface) !important;
+  border-color: rgba(212, 255, 0, 0.3);
+  background: var(--sheet-surface);
 }
 
 .metric-card-new.secondary {
-  border-color: rgba(99, 102, 241, 0.3) !important;
-  background: var(--sheet-surface) !important;
+  border-color: rgba(99, 102, 241, 0.3);
+  background: var(--sheet-surface);
 }
 
 .metric-card-new.accent {
-  border-color: rgba(236, 72, 153, 0.3) !important;
-  background: var(--sheet-surface) !important;
+  border-color: rgba(236, 72, 153, 0.3);
+  background: var(--sheet-surface);
 }
 
 .metric-card-new.success {
-  border-color: rgba(34, 197, 94, 0.3) !important;
+  border-color: rgba(34, 197, 94, 0.3);
   background: var(--sheet-surface) !important;
 }
 
 .metric-content-new {
-  padding: 14px !important;
+  padding: 14px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -181,14 +181,14 @@
 }
 
 .metric-badge {
-  font-size: 9px !important;
-  padding: 3px 8px !important;
-  font-weight: 600 !important;
+  font-size: 9px;
+  padding: 3px 8px;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   background: rgba(212, 255, 0, 0.15) !important;
   color: var(--sheet-lime) !important;
-  border: none !important;
+  border: none;
 }
 
 .metric-badge.active {
@@ -198,8 +198,8 @@
 
 /* Section Cards */
 .section-card {
-  background: rgba(0, 0, 0, 0.6) !important;
-  border: 1px solid rgba(212, 255, 0, 0.15) !important;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(212, 255, 0, 0.15);
   border-radius: 0;
 }
 
@@ -212,7 +212,7 @@
 }
 
 .section-header {
-  padding: 12px 14px 8px !important;
+  padding: 12px 14px 8px;
   border-bottom: 1px solid var(--sheet-surface);
 }
 
@@ -220,7 +220,7 @@
   font-size: 14px !important;
   color: var(--sheet-lime) !important;
   font-weight: 700 !important;
-  font-family: var(--sheet-body) !important;
+  font-family: var(--sheet-body);
 }
 
 /* Activity Grid */
@@ -228,7 +228,7 @@
   display: flex;
   align-items: center;
   justify-content: space-around;
-  padding: 14px !important;
+  padding: 14px;
 }
 
 .activity-item {
@@ -263,7 +263,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px !important;
+  padding: 14px;
 }
 
 .category-badge {
@@ -284,7 +284,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 14px 14px !important;
+  padding: 10px 14px 14px;
 }
 
 .trending-item-new {
@@ -305,12 +305,12 @@
 }
 
 .trending-rank-badge {
-  font-size: 10px !important;
-  padding: 4px 8px !important;
-  background: rgba(212, 255, 0, 0.1) !important;
-  color: var(--sheet-lime) !important;
-  border-color: rgba(212, 255, 0, 0.3) !important;
-  font-weight: 700 !important;
+  font-size: 10px;
+  padding: 4px 8px;
+  background: rgba(212, 255, 0, 0.1);
+  color: var(--sheet-lime);
+  border-color: rgba(212, 255, 0, 0.3);
+  font-weight: 700;
   flex-shrink: 0;
 }
 
@@ -360,10 +360,10 @@
 }
 
 .participants-badge {
-  font-size: 9px !important;
-  padding: 2px 6px !important;
-  background: var(--sheet-rule) !important;
-  color: var(--sheet-paper-2) !important;
+  font-size: 9px;
+  padding: 2px 6px;
+  background: var(--sheet-rule);
+  color: var(--sheet-paper-2);
 }
 
 .trending-arrow {
@@ -381,8 +381,8 @@
 
 /* Footer Card */
 .footer-card {
-  background: var(--sheet-surface) !important;
-  border: 1px solid rgba(212, 255, 0, 0.2) !important;
+  background: var(--sheet-surface);
+  border: 1px solid rgba(212, 255, 0, 0.2);
   border-radius: 0;
 }
 
@@ -390,7 +390,7 @@
   display: flex;
   align-items: center;
   justify-content: space-around;
-  padding: 14px !important;
+  padding: 14px;
 }
 
 .footer-stat {
@@ -408,11 +408,11 @@
 }
 
 .footer-value-badge {
-  font-size: 14px !important;
-  padding: 4px 12px !important;
-  background: var(--sheet-surface) !important;
-  color: #000 !important;
-  font-weight: 800 !important;
+  font-size: 14px;
+  padding: 4px 12px;
+  background: var(--sheet-surface);
+  color: #000;
+  font-weight: 800;
 }
 
 .footer-divider {
@@ -460,7 +460,7 @@
   }
   
   .stats-main-title {
-    font-size: 18px !important;
+    font-size: 18px;
   }
 
   .trending-question-new {

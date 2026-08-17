@@ -391,14 +391,14 @@
 
 .filter-row-select {
   width: auto !important;
-  min-width: unset !important;
+  min-width: unset;
   height: 26px !important;
   background: rgba(0, 0, 0, 0.6) !important;
-  border: 1px solid rgba(212, 255, 0, 0.4) !important;
-  border-radius: 6px !important;
+  border: 1px solid rgba(212, 255, 0, 0.4);
+  border-radius: 6px;
   font-size: 10px !important;
   color: #ffffff !important;
-  padding: 0 8px !important;
+  padding: 0 8px;
 }
 
 .filter-row-select span {
@@ -413,7 +413,7 @@
 }
 
 .filter-row-select:hover {
-  border-color: #d4ff00 !important;
+  border-color: #d4ff00;
   background: rgba(212, 255, 0, 0.1) !important;
 }
 
@@ -443,8 +443,8 @@
 
 /* Claim Badge Overlay - red badge for ready to claim count */
 .claim-badge-overlay {
-  background: linear-gradient(135deg, #ef4444, #dc2626) !important;
-  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.5) !important;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.5);
 }
 
 /* Filter Badge */
@@ -510,20 +510,20 @@
   background: rgba(255, 255, 255, 0.1) !important;
   border: 1px solid rgba(212, 255, 0, 0.4) !important;
   color: #d4ff00 !important;
-  font-family: "Exo 2", sans-serif !important;
-  font-weight: 600 !important;
+  font-family: "Exo 2", sans-serif;
+  font-weight: 600;
 }
 
 .filter-section [data-radix-select-trigger]:hover,
 .filter-section button[role="combobox"]:hover {
   background: rgba(212, 255, 0, 0.1) !important;
-  border-color: #d4ff00 !important;
+  border-color: #d4ff00;
 }
 
 .filter-section [data-radix-select-trigger] svg,
 .filter-section button[role="combobox"] svg {
   color: #d4ff00 !important;
-  opacity: 1 !important;
+  opacity: 1;
 }
 
 /* No predictions message inside filter section */
@@ -739,17 +739,17 @@
  * pale card that no longer exists.
  */
 .stat-value-total {
-  color: var(--sheet-paper) !important;
+  color: var(--sheet-paper);
   text-shadow: none;
-  font-family: var(--sheet-data) !important;
+  font-family: var(--sheet-data);
   font-variant-numeric: tabular-nums;
   font-weight: 500;
 }
 
 .stat-value-payout {
-  color: var(--sheet-paper-2) !important;
+  color: var(--sheet-paper-2);
   text-shadow: none;
-  font-family: var(--sheet-data) !important;
+  font-family: var(--sheet-data);
   font-variant-numeric: tabular-nums;
   font-weight: 500;
 }
@@ -798,9 +798,9 @@
 
 /* Potential payout - ciemniejszy kolor dla lepszej widoczności */
 .card-content .potential-payout {
-  color: #059669 !important;
-  font-family: "Exo 2", sans-serif !important;
-  font-weight: 700 !important;
+  color: #059669;
+  font-family: "Exo 2", sans-serif;
+  font-weight: 700;
   background: rgba(5, 150, 105, 0.1);
   padding: 2px 6px;
   border-radius: 4px;
@@ -1587,7 +1587,7 @@
 }
 
 .token-badge-icon-compact.eth-icon-no-bg {
-  background: transparent !important;
+  background: transparent;
   filter: drop-shadow(0 0 2px rgba(96, 165, 250, 0.5));
 }
 

@@ -653,7 +653,7 @@
   }
 
   .hf * {
-    transition-duration: 1ms !important;
+    transition-duration: 1ms;
   }
 }
 
@@ -688,6 +688,6 @@
 
   /* Every answer is on the page when it is printed. */
   .hf-faq-a {
-    display: block !important;
+    display: block;
   }
 }

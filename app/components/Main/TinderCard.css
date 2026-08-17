@@ -730,33 +730,33 @@ html, body {
 
 /* Badge styles for prediction stats */
 .stat-label-badge {
-  font-size: 8px !important;
-  font-weight: 600 !important;
-  padding: 2px 6px !important;
-  height: auto !important;
-  font-family: "Orbitron", sans-serif !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.3px !important;
-  border: 1px solid rgba(255, 255, 255, 0.3) !important;
-  background: rgba(255, 255, 255, 0.1) !important;
-  color: #6b7280 !important;
+  font-size: 8px;
+  font-weight: 600;
+  padding: 2px 6px;
+  height: auto;
+  font-family: "Orbitron", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  color: #6b7280;
 }
 
 .stat-value-badge {
   font-size: 11px !important;
-  font-weight: 700 !important;
-  padding: 4px 8px !important;
-  height: auto !important;
-  font-family: "Exo 2", sans-serif !important;
-  background: rgba(255, 255, 255, 0.2) !important;
+  font-weight: 700;
+  padding: 4px 8px;
+  height: auto;
+  font-family: "Exo 2", sans-serif;
+  background: rgba(255, 255, 255, 0.2);
   color: #1e293b !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-  word-break: break-word !important;
-  overflow-wrap: break-word !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  max-width: 100% !important;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 /* New Charts and Diagrams Section - VERTICAL LAYOUT */
@@ -764,26 +764,26 @@ html, body {
   display: flex !important;
   flex-direction: column !important;
   gap: 8px !important;
-  margin-top: 16px !important;
-  padding: 12px !important;
-  background: rgba(255, 255, 255, 0.1) !important;
-  border-radius: 12px !important;
-  backdrop-filter: blur(10px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .chart-item {
-  background: rgba(255, 255, 255, 0.2) !important;
-  backdrop-filter: blur(10px) !important;
-  border-radius: 8px !important;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  border-radius: 8px;
   padding: 8px 12px !important;
-  border: 1px solid rgba(255, 255, 255, 0.3) !important;
-  text-align: center !important;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  text-align: center;
   min-height: 50px !important;
-  display: flex !important;
-  flex-direction: column !important;
-  justify-content: center !important;
-  width: 100% !important;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
 }
 
 .chart-title {
@@ -3349,15 +3349,15 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 
 /* Terminal Header - SWIPE Brand Colors */
 .cyber-terminal {
-  background: linear-gradient(135deg, #d4ff00 0%, #b8e600 100%) !important;
-  border: 2px solid rgba(0, 0, 0, 0.2) !important;
-  border-radius: 12px !important;
+  background: linear-gradient(135deg, #d4ff00 0%, #b8e600 100%);
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
   overflow: hidden;
   box-shadow: 
     0 4px 20px rgba(212, 255, 0, 0.3),
-    0 0 40px rgba(212, 255, 0, 0.15) !important;
-  min-height: auto !important;
-  height: auto !important;
+    0 0 40px rgba(212, 255, 0, 0.15);
+  min-height: auto;
+  height: auto;
   display: block;
 }
 
@@ -3401,8 +3401,8 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 }
 
 .terminal-body p {
-  color: #1a1a1a !important;
-  margin: 0 !important;
+  color: #1a1a1a;
+  margin: 0;
   padding: 0 !important;
   min-height: auto !important;
   height: auto !important;
@@ -3426,24 +3426,24 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 /* Cyber Table */
 /* Stats Table - SWIPE Brand Colors */
 .cyber-table {
-  background: linear-gradient(135deg, #d4ff00 0%, #c4ef00 100%) !important;
-  border: 2px solid rgba(0, 0, 0, 0.15) !important;
-  border-radius: 12px !important;
+  background: linear-gradient(135deg, #d4ff00 0%, #c4ef00 100%);
+  border: 2px solid rgba(0, 0, 0, 0.15);
+  border-radius: 12px;
   overflow: hidden;
   box-shadow: 
     0 4px 20px rgba(212, 255, 0, 0.3),
-    0 0 40px rgba(212, 255, 0, 0.15) !important;
+    0 0 40px rgba(212, 255, 0, 0.15);
 }
 
 .table-header {
-  background: rgba(0, 0, 0, 0.1) !important;
+  background: rgba(0, 0, 0, 0.1);
   padding: 10px 16px;
-  border-bottom: 2px solid rgba(0, 0, 0, 0.1) !important;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.1);
 }
 
 .table-header span {
-  color: #1a1a1a !important;
-  font-weight: 700 !important;
+  color: #1a1a1a;
+  font-weight: 700;
 }
 
 .cyber-table table {
@@ -3467,27 +3467,27 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 
 .cyber-label {
   padding: 12px 16px;
-  color: #333 !important;
+  color: #333;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 1px;
-  font-weight: 600 !important;
-  background: transparent !important;
+  font-weight: 600;
+  background: transparent;
 }
 
 .cyber-value {
   padding: 12px 16px;
   text-align: right;
   font-size: 13px;
-  font-weight: 700 !important;
-  color: #1a1a1a !important;
-  background: transparent !important;
+  font-weight: 700;
+  color: #1a1a1a;
+  background: transparent;
 }
 
 /* Risk Level - Full Width Two Lines */
 .risk-full-section {
-  padding: 12px 16px !important;
-  background: transparent !important;
+  padding: 12px 16px;
+  background: transparent;
 }
 
 .risk-container {
@@ -3508,7 +3508,7 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 11px;
   font-weight: 600;
-  color: #333 !important;
+  color: #333;
   text-transform: uppercase;
   letter-spacing: 1px;
   flex-shrink: 0;
@@ -3522,14 +3522,14 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 .risk-level-text {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 13px;
-  font-weight: 700 !important;
+  font-weight: 700;
   flex-shrink: 0;
 }
 
 .risk-pts {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 11px;
-  color: #1a1a1a !important;
+  color: #1a1a1a;
   font-weight: 600;
   background: rgba(0, 0, 0, 0.1);
   padding: 2px 8px;
@@ -3551,12 +3551,12 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 .risk-detail {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 10px;
-  color: #1a1a1a !important;
+  color: #1a1a1a;
   font-weight: 600;
 }
 
 .risk-divider {
-  color: #666 !important;
+  color: #666;
   font-size: 10px;
 }
 
@@ -3600,20 +3600,20 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 /* Cyber Pool */
 /* Pool Sections - SWIPE Brand Colors */
 .cyber-pool {
-  background: linear-gradient(135deg, #d4ff00 0%, #c4ef00 100%) !important;
-  border-radius: 12px !important;
+  background: linear-gradient(135deg, #d4ff00 0%, #c4ef00 100%);
+  border-radius: 12px;
   overflow: hidden;
   box-shadow: 
     0 4px 20px rgba(212, 255, 0, 0.3),
-    0 0 40px rgba(212, 255, 0, 0.15) !important;
+    0 0 40px rgba(212, 255, 0, 0.15);
 }
 
 .cyber-pool.eth-pool {
-  border: 2px solid rgba(0, 0, 0, 0.15) !important;
+  border: 2px solid rgba(0, 0, 0, 0.15);
 }
 
 .cyber-pool.swipe-pool {
-  border: 2px solid rgba(0, 0, 0, 0.15) !important;
+  border: 2px solid rgba(0, 0, 0, 0.15);
 }
 
 .pool-header {
@@ -3621,7 +3621,7 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
   align-items: center;
   gap: 8px;
   padding: 12px 16px;
-  border-bottom: 2px solid rgba(0, 0, 0, 0.1) !important;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.1);
   background: rgba(0, 0, 0, 0.08) !important;
 }
 
@@ -3666,7 +3666,7 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 
 .pool-total {
   font-size: 11px;
-  color: #333 !important;
+  color: #333;
   font-weight: 600;
 }
 
@@ -3680,11 +3680,11 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 .pool-side {
   padding: 16px;
   text-align: center;
-  background: rgba(255, 255, 255, 0.3) !important;
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .pool-side.yes {
-  border-right: 2px solid rgba(0, 0, 0, 0.1) !important;
+  border-right: 2px solid rgba(0, 0, 0, 0.1);
 }
 
 .side-label {
@@ -3700,7 +3700,7 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
 .side-amount {
   font-size: 14px;
   font-weight: 700;
-  color: #1a1a1a !important;
+  color: #1a1a1a;
   margin-bottom: 4px;
 }
 
@@ -3784,9 +3784,9 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
   text-align: center;
   padding: 8px;
   font-size: 10px;
-  color: #555 !important;
+  color: #555;
   border-top: 1px solid rgba(0, 0, 0, 0.1);
-  background: transparent !important;
+  background: transparent;
 }
 
 /* Category Filter Section */
