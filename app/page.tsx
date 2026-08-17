@@ -595,10 +595,18 @@ export default function App() {
           <>
 
         {/* Wallet Connection and Admin/Help - Top */}
-        <div className="flex justify-between items-center mb-3">
+        <div className="flex justify-between items-center gap-2 mb-3">
           {walletControl}
 
-          {/* Menu Dropdown - Top Right */}
+          {/* The network sits between sign-in and the menu, so the chain you
+              are betting on is on the same line as who you are betting as.
+              It used to be a chip in the row below, wedged between Bets and
+              the collateral tab, which read as another destination rather
+              than as the setting that decides what every destination shows. */}
+          <div className="flex items-center gap-2 ml-auto">
+            <ChainSwitcher />
+
+            {/* Menu Dropdown - Top Right */}
           <Menubar className="!bg-transparent !border-0 !p-0 !h-auto">
             <MenubarMenu>
               <MenubarTrigger 
@@ -667,7 +675,8 @@ export default function App() {
                 )}
               </MenubarContent>
             </MenubarMenu>
-          </Menubar>
+            </Menubar>
+          </div>
         </div>
 
         {/* Menu Bar - Right after Wallet */}
@@ -678,9 +687,8 @@ export default function App() {
                 Bets
               </MenubarTrigger>
             </MenubarMenu>
-            {/* Network switch sits with the other nav controls so the active
-                chain is visible without opening a menu. */}
-            <ChainSwitcher />
+            {/* The network switch moved up to the wallet row, next to Menu.
+                Two of them would be two controls for one fact. */}
             {/* Layout switch lives in the main nav here; on the desktop shell
                 it moves to the top bar. */}
             {viewSwitch}
