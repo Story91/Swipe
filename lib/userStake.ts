@@ -67,6 +67,16 @@ export interface StakeLeg {
   stakedAt: number;
   contractVersion?: string;
   tokenType: StakeToken;
+  /**
+   * The stake after the contract's time weighting, raw, in the same units.
+   *
+   * Only the collateral leg has one: /api/sync/usdc reads it off positions(id,
+   * user) and the archived contracts had no weighting at all. Zero means "not
+   * recorded", and a payout that divides by weight has to fall back to the raw
+   * stake rather than dividing by nothing.
+   */
+  weightedYes?: number;
+  weightedNo?: number;
 }
 
 function leg(
@@ -83,6 +93,8 @@ function leg(
     stakedAt: Number(raw.stakedAt) || 0,
     contractVersion: raw.contractVersion as string | undefined,
     tokenType: token,
+    weightedYes: Number(nested.weightedYes) || 0,
+    weightedNo: Number(nested.weightedNo) || 0,
   };
 }
 
@@ -146,6 +158,15 @@ export interface TokenMarket {
   /** Raw, same units as a leg of this token. */
   yesPool: number;
   noPool: number;
+  /**
+   * The pools after weighting, which are what a payout is divided by.
+   *
+   * Zero on the archived legs, which never had weighting, and zero on a
+   * collateral market synced before these were recorded. A caller that gets
+   * zero must fall back to the raw pool rather than dividing by it.
+   */
+  weightedYesPool: number;
+  weightedNoPool: number;
   resolved: boolean;
   cancelled: boolean;
   outcome: boolean;
@@ -165,6 +186,8 @@ export function tokenMarket(prediction: RedisPrediction, token: StakeToken): Tok
     return {
       yesPool: prediction.usdcYesTotalAmount ?? 0,
       noPool: prediction.usdcNoTotalAmount ?? 0,
+      weightedYesPool: (prediction as { usdcWeightedYes?: number }).usdcWeightedYes ?? 0,
+      weightedNoPool: (prediction as { usdcWeightedNo?: number }).usdcWeightedNo ?? 0,
       // A market can be settled on the collateral contract and not on the V2
       // one, or the reverse, so the collateral's own flags win when present.
       resolved: prediction.usdcResolved ?? prediction.resolved,
@@ -176,6 +199,8 @@ export function tokenMarket(prediction: RedisPrediction, token: StakeToken): Tok
     return {
       yesPool: prediction.swipeYesTotalAmount ?? 0,
       noPool: prediction.swipeNoTotalAmount ?? 0,
+      weightedYesPool: 0,
+      weightedNoPool: 0,
       resolved: prediction.resolved,
       cancelled: prediction.cancelled,
       outcome: prediction.outcome ?? false,
@@ -184,6 +209,8 @@ export function tokenMarket(prediction: RedisPrediction, token: StakeToken): Tok
   return {
     yesPool: prediction.yesTotalAmount ?? 0,
     noPool: prediction.noTotalAmount ?? 0,
+    weightedYesPool: 0,
+    weightedNoPool: 0,
     resolved: prediction.resolved,
     cancelled: prediction.cancelled,
     outcome: prediction.outcome ?? false,

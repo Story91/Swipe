@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useAccount, useReadContract } from 'wagmi';
-import { estimatePosition } from './positionMath';
+import { estimatePosition } from '../../../lib/positionMath';
 import './YourPosition.css';
 
 /**

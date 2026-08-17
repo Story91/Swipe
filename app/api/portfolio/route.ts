@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { redis, redisHelpers, REDIS_KEYS } from '../../../lib/redis';
 import { chainFromRequest } from '@/lib/chains/requestChain';
 import { RedisPrediction } from '../../../lib/types/redis';
+import { estimatePosition } from '@/lib/positionMath';
+import { getFeeBps } from '@/lib/chains/fees';
 import {
   stakeLegs,
   tokenMarket,
@@ -108,6 +110,11 @@ export async function GET(request: NextRequest) {
     // Get all predictions
     const allPredictions = await redisHelpers.getAllPredictions(chain);
 
+    // One read per request, cached per chain for five minutes. Written down
+    // instead, the obvious literal is the contract's 1% constructor default
+    // rather than the 3% the deploy script sets afterwards.
+    const fees = await getFeeBps(chain);
+
     const portfolioItems: PortfolioItem[] = [];
     const totals = emptyTotals();
     let activeBets = 0;
@@ -145,13 +152,43 @@ export async function GET(request: NextRequest) {
         let potentialPayout = 0;
         let profit = 0;
 
-        /** Parimutuel: your side splits the other side, pro rata. */
+        /**
+         * What the contract would actually pay, not a pro rata guess.
+         *
+         * This computed `backing * (1 + losingPool / winningPool)`, which is
+         * wrong twice and both errors overstate. It took no fee, although the
+         * contract removes the platform and creator cuts from the losing pool
+         * before dividing it. And it divided by the raw pool rather than the
+         * weighted one, which hands a late bet the share an early bet paid for.
+         * On an even market a 10 stake was reported as 10 profit where the
+         * contract pays 9.65, and less again for a late bet.
+         *
+         * estimatePosition is the same function the swipe card uses, tested
+         * against the worked example the manifesto and the FAQ both print, so
+         * the server and the card cannot disagree about a payout.
+         */
         const payoutOn = () => {
-          const losingPool = choice === 'YES' ? market.noPool : market.yesPool;
-          const winningPool = choice === 'YES' ? market.yesPool : market.noPool;
-          if (winningPool <= 0) return;
-          potentialPayout = backing * (1 + losingPool / winningPool);
-          profit = potentialPayout - staked;
+          const weightedPool = choice === 'YES' ? market.weightedYesPool : market.weightedNoPool;
+          const myWeighted = choice === 'YES' ? (l.weightedYes ?? 0) : (l.weightedNo ?? 0);
+          // Archived legs never had weighting, and a collateral market synced
+          // before it was recorded has none either. Falling back to the raw
+          // stake keeps the fee right and leaves the share unweighted, which is
+          // the best available answer rather than a division by zero.
+          const usable = weightedPool > 0 && myWeighted > 0;
+          const estimate = estimatePosition({
+            mine: backing,
+            myWeighted: usable ? myWeighted : backing,
+            myWeightedPool: usable
+              ? weightedPool
+              : choice === 'YES'
+                ? market.yesPool
+                : market.noPool,
+            losingPool: choice === 'YES' ? market.noPool : market.yesPool,
+            platformFeeBps: fees.platform,
+            creatorFeeBps: fees.creator,
+          });
+          potentialPayout = estimate.total;
+          profit = estimate.total - staked;
         };
 
         if (market.resolved && !market.cancelled) {

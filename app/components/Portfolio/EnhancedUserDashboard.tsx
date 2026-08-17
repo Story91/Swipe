@@ -5,6 +5,7 @@ import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagm
 import { useActiveChain } from '@/lib/chains/activeChain';
 import { tokenSymbol, COLLATERAL_LEG } from '@/lib/userStake';
 import { getMarketContract, txUrl } from '@/lib/chains/market';
+import { getChainConfig } from '@/lib/chains';
 import { parseMarketId, CURRENT_GENERATION } from '@/lib/marketId';
 import { CONTRACTS, getV1Contract, getV2Contract, getContractForPrediction, USDC_DUALPOOL_CONTRACT_ADDRESS, USDC_DUALPOOL_ABI } from '../../../lib/contract';
 import { ethers } from 'ethers';
@@ -627,6 +628,8 @@ export function EnhancedUserDashboard() {
       
       // Batch USDC position checks for V2 predictions
       const v2PredictionsToCheck: { prediction: any; numericId: number; stakesByToken: any }[] = [];
+      /** Markets on the live contract, which answers a different function. */
+      const livePredictionsToCheck: { prediction: any; numericId: number; stakesByToken: any }[] = [];
       
       for (const prediction of predictions) {
         try {
@@ -746,10 +749,26 @@ export function EnhancedUserDashboard() {
               ((prediction.usdcYesTotalAmount || 0) + (prediction.usdcNoTotalAmount || 0)) > 0;
             
             if (hasUserStake || hasActiveUsdcPool) {
-              const numericId = parseInt(prediction.id.replace('pred_v2_', '').replace('pred_v1_', ''), 10);
-              if (!isNaN(numericId)) {
-                // Add to batch check list
-                v2PredictionsToCheck.push({ prediction, numericId, stakesByToken });
+              /**
+               * Parse the id, do not strip prefixes off it.
+               *
+               * This stripped only pred_v2_ and pred_v1_, so every pred_v4_N id
+               * came out of parseInt as NaN and was dropped before the position
+               * was ever read. The whole of the current contract was invisible
+               * on this screen: a user who staked and won saw no position, no
+               * payout and no claim button.
+               *
+               * And the two generations do not live on the same contract, so
+               * they cannot share one batch. The archived pool answers
+               * getPosition; the live market answers positions.
+               */
+              const ref = parseMarketId(prediction.id);
+              if (ref) {
+                if (ref.generation === CURRENT_GENERATION) {
+                  livePredictionsToCheck.push({ prediction, numericId: ref.numericId, stakesByToken });
+                } else if (ref.generation === 'v1' || ref.generation === 'v2' || ref.generation === 'legacy') {
+                  v2PredictionsToCheck.push({ prediction, numericId: ref.numericId, stakesByToken });
+                }
               }
             }
             
@@ -773,7 +792,7 @@ export function EnhancedUserDashboard() {
       
       // BATCH CHECK: Fetch all USDC positions in parallel (much faster than sequential)
       console.log(`📊 V2 predictions to check for USDC: ${v2PredictionsToCheck.length}`);
-      if (v2PredictionsToCheck.length > 0) {
+      if (v2PredictionsToCheck.length > 0 || livePredictionsToCheck.length > 0) {
         try {
           console.log(`🔄 Batch checking ${v2PredictionsToCheck.length} V2 predictions for USDC positions...`);
           
@@ -790,11 +809,48 @@ export function EnhancedUserDashboard() {
           );
           
           const results = await Promise.all(positionPromises);
-          
+
+          /**
+           * The same read again, against the live contract.
+           *
+           * Two contracts, two function names, one shape. The archived pool
+           * answers getPosition and the live market answers positions, and the
+           * tuples happen to line up where this loop looks: yes at 0, no at 1,
+           * claimed at 4, and resolved, cancelled and outcome at 5, 6 and 7 of
+           * the market row. So the results are concatenated and the processing
+           * below runs once over both rather than being written twice.
+           *
+           * Resolved from the selected chain, not from a Base literal, so a
+           * Robinhood position is read off Robinhood.
+           */
+          const liveMarket = getMarketContract(claimChainKey);
+          let liveResults: [any, any][] = [];
+          if (liveMarket && livePredictionsToCheck.length > 0) {
+            const liveProvider = new ethers.JsonRpcProvider(
+              getChainConfig(claimChainKey).rpcUrl
+            );
+            const liveContract = new ethers.Contract(
+              liveMarket.address,
+              liveMarket.abi as never,
+              liveProvider
+            );
+            liveResults = await Promise.all(
+              livePredictionsToCheck.map(({ numericId }) =>
+                Promise.all([
+                  liveContract.positions(numericId, address).catch(() => null),
+                  liveContract.getPrediction(numericId).catch(() => null),
+                ])
+              )
+            ) as [any, any][];
+          }
+
+          const toCheck = [...v2PredictionsToCheck, ...livePredictionsToCheck];
+          const allResults = [...results, ...liveResults];
+
           // Process results
-          for (let i = 0; i < v2PredictionsToCheck.length; i++) {
-            const { prediction, numericId, stakesByToken } = v2PredictionsToCheck[i];
-            const [position, usdcPredictionData] = results[i];
+          for (let i = 0; i < toCheck.length; i++) {
+            const { prediction, numericId, stakesByToken } = toCheck[i];
+            const [position, usdcPredictionData] = allResults[i];
             
             if (!position) continue;
             

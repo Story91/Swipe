@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { redisHelpers, redis, REDIS_KEYS } from '../../../lib/redis';
 import { chainFromRequest } from '@/lib/chains/requestChain';
 import { RedisPrediction } from '../../../lib/types/redis';
+import { estimatePosition } from '@/lib/positionMath';
+import { getFeeBps } from '@/lib/chains/fees';
 import {
   stakeLegs,
   tokenMarket,
@@ -55,6 +57,11 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '20');
     const type = searchParams.get('type'); // 'all', 'predictions', 'bets'
+
+    // One read per request, cached per chain. Written down instead, the obvious
+    // literal is the contract's 1% constructor default rather than the 3% the
+    // deploy script sets afterwards.
+    const fees = await getFeeBps(chain);
 
     const activities: ActivityItem[] = [];
     const avatars = ['🐋', '🎯', '🔮', '🐂', '👑', '🍀', '📈', '🤖', '⚽', '💻', '🚀', '💎'];
@@ -177,10 +184,29 @@ export async function GET(request: NextRequest) {
             if (!market.resolved || market.cancelled || !l.claimed) continue;
             if ((choice === 'YES') !== market.outcome || backing <= 0) continue;
 
-            const losingPool = choice === 'YES' ? market.noPool : market.yesPool;
-            const winningPool = choice === 'YES' ? market.yesPool : market.noPool;
-            if (winningPool <= 0) continue;
-            const payout = backing * (1 + losingPool / winningPool);
+          /**
+           * The contract's own arithmetic, not a pro rata guess.
+           *
+           * Two errors, both overstating. No fee was taken, although the
+           * contract removes the platform and creator cuts from the losing pool
+           * first. And the share was over the raw pool rather than the weighted
+           * one, which hands a late bet what an early bet paid for. On a
+           * ranking that is not a rounding difference, it is the order.
+           */
+            const weightedPool =
+              choice === 'YES' ? market.weightedYesPool : market.weightedNoPool;
+            const myWeighted = choice === 'YES' ? (l.weightedYes ?? 0) : (l.weightedNo ?? 0);
+            const usable = weightedPool > 0 && myWeighted > 0;
+            const rawPool = choice === 'YES' ? market.yesPool : market.noPool;
+            if (!usable && rawPool <= 0) continue;
+            const payout = estimatePosition({
+              mine: backing,
+              myWeighted: usable ? myWeighted : backing,
+              myWeightedPool: usable ? weightedPool : rawPool,
+              losingPool: choice === 'YES' ? market.noPool : market.yesPool,
+              platformFeeBps: fees.platform,
+              creatorFeeBps: fees.creator,
+            }).total;
 
             activities.push({
               id: `payout_${participant}_${prediction.id}_${token}`,

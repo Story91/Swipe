@@ -1555,21 +1555,37 @@ export default function SwipeMarkets() {
                     const yourSidePool = betModal.side === 'yes' ? usdcYes : usdcNo;
                     const betAmount = betModal.amount;
                     
-                    // Payout = your bet + (your share of opposite pool) - 1.5% fee
+                    /**
+                     * The fee comes from the contract, not from a literal.
+                     *
+                     * This multiplied by 0.985, a 1.5% cut, in a component that
+                     * had already read the real rates off getFeeConfig twenty
+                     * lines earlier. The live figure is 3% platform plus 0.5%
+                     * creator, so every quote here was too high.
+                     *
+                     * It is still an estimate and now says so: the share is over
+                     * the raw pool, and the contract divides by the weighted one,
+                     * so a bet landing later than the money already in will take
+                     * less than this. Modelling that needs the weighted pools,
+                     * which the card beside this does read.
+                     */
                     const newYourSidePool = yourSidePool + betAmount;
                     const yourShare = betAmount / newYourSidePool;
-                    const potentialWin = betAmount + (oppositePool * yourShare * 0.985);
-                    
+                    const feeRate = (platformPct + creatorPct) / 100;
+                    const potentialWin = betAmount + oppositePool * yourShare * (1 - feeRate);
+
                     return (
                       <div className="payout-row">
-                        <span>If you win</span>
-                        <span className="text-green-500">~${potentialWin.toFixed(2)}</span>
+                        <span>If you win, roughly</span>
+                        <span className="text-green-500">
+                          {potentialWin.toFixed(2)} {sym}
+                        </span>
                       </div>
                     );
                   })()}
                   <div className="payout-row text-sm text-gray-500">
                     <span>Early exit fee</span>
-                    <span>5%</span>
+                    <span>{exitPct}%</span>
                   </div>
                 </div>
               )}

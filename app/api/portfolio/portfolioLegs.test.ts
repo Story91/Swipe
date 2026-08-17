@@ -142,8 +142,16 @@ describe('which pools a row is priced against', () => {
 
     const { portfolio: rows } = await portfolio();
     expect(rows[0].token).toBe('USDC');
-    // 10 staked, opposite pool equals own pool, so 10 back plus 10 won.
-    expect(rows[0].potentialPayout).toBeCloseTo(20, 6);
+    /**
+     * 10 staked, the opposite pool equals this side's pool, so the whole losing
+     * pool is this position's share. The contract takes 3% platform and 0.5%
+     * creator out of that before dividing, so the payout is 10 + 10 * 0.965.
+     *
+     * This asserted a flat 20 while the route computed the payout with no fee
+     * at all. Both were wrong together, which is exactly how a test stops being
+     * a check and becomes a second copy of the bug.
+     */
+    expect(rows[0].potentialPayout).toBeCloseTo(19.65, 6);
     expect(rows[0].yesPool).toBe(50);
     expect(rows[0].noPool).toBe(50);
   });

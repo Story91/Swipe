@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { redis, redisHelpers, REDIS_KEYS } from '../../../lib/redis';
 import { chainFromRequest } from '@/lib/chains/requestChain';
 import { RedisPrediction } from '../../../lib/types/redis';
+import { estimatePosition } from '@/lib/positionMath';
+import { getFeeBps } from '@/lib/chains/fees';
 import {
   stakeLegs,
   tokenMarket,
@@ -63,6 +65,11 @@ export async function GET(request: NextRequest) {
       filteredPredictions = allPredictions.filter(p => p.createdAt >= cutoffTime);
     }
 
+    // One read per request, cached per chain. Written down instead, the obvious
+    // literal is the contract's 1% constructor default rather than the 3% the
+    // deploy script sets afterwards.
+    const fees = await getFeeBps(chain);
+
     // Aggregate user statistics
     const userStats: { [address: string]: LeaderboardEntry } = {};
 
@@ -114,14 +121,28 @@ export async function GET(request: NextRequest) {
 
           if ((choice === 'YES') === market.outcome) {
             wonBets++;
-            // Parimutuel: the winning side splits the losing side pro rata, so
-            // profit is the share of the losing pool this stake earned. Both
-            // pools come from tokenMarket, so they are this token's pools.
-            const losingPool = choice === 'YES' ? market.noPool : market.yesPool;
-            const winningPool = choice === 'YES' ? market.yesPool : market.noPool;
-            if (winningPool > 0) {
-              totals[token].profit += backing * (losingPool / winningPool);
-            }
+          /**
+           * The contract's own arithmetic, not a pro rata guess.
+           *
+           * Two errors, both overstating. No fee was taken, although the
+           * contract removes the platform and creator cuts from the losing pool
+           * first. And the share was over the raw pool rather than the weighted
+           * one, which hands a late bet what an early bet paid for. On a
+           * ranking that is not a rounding difference, it is the order.
+           */
+            const weightedPool =
+              choice === 'YES' ? market.weightedYesPool : market.weightedNoPool;
+            const myWeighted = choice === 'YES' ? (l.weightedYes ?? 0) : (l.weightedNo ?? 0);
+            const usable = weightedPool > 0 && myWeighted > 0;
+            const rawPool = choice === 'YES' ? market.yesPool : market.noPool;
+            totals[token].profit += estimatePosition({
+              mine: backing,
+              myWeighted: usable ? myWeighted : backing,
+              myWeightedPool: usable ? weightedPool : rawPool,
+              losingPool: choice === 'YES' ? market.noPool : market.yesPool,
+              platformFeeBps: fees.platform,
+              creatorFeeBps: fees.creator,
+            }).winnings;
           } else {
             totals[token].profit -= backing;
           }

@@ -164,6 +164,32 @@ async function syncMarket(ref: MarketRef, chain: ChainKey, client: PublicClient)
     const cancelled = Boolean(data[6]);
     const outcome = Boolean(data[7]);
     const refundable = source.kind === 'live' ? Boolean(data[8]) : false;
+
+    /**
+     * The weighted pools, which are what actually divide a payout.
+     *
+     * getPrediction does not return them, so this is a second read of
+     * predictions(id), where they sit at 5 and 6. Without them every server
+     * side payout figure has to fall back to the raw pools, which overstates a
+     * late bet and understates an early one by exactly the multiplier the
+     * contract applied. Live contract only: the archived pool has no weighting.
+     */
+    let weightedYes = 0;
+    let weightedNo = 0;
+    if (source.kind === 'live') {
+      const row = (await client
+        .readContract({
+          address: source.address,
+          abi: source.abi as never,
+          functionName: 'predictions',
+          args: [id],
+        })
+        .catch(() => null)) as readonly bigint[] | null;
+      if (row && row.length >= 7) {
+        weightedYes = Number(row[5]);
+        weightedNo = Number(row[6]);
+      }
+    }
     const participantCount = Number((source.kind === 'live' ? data[9] : data[8]) as bigint);
 
     const predData = await redis.get(REDIS_KEYS.PREDICTION(ref.redisId, chain));
@@ -181,6 +207,9 @@ async function syncMarket(ref: MarketRef, chain: ChainKey, client: PublicClient)
       usdcOutcome: outcome,
       usdcRefundable: refundable,
       usdcParticipantCount: participantCount,
+      // Raw, same decimals as the pools above. A payout divides by these.
+      usdcWeightedYes: weightedYes,
+      usdcWeightedNo: weightedNo,
       contractVersion: source.contractVersion,
     };
 
