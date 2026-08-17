@@ -45,6 +45,19 @@ describe('chain abstraction is not bypassed', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('the swipe bet path gates on the address it writes to, not on the chain', () => {
+    // A guard that only asks "does this chain have a market?" while the write
+    // itself goes to a module-scope constant has checked nothing about where
+    // the money lands. That shape is what would have put a Base address on a
+    // Robinhood transaction the moment a pool address was configured.
+    const src = readFileSync(
+      path.join(ROOT, 'app', 'components', 'Main', 'TinderCard.tsx'),
+      'utf8'
+    );
+    expect(src).toContain('isWritableMarket(');
+    expect(src).not.toMatch(/if\s*\(\s*!\s*getWritableMarket\s*\(/);
+  });
+
   it('no module hardcodes the public Base RPC as a fallback', () => {
     const files = SCAN_DIRS
       .map(d => path.join(ROOT, d))

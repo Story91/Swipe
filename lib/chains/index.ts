@@ -40,6 +40,18 @@ export const CHAINS: Record<ChainKey, ChainConfig> = {
     viemChain: robinhoodTestnetChain,
     rpcUrl: process.env.ROBINHOOD_TESTNET_RPC_URL || 'https://rpc.testnet.chain.robinhood.com',
     explorer: 'https://explorer.testnet.chain.robinhood.com',
+    // These addresses are read from env vars with no NEXT_PUBLIC_ prefix, so
+    // Next.js leaves them undefined in the browser bundle: on the server this
+    // chain has its real pool address, in the UI it has the zero address, and
+    // getWritableMarket answers the same question two different ways depending
+    // on where it runs. Verified against a production build — the value of
+    // ROBINHOOD_TESTNET_USDG_DUALPOOL, which .env.local does set, appears in no
+    // client chunk, while NEXT_PUBLIC_CONTRACT_V2_ADDRESS's value appears in
+    // three.
+    //
+    // Prefixing them is what makes a Robinhood market reachable from the UI at
+    // all, and it is therefore the moment every client-side write guard has to
+    // already be sound — see isWritableMarket.
     contracts: {
       // No $SWIPE on Robinhood, so there is no v2 leg by design.
       dualPool: (process.env.ROBINHOOD_TESTNET_DUALPOOL || ZERO) as `0x${string}`,
@@ -61,6 +73,8 @@ export const CHAINS: Record<ChainKey, ChainConfig> = {
     rpcUrl: process.env.ROBINHOOD_RPC_URL || 'https://rpc.mainnet.chain.robinhood.com',
     explorer: 'https://robinhoodchain.blockscout.com',
     contracts: {
+      // Server-only, exactly as on the testnet above: the browser reads the
+      // zero address here no matter what this env var is set to.
       usdgPool: (process.env.ROBINHOOD_USDG_DUALPOOL || ZERO) as `0x${string}`,
     },
     stable: {
@@ -124,6 +138,10 @@ export function isReadOnlyChain(key: ChainKey = DEFAULT_CHAIN_KEY): boolean {
  * The market contract new bets should go to, or null when the chain is
  * read-only. Callers that write must check this rather than reaching for
  * `contracts.dualPool`, which on Base points at a contract nobody controls.
+ *
+ * This answers "does this chain have a market?", which is *not* the question a
+ * caller about to send a transaction needs answered. If you are about to write
+ * to an address, use `isWritableMarket` and pass that address.
  */
 export function getWritableMarket(
   key: ChainKey = DEFAULT_CHAIN_KEY
@@ -133,4 +151,29 @@ export function getWritableMarket(
   const pool = config.contracts.usdgPool;
   if (!pool || pool === ZERO) return null;
   return pool;
+}
+
+/**
+ * True only when `target` is exactly the market contract that writes on `key`
+ * must go to.
+ *
+ * The write guard has two halves and `getWritableMarket` is only the first. A
+ * caller that checks the chain and then writes to an address of its own — a
+ * module-scope constant, say — has verified nothing about where the money
+ * goes: the moment that chain's pool address becomes configured, the chain
+ * check starts passing while the transaction still leaves for whatever address
+ * was hardcoded. On a chain where that address holds no contract, a transfer
+ * to it is simply gone.
+ *
+ * So the guard compares the address. Anything that is not this chain's market
+ * is refused, and wiring a new chain up means routing its address (and ABI)
+ * through here — not setting an env var and hoping the call sites followed.
+ */
+export function isWritableMarket(
+  key: ChainKey,
+  target: string | null | undefined
+): boolean {
+  const market = getWritableMarket(key);
+  if (!market || !target) return false;
+  return target.toLowerCase() === market.toLowerCase();
 }

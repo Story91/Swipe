@@ -1,10 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   CHAINS,
   getChainConfig,
   DEFAULT_CHAIN_KEY,
   isReadOnlyChain,
   getWritableMarket,
+  isWritableMarket,
   chainList,
   supportedChains,
 } from './index';
@@ -107,5 +108,58 @@ describe('read-only chains', () => {
     const market = getWritableMarket('robinhood');
     expect(market === null || /^0x[0-9a-fA-F]{40}$/.test(market)).toBe(true);
     expect(market).not.toBe('0x0000000000000000000000000000000000000000');
+  });
+});
+
+describe('the address a write is actually addressed to', () => {
+  const BASE_V2 = CHAINS.base.contracts.v2 as string;
+  // Mixed case on purpose: addresses are compared case-insensitively.
+  const POOL = '0xAbCdEf0123456789aBcDeF0123456789AbCdEf01';
+
+  // CHAINS is built from process.env at module load, so a chain can only be
+  // given a market by re-importing the module under a stubbed environment.
+  async function withPool(value: string) {
+    vi.stubEnv('ROBINHOOD_USDG_DUALPOOL', value);
+    vi.resetModules();
+    return import('./index');
+  }
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('refuses every target on a read-only chain', () => {
+    expect(isWritableMarket('base', BASE_V2)).toBe(false);
+    expect(isWritableMarket('base', CHAINS.base.contracts.dualPool as string)).toBe(false);
+  });
+
+  it('refuses a missing target instead of reading it as a match', () => {
+    expect(isWritableMarket('robinhood', null)).toBe(false);
+    expect(isWritableMarket('robinhood', undefined)).toBe(false);
+    expect(isWritableMarket('robinhood', '')).toBe(false);
+  });
+
+  it('refuses when the selected chain has no market deployed', async () => {
+    const chains = await withPool('');
+    expect(chains.getWritableMarket('robinhood')).toBeNull();
+    expect(chains.isWritableMarket('robinhood', BASE_V2)).toBe(false);
+  });
+
+  it("still refuses another chain's contract once this chain has a market", async () => {
+    // The regression this guard exists for. Configuring the pool address is the
+    // first step of the V3 migration, and from that moment the chain check on
+    // its own starts passing — while a caller writing to a Base constant would
+    // be sending the stake to an address that holds no contract on this chain.
+    const chains = await withPool(POOL);
+
+    expect(chains.getWritableMarket('robinhood')).toBe(POOL); // the chain check now passes
+    expect(chains.isWritableMarket('robinhood', BASE_V2)).toBe(false);
+  });
+
+  it('accepts this chain\'s market in whatever case it is written', async () => {
+    const chains = await withPool(POOL);
+    expect(chains.isWritableMarket('robinhood', POOL)).toBe(true);
+    expect(chains.isWritableMarket('robinhood', POOL.toLowerCase())).toBe(true);
   });
 });

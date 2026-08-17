@@ -5,7 +5,7 @@ import { ethers } from 'ethers';
 import { CONTRACTS, SWIPE_TOKEN, getV2Contract, getContractForAction } from '../../../lib/contract';
 import { calculateApprovalAmount } from '../../../lib/constants/approval';
 import { useAdminRequest } from '../../../lib/auth/useAdminRequest';
-import { getWritableMarket } from '@/lib/chains';
+import { isWritableMarket } from '@/lib/chains';
 import { useActiveChain } from '@/lib/chains/activeChain';
 import { useViewProfile, useComposeCast, useMiniKit, useViewCast, useOpenUrl } from '@coinbase/onchainkit/minikit';
 import sdk from '@farcaster/miniapp-sdk';
@@ -1061,14 +1061,23 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   // Dashboard handlers
 
   const handleStakeBet = (predictionId: number, isYes: boolean, amount: number, token: 'ETH' | 'SWIPE') => {
-    // Refuse unless the chain the user actually has selected (not the build-time
-    // default) both accepts writes and has a market contract configured.
-    // getWritableMarket returns null in both cases: Base is read-only (its
-    // contracts are owned by a compromised, unrecoverable key, so a stake there
-    // could never be resolved or claimed), and Robinhood mainnet is writable but
-    // has no deployed pool address yet (ROBINHOOD_USDG_DUALPOOL unset). Either
-    // way, this must fail closed before any wallet interaction.
-    if (!getWritableMarket(chainKey)) {
+    // Refuse unless the contract this function is about to write to *is* the
+    // market of the chain the user actually has selected (not the build-time
+    // default). Both halves matter, and the address half is the one that
+    // protects the money: `contract` below is CONTRACTS.V2, a module-load
+    // constant pinned to Base's V2 address that does not follow the switcher.
+    // Gating on the chain alone would let this open the moment a Robinhood pool
+    // address became configured, and then send the stake to a Base address on
+    // Robinhood — an address with no contract behind it, where the tokens are
+    // simply gone.
+    //
+    // So this stays shut until V3 routes both the address and the ABI through
+    // lib/chains. Configuring an env var must not be enough to open it; see
+    // isWritableMarket.
+    if (!isWritableMarket(chainKey, CONTRACTS.V2.address)) {
+      console.warn(
+        `[swipe-bet] refused: ${CONTRACTS.V2.address} is not ${chainKey}'s market contract.`
+      );
       alert(
         'Betting is moving to V3.\n\n' +
         'V3 brings audited contracts with fairer payouts and lower fees. ' +
