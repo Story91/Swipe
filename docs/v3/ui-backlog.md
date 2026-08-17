@@ -122,10 +122,10 @@ paid in that token at all.
 
 ## Also outstanding, not UI
 
-- **`NEXT_PUBLIC_WC_PROJECT_ID` on Vercel** — set locally, unverified in
-  production. `wagmi.ts:53` asserts it non-null, and `getConfig()` builds every
-  connector at mount, so if it is unset there the throw takes wallet connection
-  down entirely rather than just WalletConnect.
+- ~~`NEXT_PUBLIC_WC_PROJECT_ID` on Vercel~~ — **confirmed present in
+  production.** Closed. It mattered because `wagmi.ts:53` asserts it non-null
+  and `getConfig()` builds every connector at mount, so an unset value would
+  have taken wallet connection down entirely rather than just WalletConnect.
 - **Help & FAQ, the manifesto, and `USDC_MARKETS_GUIDE.md` all still describe
   V2** and get rewritten from [`rules-v3.md`](./rules-v3.md) once the rules are
   frozen. See [`README.md`](./README.md).

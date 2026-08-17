@@ -58,5 +58,5 @@ From [`2026-08-16-swipe-rebuild-design.md`](../superpowers/specs/2026-08-16-swip
   US-regulated broker-dealer, and prediction markets are a sensitive category.
 - **Price adapter provider** — must return a *historical* price at a timestamp,
   not spot, or a late cron tick settles on the wrong number.
-- **`NEXT_PUBLIC_WC_PROJECT_ID` on Vercel** — set locally, unverified in
-  production, and `wagmi.ts` asserts it non-null.
+- ~~`NEXT_PUBLIC_WC_PROJECT_ID` on Vercel~~ — **confirmed present in
+  production.** Closed 2026-08-17.
