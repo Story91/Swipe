@@ -192,7 +192,7 @@ export default function PredictionPageClient() {
     setIsSharing(true);
 
     try {
-      const appUrl = `${window.location.origin}/prediction/${prediction.id}`;
+      const appUrl = `${window.location.origin}/prediction/${prediction.id}?chain=${chainKey}`;
       // Was the ETH pool, which is zero on every market this app takes bets on,
       // so every share went out advertising an empty market.
       const shareText = `🔮 Check out this prediction: ${prediction.question}\n\n📊 Total Pool: ${formatPool(pools.total, decimals)} ${sym}\n\nJoin and make your prediction! 🎯`;

@@ -207,6 +207,7 @@ export function ExitPanel({ predictionId, question, onExited }: ExitPanelProps) 
 
   const { isSuccess: isExitConfirmed, isError: isExitFailed } = useWaitForTransactionReceipt({
     hash: exitHash,
+    chainId: marketWrite.market?.chainId,
   });
 
   useEffect(() => {

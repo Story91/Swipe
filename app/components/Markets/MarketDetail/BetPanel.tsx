@@ -282,6 +282,7 @@ export function BetPanel({
 
   const { isSuccess: isBetConfirmed, isError: isBetFailed } = useWaitForTransactionReceipt({
     hash: betHash,
+    chainId: marketWrite.market?.chainId,
   });
 
   useEffect(() => {

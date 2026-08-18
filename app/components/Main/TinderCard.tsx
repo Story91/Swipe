@@ -1499,7 +1499,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       console.warn('Cannot share: no canonical id for this market');
       return;
     }
-    const predictionUrl = `${window.location.origin}/prediction/${predictionId}`;
+    const predictionUrl = `${window.location.origin}/prediction/${predictionId}?chain=${chainKey}`;
 
     // Two decimals, the way the collateral is quoted.
     const formattedAmount = shareStakeData.amount.toFixed(2);
@@ -2205,7 +2205,7 @@ New markets land through the day, so it is worth coming back.`,
       console.warn('Cannot share: no canonical id for this market');
       return;
     }
-    const predictionUrl = `${window.location.origin}/prediction/${predictionId}`;
+    const predictionUrl = `${window.location.origin}/prediction/${predictionId}?chain=${chainKey}`;
 
     // Get pool data for share text
     const currentPred = transformedPredictions[currentIndex];
