@@ -1,29 +1,34 @@
 /*
- * The exit rows. One panel, one row per side held.
+ * The exit rows, as a ledger. One row per side held, hairlines between,
+ * key on the left and a mono figure on the right, and one number per row
+ * that matters: what comes back after the fee.
  *
  * This component mounts on two very different grounds: the dark detail page
  * and the lime Bets page under the card deck. So the panel carries its own
  * opaque dark face, the same move YourPosition makes in the same column, and
  * nothing here assumes what is behind it.
  *
- * Nothing under 12px, fonts through the sheet aliases of the --font tokens.
+ * House language from tokens.css and CreatePredictionModal.css: opaque
+ * #0d0d0d face, 2px lime border, square corners, lime rationed to the Exit
+ * action and the payout figure, --sheet-loss for the NO side, --sheet-warn
+ * for a refusal. Nothing under 12px. Contrast on #0d0d0d: lime 17.1:1,
+ * paper 16.4:1, paper-2 10.1:1, paper-3 5.4:1, warn 10.6:1, loss 7.1:1.
  */
 
 .xpanel {
-  background: #0d0d0d;
+  background: var(--sheet-ink-1, #0d0d0d);
   border: 2px solid var(--sheet-lime, #d4ff00);
-  border-radius: 12px;
-  padding: 14px 16px 16px;
+  border-radius: 0;
+  padding: 12px 16px 14px;
   min-width: 0;
   overflow-wrap: anywhere;
   font-family: var(--sheet-body, sans-serif);
   display: flex;
   flex-direction: column;
-  gap: 12px;
 }
 
 .xpanel__title {
-  margin: 0;
+  margin: 0 0 8px;
   font-family: var(--sheet-display, sans-serif);
   font-size: 12px;
   font-weight: 700;
@@ -32,41 +37,25 @@
   color: var(--sheet-lime, #d4ff00);
 }
 
-.xpanel__lede {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: rgba(255, 255, 255, 0.72);
-}
-
+/* A ledger row, not a boxed card. The hairline above each row separates it
+   from the title or from the row before. */
 .xpanel__row {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-}
-
-.xpanel__row--yes {
-  border-left: 3px solid #10b981;
-}
-
-.xpanel__row--no {
-  border-left: 3px solid #ef4444;
+  padding: 10px 0 12px;
+  border-top: 1px solid var(--sheet-rule, rgba(255, 255, 255, 0.1));
 }
 
 .xpanel__rowhead {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: 8px;
 }
 
+/* The side is a word in its colour, not a slab. */
 .xpanel__badge {
-  padding: 3px 10px;
-  border-radius: 999px;
   font-family: var(--sheet-display, sans-serif);
   font-size: 12px;
   font-weight: 700;
@@ -75,20 +64,18 @@
 }
 
 .xpanel__badge--yes {
-  color: #052e1a;
-  background: #10b981;
+  color: var(--sheet-lime, #d4ff00);
 }
 
 .xpanel__badge--no {
-  color: #2e0505;
-  background: #ef4444;
+  color: var(--sheet-loss, rgba(255, 138, 128, 0.9));
 }
 
 .xpanel__held {
   font-family: var(--sheet-data, monospace);
   font-variant-numeric: tabular-nums;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--sheet-paper, rgba(255, 255, 255, 0.92));
 }
 
 .xpanel__controls {
@@ -110,7 +97,7 @@
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--sheet-paper-3, rgba(255, 255, 255, 0.5));
 }
 
 .xpanel__field input {
@@ -118,15 +105,16 @@
   padding: 8px 10px;
   font-family: var(--sheet-data, monospace);
   font-size: 14px;
-  color: #fff;
-  background: #161616;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+  color: var(--sheet-paper, #fff);
+  background: var(--sheet-surface, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--sheet-rule-strong, rgba(255, 255, 255, 0.18));
+  border-radius: 0;
 }
 
 .xpanel__field input:focus-visible {
   outline: 2px solid var(--sheet-lime, #d4ff00);
-  outline-offset: 1px;
+  outline-offset: -2px;
 }
 
 .xpanel__exit {
@@ -137,10 +125,10 @@
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #000;
+  color: var(--sheet-ink-0, #0d0d0d);
   background: var(--sheet-lime, #d4ff00);
   border: 0;
-  border-radius: 6px;
+  border-radius: 0;
   cursor: pointer;
 }
 
@@ -158,23 +146,45 @@
   outline-offset: 2px;
 }
 
+/* The one number that matters: key left, figure right. What you lose is the
+   gap between this and the amount above it. */
+.xpanel__quote {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.xpanel__quote-key {
+  font-size: 12px;
+  color: var(--sheet-paper-2, rgba(255, 255, 255, 0.72));
+}
+
+.xpanel__quote-val {
+  font-family: var(--sheet-data, monospace);
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  color: var(--sheet-lime, #d4ff00);
+}
+
 .xpanel__hint {
   margin: 0;
   font-size: 12px;
   line-height: 1.5;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--sheet-paper-3, rgba(255, 255, 255, 0.5));
 }
 
+/* The honest refusal, one line. Amber: a rule holding, not an error. */
 .xpanel__refusal {
   margin: 0;
   font-size: 12px;
   line-height: 1.5;
-  color: #fbbf24;
+  color: var(--sheet-warn, #ffb020);
 }
 
 .xpanel__error {
   margin: 0;
   font-size: 12px;
   line-height: 1.5;
-  color: #ff8a8a;
+  color: var(--sheet-loss, rgba(255, 138, 128, 0.9));
 }

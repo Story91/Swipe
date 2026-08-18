@@ -283,11 +283,6 @@ export function ExitPanel({ predictionId, question, onExited }: ExitPanelProps) 
   return (
     <section className="xpanel">
       <h2 className="xpanel__title">Exit early</h2>
-      <p className="xpanel__lede">
-        Sell part of a position back before the deadline. The contract keeps a{' '}
-        {exitFeeBps !== null ? `${Number(exitFeeBps) / 100}%` : ''} fee read live from the
-        chain, and what you get depends on the pools as they stand now.
-      </p>
 
       {rows.map((side) => {
         const held = heldBySide[side];
@@ -332,13 +327,13 @@ export function ExitPanel({ predictionId, question, onExited }: ExitPanelProps) 
                 {side === 'yes' ? 'Yes' : 'No'}
               </span>
               <span className="xpanel__held">
-                Holding {heldDisplay} {symbol}
+                {heldDisplay} {symbol}
               </span>
             </div>
 
             <div className="xpanel__controls">
               <label className="xpanel__field">
-                <span>Exit amount</span>
+                <span>Amount</span>
                 <input
                   type="number"
                   inputMode="decimal"
@@ -367,14 +362,16 @@ export function ExitPanel({ predictionId, question, onExited }: ExitPanelProps) 
             </div>
 
             {quote === null ? (
-              <p className="xpanel__hint">Reading the pools and the fee from the contract.</p>
+              <p className="xpanel__hint">Reading the contract.</p>
             ) : quote.refusal !== null ? (
               <p className="xpanel__refusal">{quote.refusal}</p>
             ) : (
-              <p className="xpanel__hint">
-                You would receive about {formatUnits(quote.net, decimals)} {symbol}, after a fee of{' '}
-                {formatUnits(quote.fee, decimals)} {symbol}. The figure moves as others bet.
-              </p>
+              <div className="xpanel__quote">
+                <span className="xpanel__quote-key">Back after fee</span>
+                <span className="xpanel__quote-val">
+                  {formatUnits(quote.net, decimals)} {symbol}
+                </span>
+              </div>
             )}
           </div>
         );

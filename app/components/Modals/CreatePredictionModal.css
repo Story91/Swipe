@@ -120,6 +120,27 @@ p.propose__intro {
   outline-offset: -2px;
 }
 
+/* The dropdown list itself.
+ *
+ * Styling the <select> only paints the closed control; the open list is drawn
+ * by the browser from the <option> elements, which inherit nothing and default
+ * to a white popup with black text. On this dialog that arrived as a white slab
+ * hanging out of a black modal.
+ *
+ * background-color rather than background: Chrome ignores the shorthand here.
+ * The face is the opaque ink the dialog itself uses - --sheet-surface is white
+ * at 4% and would composite against the popup's own white, not against the
+ * modal. color-scheme tells the browser to draw the scrollbar and the
+ * highlight dark too, which is the part no rule of ours can reach. */
+select.propose__input {
+  color-scheme: dark;
+}
+
+.propose__input option {
+  background-color: #0d0d0d;
+  color: var(--sheet-paper);
+}
+
 .propose__input--area {
   resize: vertical;
   min-height: 56px;

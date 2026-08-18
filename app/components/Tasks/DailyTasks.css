@@ -119,10 +119,18 @@ h3.daily-tasks__section-title {
 
 /* ------------------------------------------------------------ the toggle */
 
+/* The same opaque face as the sibling panels. This block used to paint no
+   ground of its own, which put a lime button and a 50%-white note straight on
+   whatever is behind the component: the lime page on a phone, where both were
+   invisible. On #0d0d0d the lime label measures 17.1:1 and the note 5.4:1. */
 .daily-tasks__demo {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  background: #0d0d0d;
+  border: 1px solid var(--sheet-rule-strong);
+  padding: 12px;
+  min-width: 0;
 }
 
 .daily-tasks__demo-btn {
@@ -342,6 +350,7 @@ h3.daily-tasks__section-title {
    at 480px, so there is no second column to move to. */
 @media (min-width: 560px) {
   .daily-tasks__notice,
+  .daily-tasks__demo,
   .daily-tasks__tasks,
   .daily-tasks__claim,
   .daily-tasks__past {

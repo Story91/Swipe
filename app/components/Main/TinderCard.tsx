@@ -3334,7 +3334,7 @@ New markets land through the day, so it is worth coming back.`,
                       </div>
                     )}
                     <p className="swipe-stake__caveat">
-                      An estimate on the pools as they stand. Your share of the losing pool is also weighted by how early you bet, which this does not model.
+                      An estimate on the pools as they stand. Early bets weigh more, which this does not model.
                     </p>
                   </CardContent>
                 </Card>

@@ -7,6 +7,12 @@
   flex: 0 0 auto;
 }
 
+/* An opaque dark pill, the same weight as its neighbours Sign In and Menu.
+   The old lime-tinted wash disappeared on the lime page ground and left the
+   logo floating frameless; this face is opaque so the control exists on both
+   grounds it sits on, the lime page and the dark app bar. Lime text on
+   #0a0a0a measures 17.4:1, the face against the lime ground 17.4:1, and on
+   the dark bar the 1px lime border carries the frame. */
 .chain-switcher__trigger {
   display: inline-flex;
   align-items: center;
@@ -15,17 +21,17 @@
   font-size: 0.85rem;
   line-height: 1;
   color: var(--sheet-lime);
-  background: rgba(212, 255, 0, 0.12);
-  border: 1px solid rgba(212, 255, 0, 0.35);
-  border-radius: 0;
-  padding: 6px 14px;
+  background: #0a0a0a;
+  border: 1px solid var(--sheet-lime);
+  border-radius: 999px;
+  padding: 8px 14px;
   cursor: pointer;
   white-space: nowrap;
   transition: background 140ms ease;
 }
 
 .chain-switcher__trigger:hover {
-  background: rgba(212, 255, 0, 0.22);
+  background: #1a1a1a;
 }
 
 .chain-switcher__trigger:focus-visible,
