@@ -1,6 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { redisHelpers } from '../../../lib/redis';
 import { UserTransaction } from '../../../lib/types/redis';
+import { chainFromRequest, chainFromRequestOrBody } from '@/lib/chains/requestChain';
+
+/**
+ * A person's transaction history, per chain.
+ *
+ * The Redis key behind this was the last one in lib/redis.ts with no chain
+ * namespace, defended by a comment saying the records carry the chain inside
+ * themselves. They do not: UserTransaction has no chain field, so no reader
+ * could have filtered even if one had tried, and both chains wrote into one
+ * list. A Robinhood bet appeared in a Base user's history with a Base
+ * explorer link beside it.
+ *
+ * The key is namespaced now, and these three handlers are the link that makes
+ * that fix do anything. Without the chain reaching redisHelpers, every request
+ * would still land on Base's list, prefix or no prefix.
+ */
 
 // GET /api/user-transactions - Get user transactions
 export async function GET(request: NextRequest) {
@@ -15,7 +31,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const transactions = await redisHelpers.getUserTransactions(userId);
+    const requested = chainFromRequest(request);
+    if (!requested.ok) {
+      return NextResponse.json({ success: false, error: requested.error }, { status: 400 });
+    }
+
+    const transactions = await redisHelpers.getUserTransactions(userId, requested.chain);
 
     return NextResponse.json({
       success: true,
@@ -50,7 +71,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await redisHelpers.saveUserTransaction(userId, transaction);
+    const requested = chainFromRequestOrBody(request, body);
+    if (!requested.ok) {
+      return NextResponse.json({ success: false, error: requested.error }, { status: 400 });
+    }
+
+    await redisHelpers.saveUserTransaction(userId, transaction, requested.chain);
 
     return NextResponse.json({
       success: true,
@@ -84,7 +110,12 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    await redisHelpers.updateTransactionStatus(userId, txHash, status, blockNumber, gasUsed);
+    const requested = chainFromRequestOrBody(request, body);
+    if (!requested.ok) {
+      return NextResponse.json({ success: false, error: requested.error }, { status: 400 });
+    }
+
+    await redisHelpers.updateTransactionStatus(userId, txHash, status, blockNumber, gasUsed, requested.chain);
 
     return NextResponse.json({
       success: true,

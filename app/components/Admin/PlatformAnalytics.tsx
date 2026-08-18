@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useActiveChain } from '@/lib/chains/activeChain';
+import type { ChainKey } from '@/lib/chains/types';
+import { COLLATERAL_LEG, toDisplayUnits, tokenSymbol } from '@/lib/userStake';
 import '../../styles/sheet.css';
 import './PlatformAnalytics.css';
 
@@ -12,8 +14,8 @@ import './PlatformAnalytics.css';
  * because these are the numbers an operator makes decisions on.
  *
  * `dailyStats` was a hardcoded week of 2024-08-20 to 2024-08-26, rendered as
- * recent activity. Deleted. /api/market/stats does carry a genuine last-seven-
- * days block, so that is shown instead and labelled for what it is.
+ * recent activity. Deleted. A real rolling week is counted off the markets
+ * instead, and labelled for what it is.
  *
  * Category volume was `Math.random() * 100 + 50`, so the bar chart reshuffled
  * itself on every 60s refresh. Categories now show the count they actually
@@ -29,28 +31,107 @@ import './PlatformAnalytics.css';
  * The time-range selector was removed rather than restyled. It set state that
  * nothing read: the fetch had an empty dependency array and never sent the
  * range, so all three options showed identical numbers.
+ *
+ * And the money was fiction in a fourth way. Three rows printed a figure with
+ * ETH after it. `totalVolume` and `collectedFees` are not fields the stats
+ * snapshot has ever carried, so both read undefined and rendered 0.0000 ETH
+ * forever. The other two, average stake and last week's staked, came from
+ * `totalStakes`, which lib/redis writes as `participants.length`. That is a
+ * head count. The page was putting a currency after it.
+ *
+ * The pools are read from the markets instead, in the collateral the chain
+ * actually settles in, named from lib/chains. Nothing is summed across tokens:
+ * a raw ETH pool is 1e18 and a raw collateral pool is 1e6, so one added total
+ * is just the wei leg wearing a dollar sign.
  */
 
 interface Analytics {
   totalPredictions: number;
   activePredictions: number;
-  totalVolume: number;
-  totalParticipants: number;
-  averageStake: number;
-  platformFees: number;
   resolutionRate: number;
   topCategories: Array<{ name: string; count: number }>;
-  last7Days: {
-    predictions: number;
-    stakes: number;
-    newParticipants: number;
-  };
   endingSoon: number;
+  marketsLast7Days: number;
   lastUpdated: string | null;
+  /** Whichever stablecoin this chain settles in. USDC on Base, USDG on Robinhood. */
+  symbol: string;
+  /** Readable units, collateral only. */
+  pooled: number;
+  pooledLast7Days: number;
+  averagePerBettor: number;
+  bettors: number;
+  bettorsLast7Days: number;
+}
+
+/** The fields this page reads off a stored market. */
+interface StatsPrediction {
+  createdAt?: number;
+  usdcYesTotalAmount?: number;
+  usdcNoTotalAmount?: number;
+  usdcParticipants?: string[];
 }
 
 const num = (n: number | undefined) => (n ?? 0).toLocaleString('en-US');
-const eth = (n: number | undefined, dp = 4) => `${(n ?? 0).toFixed(dp)} ETH`;
+
+/** An amount of collateral, with the chain's own name for it. */
+const money = (n: number, symbol: string) =>
+  `${n.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} ${symbol}`;
+
+const WEEK_SECONDS = 7 * 24 * 60 * 60;
+
+/**
+ * What is actually staked, counted off the markets.
+ *
+ * One pass, because the seven day figures and the all time ones want the same
+ * fields and the list is a few hundred long. Only the collateral pair is read:
+ * `yesTotalAmount` and its SWIPE twin belong to the archived contracts and are
+ * in wei, and adding them here would produce a number in no unit at all.
+ *
+ * The bettor set is `usdcParticipants` for the same reason the pools are. The
+ * `participants` array the snapshot counts is the V2 one, so its total misses
+ * everybody who has bet since.
+ */
+function collateralFrom(predictions: StatsPrediction[], chainKey: ChainKey) {
+  const cutoff = Math.floor(Date.now() / 1000) - WEEK_SECONDS;
+
+  let raw = 0;
+  let rawLast7Days = 0;
+  let marketsLast7Days = 0;
+  const bettors = new Set<string>();
+  const recentBettors = new Set<string>();
+
+  for (const p of predictions) {
+    const pool = (p.usdcYesTotalAmount ?? 0) + (p.usdcNoTotalAmount ?? 0);
+    const recent = (p.createdAt ?? 0) > cutoff;
+
+    raw += pool;
+    if (recent) {
+      rawLast7Days += pool;
+      marketsLast7Days += 1;
+    }
+
+    for (const address of p.usdcParticipants ?? []) {
+      const key = address.toLowerCase();
+      bettors.add(key);
+      if (recent) recentBettors.add(key);
+    }
+  }
+
+  const pooled = toDisplayUnits(raw, COLLATERAL_LEG);
+
+  return {
+    symbol: tokenSymbol(COLLATERAL_LEG, chainKey),
+    pooled,
+    pooledLast7Days: toDisplayUnits(rawLast7Days, COLLATERAL_LEG),
+    bettors: bettors.size,
+    bettorsLast7Days: recentBettors.size,
+    marketsLast7Days,
+    averagePerBettor: bettors.size > 0 ? pooled / bettors.size : 0,
+  };
+}
 
 export function PlatformAnalytics() {
   // The active chain travels with every read below. The server defaults to
@@ -67,24 +148,39 @@ export function PlatformAnalytics() {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(`/api/market/stats?chain=${chainKey}`);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+        // Two reads, in parallel. The snapshot has the counts and the
+        // categories; it has no money in it, so the pools come from the
+        // markets themselves.
+        const [statsResponse, marketsResponse] = await Promise.all([
+          fetch(`/api/market/stats?chain=${chainKey}`),
+          fetch(`/api/predictions?chain=${chainKey}`),
+        ]);
+        if (!statsResponse.ok) {
+          throw new Error(`HTTP error! status: ${statsResponse.status}`);
+        }
+        if (!marketsResponse.ok) {
+          throw new Error(`HTTP error! status: ${marketsResponse.status}`);
         }
 
-        const result = await response.json();
+        const result = await statsResponse.json();
         if (!result.success) {
           throw new Error(result.error || 'Failed to fetch analytics');
         }
 
+        const markets = await marketsResponse.json();
+        if (!markets.success) {
+          throw new Error(markets.error || 'Failed to fetch markets');
+        }
+
         const s = result.data;
+        const pools = collateralFrom(
+          (markets.data ?? []) as StatsPrediction[],
+          chainKey
+        );
+
         setData({
           totalPredictions: s.totalPredictions ?? 0,
           activePredictions: s.activePredictions ?? 0,
-          totalVolume: s.totalVolume ?? 0,
-          totalParticipants: s.totalParticipants ?? 0,
-          averageStake: s.performance?.averageStakeSize ?? 0,
-          platformFees: s.collectedFees ?? 0,
           // Already a percentage on the way out of the API. Do not scale again.
           resolutionRate: s.performance?.resolutionRate ?? 0,
           topCategories:
@@ -92,13 +188,9 @@ export function PlatformAnalytics() {
               name: c.category,
               count: c.count,
             })) ?? [],
-          last7Days: {
-            predictions: s.recentActivity?.predictionsLast7Days ?? 0,
-            stakes: s.recentActivity?.totalStakesLast7Days ?? 0,
-            newParticipants: s.recentActivity?.newParticipantsLast7Days ?? 0,
-          },
           endingSoon: s.timeBased?.predictionsEndingSoon ?? 0,
           lastUpdated: result.lastUpdated ?? null,
+          ...pools,
         });
       } catch (err) {
         console.error('❌ Failed to fetch analytics:', err);
@@ -191,22 +283,37 @@ export function PlatformAnalytics() {
                 </span>
               </div>
               <div className="sheet-settle-row">
-                <span className="sheet-settle-key">Participants</span>
-                <span className="sheet-settle-val">{num(data.totalParticipants)}</span>
+                <span className="sheet-settle-key">Bettors</span>
+                <span className="sheet-settle-val">{num(data.bettors)}</span>
               </div>
               <div className="sheet-settle-row">
-                <span className="sheet-settle-key">Average stake</span>
-                <span className="sheet-settle-val">{eth(data.averageStake)}</span>
+                <span className="sheet-settle-key">Average per bettor</span>
+                <span className="sheet-settle-val">
+                  {money(data.averagePerBettor, data.symbol)}
+                </span>
               </div>
               <div className="sheet-settle-row">
                 <span className="sheet-settle-key">Resolved</span>
                 <span className="sheet-settle-val">{data.resolutionRate.toFixed(1)}%</span>
               </div>
               <div className="sheet-settle-row sheet-settle-row--total">
-                <span className="sheet-settle-key">Volume</span>
-                <span className="sheet-settle-val">{eth(data.totalVolume)}</span>
+                <span className="sheet-settle-key">In the pools</span>
+                <span className="sheet-settle-val">
+                  {money(data.pooled, data.symbol)}
+                </span>
               </div>
             </div>
+          </div>
+
+          <div className="sheet-note">
+            <p>
+              This is what is sitting in the pools right now, in {data.symbol},
+              not lifetime volume. Money that left through an early exit is not
+              in it. Bets made in ETH or SWIPE are not in it either: those pools
+              are on archived contracts, they are denominated in wei, and adding
+              them to a six decimal figure would give a number in no unit at
+              all.
+            </p>
           </div>
         </div>
       </section>
@@ -221,28 +328,38 @@ export function PlatformAnalytics() {
             <div className="sheet-settle">
               <div className="sheet-settle-row">
                 <span className="sheet-settle-key">Markets opened</span>
-                <span className="sheet-settle-val">{num(data.last7Days.predictions)}</span>
+                <span className="sheet-settle-val">{num(data.marketsLast7Days)}</span>
               </div>
               <div className="sheet-settle-row">
-                <span className="sheet-settle-key">New participants</span>
-                <span className="sheet-settle-val">{num(data.last7Days.newParticipants)}</span>
+                <span className="sheet-settle-key">Bettors in them</span>
+                <span className="sheet-settle-val">
+                  {num(data.bettorsLast7Days)}
+                </span>
               </div>
               <div className="sheet-settle-row">
                 <span className="sheet-settle-key">Closing within a day</span>
                 <span className="sheet-settle-val">{num(data.endingSoon)}</span>
               </div>
               <div className="sheet-settle-row sheet-settle-row--total">
-                <span className="sheet-settle-key">Staked</span>
-                <span className="sheet-settle-val">{eth(data.last7Days.stakes)}</span>
+                <span className="sheet-settle-key">Staked in them</span>
+                <span className="sheet-settle-val">
+                  {money(data.pooledLast7Days, data.symbol)}
+                </span>
               </div>
             </div>
           </div>
 
           <div className="sheet-note">
             <p>
-              There is no day-by-day trend here because none is recorded. The
-              chart that used to sit in this spot was a fixed week of{' '}
-              <strong>hardcoded 2024 figures</strong> that never changed.
+              Every row here is about markets opened this week, not about bets
+              placed this week. Nothing records when a bet was placed, so a bet
+              made today on a market opened a month ago sits in the all time
+              figures above and nowhere in this block.
+            </p>
+            <p>
+              There is no day-by-day trend either, because none is recorded. The
+              chart that used to sit in this spot was a fixed week of hardcoded
+              2024 figures that never changed.
             </p>
           </div>
         </div>
@@ -285,9 +402,10 @@ export function PlatformAnalytics() {
 
           <div className="sheet-note">
             <p>
-              Bars compare market <strong>count</strong>, not volume. Per-category
-              volume is not collected; the figure that used to appear here was
-              randomly generated and reshuffled on every refresh.
+              Bars compare how many markets a category has, not how much is in
+              them. Per-category volume is not collected; the figure that used
+              to appear here was randomly generated and reshuffled on every
+              refresh.
             </p>
           </div>
         </div>

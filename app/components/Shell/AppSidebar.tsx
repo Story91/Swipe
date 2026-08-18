@@ -5,7 +5,6 @@ import {
   Activity,
   BarChart3,
   Coins,
-  DollarSign,
   Gift,
   HelpCircle,
   LayoutDashboard,
@@ -41,7 +40,6 @@ import './appshell.css';
 const ICONS: Record<NavIconName, LucideIcon> = {
   markets: LayoutGrid,
   dashboard: LayoutDashboard,
-  usdc: DollarSign,
   leaderboard: Trophy,
   stats: BarChart3,
   token: Coins,
@@ -61,13 +59,6 @@ export interface AppSidebarProps {
   onCreate: () => void;
   onHowToPlay: () => void;
   claimCount: number;
-  /**
-   * What the active network actually settles in. The stable-markets row was
-   * hardcoded to USDC, and on Robinhood the contract holds Paxos USDG and
-   * cannot hold USDC at all, so the row named a token that is not there.
-   * Falls back to the static label if nothing is passed.
-   */
-  collateralSymbol?: string;
   isAdmin: boolean;
 }
 
@@ -79,7 +70,6 @@ export function AppSidebar({
   onCreate,
   onHowToPlay,
   claimCount,
-  collateralSymbol,
   isAdmin,
 }: AppSidebarProps) {
   const currentRow = activeRowId(active);
@@ -122,10 +112,7 @@ export function AppSidebar({
                 const Icon = ICONS[item.icon];
                 const isCurrent = currentRow !== null && currentRow === item.id;
                 const showBadge = Boolean(item.badge) && claimCount > 0;
-                const label =
-                  item.id === 'usdc' && collateralSymbol
-                    ? `${collateralSymbol} markets`
-                    : item.label;
+                const label = item.label;
 
                 return (
                   <button

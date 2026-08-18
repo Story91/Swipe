@@ -4,26 +4,111 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useHybridPredictions } from "@/lib/hooks/useHybridPredictions";
 import type { HybridPrediction } from "@/lib/hooks/useHybridPredictions";
+import { useActiveChain } from "@/lib/chains/activeChain";
+import { CHAINS } from "@/lib/chains";
+import type { ChainKey } from "@/lib/chains/types";
+import { chainMark } from "../Wallet/ChainSwitcher";
+import type { RedisPrediction } from "@/lib/types/redis";
+import {
+  COLLATERAL_LEG,
+  tokenMarket,
+  tokenSymbol,
+  toDisplayUnits,
+  type StakeToken,
+} from "@/lib/userStake";
 import { pageWindow } from "./pageWindow";
 import { thumbKindFor, hueFromSeed, initialsFor } from "./marketThumb";
 import type { ThumbKind } from "./marketThumb";
+import { Sparkline } from "./Sparkline";
+import type { SparkPoint } from "./sparklinePath";
+import { usePriceHistories } from "./usePriceHistories";
 import "./MarketGrid.css";
 
 /**
  * Desktop browse view: every open market at once.
  *
- * Presentational by design — a card links through to /prediction/[id], where the
+ * Presentational by design. A card links through to /prediction/[id], where the
  * existing staking flow lives. Keeping betting out of the grid means there is
  * exactly one implementation of it. If inline betting is wanted later, the card
  * gains a control that calls the same flow; nothing here needs rewriting.
  */
 
-function formatPool(amountWei: number): string {
-  const eth = amountWei / 1e18;
-  if (eth === 0) return "0";
-  if (eth < 0.001) return "<0.001";
-  if (eth < 1) return eth.toFixed(3);
-  return eth.toFixed(2);
+/**
+ * A pool in the units a person reads, with no symbol attached.
+ *
+ * Two decimals, not three. This used to divide by 1e18 and print three places,
+ * which is the right shape for ETH and the wrong one for a dollar: the live
+ * pools are collateral, and 0.001 of a dollar is not a figure anyone acts on.
+ */
+function formatPool(units: number): string {
+  if (units <= 0) return "0";
+  if (units < 0.01) return "<0.01";
+  if (units >= 1000) return `${(units / 1000).toFixed(1)}k`;
+  return units.toFixed(2);
+}
+
+/**
+ * How many people are actually in this market.
+ *
+ * `participants` is the V2 array, written by the ETH and SWIPE sync. A market
+ * on the live contract gets `usdcParticipants` instead, so counting the old
+ * array reports zero players on every market anyone is currently betting in,
+ * and drops settled collateral markets out of the filters below for looking
+ * empty. Same precedent as adminMarkets.ts and /prediction/[id].
+ */
+function playerCount(p: HybridPrediction): number {
+  return (
+    p.usdcParticipants?.length ??
+    p.usdcParticipantCount ??
+    p.participants?.length ??
+    0
+  );
+}
+
+/**
+ * Which pool a card is about, and how the two sides split it.
+ *
+ * The card read `yesTotalAmount` and `noTotalAmount`, which are the ETH pools
+ * on the archived contracts. They are zero on every market opened since, so a
+ * live card computed 0 percent YES, took 100 minus that, and told the reader
+ * the whole crowd was on NO. Nobody was on either side.
+ *
+ * tokenMarket in lib/userStake is the one place that knows which pair of
+ * fields belongs to which token, so the pair comes from there. Collateral is
+ * the default because it is the only leg taking bets. ETH is the fallback
+ * rather than gone, because an archived market really did have an ETH pool and
+ * blanking it would erase the only numbers a settled card is read for.
+ *
+ * An empty pool returns no split at all. Zero staked is not fifty fifty, and it
+ * is not a landslide either.
+ */
+function cardPool(prediction: HybridPrediction, chainKey: ChainKey) {
+  // HybridPrediction is the UI's own shape rather than the stored one, and
+  // tokenMarket is typed against the stored one. It carries every field read
+  // for the collateral leg; the ones it does not carry (usdcResolved and its
+  // pair) are optional there and fall back to the shared flags, which is what
+  // this card was already showing.
+  const stored = prediction as unknown as RedisPrediction;
+
+  const collateral = tokenMarket(stored, COLLATERAL_LEG);
+  const collateralRaw = collateral.yesPool + collateral.noPool;
+  const eth = tokenMarket(stored, "ETH");
+  const ethRaw = eth.yesPool + eth.noPool;
+
+  const token: StakeToken = collateralRaw > 0 || ethRaw === 0 ? COLLATERAL_LEG : "ETH";
+  const market = token === COLLATERAL_LEG ? collateral : eth;
+
+  const yesUnits = toDisplayUnits(market.yesPool, token);
+  const noUnits = toDisplayUnits(market.noPool, token);
+  const total = yesUnits + noUnits;
+
+  return {
+    symbol: tokenSymbol(token, chainKey),
+    total,
+    hasPool: total > 0,
+    yes: total > 0 ? Math.round((yesUnits / total) * 100) : 0,
+    no: total > 0 ? 100 - Math.round((yesUnits / total) * 100) : 0,
+  };
 }
 
 function formatTimeLeft(deadline: number): { label: string; urgent: boolean } {
@@ -66,7 +151,7 @@ function isOpen(p: HybridPrediction, now: number): boolean {
  * The card's ground.
  *
  * The market's picture used to be a tile on the category row, 42px once and
- * 22px after that, which is too small to tell one upload from another — the one
+ * 22px after that, which is too small to tell one upload from another, the one
  * thing a picture is on the card for. It is the card's own background now: full
  * bleed, blurred, and under a scrim heavy enough that the text on top does not
  * care what was uploaded.
@@ -74,14 +159,24 @@ function isOpen(p: HybridPrediction, now: number): boolean {
  * Crypto markets store a GeckoTerminal embed URL rather than an image, and
  * plenty of markets have no picture at all. Both get a drawn ground rather than
  * a hole, so a card without a photo still looks like something someone chose.
+ *
+ * A card without a photo gets its own odds line in place of that mark, once the
+ * page's histories arrive. A card with a photo keeps the photo, and gets no
+ * line. Under the scrim, which runs to 0.84 over an upload, a line is a sixth
+ * of itself and reads as a scratch on the picture. Above the scrim it is a
+ * bright stroke crossing the foot row, and the note over .mgcard__bg::after is
+ * explicit that every bright thing tried on top of a photo took the card's
+ * quiet text under contrast. Neither is worth a chart nobody can read.
  */
 function MarketGround({
   prediction,
   kind,
+  history,
   onImageError,
 }: {
   prediction: HybridPrediction;
   kind: ThumbKind;
+  history: SparkPoint[] | undefined;
   onImageError: () => void;
 }) {
   if (kind === "image") {
@@ -98,6 +193,22 @@ function MarketGround({
           loading="lazy"
           onError={onImageError}
         />
+      </div>
+    );
+  }
+
+  // A line only when there is a line to draw: two readings or more. The first
+  // version rendered the degenerate shapes too - "no odds recorded yet" as a
+  // dashed rule, one reading as a dot - each with an explanatory caption. The
+  // adversarial review measured that caption at 1.53-2.86:1 under the scrim,
+  // unreadable at every hue, and against live Redis seven of the first eight
+  // markets had no history at all: nearly every card traded its art for an
+  // apology nobody could read. A card without enough data keeps its art, which
+  // was already honest about having nothing to chart.
+  if (history && history.length >= 2) {
+    return (
+      <div className="mgcard__bg" aria-hidden="true">
+        <Sparkline history={history} />
       </div>
     );
   }
@@ -130,17 +241,27 @@ function MarketGround({
 
 function MarketCard({
   prediction,
+  chainKey,
+  history,
   onOpen,
 }: {
   prediction: HybridPrediction;
+  chainKey: ChainKey;
+  history: SparkPoint[] | undefined;
   onOpen: (id: string) => void;
 }) {
-  const yes = Math.round(prediction.yesPercentage ?? 0);
-  const no = Math.max(0, 100 - yes);
+  const { symbol, total, hasPool, yes, no } = cardPool(prediction, chainKey);
+  // The grid is per-chain, so every card on this screen settles on the same
+  // network. The mark and the border tint are still per card: a screenshot of
+  // one tile has to say which network and collateral it settles in without the
+  // nav in frame. chainMark is the networks' own artwork, same source as the
+  // switcher, because a wrong mark beside a market reads as official.
+  const mark = chainMark(chainKey);
+  const chainLabel = CHAINS[chainKey].label;
   const time = formatTimeLeft(prediction.deadline);
-  const pool = formatPool(prediction.totalPool ?? 0);
+  const pool = formatPool(total);
   const settled = prediction.resolved || prediction.cancelled;
-  const players = prediction.participants?.length ?? 0;
+  const players = playerCount(prediction);
   const hot = !settled && players >= HOT_PLAYER_THRESHOLD;
 
   // A dead image URL falls back to the drawn ground rather than leaving the
@@ -171,7 +292,9 @@ function MarketCard({
       // Only a photo gets the heavy scrim. The two drawn grounds are already
       // dark and controlled, and burying them under 0.9 of black would make
       // every one of them the same card.
-      className={`mgcard${kind === "image" ? " mgcard--photo" : ""}`}
+      className={`mgcard mgcard--chain-${chainKey}${kind === "image" ? " mgcard--photo" : ""}${
+        kind !== "image" && (history?.length ?? 0) >= 2 ? " mgcard--spark" : ""
+      }`}
       style={ground}
       role="link"
       tabIndex={0}
@@ -187,12 +310,27 @@ function MarketCard({
       <MarketGround
         prediction={prediction}
         kind={kind}
+        history={history}
         onImageError={() => setImageFailed(true)}
       />
 
       <div className="mgcard__cat">
         <span className="mgcard__cat-name">{prediction.category || "Market"}</span>
         {hot && <span className="mgcard__flag">Hot</span>}
+        <span className="mgcard__chain" title={`Settles on ${chainLabel}`}>
+          {mark.src ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className="mgcard__chain-mark" src={mark.src} alt="" />
+          ) : (
+            <span
+              className="mgcard__chain-mark mgcard__chain-mark--letter"
+              aria-hidden="true"
+            >
+              {mark.letter}
+            </span>
+          )}
+          {chainLabel}
+        </span>
       </div>
 
       {/* The title attribute is the clamped tail: the question is cut at two
@@ -201,19 +339,28 @@ function MarketCard({
         {prediction.question}
       </h3>
 
-      <div className="mgcard__odds">
-        <div className="mgcard__side">
-          <span className="mgcard__side-pill mgcard__side-pill--yes">Yes</span>
-          <span className="mgcard__side-pct">{yes}%</span>
+      {/* No pool, no split. Printing "Yes 0% / No 100%" over an empty market
+          claims a crowd that has not turned up, and a 50/50 fallback claims a
+          disagreement nobody is having. */}
+      {hasPool ? (
+        <div className="mgcard__odds">
+          <div className="mgcard__side">
+            <span className="mgcard__side-pill mgcard__side-pill--yes">Yes</span>
+            <span className="mgcard__side-pct">{yes}%</span>
+          </div>
+          <div className="mgcard__side">
+            <span className="mgcard__side-pill mgcard__side-pill--no">No</span>
+            <span className="mgcard__side-pct">{no}%</span>
+          </div>
+          <div className="mgcard__bar" aria-hidden="true">
+            <span className="mgcard__bar-yes" style={{ width: `${yes}%` }} />
+          </div>
         </div>
-        <div className="mgcard__side">
-          <span className="mgcard__side-pill mgcard__side-pill--no">No</span>
-          <span className="mgcard__side-pct">{no}%</span>
-        </div>
-        <div className="mgcard__bar" aria-hidden="true">
-          <span className="mgcard__bar-yes" style={{ width: `${yes}%` }} />
-        </div>
-      </div>
+      ) : (
+        <p className="mgcard__odds mgcard__odds--empty">
+          {settled ? "Nobody bet on this one" : "No bets yet, be first"}
+        </p>
+      )}
 
       {/* A settled market's numbers are the only thing anyone reads it for, and
           they were being thrown away: the card showed the same "0 ETH · 0
@@ -227,15 +374,17 @@ function MarketCard({
               {prediction.outcome ? "YES" : "NO"}
             </dd>
           </div>
-          <div className="mgcard__result-row">
-            <dt>Winning side</dt>
-            <dd>{prediction.outcome ? yes : no}% of the pool</dd>
-          </div>
+          {hasPool && (
+            <div className="mgcard__result-row">
+              <dt>Winning side</dt>
+              <dd>{prediction.outcome ? yes : no}% of the pool</dd>
+            </div>
+          )}
           <div className="mgcard__result-row">
             <dt>Pool</dt>
             <dd>
-              {pool} ETH · {prediction.participants?.length ?? 0} player
-              {(prediction.participants?.length ?? 0) === 1 ? "" : "s"}
+              {hasPool ? `${pool} ${symbol}` : "nothing staked"} · {players}{" "}
+              player{players === 1 ? "" : "s"}
             </dd>
           </div>
         </dl>
@@ -244,11 +393,11 @@ function MarketCard({
       <div className="mgcard__foot">
         {settled && !prediction.cancelled ? null : (
           <>
-            <span className="mgcard__stat">{pool} ETH</span>
-            <span className="mgcard__dot" aria-hidden="true">·</span>
             <span className="mgcard__stat">
-              {prediction.participants?.length ?? 0} players
+              {hasPool ? `${pool} ${symbol}` : "no pool yet"}
             </span>
+            <span className="mgcard__dot" aria-hidden="true">·</span>
+            <span className="mgcard__stat">{players} players</span>
           </>
         )}
         <span className="mgcard__spacer" />
@@ -276,6 +425,7 @@ export function MarketGrid() {
   const router = useRouter();
   const { predictions, loading, error, allPredictionsLoaded, fetchAllPredictions } =
     useHybridPredictions();
+  const { chainKey } = useActiveChain();
   const [filter, setFilter] = useState<StatusFilter>("open");
   const [page, setPage] = useState(1);
 
@@ -312,7 +462,7 @@ export function MarketGrid() {
     // never dropped for having no players yet - having none is what an open
     // market with room in it looks like.
     const worthShowing = (p: HybridPrediction) =>
-      !(p.resolved || p.cancelled) || (p.participants?.length ?? 0) > 0;
+      !(p.resolved || p.cancelled) || playerCount(p) > 0;
 
     const list =
       filter === "open"
@@ -338,6 +488,20 @@ export function MarketGrid() {
     currentPage * PAGE_SIZE
   );
 
+  // One request for the whole page, refetched when the page or the chain
+  // changes. The lines land in .mgcard__bg, which is out of flow and sized off
+  // the card, so a card that gets its history a second after paint does not
+  // move a pixel of anything around it.
+  //
+  // The lookup below is by the id the grid holds. The route answers with the
+  // canonical id, which is the same string for every market Redis has written
+  // since ids were canonicalised. Anything that ever fell out of step misses
+  // the map and keeps its mark, which is the right way round to be wrong.
+  const histories = usePriceHistories(
+    pageItems.map((p) => p.id),
+    chainKey
+  );
+
   const goToPage = (next: number) => {
     setPage(next);
     // A new page of cards replaces the viewport contents; without this you land
@@ -347,7 +511,14 @@ export function MarketGrid() {
     }
   };
 
-  const openMarket = (id: string) => router.push(`/prediction/${id}`);
+  /**
+   * The chain travels with the link.
+   *
+   * Both deployments number their markets from 1, so /prediction/5 on its own
+   * is two different questions. The market page reads ?chain= and switches the
+   * app to it, which also means the back button lands somewhere consistent.
+   */
+  const openMarket = (id: string) => router.push(`/prediction/${id}?chain=${chainKey}`);
 
   const filterBar = (
     <div className="market-filter-bar">
@@ -372,7 +543,7 @@ export function MarketGrid() {
       </div>
       {openCount === 0 && !loading && (
         <p className="market-filter__hint">
-          No markets are open right now — showing past ones.
+          No markets are open right now, showing past ones.
         </p>
       )}
     </div>
@@ -430,6 +601,8 @@ export function MarketGrid() {
               <MarketCard
                 key={prediction.id}
                 prediction={prediction}
+                chainKey={chainKey}
+                history={histories.get(prediction.id)}
                 onOpen={openMarket}
               />
             ))}
@@ -476,7 +649,7 @@ export function MarketGrid() {
               </button>
 
               <span className="market-pagination__summary">
-                {(currentPage - 1) * PAGE_SIZE + 1}–
+                {(currentPage - 1) * PAGE_SIZE + 1} to{" "}
                 {Math.min(currentPage * PAGE_SIZE, visible.length)} of{" "}
                 {visible.length}
               </span>

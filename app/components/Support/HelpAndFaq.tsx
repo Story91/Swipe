@@ -68,7 +68,7 @@ const FAQ_GROUPS: FAQGroup[] = [
         id: 3,
         question: 'What about the older Swipe markets on Base?',
         answer:
-          'Base carries three Swipe contracts from before V4, and they are finished. The key that owned them is gone, so a market still open on one of them can never be settled and a stake sitting in it cannot be claimed. We would rather say that plainly than imply a recovery that is not coming. They stay readable so old positions and results are still visible, and nothing new is ever written to them.',
+          'Base carries three Swipe contracts from before V4, and they take no new bets. The key that settles them is gone, so a market still open on one of those can never be decided, and a stake sitting in it stays there. We would rather say that plainly than imply a recovery that is not coming. What the lost key blocks is settling, not collecting: a market that had already resolved still pays out from the old contract, and that claim still works. They stay readable so old positions and results are visible, and nothing new is written to them.',
       },
     ],
   },
@@ -118,13 +118,13 @@ const FAQ_GROUPS: FAQGroup[] = [
         id: 9,
         question: 'How do I claim my winnings?',
         answer:
-          'Open the market from your dashboard and claim. Payouts are pulled by you rather than pushed, and nothing expires, so an unclaimed one waits on the contract until you take it. A cancelled market returns your stake the same way. A market that resolves with nobody on the winning side is refundable too and every backer gets their raw stake back, but that case is a claimRefund call on the contract today rather than a button in the dashboard.',
+          'Open the market from your dashboard and claim. Payouts are pulled by you rather than pushed, and nothing expires, so an unclaimed one waits on the contract until you take it. A cancelled market returns your stake the same way. A market that resolves with nobody on the winning side is refundable too, and so is one nobody settled for 30 days past its deadline. Your dashboard has a refunds panel for both: it opens refunds on an abandoned market, which anyone at all is allowed to do, and then claims your stake back. A refund returns the raw stake, unweighted.',
       },
       {
         id: 10,
         question: 'I created a market. When do I get the 0.5%?',
         answer:
-          'It is credited to the creator address the moment the market resolves, out of the losing pool, and it sits there until it is pulled. That is deliberate. Paying it out during resolution meant a creator who could not receive the token could block settlement for everyone else in that market. There is no screen for it yet, so collecting it means calling claimCreatorReward on the market contract yourself.',
+          'It is credited to the creator address the moment the market resolves, out of the losing pool, and it sits there until it is pulled. That is deliberate. Paying it out during resolution meant a creator who could not receive the token could block settlement for everyone else in that market. Your dashboard shows what you are owed and claims it. The panel only appears if you have a balance, so it stays out of the way of everyone who has never opened a market.',
       },
     ],
   },

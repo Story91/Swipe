@@ -151,3 +151,128 @@ export function wouldEmptyPool(params: {
   const side = isYes ? yesPool : noPool;
   return side - amount === BigInt(0);
 }
+
+/**
+ * positions(id, user), decoded without collapsing the sides.
+ *
+ * The contract lets one address hold YES and NO on the same market at once,
+ * and exitEarly is per side. Both existing consumers of this read pick the
+ * larger side and throw the other away, which renders a two-sided position as
+ * one and makes half of it un-exitable from the screen. This decoder returns
+ * both amounts and nothing else decides which one matters.
+ *
+ * Slots 2 and 3 are time weights, not amounts, so they are deliberately not
+ * surfaced here: an exit UI that showed them as money would overstate the
+ * position.
+ */
+export interface PositionSides {
+  yesAmount: bigint;
+  noAmount: bigint;
+  claimed: boolean;
+}
+
+export function decodePositionSides(
+  data: readonly unknown[] | undefined | null
+): PositionSides | null {
+  if (!data || data.length < 5) return null;
+  const [yesAmount, noAmount, , , claimed] = data as readonly [
+    bigint,
+    bigint,
+    bigint,
+    bigint,
+    boolean,
+  ];
+  if (typeof yesAmount !== 'bigint' || typeof noAmount !== 'bigint') return null;
+  return { yesAmount, noAmount, claimed: Boolean(claimed) };
+}
+
+/**
+ * Everything the contract will check before it lets this exit through, run
+ * before the wallet opens.
+ *
+ * The refusal is a sentence a user can read, or null when the exit would go
+ * through. The checks mirror bettingOpen and exitEarly in the contract's own
+ * order, so the first reason the chain would give is the first reason shown.
+ * A disabled button with the sentence under it costs nothing; the same
+ * refusal discovered on chain costs a signature and the gas.
+ *
+ * The value maths is exitValue above, unchanged, so the quote and the payout
+ * cannot drift apart.
+ */
+export interface ExitQuote {
+  gross: bigint;
+  fee: bigint;
+  net: bigint;
+  /** Null when the exit would go through. Otherwise, why it would not. */
+  refusal: string | null;
+}
+
+export function exitQuote(params: {
+  amount: bigint;
+  isYes: boolean;
+  held: bigint;
+  yesPool: bigint;
+  noPool: bigint;
+  createdAt: bigint;
+  deadline: bigint;
+  now: bigint;
+  earlyExitFeeBps: bigint;
+  resolved: boolean;
+  cancelled: boolean;
+  refundable: boolean;
+}): ExitQuote {
+  const ZERO = BigInt(0);
+  const {
+    amount,
+    isYes,
+    held,
+    yesPool,
+    noPool,
+    createdAt,
+    deadline,
+    now,
+    earlyExitFeeBps,
+    resolved,
+    cancelled,
+    refundable,
+  } = params;
+
+  const value = exitValue({ amount, isYes, yesPool, noPool, earlyExitFeeBps });
+  const refuse = (refusal: string): ExitQuote => ({ ...value, refusal });
+
+  // bettingOpen, in the contract's order.
+  if (resolved) {
+    return refuse('This market has settled. Winnings are claimed, not exited.');
+  }
+  if (cancelled) {
+    return refuse('This market was cancelled. Your stake comes back as a refund, not an exit.');
+  }
+  if (refundable) {
+    return refuse('This market is refundable. Your stake comes back as a refund, not an exit.');
+  }
+  if (now >= deadline) {
+    return refuse('Betting has closed on this market, and exits close with it.');
+  }
+
+  // exitEarly's own requires.
+  if (amount === ZERO) {
+    return refuse('Enter an amount to exit.');
+  }
+  if (amount > held) {
+    return refuse('You hold less than that on this side.');
+  }
+  if (wouldEmptyPool({ amount, isYes, yesPool, noPool, createdAt, deadline, now })) {
+    return refuse(
+      'In the last quarter of a market an exit cannot empty its side of the pool. ' +
+        'Exit a little less, or wait for settlement.'
+    );
+  }
+  if (yesPool + noPool === ZERO) {
+    return refuse('The pool is empty, so there is nothing to exit into.');
+  }
+  if (value.net === ZERO) {
+    return refuse('After the exit fee this amount would round to nothing.');
+  }
+
+  return { ...value, refusal: null };
+}

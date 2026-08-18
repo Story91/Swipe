@@ -30,7 +30,10 @@ export const DASHBOARDS = [
   'swipe-token',
   'claim',
   'daily-tasks',
-  'usdc-markets',
+  // 'usdc-markets' is gone, not excluded: the separate stable-collateral list
+  // merged into the markets grid, which now carries each tile's network and
+  // collateral identity itself. The component behind it (SwipeMarkets) was
+  // deleted, so keeping the id would name a dashboard nothing can render.
 ] as const;
 
 export type DashboardType = (typeof DASHBOARDS)[number];
@@ -54,7 +57,6 @@ export const NOT_IN_SIDEBAR: Record<string, string> = {
 export type NavIconName =
   | 'markets'
   | 'dashboard'
-  | 'usdc'
   | 'leaderboard'
   | 'stats'
   | 'token'
@@ -86,7 +88,6 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { id: 'markets', label: 'Markets', icon: 'markets', group: 'main', action: { kind: 'dashboard', dashboard: 'tinder' } },
   { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', group: 'main', action: { kind: 'dashboard', dashboard: 'user' }, badge: true },
-  { id: 'usdc', label: 'USDC markets', icon: 'usdc', group: 'main', action: { kind: 'dashboard', dashboard: 'usdc-markets' } },
   { id: 'leaderboard', label: 'Leaderboard', icon: 'leaderboard', group: 'main', action: { kind: 'dashboard', dashboard: 'leaderboard' } },
   { id: 'stats', label: 'Stats', icon: 'stats', group: 'main', action: { kind: 'dashboard', dashboard: 'market-stats' } },
 
@@ -138,7 +139,6 @@ export const CRUMB: Record<DashboardType, CrumbEntry> = {
   'swipe-token': { crumb: ['Rewards', '$SWIPE'], title: '$SWIPE' },
   claim: { crumb: ['Rewards', 'Claim'], title: 'Claim' },
   'daily-tasks': { crumb: ['Rewards', 'Tasks'], title: 'Daily tasks' },
-  'usdc-markets': { crumb: ['Markets', 'USDC'], title: 'USDC markets' },
 };
 
 /** Which sidebar row should read as current for a given dashboard. */

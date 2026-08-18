@@ -109,7 +109,11 @@
 
 .market-sheet .mgcard {
   background: var(--sheet-ink-2);
-  border-color: var(--sheet-ink-line-2);
+  /* No border-color here. MarketGrid.css owns it: the default on .mgcard and
+     the per-network tint on .mgcard--chain-*. Re-setting it at this
+     specificity was silently cancelling the tint on every card, because
+     .market-sheet .mgcard outweighs a single modifier class. Same argument as
+     the note below: one place to change a colour. */
   padding: 15px 16px;
   /* A card with a short question was 159px tall and read as a fragment. This is
      the height of a card carrying a two-line question, so the grid is regular

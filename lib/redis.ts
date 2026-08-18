@@ -47,10 +47,18 @@ export function chainNamespace(chain: ChainKey = DEFAULT_CHAIN_KEY): string {
 
 // Redis key patterns for predictions.
 //
-// Keys that describe a market take a chain. Keys that describe a person do not:
-// splitting USER_TRANSACTIONS would cut one user's history in half against a
-// reader that reads one list, and it is capped at 50 entries. Those carry the
-// chain inside the record instead.
+// Keys that describe a market take a chain. Keys that describe a person and
+// nothing else do not: a portfolio total or a Farcaster handle is the same fact
+// whichever contract the person was betting on.
+//
+// USER_TRANSACTIONS looks like the second kind and is the first. Every record in
+// it names a market id, a transaction hash and an explorer URL, and all three
+// belong to one chain. The list was shared, so a Base user opening their history
+// read Robinhood's transactions mixed into it, with market ids that mean a
+// different market on the chain they are looking at and links that resolve on
+// the wrong explorer. The earlier note here claimed those records carry the
+// chain inside them; check lib/types/redis.ts, UserTransaction has no such
+// field, so no reader could have filtered even if one had tried.
 export const REDIS_KEYS = {
   PREDICTIONS: (chain?: ChainKey) => `${chainNamespace(chain)}predictions`,
   PREDICTION: (id: string, chain?: ChainKey) => `${chainNamespace(chain)}prediction:${id}`,
@@ -67,14 +75,26 @@ export const REDIS_KEYS = {
   PREDICTIONS_COUNT: (chain?: ChainKey) => `${chainNamespace(chain)}predictions:count`,
   /** Denormalised snapshot of every prediction, so a listing is one read. */
   PREDICTIONS_INDEX: (chain?: ChainKey) => `${chainNamespace(chain)}predictions:index`,
+  /**
+   * A wallet address, cased one way, always.
+   *
+   * Redis keys are bytes and 0xAbC is not 0xabc. Most writers lowercased and
+   * several readers did not, so /api/portfolio built its key from the raw query
+   * value: connect with a checksummed address and the portfolio came back
+   * empty, with no error anywhere, because the key simply was not there.
+   *
+   * Normalising in the builder rather than at each of the twelve call sites is
+   * the only version of this fix that cannot rot. A new caller gets it for
+   * free, and a caller that already lowercases is unaffected.
+   */
   USER_STAKES: (userId: string, predictionId: string, chain?: ChainKey) =>
-    `${chainNamespace(chain)}user_stakes:${userId}:${predictionId}`,
+    `${chainNamespace(chain)}user_stakes:${userId.toLowerCase()}:${predictionId}`,
   /**
    * Every stake key for one user on one chain. The prefix is leading precisely
    * so this cannot reach across chains.
    */
   USER_STAKES_PATTERN: (userId: string, chain?: ChainKey) =>
-    `${chainNamespace(chain)}user_stakes:${userId}:*`,
+    `${chainNamespace(chain)}user_stakes:${userId.toLowerCase()}:*`,
   /**
    * Every stake on one market on one chain.
    *
@@ -86,7 +106,20 @@ export const REDIS_KEYS = {
    */
   PREDICTION_STAKES_PATTERN: (predictionId: string, chain?: ChainKey) =>
     `${chainNamespace(chain)}user_stakes:*:${predictionId}`,
-  USER_TRANSACTIONS: (userId: string) => `user_transactions:${userId}`,
+  /**
+   * One user's transaction history on one chain.
+   *
+   * Namespaced like every market key, and for the same reason: the entries
+   * carry market ids, and `pred_v4_1` is a different market on each chain. Base
+   * stays the identity namespace, so the key production already holds is
+   * unchanged and the 50-entry list a Base user reads today is the same list
+   * tomorrow. Robinhood transactions written before this got their own key are
+   * still sitting in Base's list. They are not lost, they are mislabelled, and
+   * they age out as the cap rolls them off.
+   */
+  /** Lowercased for the same reason USER_STAKES is. */
+  USER_TRANSACTIONS: (userId: string, chain?: ChainKey) =>
+    `${chainNamespace(chain)}user_transactions:${userId.toLowerCase()}`,
   MARKET_STATS: (chain?: ChainKey) => `${chainNamespace(chain)}market:stats`,
   COMPACT_STATS: (chain?: ChainKey) => `${chainNamespace(chain)}market:compact_stats`,
   /**
@@ -557,9 +590,18 @@ export const redisHelpers = {
   },
 
   // Save user transaction
-  async saveUserTransaction(userId: string, transaction: UserTransaction): Promise<void> {
+  //
+  // `chain` decides which list this lands in and defaults to Base, matching
+  // every other helper here. A caller that knows the chain must pass it: a
+  // Robinhood bet saved without one is written into the Base history, where the
+  // market id it names points at a different market.
+  async saveUserTransaction(
+    userId: string,
+    transaction: UserTransaction,
+    chain: ChainKey = DEFAULT_CHAIN_KEY
+  ): Promise<void> {
     try {
-      const transactionsKey = REDIS_KEYS.USER_TRANSACTIONS(userId);
+      const transactionsKey = REDIS_KEYS.USER_TRANSACTIONS(userId, chain);
       const existingData = await redis.get(transactionsKey);
       let transactions: UserTransaction[] = [];
       
@@ -587,9 +629,12 @@ export const redisHelpers = {
   },
 
   // Get user transactions
-  async getUserTransactions(userId: string): Promise<UserTransaction[]> {
+  async getUserTransactions(
+    userId: string,
+    chain: ChainKey = DEFAULT_CHAIN_KEY
+  ): Promise<UserTransaction[]> {
     try {
-      const transactionsKey = REDIS_KEYS.USER_TRANSACTIONS(userId);
+      const transactionsKey = REDIS_KEYS.USER_TRANSACTIONS(userId, chain);
       const data = await redis.get(transactionsKey);
       
       if (!data) return [];
@@ -608,9 +653,9 @@ export const redisHelpers = {
   },
 
   // Update transaction status
-  async updateTransactionStatus(userId: string, txHash: string, status: 'pending' | 'success' | 'failed', blockNumber?: number, gasUsed?: number): Promise<void> {
+  async updateTransactionStatus(userId: string, txHash: string, status: 'pending' | 'success' | 'failed', blockNumber?: number, gasUsed?: number, chain: ChainKey = DEFAULT_CHAIN_KEY): Promise<void> {
     try {
-      const transactionsKey = REDIS_KEYS.USER_TRANSACTIONS(userId);
+      const transactionsKey = REDIS_KEYS.USER_TRANSACTIONS(userId, chain);
       const data = await redis.get(transactionsKey);
       
       if (!data) return;

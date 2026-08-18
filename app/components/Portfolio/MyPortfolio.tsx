@@ -14,6 +14,8 @@ import {
   type TokenTotal,
 } from './portfolioTokens';
 import { StaleNotice, ArchivedNote, ArchivedTag } from './PortfolioNotes';
+import { CreatorRewards } from './CreatorRewards';
+import { Refunds } from './Refunds';
 import '../../styles/sheet.css';
 import './MyPortfolio.css';
 
@@ -29,6 +31,14 @@ import './MyPortfolio.css';
  * stablecoin, and the sum is dominated by whichever leg is denominated in wei.
  * So the standing is one ledger per token and there is no grand total anywhere
  * on this screen.
+ *
+ * Two panels sit outside the ledger, because they are about money the contract
+ * is holding rather than about how a book has performed. Refunds covers markets
+ * nobody settled, where the contract lets anyone open refunds thirty days past
+ * the deadline. CreatorRewards covers the cut a market creator earns, which the
+ * contract credits at resolution and never sends on its own. Both render null
+ * when there is nothing owed, which is the usual case, so they cost a reader
+ * with an ordinary book nothing.
  */
 
 type Tab = 'overview' | 'active' | 'history';
@@ -193,6 +203,11 @@ export function MyPortfolio() {
 
   return shell(
     <>
+      {/* Money the contract is holding for you, above the book rather than in
+          it. Both panels render nothing at all when there is nothing owed, so
+          for almost everybody this page looks exactly as it did. */}
+      <Refunds rows={items} onChanged={refresh} />
+
       <section className="sheet-block">
         <div className="sheet-rail">
           <p className="sheet-eyebrow">Standing</p>
@@ -288,6 +303,8 @@ export function MyPortfolio() {
           )}
         </div>
       </section>
+
+      <CreatorRewards />
 
       <section className="sheet-block">
         <div className="sheet-rail">

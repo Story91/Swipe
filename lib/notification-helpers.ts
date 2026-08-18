@@ -30,13 +30,14 @@ function formatNumberCompact(amount: number | string): string {
 }
 
 /**
- * Format token amount for notifications - use compact format for SWIPE, normal for ETH
+ * SWIPE amounts run to millions and are shown compact. A stablecoin amount is
+ * shown as it was typed, because "1.2M USDC" and "1200000 USDC" are the same
+ * number but only one of them is a bet somebody placed.
  */
 function formatTokenAmountForNotification(amount: string | number, token: string): string {
-  if (token === 'SWIPE' || token.toUpperCase() === 'SWIPE') {
+  if (token.toUpperCase() === 'SWIPE') {
     return formatNumberCompact(amount);
   }
-  // For ETH, return as is (already formatted)
   return String(amount);
 }
 
@@ -83,101 +84,119 @@ export async function sendNotificationToUser(data: NotificationData): Promise<bo
 }
 
 // Predefined notification templates
+/**
+ * What a push notification is allowed to say.
+ *
+ * Every one of these used to end in a pitch for free $SWIPE from daily tasks.
+ * There is no daily task that pays $SWIPE, and the token is not live, so the
+ * app was sending users a promise it cannot keep, on every bet, every share and
+ * every settlement. A notification is the one surface a user cannot mute
+ * selectively and cannot check against the screen, which makes it the worst
+ * place in the product to be loose.
+ *
+ * The token also defaulted to ETH. ETH bets only exist on the archived
+ * contracts nobody can settle, so a stablecoin bet whose caller forgot the
+ * argument was announced in the wrong currency. There is no default now.
+ */
 export const notificationTemplates = {
-  betSuccess: (fid: number, predictionTitle: string, betAmount: string, outcome: string, token: string = 'ETH') => {
+  betSuccess: (fid: number, predictionTitle: string, betAmount: string, outcome: string, token: string) => {
     const formattedAmount = formatTokenAmountForNotification(betAmount, token);
     return {
       fid,
-      title: "✅ Bet Placed!",
-      body: `Your ${formattedAmount} ${token} bet on "${predictionTitle}" is live! Prediction: ${outcome}. Complete daily tasks to earn free $SWIPE! 🎁`,
+      title: 'Bet placed',
+      body: `${formattedAmount} ${token} on ${outcome} in "${predictionTitle}". You can exit early until the deadline.`,
       type: 'bet_success' as const
     };
   },
 
   betFailed: (fid: number, predictionTitle: string, reason: string) => ({
     fid,
-    title: "❌ Bet Failed",
-    body: `Couldn't place bet on "${predictionTitle}". ${reason}. Try again or complete daily tasks for free $SWIPE! 💰`,
+    title: 'Bet did not go through',
+    body: `Nothing was staked on "${predictionTitle}". ${reason}`,
     type: 'bet_failed' as const
   }),
 
-  winningsClaimed: (fid: number, predictionTitle: string, amount: string, token: string = 'ETH') => {
+  winningsClaimed: (fid: number, predictionTitle: string, amount: string, token: string) => {
     const formattedAmount = formatTokenAmountForNotification(amount, token);
     return {
       fid,
-      title: "💰 Winnings Claimed!",
-      body: `You claimed ${formattedAmount} ${token} from "${predictionTitle}"! Keep betting and complete daily tasks for more $SWIPE rewards! 🎁`,
+      title: 'Winnings claimed',
+      body: `${formattedAmount} ${token} from "${predictionTitle}" is in your wallet.`,
       type: 'winnings_claimed' as const
     };
   },
 
   predictionShared: (fid: number, predictionTitle: string, shareType: string) => ({
     fid,
-    title: "📤 Prediction Shared!",
-    body: `You shared "${predictionTitle}" on Farcaster! Share more to earn free $SWIPE rewards. Complete daily tasks! 💰`,
+    title: 'Shared',
+    body: `"${predictionTitle}" is on your feed.`,
     type: 'prediction_shared' as const
   }),
 
   predictionResolved: (fid: number, predictionTitle: string, outcome: string, won: boolean) => ({
     fid,
-    title: won ? "🎉 You Won!" : "💪 Try Again!",
-    body: won 
-      ? `"${predictionTitle}" resolved as ${outcome} - you won! Claim your winnings and earn more free $SWIPE with daily tasks! 🎁`
-      : `"${predictionTitle}" resolved as ${outcome}. Don't give up! Complete daily tasks for free $SWIPE and keep betting! 💰`,
+    title: won ? 'You called it' : 'Settled',
+    body: won
+      ? `"${predictionTitle}" settled ${outcome}. Your payout is waiting, claim it whenever, it does not expire.`
+      : `"${predictionTitle}" settled ${outcome}, so this one went to the other side.`,
     type: 'prediction_resolved' as const
   }),
 
   newPrediction: (fid: number, predictionTitle: string, category: string) => ({
     fid,
-    title: "🔮 New Prediction!",
-    body: `New prediction in ${category}: "${predictionTitle}". Place your bet now! Complete daily tasks for free $SWIPE! 💰`,
+    title: `New in ${category}`,
+    body: `"${predictionTitle}" just opened. Betting early counts for a larger share.`,
     type: 'new_prediction' as const
   }),
 
   achievement: (fid: number, achievementName: string, description: string) => ({
     fid,
-    title: "🏆 Achievement Unlocked!",
-    body: `"${achievementName}": ${description}. Keep going to earn more free $SWIPE with daily tasks! 🎁`,
+    title: achievementName,
+    body: description,
     type: 'achievement' as const
   }),
 
   welcome: (fid: number) => ({
     fid,
-    title: "👋 Welcome to Swipe!",
-    body: "Start predicting and earn free $SWIPE rewards! Complete daily tasks to unlock more rewards. Let's go! 🚀",
+    title: 'Welcome to Swipe',
+    body: 'Right for yes, left for no. Winners split what the losing side staked, and the fees come out of that side, never yours.',
     type: 'achievement' as const
   }),
 
   milestone: (fid: number, milestone: string, count: number) => ({
     fid,
-    title: "🎯 Milestone Achieved!",
-    body: `You reached ${milestone}: ${count} predictions! Earn even more free $SWIPE with daily tasks! 💰`,
+    title: milestone,
+    body: `${count} predictions in.`,
     type: 'achievement' as const
   }),
 
+  /**
+   * Kept because the daily tasks screen exists, with no reward named. It said a
+   * task pays $SWIPE, which is not a thing the app can do today.
+   */
   dailyTaskReminder: (fid: number, taskName: string) => ({
     fid,
-    title: "⏰ Daily Task Available!",
-    body: `Complete "${taskName}" to earn free $SWIPE! Daily tasks reset soon - claim your rewards now! 🎁`,
+    title: 'Daily task waiting',
+    body: `"${taskName}" resets at midnight UTC.`,
     type: 'daily_task' as const
   }),
 
   dailyTaskCompleted: (fid: number, reward: string) => ({
     fid,
-    title: "🎁 Daily Task Complete!",
-    body: `You earned ${reward} $SWIPE! Complete more daily tasks for bigger rewards. Keep going! 💰`,
+    title: 'Daily task done',
+    body: `"${reward}" is checked off.`,
     type: 'daily_task' as const
   })
 };
 
 // Convenience functions
-export async function notifyBetSuccess(fid: number, predictionTitle: string, betAmount: string, outcome: string, token: string = 'ETH') {
+export async function notifyBetSuccess(fid: number, predictionTitle: string, betAmount: string, outcome: string, token: string) {
   const notification = notificationTemplates.betSuccess(fid, predictionTitle, betAmount, outcome, token);
   return await sendNotificationToUser(notification);
 }
 
 // Backward compatibility - keep old function names for existing code
-export async function notifyStakeSuccess(fid: number, predictionTitle: string, stakeAmount: string, outcome: string, token: string = 'ETH') {
+export async function notifyStakeSuccess(fid: number, predictionTitle: string, stakeAmount: string, outcome: string, token: string) {
   return notifyBetSuccess(fid, predictionTitle, stakeAmount, outcome, token);
 }
 
@@ -191,7 +210,7 @@ export async function notifyStakeFailed(fid: number, predictionTitle: string, re
   return notifyBetFailed(fid, predictionTitle, reason);
 }
 
-export async function notifyWinningsClaimed(fid: number, predictionTitle: string, amount: string, token: string = 'ETH') {
+export async function notifyWinningsClaimed(fid: number, predictionTitle: string, amount: string, token: string) {
   const notification = notificationTemplates.winningsClaimed(fid, predictionTitle, amount, token);
   return await sendNotificationToUser(notification);
 }

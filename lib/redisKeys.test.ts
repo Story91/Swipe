@@ -76,12 +76,59 @@ describe('another chain gets its own keyspace', () => {
   });
 });
 
-describe('keys about a person stay global', () => {
-  it('does not split one user across chains', () => {
-    // USER_TRANSACTIONS is capped at 50 entries and read as one list, so
-    // namespacing it would silently halve a user's visible history.
+describe('which keys about a person stay global', () => {
+  /**
+   * This block used to argue that USER_TRANSACTIONS must not be namespaced,
+   * because capping it at 50 and then splitting it would halve a visible
+   * history. The argument was backwards: one list meant a Robinhood bet showed
+   * up in a Base user's history with a Base explorer link beside it, and
+   * UserTransaction has no chain field, so no reader could tell them apart.
+   * Halving a list that was wrong is not a cost.
+   *
+   * A profile and a portfolio genuinely are about the person rather than the
+   * chain, so those two stay global.
+   */
+  it('gives transactions a chain, because a transaction happened on one', () => {
     expect(REDIS_KEYS.USER_TRANSACTIONS('0xabc')).toBe('user_transactions:0xabc');
+    expect(REDIS_KEYS.USER_TRANSACTIONS('0xabc', 'robinhood')).toBe('robinhood:user_transactions:0xabc');
+  });
+
+  it('leaves the person themselves un-namespaced', () => {
     expect(REDIS_KEYS.USER_PORTFOLIO('0xabc')).toBe('user:portfolio:0xabc');
     expect(REDIS_KEYS.FARCASTER_PROFILE('0xABC')).toBe('farcaster_profile:0xabc');
+  });
+});
+
+/**
+ * A wallet address is one key, whatever case it arrives in.
+ *
+ * Redis keys are bytes, so 0xAbC and 0xabc are two different keys. Writers
+ * lowercased, several readers passed the address through as given, and
+ * /api/portfolio built its key straight from the query string. Connecting with
+ * a checksummed address returned an empty portfolio: no error, no log, just a
+ * user being told they have no positions.
+ */
+describe('address casing cannot split a key in two', () => {
+  const MIXED = '0xAbCdEf0123456789AbCdEf0123456789AbCdEf01';
+  const LOWER = MIXED.toLowerCase();
+
+  it('builds one stake key from either casing', () => {
+    expect(REDIS_KEYS.USER_STAKES(MIXED, 'pred_1')).toBe(REDIS_KEYS.USER_STAKES(LOWER, 'pred_1'));
+    expect(REDIS_KEYS.USER_STAKES(MIXED, 'pred_1')).toContain(LOWER);
+    expect(REDIS_KEYS.USER_STAKES(MIXED, 'pred_1')).not.toContain('AbC');
+  });
+
+  it('builds one stake glob from either casing', () => {
+    expect(REDIS_KEYS.USER_STAKES_PATTERN(MIXED)).toBe(REDIS_KEYS.USER_STAKES_PATTERN(LOWER));
+  });
+
+  it('builds one transaction key from either casing', () => {
+    expect(REDIS_KEYS.USER_TRANSACTIONS(MIXED)).toBe(REDIS_KEYS.USER_TRANSACTIONS(LOWER));
+  });
+
+  it('still keeps the two chains apart while doing it', () => {
+    expect(REDIS_KEYS.USER_STAKES(MIXED, 'pred_1', 'robinhood'))
+      .not.toBe(REDIS_KEYS.USER_STAKES(MIXED, 'pred_1', 'base'));
+    expect(REDIS_KEYS.USER_TRANSACTIONS(MIXED, 'robinhood')).toMatch(/^robinhood:/);
   });
 });

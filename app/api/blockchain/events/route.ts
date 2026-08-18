@@ -128,13 +128,20 @@ export async function POST(request: NextRequest) {
                     tokenType: (ethYesAmount > 0 || ethNoAmount > 0) ? 'ETH' : 'SWIPE'
                   };
                   
-                  // Save to user transactions
-                  const userTxKey = `user_transactions:${participant.toLowerCase()}`;
+                  // Save to user transactions. Built from REDIS_KEYS so it
+                  // carries the chain namespace, and pinned to Base like the
+                  // prediction read above, because this route indexes the
+                  // archived Base contracts and nothing else.
+                  const userTxKey = REDIS_KEYS.USER_TRANSACTIONS(participant.toLowerCase(), 'base');
                   const existingTxs = await redis.get(userTxKey);
                   let transactions = existingTxs ? (typeof existingTxs === 'string' ? JSON.parse(existingTxs) : existingTxs) : [];
                   
                   // Add new transaction to beginning of array
-                  transactions = [transaction, ...transactions].slice(0, 100); // Keep last 100
+                  // 50, matching redisHelpers.saveUserTransaction. Two writers
+                  // on one key disagreeing about its length means the list
+                  // grows to 100 through this path and is silently truncated to
+                  // 50 by the next write through the other.
+                  transactions = [transaction, ...transactions].slice(0, 50);
                   
                   await redis.set(userTxKey, JSON.stringify(transactions));
                   console.log(`✅ Saved stake transaction to user history: ${participant}`);

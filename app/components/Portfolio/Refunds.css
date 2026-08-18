@@ -1,0 +1,176 @@
+/*
+ * Stuck markets, on the shared sheet (app/styles/sheet.css).
+ *
+ * Same hairline rows as the portfolio list below it, on purpose: these are
+ * positions, and making them look like an alert banner would suggest something
+ * has gone wrong with the app rather than with one market's resolver.
+ */
+
+.rf-note {
+  margin: 16px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--sheet-paper-3);
+  max-width: 62ch;
+}
+
+.rf-note--tight {
+  margin-top: 14px;
+}
+
+.rf-list {
+  margin-top: 18px;
+  border-top: 1px solid var(--sheet-rule);
+}
+
+.rf-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 132px) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--sheet-rule);
+}
+
+.rf-main {
+  min-width: 0;
+}
+
+.rf-question {
+  font-family: var(--sheet-display);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.rf-sub {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 5px;
+}
+
+.rf-id {
+  font-family: var(--sheet-data);
+  font-size: 11px;
+  color: var(--sheet-paper-3);
+}
+
+.rf-state {
+  font-family: var(--sheet-display);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sheet-paper-3);
+  border: 1px solid var(--sheet-rule);
+  padding: 2px 6px;
+}
+
+.rf-state--live {
+  color: var(--sheet-lime);
+  border-color: var(--sheet-lime-line);
+}
+
+.rf-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.rf-figure-label {
+  font-family: var(--sheet-display);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sheet-paper-3);
+}
+
+.rf-figure-val {
+  font-family: var(--sheet-data);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: var(--sheet-paper);
+}
+
+.rf-action {
+  justify-self: end;
+}
+
+.rf-action .sheet-action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.rf-action .sheet-action:disabled:hover {
+  color: var(--sheet-paper-2);
+  border-color: var(--sheet-rule);
+}
+
+.rf-wait {
+  font-size: 13px;
+  color: var(--sheet-paper-3);
+}
+
+.rf-error {
+  margin: 14px 0 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--sheet-loss);
+  font-size: 14px;
+  color: var(--sheet-loss);
+}
+
+.rf-retry {
+  font: inherit;
+  color: var(--sheet-lime);
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--sheet-lime-line);
+  padding: 0;
+  cursor: pointer;
+}
+
+.rf-retry:hover {
+  border-bottom-color: var(--sheet-lime);
+}
+
+.rf-done {
+  margin: 14px 0 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--sheet-lime);
+  font-size: 14px;
+  color: var(--sheet-paper-2);
+}
+
+.rf-done a {
+  color: var(--sheet-lime);
+  text-decoration: none;
+  border-bottom: 1px solid var(--sheet-lime-line);
+}
+
+.rf-done a:hover {
+  border-bottom-color: var(--sheet-lime);
+}
+
+/* The panel renders inside the dashboard shell as well as on the standalone
+   route, and the shell is about 528px wide on a 1280px desktop. Asking the
+   sheet about its own width is the only question with the same answer in both
+   places. */
+@container sheet (max-width: 560px) {
+  .rf-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .rf-action {
+    justify-self: start;
+  }
+}

@@ -465,7 +465,12 @@ export function EnhancedUserDashboard() {
     
     setLoadingTransactions(true);
     try {
-      const response = await fetch(`/api/user-transactions?userId=${address.toLowerCase()}`);
+      // The chain travels with the read, the same way the stakes read below
+      // sends it. Redis holds one history per chain now, and a request without
+      // a chain is a request for Base's, whatever the switcher is showing.
+      const response = await fetch(
+        `/api/user-transactions?userId=${address.toLowerCase()}&chain=${claimChainKey}`
+      );
       const result = await response.json();
 
       /**
@@ -493,7 +498,7 @@ export function EnhancedUserDashboard() {
     } finally {
       setLoadingTransactions(false);
     }
-  }, [address]);
+  }, [address, claimChainKey]);
 
   // Sync transactions from blockchain (recover historical data)
   const syncFromBlockchain = useCallback(async () => {
@@ -1463,10 +1468,11 @@ export function EnhancedUserDashboard() {
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                     userId: address.toLowerCase(),
+                    chain: claimChainKey,
                     transaction
                   }),
                 });
-                
+
                 // Add to local state
                 addNewTransaction(transaction);
               } catch (e) {
@@ -1525,6 +1531,7 @@ export function EnhancedUserDashboard() {
                 },
                 body: JSON.stringify({
                   userId: address,
+                  chain: claimChainKey,
                   txHash: txHash,
                   status: 'success'
                 }),
@@ -1584,6 +1591,7 @@ export function EnhancedUserDashboard() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 userId: address.toLowerCase(),
+                chain: claimChainKey,
                 transaction
               })
             });
@@ -1641,6 +1649,7 @@ export function EnhancedUserDashboard() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                       userId: address.toLowerCase(),
+                      chain: claimChainKey,
                       txHash,
                       status: 'success'
                     })

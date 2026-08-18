@@ -35,7 +35,10 @@ export async function POST(
     // Generate OG image by calling our USDC endpoint (gets fresh chart data)
     console.log(`🔗 Using base URL: ${BASE_URL}`);
     
-    const ogResponse = await fetch(`${BASE_URL}/api/og/usdc-prediction/${id}`, {
+    // With the chain. The renderer defaults an absent one to Base, and market
+    // numbers are reused across chains, so a Robinhood share was uploading a
+    // picture of Base's market and saving it as this one's card.
+    const ogResponse = await fetch(`${BASE_URL}/api/og/usdc-prediction/${id}?chain=${chain}`, {
       headers: {
         'Accept': 'image/png',
       },

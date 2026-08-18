@@ -2,6 +2,7 @@ import { ImageResponse } from 'next/og';
 import { NextRequest } from 'next/server';
 import { redisHelpers } from '@/lib/redis';
 import { chainFromRequest } from '@/lib/chains/requestChain';
+import { CHAINS } from '@/lib/chains';
 
 export const runtime = 'edge';
 
@@ -197,24 +198,49 @@ export async function GET(
       }
     }
 
-    // Calculate stats - convert from wei to ETH
-    const totalPoolWei = prediction.yesTotalAmount + prediction.noTotalAmount;
-    const totalPoolETH = totalPoolWei / 1e18;
-    const yesPercentage = totalPoolWei > 0 ? Math.round((prediction.yesTotalAmount / totalPoolWei) * 100) : 50;
-    const noPercentage = 100 - yesPercentage;
-    
-    // SWIPE pool stats
-    const swipeYes = (prediction.swipeYesTotalAmount || 0) / 1e18;
-    const swipeNo = (prediction.swipeNoTotalAmount || 0) / 1e18;
-    const totalSwipe = swipeYes + swipeNo;
-    
-    // Format SWIPE amount
-    const formatSwipe = (amount: number): string => {
-      if (amount >= 1000000) return (amount / 1000000).toFixed(1) + 'M';
-      if (amount >= 1000) return (amount / 1000).toFixed(0) + 'K';
-      return amount.toFixed(0);
-    };
-    
+    /**
+     * The collateral pool, which is the only pool this market takes bets in.
+     *
+     * The decision, since the brief asked for one in writing: this card reads
+     * the live pools rather than becoming an honest "archived market" card. It
+     * is the og:image for /prediction/[id], and that page reads
+     * usdcYesTotalAmount and usdcNoTotalAmount and offers a live bet. A card
+     * announcing the market as archived would contradict the page it previews.
+     *
+     * What it printed before: an "ETH Pool" off yesTotalAmount and a "SWIPE
+     * Pool" off swipeYesTotalAmount, neither of which anything has written
+     * since the role split, so every market the app can currently bet on
+     * rendered as 0.0000 ETH and 0 SWIPE. The odds bar was worse. It fell back
+     * to 50 percent on an empty pool, so a question nobody had touched went out
+     * to a public feed as YES 50% / NO 50%, an even split of a pool that does
+     * not exist, and a reader has no way to tell that apart from a market where
+     * the crowd genuinely disagreed.
+     *
+     * This stays a separate renderer from /api/og/usdc-prediction: that one
+     * draws the market card, this one draws the 7 day price chart a crypto
+     * question needs. Same source of truth, different picture.
+     */
+    const stable = CHAINS[chain].stable;
+    const unit = 10 ** stable.decimals;
+
+    const yesPool = (prediction.usdcYesTotalAmount || 0) / unit;
+    const noPool = (prediction.usdcNoTotalAmount || 0) / unit;
+    const totalPool = yesPool + noPool;
+    const hasPool = totalPool > 0;
+    const yesPercentage = hasPool ? Math.round((yesPool / totalPool) * 100) : 0;
+    const noPercentage = hasPool ? 100 - yesPercentage : 0;
+
+    const poolText = !hasPool
+      ? 'no bets yet'
+      : totalPool >= 1000
+        ? `${(totalPool / 1000).toFixed(1)}k ${stable.symbol}`
+        : `${totalPool.toFixed(2)} ${stable.symbol}`;
+
+    // The collateral contract keeps its own participant list. The other one
+    // counts people who bet on a contract this market no longer settles on.
+    const participantCount =
+      prediction.usdcParticipants?.length ?? prediction.participants?.length ?? 0;
+
     // Format time left
     const now = Date.now() / 1000;
     const timeLeft = prediction.deadline - now;
@@ -235,13 +261,19 @@ export async function GET(
       }
     }
 
-    // Determine status
-    const isResolved = prediction.resolved;
-    const statusText = isResolved 
-      ? (prediction.outcome ? 'YES Won!' : 'NO Won!') 
-      : (timeLeft <= 0 ? 'Awaiting Resolution' : 'Active');
-    const statusColor = isResolved 
-      ? (prediction.outcome ? '#22c55e' : '#ef4444') 
+    // Status, off the collateral contract's own flags. A market can be settled
+    // there and not on the archived one, or the reverse, so reading
+    // `prediction.resolved` announced the wrong contract's result.
+    const isCancelled = prediction.usdcCancelled ?? prediction.cancelled;
+    const isResolved = (prediction.usdcResolved ?? prediction.resolved) && !isCancelled;
+    const outcome = prediction.usdcOutcome ?? prediction.outcome;
+    const statusText = isCancelled
+      ? 'cancelled, stakes returned'
+      : isResolved
+        ? (outcome ? 'YES won' : 'NO won')
+        : (timeLeft <= 0 ? 'awaiting resolution' : 'live');
+    const statusColor = isResolved
+      ? (outcome ? '#22c55e' : '#ef4444')
       : '#d4ff00';
 
     return new ImageResponse(
@@ -347,26 +379,19 @@ export async function GET(
                 }}
               >
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ display: 'flex', fontSize: 12, color: '#333333' }}>ETH Pool</div>
+                  <div style={{ display: 'flex', fontSize: 12, color: '#333333' }}>Pool</div>
                   <div style={{ display: 'flex', fontSize: 20, fontWeight: 'bold', color: '#000000' }}>
-                    {totalPoolETH.toFixed(4)} ETH
+                    {poolText}
                   </div>
                 </div>
-                
+
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ display: 'flex', fontSize: 12, color: '#333333' }}>SWIPE Pool</div>
+                  <div style={{ display: 'flex', fontSize: 12, color: '#333333' }}>Swipers</div>
                   <div style={{ display: 'flex', fontSize: 20, fontWeight: 'bold', color: '#000000' }}>
-                    {formatSwipe(totalSwipe)}
+                    {participantCount}
                   </div>
                 </div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ display: 'flex', fontSize: 12, color: '#333333' }}>Participants</div>
-                  <div style={{ display: 'flex', fontSize: 20, fontWeight: 'bold', color: '#000000' }}>
-                    {prediction.participants?.length || 0}
-                  </div>
-                </div>
-                
+
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <div style={{ display: 'flex', fontSize: 12, color: '#333333' }}>Time</div>
                   <div style={{ display: 'flex', fontSize: 20, fontWeight: 'bold', color: '#000000' }}>
@@ -386,6 +411,11 @@ export async function GET(
                   borderRadius: 12,
                 }}
               >
+                {/*
+                  The split is a share of the money on each side, and an empty
+                  market says so. A bar drawn at 50/50 with nothing behind it is
+                  the single most misleading thing this card could publish.
+                */}
                 <div
                   style={{
                     display: 'flex',
@@ -394,30 +424,37 @@ export async function GET(
                   }}
                 >
                   <div style={{ display: 'flex', fontSize: 16, fontWeight: 'bold', color: '#22c55e' }}>
-                    YES {yesPercentage}%
+                    {hasPool ? `YES ${yesPercentage}%` : 'YES'}
                   </div>
+                  {!hasPool && (
+                    <div style={{ display: 'flex', fontSize: 16, fontWeight: 'bold', color: '#d4ff00' }}>
+                      open, no bets yet
+                    </div>
+                  )}
                   <div style={{ display: 'flex', fontSize: 16, fontWeight: 'bold', color: '#ef4444' }}>
-                    NO {noPercentage}%
+                    {hasPool ? `NO ${noPercentage}%` : 'NO'}
                   </div>
                 </div>
-                
+
                 <div
                   style={{
                     display: 'flex',
                     width: '100%',
                     height: 12,
-                    backgroundColor: '#ef4444',
+                    backgroundColor: hasPool ? '#ef4444' : '#333333',
                     borderRadius: 6,
                     overflow: 'hidden',
                   }}
                 >
-                  <div
-                    style={{
-                      width: `${yesPercentage}%`,
-                      height: '100%',
-                      backgroundColor: '#22c55e',
-                    }}
-                  />
+                  {hasPool && (
+                    <div
+                      style={{
+                        width: `${yesPercentage}%`,
+                        height: '100%',
+                        backgroundColor: '#22c55e',
+                      }}
+                    />
+                  )}
                 </div>
               </div>
             </div>

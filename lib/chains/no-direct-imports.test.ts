@@ -54,7 +54,12 @@ describe('chain abstraction is not bypassed', () => {
   // these paths onto contracts whose owner key is lost.
   const WRITE_PATHS = [
     ['app', 'components', 'Main', 'TinderCard.tsx'],
-    ['app', 'components', 'Markets', 'SwipeMarkets.tsx'],
+    // SwipeMarkets.tsx was on this list until the USDC markets dashboard
+    // merged into the grid and the file was deleted. Its two successors are
+    // covered: BetPanel and ExitPanel carry their own structural pins in
+    // app/components/Markets/MarketDetail/exitMoneyPath.test.ts.
+    ['app', 'components', 'Markets', 'MarketDetail', 'BetPanel.tsx'],
+    ['app', 'components', 'Markets', 'MarketDetail', 'ExitPanel.tsx'],
     ['app', 'components', 'Modals', 'CreatePredictionModal.tsx'],
     // Sends native ETH. It was missing from this list and had no guard at all.
     ['app', 'components', 'Portfolio', 'UserDashboard.tsx'],

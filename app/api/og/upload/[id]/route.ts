@@ -35,7 +35,12 @@ export async function POST(
     // Generate OG image by calling our existing endpoint (gets fresh chart data)
     console.log(`🔗 Using base URL: ${BASE_URL}`);
     
-    const ogResponse = await fetch(`${BASE_URL}/api/og/prediction/${id}`, {
+    // With the chain, not without it. The route already resolved which chain
+    // this market is on, then asked the renderer for the same id with no chain
+    // at all, and that renderer defaults an absent chain to Base. Market 1
+    // exists on both, so a Robinhood share was pinned to a picture of Base's
+    // question, in Base's currency, and saved to Redis as this market's card.
+    const ogResponse = await fetch(`${BASE_URL}/api/og/prediction/${id}?chain=${chain}`, {
       headers: {
         'Accept': 'image/png',
       },

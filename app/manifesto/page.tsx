@@ -286,7 +286,7 @@ export default function ManifestoPage() {
               <p className="mf-p">
                 The platform takes <span className="mf-data">3%</span> of the
                 losing pool and the market&apos;s creator takes{' '}
-                <span className="mf-data">0.5%</span>. A winner keeps 97% of their
+                <span className="mf-data">0.5%</span>. A winner keeps 96.5% of their
                 winnings, against 5% of winnings at Betfair and a takeout of 15 to
                 20 per cent at a traditional tote.
               </p>
@@ -355,9 +355,9 @@ export default function ManifestoPage() {
                 </li>
                 <li className="mf-step">
                   <p className="mf-step-text">
-                    Your weight is set from the clock at that moment and{' '}
-                    <strong>never recalculated</strong>, on a read, a settlement or
-                    a claim.
+                    Your weight is set from the clock at that moment. It is
+                    never recalculated, not on a read, not on a settlement and not
+                    on a claim.
                   </p>
                 </li>
                 <li className="mf-step">

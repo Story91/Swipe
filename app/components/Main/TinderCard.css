@@ -2735,282 +2735,259 @@ html, body {
   }
 }
 
-/* Share Prompt Styles - New Dark Theme */
+/* The stake flow's success screen. House language: opaque ink face on the
+   black scrim, 2px lime border, square corners, tokens from app/styles/
+   tokens.css. The success mark is a lime tile, not a circle; the glow,
+   the gradients and 'Source Code Pro' all left with the restyle. */
 .share-prompt-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(12px);
+  background: rgba(0, 0, 0, 0.8);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 10000;
-  animation: fadeIn 0.3s ease-out;
   padding: 20px;
 }
 
 .share-prompt-content-new {
-  background: linear-gradient(145deg, #1a1a1a 0%, #0d0d0d 100%);
-  border: 1px solid rgba(212, 255, 0, 0.3);
-  border-radius: 24px;
-  padding: 28px 24px;
-  max-width: 380px;
-  width: 100%;
-  text-align: center;
-  box-shadow: 
-    0 0 40px rgba(212, 255, 0, 0.15),
-    0 20px 60px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  animation: slideUp 0.4s ease-out;
   position: relative;
+  width: 100%;
+  max-width: 380px;
+  padding: 20px;
+  text-align: center;
+  color: var(--sheet-paper);
+  background: #0d0d0d;
+  border: 2px solid var(--sheet-lime);
+  border-radius: 0;
+  box-shadow: none;
+  /* Start state lives inside the keyframe on purpose: an animation delivers
+     its 'from' even when a reduced-motion block later cancels it, while a
+     pre-set opacity: 0 on the element would leave the card invisible. */
+  animation: sharePromptRise 460ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@keyframes sharePromptRise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .share-close-btn {
   position: absolute;
-  top: 16px;
-  right: 16px;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #888;
-  font-size: 14px;
+  top: 12px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  border-radius: 0;
+  background: transparent;
+  border: 1px solid var(--sheet-rule-strong);
+  color: var(--sheet-paper-2);
+  font-size: 12px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: color 140ms ease, border-color 140ms ease;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .share-close-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  color: #fff;
+  background: transparent;
+  border-color: var(--sheet-lime-line);
+  color: var(--sheet-lime);
 }
 
 .share-logos {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 10px;
+  margin-bottom: 16px;
 }
 
 .share-logo {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 0;
   object-fit: contain;
 }
 
 .share-logo-divider {
-  color: rgba(212, 255, 0, 0.5);
-  font-size: 20px;
-  font-weight: 300;
+  color: var(--sheet-paper-3);
+  font-size: 14px;
+  font-weight: 400;
 }
 
 .share-success-icon {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .share-success-circle {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #d4ff00 0%, #a8cc00 100%);
+  width: 48px;
+  height: 48px;
+  border-radius: 0;
+  background: var(--sheet-lime);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 30px rgba(212, 255, 0, 0.4);
-  animation: pulseSuccess 2s ease-in-out infinite;
+  box-shadow: none;
 }
 
+/* Text on the lime tile. The fallback is load-bearing: an undefined custom
+   property invalidates the declaration and the check would inherit white. */
 .share-success-circle span {
-  font-size: 32px;
-  color: #000;
-  font-weight: bold;
-}
-
-@keyframes pulseSuccess {
-  0%, 100% {
-    box-shadow: 0 0 20px rgba(212, 255, 0, 0.4);
-  }
-  50% {
-    box-shadow: 0 0 40px rgba(212, 255, 0, 0.6);
-  }
+  font-size: 24px;
+  color: var(--sheet-ink-0, #0d0d0d);
+  font-weight: 700;
 }
 
 .share-title {
-  font-family: 'Orbitron', sans-serif;
+  font-family: var(--sheet-display);
   font-weight: 700;
-  font-size: 24px;
-  color: #fff;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sheet-lime);
   margin: 0 0 6px 0;
 }
 
 .share-subtitle {
-  font-family: 'Source Code Pro', monospace;
-  font-size: 14px;
-  color: #888;
-  margin: 0 0 20px 0;
+  font-family: var(--sheet-body);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sheet-paper-2);
+  margin: 0 0 14px 0;
 }
 
 .share-bet-details {
-  background: rgba(212, 255, 0, 0.08);
-  border: 1px solid rgba(212, 255, 0, 0.2);
-  border-radius: 16px;
-  padding: 16px;
-  margin-bottom: 16px;
+  background: var(--sheet-surface);
+  border: 1px solid var(--sheet-rule);
+  border-radius: 0;
+  padding: 12px;
+  margin-bottom: 14px;
+  text-align: left;
 }
 
 .share-bet-question {
-  font-family: 'Source Code Pro', monospace;
-  font-size: 14px;
-  color: #fff;
+  font-family: var(--sheet-body);
+  font-size: 13px;
+  color: var(--sheet-paper);
   line-height: 1.5;
-  margin-bottom: 12px;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
+  margin-bottom: 10px;
+  overflow-wrap: anywhere;
 }
 
 .share-bet-amount {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: center;
   gap: 8px;
 }
 
 .share-bet-label {
-  font-family: 'Source Code Pro', monospace;
+  font-family: var(--sheet-body);
   font-size: 12px;
-  color: #666;
+  color: var(--sheet-paper-3);
 }
 
 .share-bet-value {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 16px;
+  font-family: var(--sheet-data);
+  font-size: 15px;
   font-weight: 700;
-  color: #d4ff00;
+  font-variant-numeric: tabular-nums;
+  color: var(--sheet-lime);
 }
 
 .share-description {
-  font-family: 'Source Code Pro', monospace;
-  font-size: 13px;
-  color: #888;
-  margin: 0 0 20px 0;
-  line-height: 1.4;
+  font-family: var(--sheet-body);
+  font-size: 12px;
+  color: var(--sheet-paper-3);
+  margin: 0 0 16px 0;
+  line-height: 1.5;
 }
 
 .share-main-btn {
   width: 100%;
-  padding: 16px 24px;
+  padding: 11px 12px;
   border: none;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #d4ff00 0%, #a8cc00 100%);
-  font-family: 'Orbitron', sans-serif;
+  border-radius: 0;
+  background: var(--sheet-lime);
+  font-family: var(--sheet-display);
   font-weight: 700;
-  font-size: 15px;
-  color: #000;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sheet-ink-0, #0d0d0d);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: filter 140ms ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  box-shadow: 0 4px 20px rgba(212, 255, 0, 0.3);
+  gap: 8px;
+  box-shadow: none;
 }
 
 .share-main-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(212, 255, 0, 0.5);
+  transform: none;
+  filter: brightness(1.12);
+  box-shadow: none;
 }
 
 .share-main-btn:active {
-  transform: translateY(0);
+  transform: none;
 }
 
 .share-icon {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
 }
 
 .share-skip-link {
   background: none;
   border: none;
-  font-family: 'Source Code Pro', monospace;
-  font-size: 13px;
-  color: #666;
+  font-family: var(--sheet-body);
+  font-size: 12px;
+  color: var(--sheet-paper-3);
   cursor: pointer;
-  margin-top: 16px;
-  padding: 8px 16px;
-  transition: color 0.2s ease;
+  margin-top: 10px;
+  padding: 6px 12px;
+  transition: color 140ms ease;
 }
 
 .share-skip-link:hover {
-  color: #999;
+  color: var(--sheet-paper-2);
 }
 
-/* Legacy styles - keep for backward compatibility */
-.share-prompt-content {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.9) 100%);
-  backdrop-filter: blur(20px);
-  border-radius: 24px;
-  padding: 32px;
-  max-width: 400px;
-  width: 90%;
-  text-align: center;
-  box-shadow: 
-    0 20px 40px rgba(0, 0, 0, 0.1),
-    0 0 0 1px rgba(255, 255, 255, 0.2);
-  animation: slideUp 0.4s ease-out;
+.share-close-btn:focus-visible,
+.share-main-btn:focus-visible,
+.share-skip-link:focus-visible {
+  outline: 2px solid var(--sheet-lime);
+  outline-offset: 2px;
 }
 
-.share-prompt-header {
-  margin-bottom: 24px;
+@media (prefers-reduced-motion: reduce) {
+  .share-prompt-content-new {
+    animation: none;
+  }
+
+  .share-close-btn,
+  .share-main-btn,
+  .share-skip-link {
+    transition: none;
+  }
 }
 
-.share-prompt-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-  animation: bounce 0.6s ease-out;
-}
-
-.share-prompt-header h3 {
-  font-family: 'Orbitron', sans-serif;
-  font-weight: 700;
-  font-size: 24px;
-  color: #1a1a1a;
-  margin: 0 0 8px 0;
-}
-
-.share-prompt-header p {
-  font-family: 'Source Code Pro', monospace;
-  font-size: 14px;
-  color: #666;
-  margin: 0;
-}
-
-.share-prompt-body {
-  margin-bottom: 24px;
-}
-
-.share-prompt-body p {
-  font-family: 'Source Code Pro', monospace;
-  font-size: 16px;
-  color: #333;
-  line-height: 1.5;
-  margin: 0;
-}
-
-.share-prompt-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
+/* The white-glass .share-prompt-content block that used to sit here matched
+   no markup anywhere (grepped app/ and components/) and is gone. The
+   .share-btn family below stays: SharePredictionButton.tsx still renders it. */
 .share-btn {
   padding: 16px 24px;
   border: none;
@@ -3072,17 +3049,6 @@ html, body {
   box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4);
 }
 
-.share-skip {
-  background: linear-gradient(135deg, #9E9E9E 0%, #757575 100%);
-  color: white;
-  box-shadow: 0 4px 15px rgba(158, 158, 158, 0.3);
-}
-
-.share-skip:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(158, 158, 158, 0.4);
-}
-
 .share-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -3122,21 +3088,8 @@ html, body {
   }
 }
 
-/* Mobile responsiveness for share prompt */
+/* Mobile responsiveness for the share buttons */
 @media (max-width: 768px) {
-  .share-prompt-content {
-    padding: 24px;
-    max-width: 350px;
-  }
-  
-  .share-prompt-icon {
-    font-size: 40px;
-  }
-  
-  .share-prompt-header h3 {
-    font-size: 20px;
-  }
-  
   .share-btn {
     padding: 14px 20px;
     font-size: 13px;
@@ -3152,9 +3105,618 @@ html, body {
   opacity: 0.8;
 }
 
-/* Professional Stake Dialog Styles */
-.stake-dialog {
-  animation: dialogSlideIn 0.3s ease-out;
+/* The stake dialog, in the house language of CreatePredictionModal.css:
+   opaque #0d0d0d face on the lime ground, 2px lime border, square corners,
+   tokens from app/styles/tokens.css, nothing under 12px.
+
+   This dialog is the money path. The markup in TinderCard.tsx kept every
+   node and every handler; only classNames changed, so everything visual is
+   decided here. Selectors are element-qualified (div.stake-dialog,
+   button.swipe-stake__btn) because the Radix wrapper and the shadcn
+   components paint their own utilities (bg-background, rounded-md, h-9) and
+   the skin must win on specificity, not on stylesheet order. */
+
+div.stake-dialog {
+  display: block;
+  width: calc(100vw - 32px);
+  max-width: 500px;
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  padding: 0;
+  color: var(--sheet-paper);
+  background: #0d0d0d;
+  border: 2px solid var(--sheet-lime);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* The wrapper's built-in X. data-state utilities on it are class+attribute
+   (0,2,0), so the override carries the attribute too. */
+div.stake-dialog > button,
+div.stake-dialog > button[data-state] {
+  color: var(--sheet-paper-2);
+  background: transparent;
+  border-radius: 0;
+  opacity: 1;
+  transition: color 140ms ease;
+}
+
+div.stake-dialog > button:hover {
+  color: var(--sheet-lime);
+  opacity: 1;
+}
+
+div.stake-dialog > button:focus {
+  box-shadow: none;
+  outline: 2px solid var(--sheet-lime);
+  outline-offset: 2px;
+}
+
+/* Ornament from the neon design: kept in the markup so no sibling moves,
+   retired here. */
+.swipe-stake__gone {
+  display: none;
+}
+
+/* Header */
+.swipe-stake__head {
+  border: 0;
+}
+
+div.swipe-stake__headrow {
+  display: block;
+  padding: 16px 44px 14px 20px;
+  text-align: left;
+}
+
+.swipe-stake__topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.swipe-stake__idblock {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.swipe-stake__iconwrap {
+  flex: 0 0 auto;
+}
+
+.swipe-stake__icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  background: var(--sheet-surface);
+  border: 1px solid var(--sheet-rule-strong);
+  border-radius: 0;
+}
+
+.swipe-stake__icon--yes {
+  color: var(--sheet-lime);
+}
+
+.swipe-stake__icon--no {
+  color: var(--sheet-loss);
+}
+
+.swipe-stake__icon-mark {
+  width: 16px;
+  height: 16px;
+}
+
+.swipe-stake__titles {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+h2.swipe-stake__title {
+  margin: 0;
+  font-family: var(--sheet-display);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sheet-lime);
+}
+
+/* The side, as a statement: text and a 2px left border, never a slab. */
+p.swipe-stake__side {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--sheet-lime-line);
+  font-family: var(--sheet-body);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--sheet-paper-2);
+}
+
+p.swipe-stake__side--no {
+  border-left-color: var(--sheet-loss);
+}
+
+.swipe-stake__side-ico {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+}
+
+.swipe-stake__side-word {
+  font-family: var(--sheet-display);
+  font-weight: 700;
+}
+
+.swipe-stake__side--yes .swipe-stake__side-ico,
+.swipe-stake__side--yes .swipe-stake__side-word {
+  color: var(--sheet-lime);
+}
+
+.swipe-stake__side--no .swipe-stake__side-ico,
+.swipe-stake__side--no .swipe-stake__side-word {
+  color: var(--sheet-loss);
+}
+
+/* BULLISH/BEARISH keeps its words and loses its neon. */
+div.swipe-stake__flag {
+  position: static;
+  flex: 0 0 auto;
+  overflow: visible;
+  padding: 3px 8px;
+  font-family: var(--sheet-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--sheet-paper-2);
+  background: transparent;
+  border: 1px solid var(--sheet-rule-strong);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+div.swipe-stake__flag--yes {
+  color: var(--sheet-lime);
+}
+
+div.swipe-stake__flag--no {
+  color: var(--sheet-loss);
+}
+
+div.swipe-stake__rule {
+  height: 1px;
+  background: var(--sheet-rule);
+}
+
+/* Body */
+.swipe-stake__body {
+  padding: 16px 20px 0;
+}
+
+div.swipe-stake__panel {
+  color: inherit;
+  background: var(--sheet-surface);
+  border: 1px solid var(--sheet-rule);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+div.swipe-stake__panel-in {
+  padding: 14px;
+}
+
+.swipe-stake__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.swipe-stake__labelrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.swipe-stake__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--sheet-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sheet-paper-2);
+}
+
+.swipe-stake__label-ico {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.swipe-stake__bal {
+  font-family: var(--sheet-data);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--sheet-paper-3);
+}
+
+.swipe-stake__quick {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+button.swipe-stake__chip {
+  height: auto;
+  padding: 8px 4px;
+  font-family: var(--sheet-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--sheet-paper-2);
+  background: transparent;
+  border: 1px solid var(--sheet-rule-strong);
+  border-radius: 0;
+  box-shadow: none;
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+button.swipe-stake__chip:hover {
+  color: var(--sheet-lime);
+  background: transparent;
+  border-color: var(--sheet-lime-line);
+  transform: none;
+}
+
+/* The one hero figure in the dialog: 17px data, on its own surface. */
+input.swipe-stake__input {
+  width: 100%;
+  height: 44px;
+  padding: 9px 10px;
+  font-family: var(--sheet-data);
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: var(--sheet-paper);
+  background: var(--sheet-surface);
+  border: 1px solid var(--sheet-rule-strong);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+input.swipe-stake__input::placeholder {
+  color: var(--sheet-paper-3);
+}
+
+input.swipe-stake__input:focus {
+  border-color: var(--sheet-lime);
+  outline: 2px solid var(--sheet-lime);
+  outline-offset: -2px;
+  box-shadow: none;
+}
+
+/* A sentence, not a banner: minimum bet, and the wrong-network warning. */
+.swipe-stake__note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 10px;
+  border-left: 2px solid var(--sheet-lime-line);
+  font-family: var(--sheet-body);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--sheet-paper-3);
+}
+
+.swipe-stake__note-ico {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+}
+
+.swipe-stake__note--warn {
+  border-left-color: var(--sheet-warn);
+  color: var(--sheet-paper-2);
+}
+
+.swipe-stake__note--warn .swipe-stake__note-ico {
+  color: var(--sheet-warn);
+}
+
+/* The earnings ledger */
+div.swipe-stake__ledger {
+  margin-top: 12px;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--sheet-rule);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+div.swipe-stake__ledger-in {
+  padding: 12px;
+}
+
+.swipe-stake__ledgerhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.swipe-stake__ledgertitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--sheet-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sheet-lime);
+}
+
+.swipe-stake__ledger-ico {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+div.swipe-stake__est {
+  padding: 2px 6px;
+  font-family: var(--sheet-data);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--sheet-paper-3);
+  background: transparent;
+  border: 1px solid var(--sheet-rule-strong);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+tr.swipe-stake__tr {
+  border-top: 1px solid var(--sheet-rule);
+  border-bottom: 0;
+  background: transparent;
+}
+
+tr.swipe-stake__tr:first-child {
+  border-top: 0;
+}
+
+tr.swipe-stake__tr:hover {
+  background: transparent;
+}
+
+td.swipe-stake__td {
+  padding: 6px 0;
+}
+
+td.swipe-stake__td--key {
+  font-family: var(--sheet-body);
+  font-size: 12px;
+  color: var(--sheet-paper-2);
+}
+
+td.swipe-stake__td--val {
+  text-align: right;
+}
+
+.swipe-stake__keywrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swipe-stake__key-ico {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  color: var(--sheet-paper-3);
+}
+
+.swipe-stake__val {
+  font-family: var(--sheet-data);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--sheet-paper);
+  overflow-wrap: anywhere;
+}
+
+.swipe-stake__val--lime {
+  color: var(--sheet-lime);
+}
+
+.swipe-stake__sub {
+  margin-top: 2px;
+  font-family: var(--sheet-data);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--sheet-paper-3);
+}
+
+/* Share of pool: a 2px lime meter on an opaque trough. */
+div.swipe-stake__meter {
+  position: relative;
+  width: 100%;
+  height: 2px;
+  margin-top: 4px;
+  overflow: hidden;
+  background: var(--sheet-ink-4);
+  border-radius: 0;
+}
+
+div.swipe-stake__meter > * {
+  background: var(--sheet-lime);
+  border-radius: 0;
+}
+
+.swipe-stake__empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 0;
+  font-family: var(--sheet-body);
+  font-size: 12px;
+  color: var(--sheet-paper-3);
+}
+
+.swipe-stake__empty .swipe-stake__note-ico {
+  color: var(--sheet-lime);
+}
+
+.swipe-stake__caveat {
+  margin: 10px 0 0;
+  font-family: var(--sheet-body);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--sheet-paper-3);
+}
+
+/* Footer. The primary is the loud one; Cancel stays quiet. */
+div.swipe-stake__foot {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 16px 20px 20px;
+  border-top: 1px solid var(--sheet-rule);
+  background: transparent;
+}
+
+button.swipe-stake__btn {
+  flex: 1 1 50%;
+  height: auto;
+  padding: 11px 12px;
+  font-family: var(--sheet-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 0;
+  box-shadow: none;
+  cursor: pointer;
+  transform: none;
+  transition: filter 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+
+button.swipe-stake__btn--quiet {
+  color: var(--sheet-paper-2);
+  background: transparent;
+  border: 1px solid var(--sheet-rule-strong);
+}
+
+button.swipe-stake__btn--quiet:hover:not(:disabled) {
+  color: var(--sheet-lime);
+  background: transparent;
+  border-color: var(--sheet-lime-line);
+}
+
+/* Text on the lime. The fallback is load-bearing: an undefined custom
+   property invalidates the declaration and the label would inherit white. */
+button.swipe-stake__btn--go {
+  color: var(--sheet-ink-0, #0d0d0d);
+  background: var(--sheet-lime);
+  border: none;
+}
+
+button.swipe-stake__btn--go:hover:not(:disabled) {
+  color: var(--sheet-ink-0, #0d0d0d);
+  background: var(--sheet-lime);
+  filter: brightness(1.12);
+}
+
+/* Disabled is quiet and washed out. Pending is not disabled-looking: the
+   --busy class below keeps the lime fill while the wallet works. */
+button.swipe-stake__btn:disabled {
+  color: var(--sheet-paper-3);
+  background: transparent;
+  border: 1px solid var(--sheet-rule-strong);
+  opacity: 1;
+  cursor: default;
+  filter: none;
+}
+
+button.swipe-stake__btn--busy:disabled {
+  color: var(--sheet-ink-0, #0d0d0d);
+  background: var(--sheet-lime);
+  border: none;
+}
+
+.swipe-stake__btnrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.swipe-stake__btnrow span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.swipe-stake__btn-ico {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.swipe-stake__spin {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: swipeStakeSpin 800ms linear infinite;
+}
+
+@keyframes swipeStakeSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+button.swipe-stake__btn:focus-visible,
+button.swipe-stake__chip:focus-visible {
+  box-shadow: none;
+  outline: 2px solid var(--sheet-lime);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  div.stake-dialog[data-state] {
+    animation: none;
+  }
+
+  button.swipe-stake__btn,
+  button.swipe-stake__chip,
+  div.stake-dialog > button,
+  div.stake-dialog > button[data-state] {
+    transition: none;
+  }
+
+  /* A stopped three-quarter ring reads as broken; the Processing label
+     carries the state on its own. */
+  .swipe-stake__spin {
+    display: none;
+  }
 }
 
 /* Hide number input spinners */
@@ -3177,114 +3739,9 @@ input[type="text"][inputmode="decimal"]::-webkit-outer-spin-button {
   margin: 0;
 }
 
-/* Range Slider Styles for ETH */
-.slider-eth::-webkit-slider-thumb {
-  appearance: none;
-  -webkit-appearance: none;
-  height: 24px;
-  width: 24px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  cursor: pointer;
-  border: 3px solid #fff;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-  transition: all 0.2s ease;
-}
-
-.slider-eth::-webkit-slider-thumb:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5);
-}
-
-.slider-eth::-moz-range-thumb {
-  height: 24px;
-  width: 24px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  cursor: pointer;
-  border: 3px solid #fff;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-}
-
-/* Range Slider Styles for SWIPE */
-.slider-swipe::-webkit-slider-thumb {
-  appearance: none;
-  -webkit-appearance: none;
-  height: 24px;
-  width: 24px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #d4ff00 0%, #a8cc00 100%);
-  cursor: pointer;
-  border: 3px solid #000;
-  box-shadow: 0 4px 12px rgba(212, 255, 0, 0.4);
-  transition: all 0.2s ease;
-}
-
-.slider-swipe::-webkit-slider-thumb:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 16px rgba(212, 255, 0, 0.5);
-}
-
-.slider-swipe::-moz-range-thumb {
-  height: 24px;
-  width: 24px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #d4ff00 0%, #a8cc00 100%);
-  cursor: pointer;
-  border: 3px solid #000;
-  box-shadow: 0 4px 12px rgba(212, 255, 0, 0.4);
-}
-
-@keyframes dialogSlideIn {
-  from {
-    opacity: 0;
-    transform: translate(-50%, -48%) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-  }
-}
-
-.stake-dialog [data-radix-dialog-overlay] {
-  backdrop-filter: blur(8px);
-}
-
-/* Tab animations */
-.stake-dialog [role="tabpanel"] {
-  animation: tabFadeIn 0.2s ease-out;
-}
-
-@keyframes tabFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Quick amount button hover effects */
-.stake-dialog button[variant="outline"]:hover {
-  transform: translateY(-1px);
-}
-
-/* Input glow effect */
-.stake-dialog input:focus {
-  box-shadow: 0 0 0 3px rgba(212, 255, 0, 0.1);
-}
-
-/* Card hover effect */
-.stake-dialog .bg-zinc-800\/30:hover {
-  background: rgba(39, 39, 42, 0.4);
-}
-
-/* Table row hover */
-.stake-dialog tr:hover td {
-  background: rgba(39, 39, 42, 0.3);
-}
+/* The .slider-eth/.slider-swipe thumbs and the .stake-dialog glow, blur and
+   hover-transform rules that used to sit here dressed the removed token
+   selector and the neon dialog. No TSX references them any more. */
 
 .stat-value-badge .usd-equivalent {
   display: block;

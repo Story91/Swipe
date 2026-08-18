@@ -11,6 +11,36 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  /**
+   * /usdc-markets/prediction/:id was never a route.
+   *
+   * The directory holds a layout.tsx and no page.tsx, and Next does not route a
+   * segment without a page, so the path 404s. It is absent from
+   * .next/routes-manifest.json, which is how this was confirmed rather than
+   * reasoned about. Every share sent from the markets grid pointed at it, so
+   * every one of those links was dead, including the ones already posted.
+   *
+   * There is one market page and it is /prediction/:id. This makes the links
+   * that are already out there resolve to it. Permanent, because the old path
+   * is not coming back.
+   */
+  async redirects() {
+    return [
+      {
+        source: '/usdc-markets/prediction/:id',
+        destination: '/prediction/:id',
+        permanent: true,
+      },
+      // The standalone /usdc-markets page was retired when the USDC markets
+      // dashboard merged into the markets grid. Anyone holding the old URL
+      // lands on the app, where the grid is the markets surface.
+      {
+        source: '/usdc-markets',
+        destination: '/',
+        permanent: true,
+      },
+    ];
+  },
   // Silence warnings
   // https://github.com/WalletConnect/walletconnect-monorepo/issues/1908
   webpack: (config) => {

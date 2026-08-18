@@ -349,6 +349,162 @@
   outline-offset: 3px;
 }
 
+/* -------------------------------------------------------------- bet panel */
+
+/* Desktop only by construction: the page mounts it only above the 1024px
+   line, where the rail exists. Same opaque face as every other panel. */
+.mdet-bet {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mdet-bet__sides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.mdet-bet__side {
+  padding: 12px;
+  font-family: var(--sheet-display);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: var(--shell-radius);
+  cursor: pointer;
+  transition: border-color 140ms ease;
+}
+
+.mdet-bet__side--yes {
+  color: #34d399;
+  background: #0e1a14;
+  border: 1px solid #1d3d2e;
+}
+
+.mdet-bet__side--yes.is-picked {
+  border-color: #34d399;
+  outline: 1px solid #34d399;
+}
+
+.mdet-bet__side--no {
+  color: #f87171;
+  background: #1a0f0f;
+  border: 1px solid #3d1f1f;
+}
+
+.mdet-bet__side--no.is-picked {
+  border-color: #f87171;
+  outline: 1px solid #f87171;
+}
+
+.mdet-bet__side:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.mdet-bet__presets {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.mdet-bet__preset {
+  padding: 6px 12px;
+  font-family: var(--sheet-data);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sheet-ink-text-2);
+  background: var(--sheet-ink-3);
+  border: 1px solid var(--sheet-ink-line);
+  border-radius: var(--shell-radius);
+  cursor: pointer;
+}
+
+.mdet-bet__preset.is-picked {
+  color: #000;
+  background: var(--sheet-lime);
+  border-color: var(--sheet-lime);
+}
+
+.mdet-bet__preset:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.mdet-bet__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mdet-bet__field span {
+  font-family: var(--sheet-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sheet-ink-text-3);
+}
+
+.mdet-bet__field input {
+  width: 100%;
+  padding: 10px 12px;
+  font-family: var(--sheet-data);
+  font-size: 15px;
+  color: var(--sheet-ink-text);
+  background: var(--sheet-ink-3);
+  border: 1px solid var(--sheet-ink-line);
+  border-radius: var(--shell-radius);
+}
+
+.mdet-bet__field input:focus-visible {
+  outline: 2px solid var(--sheet-lime);
+  outline-offset: 1px;
+}
+
+.mdet-bet__facts {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.mdet-bet__facts div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mdet-bet__facts dt {
+  font-size: 12px;
+  color: var(--sheet-ink-text-3);
+}
+
+.mdet-bet__facts dd {
+  margin: 0;
+  font-family: var(--sheet-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sheet-ink-text);
+}
+
+.mdet-bet__note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--sheet-ink-text-3);
+}
+
+.mdet-bet__error {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #ff8a8a;
+}
+
 .mdet-notice {
   border-color: var(--sheet-warn);
 }
@@ -401,6 +557,21 @@
   font-size: 12px;
   color: var(--sheet-ink-text-3);
   text-align: center;
+}
+
+/* The contract this market's money sits in, on this chain's own explorer.
+   Moved here from the retired USDC markets header. Same quiet line as the
+   id it follows; underlined because it is the one part of it that goes
+   somewhere. */
+.mdet__contract {
+  color: var(--sheet-ink-text-2);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.mdet__contract:hover,
+.mdet__contract:focus-visible {
+  color: var(--sheet-lime);
 }
 
 /* ---------------------------------------------------------------- states */

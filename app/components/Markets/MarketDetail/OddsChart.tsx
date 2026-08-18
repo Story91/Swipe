@@ -11,9 +11,10 @@ import type { PricePoint } from './marketDetail';
  * takes props and holds no state.
  *
  * It is a copy of that screen's expanded view rather than an import, and that
- * was the call: MarketCard in SwipeMarkets.tsx is 485 unexported lines that mix
+ * was the call: MarketCard in SwipeMarkets.tsx (retired since) was 485
+ * unexported lines that mixed
  * the collapsed tile, the expanded detail, a contract read and an early-exit
- * path, so importing it means editing the screen the app is happiest with in
+ * path, so importing it meant editing the screen the app was happiest with in
  * order to widen a different page. The chart itself is fifty lines of recharts.
  *
  * The stylesheet is not copied. Every class on that screen is drawn for a white

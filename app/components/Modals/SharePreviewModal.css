@@ -1,380 +1,657 @@
-/* ============================================
-   SHARE MODAL - Dark Theme with Neon Accents
-   Similar to Claim Modal
-============================================ */
+/* The share sheet.
+ *
+ * Replaces the two-button dark card this modal used to be. Nothing from that
+ * survives, so the old `.share-modal-*` rules are gone rather than orphaned:
+ * they were defined here and used in one component, and both were rewritten
+ * together.
+ *
+ * Colours, type and hairlines are --sheet-* tokens from app/styles/tokens.css.
+ * The one literal is #0d0d0d on the sheet face, which matches SwipeTokenCard,
+ * HowToPlayModal, MarketChooserModal and WalletPicker: the app's ground is
+ * lime, and a translucent panel puts that behind body text and makes it
+ * unreadable. Radius is 0 everywhere, matching the rest of the house.
+ *
+ * Selectors are element-qualified where they override a Radix class, so the
+ * override wins on specificity rather than on stylesheet order.
+ *
+ * SHAPE. Mobile first: a bottom sheet, full width, capped at 92% of the visible
+ * viewport, with the destinations and the preview in the one scroller and the
+ * send button pinned under them. From 560px it becomes a centred card. Nothing
+ * in here can push the sheet sideways: the only element wider than its box is
+ * the marquee track, and its parent clips.
+ *
+ * MOTION, all six devices from app/components/Market/SwipeTokenCard.css:
+ * rise on the sections, sweep on the hero's top edge, scroll on the marquee,
+ * ants on the wire between the destinations and the preview while a card is
+ * being redrawn, pulse on the chosen tile and the live dot, breathe on the
+ * empty card frame. Every one is switched off in the reduce block at the
+ * bottom, which is also where the fill-mode trap lives: `animation: none` drops
+ * the keyframe entirely, so an element whose start state lives inside a
+ * keyframe renders at its natural value rather than staying blank. That is why
+ * the rise and sheet keyframes carry their own start state and the rules do
+ * not.
+ */
 
-.share-modal-overlay {
+.shr-scrim {
   position: fixed;
-  top: 0;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.82);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: shr-fade 220ms ease-out both;
+}
+
+@keyframes shr-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+div.shr {
+  position: fixed;
+  z-index: 10001;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(8px);
   display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10000;
-  padding: 20px;
-}
-
-.share-modal-content {
-  background: var(--sheet-surface);
-  border: 1px solid rgba(212, 255, 0, 0.3);
-  border-radius: 0;
-  padding: 28px;
-  max-width: 380px;
+  flex-direction: column;
   width: 100%;
-  text-align: center;
-  position: relative;
+  max-height: 92vh;
+  max-height: 92dvh;
+  overflow: hidden;
+  color: var(--sheet-paper);
+  background: #0d0d0d;
+  border: none;
+  border-top: 2px solid var(--sheet-lime);
+  border-radius: 0;
   box-shadow: none;
-  animation: shareModalSlideIn 0.3s ease-out;
+  animation: shr-sheet 320ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
-@keyframes shareModalSlideIn {
+@keyframes shr-sheet {
   from {
     opacity: 0;
-    transform: scale(0.9) translateY(20px);
+    transform: translateY(26px);
   }
   to {
     opacity: 1;
-    transform: scale(1) translateY(0);
+    transform: translateY(0);
   }
 }
 
-/* Close button */
-.share-modal-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 28px;
-  height: 28px;
-  border-radius: 0;
-  background: var(--sheet-rule);
-  border: none;
-  color: #888;
-  font-size: 14px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-}
-
-.share-modal-close:hover {
+/* The grab handle. Phone only, and decorative: the sheet is dismissed with the
+   close button, escape, or the scrim, not by dragging this. */
+.shr__grip {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 3px;
+  margin: 8px auto 0;
   background: var(--sheet-rule-strong);
-  color: #fff;
 }
 
-/* Title */
-.share-modal-title {
-  margin: 12px 0 8px 0;
-  color: var(--sheet-lime);
-  font-size: 22px;
+/* ------------------------------------------------------------------- hero */
+
+.shr__hero {
+  position: relative;
+  flex: 0 0 auto;
+  overflow: hidden;
+  /* The right side clears the close button in the corner. */
+  padding: 14px 52px 13px 16px;
+  border-bottom: 1px solid var(--sheet-lime-line);
+}
+
+/* A light sweeping the top edge. Clipped by the hero, so it cannot add scroll. */
+.shr__beam {
+  position: absolute;
+  top: 0;
+  left: -40%;
+  width: 40%;
+  height: 2px;
+  opacity: 0;
+  background: linear-gradient(90deg, transparent, var(--sheet-lime), transparent);
+  animation: shr-sweep 3600ms ease-in-out infinite;
+}
+
+@keyframes shr-sweep {
+  0%   { transform: translateX(0);    opacity: 0; }
+  12%  { opacity: 1; }
+  88%  { opacity: 1; }
+  100% { transform: translateX(350%); opacity: 0; }
+}
+
+.shr__eyebrow {
+  display: block;
   font-family: var(--sheet-display);
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sheet-lime);
 }
 
-/* Question */
-.share-modal-question {
-  margin: 0 0 16px 0;
-  font-size: 13px;
+h2.shr__headline {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  margin: 8px 0 0;
+  font-family: var(--sheet-display);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  text-transform: none;
   color: var(--sheet-paper);
+  overflow-wrap: anywhere;
+}
+
+p.shr__standfirst {
+  margin: 8px 0 0;
   font-family: var(--sheet-body);
-  line-height: 1.4;
-  font-style: italic;
-}
-
-/* Stake info */
-.share-modal-stake {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border-radius: 0;
-  margin-bottom: 20px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.share-modal-stake-yes {
-  background: var(--sheet-surface);
-  border: 1px solid rgba(34, 197, 94, 0.4);
-}
-
-.share-modal-stake-no {
-  background: var(--sheet-surface);
-  border: 1px solid rgba(239, 68, 68, 0.4);
-}
-
-.share-modal-stake-label {
+  font-size: 12px;
+  line-height: 1.55;
   color: var(--sheet-paper-2);
 }
 
-.share-modal-stake-value {
-  color: #fff;
-  font-weight: 700;
-}
-
-.share-modal-stake-side {
-  padding: 2px 8px;
-  border-radius: 0;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-}
-
-.share-modal-stake-side.yes {
-  background: rgba(34, 197, 94, 0.3);
-  color: #22c55e;
-}
-
-.share-modal-stake-side.no {
-  background: rgba(239, 68, 68, 0.3);
-  color: #ef4444;
-}
-
-/* Loading indicator */
-.share-modal-loading {
+.shr__facts {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px 16px;
-  margin-bottom: 14px;
-  background: rgba(212, 255, 0, 0.1);
-  border: 1px solid rgba(212, 255, 0, 0.3);
-  border-radius: 0;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.shr__chip {
+  padding: 3px 8px;
+  font-family: var(--sheet-data);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  color: var(--sheet-paper-2);
+  background: var(--sheet-surface);
+  border: 1px solid var(--sheet-rule-strong);
+}
+
+.shr__chip--yes {
+  color: var(--sheet-paper);
+  border-color: rgba(34, 197, 94, 0.5);
+}
+
+.shr__chip--no {
+  color: var(--sheet-paper);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+/* ----------------------------------------------------------------- ticker */
+
+.shr__ticker {
+  flex: 0 0 auto;
+  overflow: hidden;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--sheet-rule-strong);
+  /* Alpha stops, not colours: this fades the strip out at both ends so items do
+     not appear to be cut off mid-word. */
+  -webkit-mask-image: linear-gradient(90deg, transparent, rgba(0, 0, 0, 1) 8%, rgba(0, 0, 0, 1) 92%, transparent);
+  mask-image: linear-gradient(90deg, transparent, rgba(0, 0, 0, 1) 8%, rgba(0, 0, 0, 1) 92%, transparent);
+}
+
+.shr__ticker-track {
+  display: flex;
+  width: max-content;
+  animation: shr-scroll 34s linear infinite;
+}
+
+@keyframes shr-scroll {
+  to { transform: translateX(-50%); }
+}
+
+.shr__ticker-item {
+  flex: 0 0 auto;
+  padding: 0 12px;
+  font-family: var(--sheet-data);
+  font-size: 10px;
+  white-space: nowrap;
+  color: var(--sheet-paper-3);
+}
+
+.shr__ticker-item::after {
+  content: '/';
+  margin-left: 12px;
   color: var(--sheet-lime);
-  font-size: 13px;
-  font-family: var(--sheet-body);
 }
 
-.share-modal-loading-icon {
-  width: 16px;
-  height: 16px;
-  animation: spin 1s linear infinite;
+/* ---------------------------------------------------------------- scroller */
+
+.shr__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
-@keyframes spin {
+.shr__scroll > * {
+  animation: shr-rise 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.shr__scroll > *:nth-child(2) { animation-delay: 60ms; }
+.shr__scroll > *:nth-child(3) { animation-delay: 120ms; }
+
+@keyframes shr-rise {
   from {
-    transform: rotate(0deg);
+    opacity: 0;
+    transform: translateY(10px);
   }
   to {
-    transform: rotate(360deg);
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-/* Share buttons */
-.share-modal-buttons {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 14px;
-  justify-content: center;
+.shr__panel {
+  min-width: 0;
+  padding: 14px 16px;
 }
 
-.share-modal-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none !important;
+.shr__panel--accent {
+  background: var(--sheet-wash);
+  border-top: 1px solid var(--sheet-lime-line);
 }
 
-.share-modal-btn {
-  width: 140px;
-  height: 48px;
+.shr__panel-head {
   display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+h3.shr__panel-title,
+.shr__panel-title {
+  margin: 0 0 10px;
+  font-family: var(--sheet-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sheet-lime);
+}
+
+.shr__panel-head .shr__panel-title {
+  margin-bottom: 0;
+}
+
+.shr__count {
+  font-family: var(--sheet-data);
+  font-size: 10.5px;
+  color: var(--sheet-paper-3);
+}
+
+.shr__count--over {
+  color: var(--sheet-loss);
+}
+
+/* ----------------------------------------------------------- destinations */
+
+.shr__targets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+  gap: 6px;
+}
+
+.shr__tile {
+  /* The knockout colour inside the Facebook and Reddit marks. The tile face
+     never changes, in any state, so this always matches what is behind them. */
+  --shr-face: #0d0d0d;
+
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 0;
-  border-radius: 0;
+  min-height: 62px;
+  padding: 9px 4px;
+  color: var(--sheet-paper-2);
+  background: var(--shr-face);
   border: 1px solid var(--sheet-rule-strong);
+  border-radius: 0;
   cursor: pointer;
-  font-family: var(--sheet-body);
-  font-size: 13px;
-  font-weight: 600;
-  transition: all 0.2s ease;
-  position: relative;
-  overflow: hidden;
+  transition: color 140ms ease, border-color 140ms ease;
 }
 
-/* Farcaster + Base split color button */
-.share-modal-btn-farcaster-base {
-  background: transparent;
-  width: 140px;
-  height: 48px;
+.shr__tile:hover {
+  color: var(--sheet-paper);
+  border-color: var(--sheet-paper-3);
 }
 
-.share-btn-split-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  border-radius: 0;
-  overflow: hidden;
-  border: 1px solid var(--sheet-rule-strong);
+.shr__tile--on {
+  color: var(--sheet-lime);
+  border-color: var(--sheet-lime);
+  animation: shr-pulse 900ms ease-out 1;
 }
 
-.share-btn-half-purple {
-  flex: 1;
-  /* Farcaster brand purple #8A63D2 */
-  background: #8A63D2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+@keyframes shr-pulse {
+  0%   { box-shadow: 0 0 0 0 var(--sheet-lime-line); }
+  70%  { box-shadow: 0 0 0 9px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
 }
 
-.share-btn-half-white {
-  flex: 1;
-  background: var(--sheet-surface);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.shr__tile:focus-visible {
+  outline: 2px solid var(--sheet-lime);
+  outline-offset: 2px;
 }
 
-.share-btn-icons {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-}
-
-.share-btn-icon-left {
-  position: absolute;
-  left: 25%;
-  transform: translateX(-50%);
-}
-
-.share-btn-icon-right {
-  position: absolute;
-  right: 25%;
-  transform: translateX(50%);
-}
-
-.share-modal-btn-farcaster-base:hover {
-  transform: translateY(-2px);
-  box-shadow: none;
-}
-
-.share-modal-btn-farcaster-base .share-modal-btn-icon {
+.shr__glyph {
+  flex: 0 0 auto;
   width: 22px;
   height: 22px;
 }
 
-.share-modal-btn-farcaster-base .share-btn-icon-left .share-modal-btn-icon {
-  filter: brightness(1.3);
-}
-
-/* X/Twitter button - just logo */
-.share-modal-btn-twitter {
-  background: var(--sheet-surface);
-  border: 1px solid var(--sheet-rule-strong);
-  color: #fff;
-  width: 140px;
-  height: 48px;
-}
-
-.share-modal-btn-twitter:hover {
-  background: var(--sheet-surface);
-  transform: translateY(-2px);
-  box-shadow: none;
-}
-
-.share-modal-btn-icon {
-  width: 20px;
-  height: 20px;
+.shr__glyph--img {
   object-fit: contain;
 }
 
-.share-modal-btn-icon-x {
-  width: 20px;
-  height: 20px;
+.shr__tile-name {
+  font-family: var(--sheet-body);
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  line-height: 1.2;
+  text-align: center;
 }
 
-/* Copy link button */
-.share-modal-copy {
+/* ------------------------------------------------------------------- wire */
+
+/* The line from the destinations into the preview. Solid when there is nothing
+   to wait for, marching while a card is being redrawn. */
+.shr__wire {
+  height: 1px;
+  margin: 0 16px;
+  background: var(--sheet-lime-line);
+}
+
+.shr__wire--busy {
+  background-color: transparent;
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--sheet-lime) 0 4px,
+    transparent 4px 10px
+  );
+  background-size: 10px 1px;
+  animation: shr-ants 760ms linear infinite;
+}
+
+@keyframes shr-ants {
+  to { background-position-x: 10px; }
+}
+
+/* ---------------------------------------------------------------- preview */
+
+.shr__card {
+  margin: 0 0 11px;
+}
+
+.shr__card-frame {
+  position: relative;
+  aspect-ratio: 1200 / 628;
+  overflow: hidden;
+  background: var(--sheet-surface);
+  border: 1px solid var(--sheet-rule-strong);
+  animation: shr-breathe 2600ms ease-in-out infinite;
+}
+
+/* Once the image is in, the frame stops waiting. */
+.shr__card-frame--on {
+  animation: none;
+  border-color: var(--sheet-lime-line);
+}
+
+/* An image that will not load. The frame stops breathing rather than waiting
+   forever, and the broken image icon does not get to sit in the preview. The
+   caption under it says what happened. */
+.shr__card-frame--blank {
+  animation: none;
+  border-style: dashed;
+  border-color: var(--sheet-rule-strong);
+}
+
+.shr__card-frame--blank .shr__card-img {
+  display: none;
+}
+
+@keyframes shr-breathe {
+  0%, 100% { border-color: var(--sheet-rule); }
+  50%      { border-color: var(--sheet-lime-line); }
+}
+
+.shr__card-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.shr__card-note {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 7px;
+  font-family: var(--sheet-body);
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--sheet-paper-3);
+}
+
+.shr__dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+}
+
+.shr__dot--live {
+  background: var(--sheet-lime);
+  animation: shr-dot 2000ms ease-out infinite;
+}
+
+.shr__dot--wait {
+  background: transparent;
+  border: 1px solid var(--sheet-rule-strong);
+}
+
+@keyframes shr-dot {
+  0%   { box-shadow: 0 0 0 0 var(--sheet-lime-line); }
+  70%  { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.shr__body {
+  margin: 0;
+  padding: 10px 12px;
+  font-family: var(--sheet-body);
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--sheet-paper);
+  background: #0d0d0d;
+  border: 1px solid var(--sheet-rule-strong);
+}
+
+.shr__body--empty {
+  font-style: italic;
+  color: var(--sheet-paper-3);
+}
+
+.shr__link {
+  margin: 7px 0 0;
+  font-family: var(--sheet-data);
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  color: var(--sheet-lime);
+}
+
+.shr__note {
+  margin: 9px 0 0;
+  font-family: var(--sheet-body);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--sheet-paper-3);
+}
+
+/* ----------------------------------------------------------------- footer */
+
+.shr__footer {
+  flex: 0 0 auto;
+  padding: 11px 16px calc(11px + env(safe-area-inset-bottom));
+  background: #0d0d0d;
+  border-top: 1px solid var(--sheet-lime-line);
+}
+
+.shr__status {
+  margin: 0;
+  min-height: 15px;
+  font-family: var(--sheet-body);
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--sheet-lime);
+}
+
+.shr__status:empty {
+  min-height: 0;
+}
+
+.shr__send {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px;
+  font-family: var(--sheet-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0d0d0d;
+  background: var(--sheet-lime);
+  border: 1px solid var(--sheet-lime);
+  border-radius: 0;
+  cursor: pointer;
+  transition: opacity 140ms ease;
+}
+
+.shr__send:hover {
+  opacity: 0.86;
+}
+
+.shr__send:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.shr__send:focus-visible,
+.shr__close:focus-visible {
+  outline: 2px solid var(--sheet-lime);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ close */
+
+.shr__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  width: 100%;
-  padding: 10px 16px;
-  background: var(--sheet-surface);
-  border: 1px solid var(--sheet-rule);
-  border-radius: 0;
-  color: var(--sheet-paper-2);
-  font-family: var(--sheet-body);
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  margin-bottom: 12px;
-}
-
-.share-modal-copy:hover {
-  background: var(--sheet-rule);
-  color: #fff;
-}
-
-.share-modal-copy-icon {
-  width: 14px;
-  height: 14px;
-}
-
-/* Close link */
-.share-modal-close-link {
-  background: none;
-  border: none;
+  width: 30px;
+  height: 30px;
   color: var(--sheet-paper-3);
-  font-family: var(--sheet-body);
-  font-size: 12px;
+  background: var(--sheet-surface);
+  border: 1px solid var(--sheet-rule-strong);
+  border-radius: 0;
   cursor: pointer;
-  padding: 6px 12px;
-  transition: color 0.2s ease;
+  transition: color 140ms ease, border-color 140ms ease;
 }
 
-.share-modal-close-link:hover {
-  color: var(--sheet-paper-2);
+.shr__close:hover {
+  color: var(--sheet-paper);
+  border-color: var(--sheet-paper-3);
 }
 
-/* Mobile responsive */
-@media (max-width: 420px) {
-  .share-modal-content {
-    padding: 24px 20px;
-    max-width: 340px;
+/* Above a phone this stops being a sheet and becomes a card, centred, and no
+   wider than a dialog has any business being. */
+@media (min-width: 560px) {
+  div.shr {
+    top: 50%;
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    width: calc(100vw - 32px);
+    max-width: 460px;
+    max-height: calc(100dvh - 64px);
+    border: 2px solid var(--sheet-lime);
+    /* The centring transform lives inside the keyframe, or the animation would
+       drop it and the card would sit at the bottom right of the middle. */
+    transform: translate(-50%, -50%);
+    animation: shr-card 300ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
   }
 
-  .share-modal-title {
+  @keyframes shr-card {
+    from {
+      opacity: 0;
+      transform: translate(-50%, calc(-50% + 14px));
+    }
+    to {
+      opacity: 1;
+      transform: translate(-50%, -50%);
+    }
+  }
+
+  .shr__grip {
+    display: none;
+  }
+
+  h2.shr__headline {
     font-size: 18px;
   }
 
-  .share-modal-question {
-    font-size: 12px;
+  .shr__hero {
+    padding: 18px 56px 16px 20px;
   }
 
-  .share-modal-btn {
-    padding: 12px 16px;
-    font-size: 12px;
+  .shr__panel {
+    padding: 16px 20px;
   }
 
-  .share-modal-btn-icon {
-    width: 18px;
-    height: 18px;
+  .shr__wire {
+    margin: 0 20px;
   }
-  
-  .share-modal-btn-farcaster-base .share-modal-btn-icon {
-    width: 20px;
-    height: 20px;
+}
+
+/* Everything that moves, stopped. The rise, sheet and card keyframes hold their
+   own start state, so dropping the animation leaves the sheet in place at full
+   opacity rather than offset or invisible. The beam is decorative and stays
+   hidden, the marquee parks on its first items and is still readable, the wire
+   stays a solid line, and the card frame keeps its border. */
+@media (prefers-reduced-motion: reduce) {
+  .shr-scrim,
+  div.shr,
+  .shr__beam,
+  .shr__ticker-track,
+  .shr__scroll > *,
+  .shr__tile--on,
+  .shr__wire--busy,
+  .shr__card-frame,
+  .shr__dot--live {
+    animation: none;
   }
-  
-  .share-modal-btn-icon-x {
-    width: 20px;
-    height: 20px;
+
+  .shr__wire--busy {
+    background-color: var(--sheet-lime);
+    background-image: none;
+  }
+
+  .shr__tile,
+  .shr__close,
+  .shr__send {
+    transition: none;
   }
 }

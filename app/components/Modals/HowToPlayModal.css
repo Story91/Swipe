@@ -1,0 +1,730 @@
+/* How to play.
+ *
+ * Replaces the Stepper skin this modal used to borrow. Nothing from that
+ * survives, so the old rules are gone rather than orphaned.
+ *
+ * Colours, type and hairlines all come from the tokens at :root in
+ * app/styles/tokens.css. The one literal is #0d0d0d on the panel faces, which
+ * matches MarketChooserModal, WalletPicker and SwipeTokenCard: the app's ground
+ * is lime, and a translucent panel puts that behind body text and makes it
+ * unreadable. Radius is 0 everywhere, matching the rest of the house.
+ *
+ * Selectors are element-qualified where they override a Radix utility class, so
+ * the override wins on specificity rather than on whichever stylesheet happens
+ * to load last. DialogContent renders a div, DialogTitle an h2 and
+ * DialogDescription a p, and all three arrive carrying Tailwind classes.
+ *
+ * Mobile first and one column throughout. Nothing here can push the dialog
+ * sideways: the only element wider than its box is the marquee track, and its
+ * parent clips.
+ *
+ * MOTION, and where each device came from. Four are lifted from
+ * app/components/Market/SwipeTokenCard.css because that screen set the house
+ * vocabulary: sections rise in on a stagger, a beam sweeps the hero's top edge,
+ * a clipped marquee scrolls, and a relay rail runs a solid connector where a
+ * step follows immediately, marching dashes where time has to pass, and a
+ * breathing node on the step that has not happened yet. The fifth is new: a
+ * playhead crosses the market clock on a twelve second loop and lights each
+ * weighting bracket as it passes.
+ *
+ * Every one of them is switched off in the reduce block at the bottom, which is
+ * also where the fill-mode trap lives. `animation: none` drops the keyframe
+ * entirely, so an element whose start state lives inside a keyframe renders at
+ * its natural value rather than staying blank or dim. That is why the rise
+ * keyframe and the bracket keyframes carry their own start states and the rules
+ * do not.
+ */
+
+div.htp {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: calc(100vw - 24px);
+  max-width: 420px;
+  max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px);
+  padding: 0;
+  overflow: hidden;
+  color: var(--sheet-paper);
+  background: #0d0d0d;
+  border: 2px solid var(--sheet-lime);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* The scroller, so the Radix close button in the corner stays put instead of
+   scrolling away with the content. */
+.htp__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ------------------------------------------------------------------ entry */
+
+.htp__scroll > * {
+  animation: htp-rise 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.htp__scroll > *:nth-child(2) { animation-delay: 50ms; }
+.htp__scroll > *:nth-child(3) { animation-delay: 100ms; }
+.htp__scroll > *:nth-child(4) { animation-delay: 150ms; }
+.htp__scroll > *:nth-child(5) { animation-delay: 200ms; }
+.htp__scroll > *:nth-child(6) { animation-delay: 250ms; }
+.htp__scroll > *:nth-child(7) { animation-delay: 300ms; }
+.htp__scroll > *:nth-child(8) { animation-delay: 350ms; }
+
+@keyframes htp-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ------------------------------------------------------------------- hero */
+
+.htp__hero {
+  position: relative;
+  overflow: hidden;
+  /* The right side clears the Radix close button, which sits at right-4 top-4
+     of the dialog and is not ours to move. */
+  padding: 18px 52px 16px 16px;
+  border-bottom: 1px solid var(--sheet-lime-line);
+}
+
+/* A light sweeping the top edge. Clipped by the hero, so it cannot add scroll. */
+.htp__beam {
+  position: absolute;
+  top: 0;
+  left: -40%;
+  width: 40%;
+  height: 2px;
+  opacity: 0;
+  background: linear-gradient(90deg, transparent, var(--sheet-lime), transparent);
+  animation: htp-sweep 3600ms ease-in-out infinite;
+}
+
+@keyframes htp-sweep {
+  0%   { transform: translateX(0);    opacity: 0; }
+  12%  { opacity: 1; }
+  88%  { opacity: 1; }
+  100% { transform: translateX(350%); opacity: 0; }
+}
+
+.htp__eyebrow {
+  display: block;
+  font-family: var(--sheet-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sheet-lime);
+}
+
+h2.htp__headline {
+  margin: 9px 0 0;
+  font-family: var(--sheet-display);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: var(--sheet-paper);
+}
+
+p.htp__standfirst {
+  margin: 10px 0 0;
+  font-family: var(--sheet-body);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--sheet-paper-2);
+}
+
+/* ----------------------------------------------------------------- ticker */
+
+.htp__ticker {
+  overflow: hidden;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--sheet-rule-strong);
+  /* Alpha stops, not colours: this fades the strip out at both ends so items
+     do not appear to be cut off mid-word. */
+  -webkit-mask-image: linear-gradient(90deg, transparent, rgba(0, 0, 0, 1) 8%, rgba(0, 0, 0, 1) 92%, transparent);
+  mask-image: linear-gradient(90deg, transparent, rgba(0, 0, 0, 1) 8%, rgba(0, 0, 0, 1) 92%, transparent);
+}
+
+.htp__ticker-track {
+  display: flex;
+  width: max-content;
+  animation: htp-scroll 30s linear infinite;
+}
+
+@keyframes htp-scroll {
+  to { transform: translateX(-50%); }
+}
+
+.htp__ticker-item {
+  flex: 0 0 auto;
+  padding: 0 13px;
+  font-family: var(--sheet-data);
+  font-size: 10.5px;
+  white-space: nowrap;
+  color: var(--sheet-paper-3);
+}
+
+.htp__ticker-item::after {
+  content: '/';
+  margin-left: 13px;
+  color: var(--sheet-lime);
+}
+
+/* ----------------------------------------------------------------- panels */
+
+.htp__panel {
+  min-width: 0;
+  padding: 15px 16px;
+  border-bottom: 1px solid var(--sheet-rule);
+}
+
+.htp__panel--accent {
+  background: var(--sheet-wash);
+  border-bottom-color: var(--sheet-lime-line);
+}
+
+.htp__scroll > .htp__panel:last-child {
+  border-bottom: none;
+}
+
+h3.htp__panel-title {
+  margin: 0 0 11px;
+  font-family: var(--sheet-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.4;
+  color: var(--sheet-lime);
+}
+
+.htp__text {
+  margin: 11px 0 0;
+  font-family: var(--sheet-body);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--sheet-paper-2);
+}
+
+.htp__text--quiet {
+  font-size: 11px;
+  color: var(--sheet-paper-3);
+}
+
+.htp__panel-title + .htp__text,
+.htp__panel-title + .htp__rows {
+  margin-top: 0;
+}
+
+.htp__status {
+  margin: 0;
+  font-family: var(--sheet-body);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--sheet-paper-3);
+}
+
+.htp__retry {
+  margin-top: 10px;
+  padding: 5px 11px;
+  font-family: var(--sheet-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sheet-lime);
+  background: transparent;
+  border: 1px solid var(--sheet-lime-line);
+  border-radius: 0;
+  cursor: pointer;
+  transition: border-color 140ms ease;
+}
+
+.htp__retry:hover {
+  border-color: var(--sheet-lime);
+}
+
+/* ------------------------------------------------------------------ relay */
+
+ol.htp__relay {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.htp__step {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  gap: 12px;
+  padding-bottom: 16px;
+}
+
+.htp__step:last-child {
+  padding-bottom: 0;
+}
+
+.htp__step-rail {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding-top: 3px;
+}
+
+/* The connector runs from under this step's node to the next node. The last
+   step has nothing below it, because there is nothing after being paid. */
+.htp__step-rail::after {
+  content: '';
+  position: absolute;
+  top: 16px;
+  bottom: -16px;
+  left: 50%;
+  width: 1px;
+  background: var(--sheet-lime-line);
+}
+
+.htp__step:last-child .htp__step-rail::after {
+  display: none;
+}
+
+/* Marching dashes on the one connector where time has to pass. Picking a side
+   and confirming an amount follow each other immediately; waiting out a
+   deadline does not, and the rail says which is which. */
+.htp__step--wait .htp__step-rail::after {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--sheet-lime) 0 4px,
+    transparent 4px 10px
+  );
+  background-size: 1px 10px;
+  animation: htp-ants 760ms linear infinite;
+}
+
+@keyframes htp-ants {
+  to { background-position-y: 10px; }
+}
+
+.htp__step-node {
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--sheet-rule-strong);
+  border-radius: 0;
+  background: transparent;
+}
+
+/* Solid for a move you make yourself. */
+.htp__step--act .htp__step-node {
+  border-color: var(--sheet-lime);
+  background: var(--sheet-lime);
+}
+
+/* Hollow and pulsing while the clock runs. */
+.htp__step--wait .htp__step-node {
+  border-color: var(--sheet-lime);
+  background: var(--sheet-lime);
+  animation: htp-pulse 2000ms ease-out infinite;
+}
+
+@keyframes htp-pulse {
+  0%   { box-shadow: 0 0 0 0 var(--sheet-lime-line); }
+  70%  { box-shadow: 0 0 0 8px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* Breathing, because it is the one step that has not happened yet. */
+.htp__step--settle .htp__step-node {
+  border-color: var(--sheet-lime);
+  animation: htp-breathe 2600ms ease-in-out infinite;
+}
+
+@keyframes htp-breathe {
+  0%, 100% { opacity: 0.35; transform: scale(0.85); }
+  50%      { opacity: 1;    transform: scale(1.15); }
+}
+
+.htp__step-body {
+  min-width: 0;
+}
+
+.htp__step-when {
+  display: block;
+  font-family: var(--sheet-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sheet-lime);
+}
+
+h4.htp__step-what {
+  margin: 4px 0 0;
+  font-family: var(--sheet-display);
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--sheet-paper);
+}
+
+.htp__step-text {
+  margin: 5px 0 0;
+  font-family: var(--sheet-body);
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--sheet-paper-2);
+}
+
+/* ------------------------------------------------------------------ clock */
+
+.htp__clock {
+  margin-bottom: 4px;
+}
+
+/* One market's whole life, left to right. The columns are the weighting
+   brackets at their real sizes: a quarter, a quarter, and a half that pays one
+   rate. Reading the widths tells you the rule before the caption does. */
+.htp__clock-bar {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr 2fr;
+  gap: 2px;
+  border: 1px solid var(--sheet-rule-strong);
+  border-radius: 0;
+}
+
+.htp__bracket {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 9px 6px;
+  text-align: center;
+  background: transparent;
+}
+
+.htp__bracket + .htp__bracket {
+  border-left: 1px solid var(--sheet-rule-strong);
+}
+
+.htp__bracket-weight {
+  font-family: var(--sheet-data);
+  font-size: 13px;
+  line-height: 1.1;
+  color: var(--sheet-lime);
+}
+
+.htp__bracket-span {
+  font-family: var(--sheet-body);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+  color: var(--sheet-paper-3);
+}
+
+/* Each bracket lights while the playhead is inside it, on the same twelve
+   second loop. The cuts are hard on purpose: the contract's brackets are hard,
+   a bet is in one or the other and never between them. */
+.htp__bracket--first  { animation: htp-lit-first 12s linear infinite; }
+.htp__bracket--second { animation: htp-lit-second 12s linear infinite; }
+.htp__bracket--half   { animation: htp-lit-half 12s linear infinite; }
+
+@keyframes htp-lit-first {
+  0%      { opacity: 1;    background: var(--sheet-wash); }
+  24.99%  { opacity: 1;    background: var(--sheet-wash); }
+  25%     { opacity: 0.42; background: transparent; }
+  100%    { opacity: 0.42; background: transparent; }
+}
+
+@keyframes htp-lit-second {
+  0%      { opacity: 0.42; background: transparent; }
+  24.99%  { opacity: 0.42; background: transparent; }
+  25%     { opacity: 1;    background: var(--sheet-wash); }
+  49.99%  { opacity: 1;    background: var(--sheet-wash); }
+  50%     { opacity: 0.42; background: transparent; }
+  100%    { opacity: 0.42; background: transparent; }
+}
+
+@keyframes htp-lit-half {
+  0%      { opacity: 0.42; background: transparent; }
+  49.99%  { opacity: 0.42; background: transparent; }
+  50%     { opacity: 1;    background: var(--sheet-wash); }
+  100%    { opacity: 1;    background: var(--sheet-wash); }
+}
+
+/* The playhead. Centred on its own position, so no width arithmetic is needed
+   to keep it inside the bar at either end. */
+.htp__playhead {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  left: 0;
+  width: 2px;
+  transform: translateX(-50%);
+  background: var(--sheet-lime);
+  animation: htp-playhead 12s linear infinite;
+}
+
+@keyframes htp-playhead {
+  from { left: 0; }
+  to   { left: 100%; }
+}
+
+.htp__clock-ends {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 7px;
+}
+
+.htp__clock-end {
+  font-family: var(--sheet-body);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sheet-paper-3);
+}
+
+/* -------------------------------------------------------------- key/value */
+
+.htp__rows {
+  display: flex;
+  flex-direction: column;
+  margin: 11px 0 0;
+}
+
+.htp__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-top: 1px solid var(--sheet-rule);
+}
+
+.htp__row:first-child {
+  border-top: none;
+}
+
+.htp__row-key {
+  min-width: 0;
+  font-family: var(--sheet-body);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--sheet-paper-3);
+}
+
+.htp__row-value {
+  margin: 0;
+  font-family: var(--sheet-data);
+  font-size: 12px;
+  text-align: right;
+  white-space: nowrap;
+  color: var(--sheet-paper);
+}
+
+/* ----------------------------------------------------------------- splits */
+
+.htp__splits {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  margin-top: 13px;
+}
+
+.htp__split {
+  min-width: 0;
+}
+
+.htp__split-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.htp__split-who {
+  font-family: var(--sheet-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sheet-paper);
+}
+
+.htp__split-take {
+  font-family: var(--sheet-data);
+  font-size: 13px;
+  color: var(--sheet-lime);
+}
+
+.htp__split-track {
+  height: 7px;
+  margin-top: 5px;
+  background: var(--sheet-surface);
+  border: 1px solid var(--sheet-rule);
+}
+
+/* The two bars are the shares of the weighted winning pool, 150 and 300 out of
+   450, drawn at those widths rather than at the stakes. That is the whole
+   lesson of the example: 100 early beats 300 late by more than the stakes say. */
+.htp__split-fill {
+  display: block;
+  height: 100%;
+  background: var(--sheet-lime);
+  transform-origin: left center;
+  animation: htp-grow 700ms cubic-bezier(0.2, 0.7, 0.2, 1) 260ms both;
+}
+
+.htp__split-fill--alice { width: 33.333%; }
+.htp__split-fill--ben   { width: 66.667%; }
+
+@keyframes htp-grow {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+.htp__split-note {
+  margin: 5px 0 0;
+  font-family: var(--sheet-body);
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--sheet-paper-3);
+}
+
+/* ------------------------------------------------------------------ flags */
+
+.htp__flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 11px;
+}
+
+.htp__flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--sheet-body);
+  font-size: 10.5px;
+  letter-spacing: 0.03em;
+  color: var(--sheet-paper-2);
+}
+
+.htp__dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 0;
+}
+
+.htp__dot--live {
+  background: var(--sheet-lime);
+  animation: htp-pulse 2000ms ease-out infinite;
+}
+
+.htp__dot--idle {
+  background: transparent;
+  border: 1px solid var(--sheet-rule-strong);
+}
+
+/* ----------------------------------------------------------------- footer */
+
+.htp__footer {
+  flex: 0 0 auto;
+  padding: 12px 16px;
+  background: #0d0d0d;
+  border-top: 1px solid var(--sheet-lime-line);
+}
+
+.htp__start {
+  display: block;
+  width: 100%;
+  padding: 11px 12px;
+  font-family: var(--sheet-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0d0d0d;
+  background: var(--sheet-lime);
+  border: 1px solid var(--sheet-lime);
+  border-radius: 0;
+  cursor: pointer;
+  transition: opacity 140ms ease;
+}
+
+.htp__start:hover {
+  opacity: 0.86;
+}
+
+.htp__start:focus-visible,
+.htp__retry:focus-visible {
+  outline: 2px solid var(--sheet-lime);
+  outline-offset: 2px;
+}
+
+/* Above a phone there is a little more room, and no more than that: this is a
+   dialog, not a page. */
+@media (min-width: 480px) {
+  div.htp {
+    max-width: 440px;
+  }
+
+  h2.htp__headline {
+    font-size: 20px;
+  }
+
+  .htp__hero {
+    padding: 22px 56px 18px 20px;
+  }
+
+  .htp__panel {
+    padding: 17px 20px;
+  }
+}
+
+/* Everything that moves, stopped. The rise and bracket keyframes hold their own
+   start states, so dropping the animation leaves each section at full opacity
+   and every bracket lit rather than blank or dimmed. The beam is decorative and
+   stays hidden, the marquee parks on its first items and is still readable, the
+   playhead parks at the start of the bar, and the two payout bars render at
+   their real widths straight away. */
+@media (prefers-reduced-motion: reduce) {
+  .htp__scroll > *,
+  .htp__beam,
+  .htp__ticker-track,
+  .htp__step--wait .htp__step-rail::after,
+  .htp__step--wait .htp__step-node,
+  .htp__step--settle .htp__step-node,
+  .htp__bracket--first,
+  .htp__bracket--second,
+  .htp__bracket--half,
+  .htp__playhead,
+  .htp__split-fill,
+  .htp__dot--live {
+    animation: none;
+  }
+
+  .htp__step--settle .htp__step-node {
+    opacity: 1;
+    transform: none;
+  }
+
+  .htp__retry,
+  .htp__start {
+    transition: none;
+  }
+}

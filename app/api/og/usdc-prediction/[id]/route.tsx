@@ -2,6 +2,7 @@ import { ImageResponse } from 'next/og';
 import { NextRequest } from 'next/server';
 import { redisHelpers } from '@/lib/redis';
 import { chainFromRequest } from '@/lib/chains/requestChain';
+import { CHAINS, DEFAULT_CHAIN_KEY } from '@/lib/chains';
 
 // Helper function to generate chart path
 function generateChartPath(prices: number[], width: number, height: number): string {
@@ -88,12 +89,16 @@ function formatDeadline(timestamp: number): string {
   return `${Math.floor(diff / 86400)}d`;
 }
 
-// Format pool amount
-function formatPool(amount: number): string {
-  const usdcAmount = amount / 1e6;
-  if (usdcAmount >= 1000) return `$${(usdcAmount / 1000).toFixed(1)}k`;
-  if (usdcAmount > 0) return `$${usdcAmount.toFixed(2)}`;
-  return '$0.00';
+/**
+ * The pool, in readable units, with the chain's own stablecoin named.
+ *
+ * An empty market says so. It used to render "$0.00", which on a share card
+ * reads as a market that went nowhere rather than one that just opened.
+ */
+function formatPool(units: number, symbol: string): string {
+  if (units <= 0) return 'no bets yet';
+  if (units >= 1000) return `${(units / 1000).toFixed(1)}k ${symbol}`;
+  return `${units.toFixed(2)} ${symbol}`;
 }
 
 // Generate dynamic OG image for USDC predictions - looks like MarketCard
@@ -140,12 +145,31 @@ export async function GET(
       );
     }
 
-    // Calculate USDC pools (6 decimals)
-    const usdcYesPool = (prediction.usdcYesTotalAmount || 0) / 1e6;
-    const usdcNoPool = (prediction.usdcNoTotalAmount || 0) / 1e6;
-    const totalPoolUSDC = usdcYesPool + usdcNoPool;
-    const yesPrice = totalPoolUSDC > 0 ? Math.round((usdcYesPool / totalPoolUSDC) * 100) : 50;
-    const noPrice = 100 - yesPrice;
+    /**
+     * Both sides of the pool, and how they split.
+     *
+     * Two things were wrong here and both of them mattered on a card people see
+     * before they bet. It hardcoded USDC, so a Robinhood market was shared with
+     * the wrong currency printed on it. And an empty market fell back to 50, so
+     * a question nobody had touched went out to a feed showing "50¢ / 50¢", an
+     * even split of a pool that does not exist. A reader has no way to tell
+     * that apart from a market where the crowd genuinely disagreed.
+     *
+     * The unit changed too. Cents is order book language and implies a share
+     * you could sell at that price. Swipe is parimutuel, there are no shares,
+     * and the number is the share of the pool sitting on each side right now.
+     */
+    const chainKey = requested.ok ? requested.chain : DEFAULT_CHAIN_KEY;
+    const symbol = CHAINS[chainKey].stable.symbol;
+    const decimals = CHAINS[chainKey].stable.decimals;
+    const unit = 10 ** decimals;
+
+    const yesPool = (prediction.usdcYesTotalAmount || 0) / unit;
+    const noPool = (prediction.usdcNoTotalAmount || 0) / unit;
+    const totalPool = yesPool + noPool;
+    const hasPool = totalPool > 0;
+    const yesShare = hasPool ? Math.round((yesPool / totalPool) * 100) : 0;
+    const noShare = hasPool ? 100 - yesShare : 0;
     
     // Format time left
     const now = Date.now() / 1000;
@@ -304,7 +328,9 @@ export async function GET(
                 }}
               >
                 <span style={{ fontSize: '12px', color: '#666666', marginBottom: '4px' }}>YES</span>
-                <span style={{ fontSize: '32px', fontWeight: 'bold', color: '#10b981' }}>{yesPrice}¢</span>
+                <span style={{ fontSize: '32px', fontWeight: 'bold', color: '#10b981' }}>
+                  {hasPool ? `${yesShare}%` : 'open'}
+                </span>
               </div>
               
               {/* NO Button */}
@@ -322,7 +348,9 @@ export async function GET(
                 }}
               >
                 <span style={{ fontSize: '12px', color: '#ffffff', marginBottom: '4px' }}>NO</span>
-                <span style={{ fontSize: '32px', fontWeight: 'bold', color: '#ef4444' }}>{noPrice}¢</span>
+                <span style={{ fontSize: '32px', fontWeight: 'bold', color: '#ef4444' }}>
+                  {hasPool ? `${noShare}%` : 'open'}
+                </span>
               </div>
             </div>
 
@@ -370,7 +398,7 @@ export async function GET(
                   fontWeight: '600',
                 }}
               >
-                {formatPool(totalPoolUSDC * 1e6)}
+                {formatPool(totalPool, symbol)}
               </div>
               
               {/* Time Badge */}

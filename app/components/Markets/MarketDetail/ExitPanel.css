@@ -1,0 +1,180 @@
+/*
+ * The exit rows. One panel, one row per side held.
+ *
+ * This component mounts on two very different grounds: the dark detail page
+ * and the lime Bets page under the card deck. So the panel carries its own
+ * opaque dark face, the same move YourPosition makes in the same column, and
+ * nothing here assumes what is behind it.
+ *
+ * Nothing under 12px, fonts through the sheet aliases of the --font tokens.
+ */
+
+.xpanel {
+  background: #0d0d0d;
+  border: 2px solid var(--sheet-lime, #d4ff00);
+  border-radius: 12px;
+  padding: 14px 16px 16px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--sheet-body, sans-serif);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.xpanel__title {
+  margin: 0;
+  font-family: var(--sheet-display, sans-serif);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sheet-lime, #d4ff00);
+}
+
+.xpanel__lede {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.xpanel__row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+}
+
+.xpanel__row--yes {
+  border-left: 3px solid #10b981;
+}
+
+.xpanel__row--no {
+  border-left: 3px solid #ef4444;
+}
+
+.xpanel__rowhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.xpanel__badge {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-family: var(--sheet-display, sans-serif);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.xpanel__badge--yes {
+  color: #052e1a;
+  background: #10b981;
+}
+
+.xpanel__badge--no {
+  color: #2e0505;
+  background: #ef4444;
+}
+
+.xpanel__held {
+  font-family: var(--sheet-data, monospace);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.xpanel__controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.xpanel__field {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.xpanel__field span {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.xpanel__field input {
+  width: 100%;
+  padding: 8px 10px;
+  font-family: var(--sheet-data, monospace);
+  font-size: 14px;
+  color: #fff;
+  background: #161616;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+}
+
+.xpanel__field input:focus-visible {
+  outline: 2px solid var(--sheet-lime, #d4ff00);
+  outline-offset: 1px;
+}
+
+.xpanel__exit {
+  flex: 0 0 auto;
+  padding: 9px 16px;
+  font-family: var(--sheet-display, sans-serif);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #000;
+  background: var(--sheet-lime, #d4ff00);
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.xpanel__exit:hover:not(:disabled) {
+  filter: brightness(0.92);
+}
+
+.xpanel__exit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.xpanel__exit:focus-visible {
+  outline: 2px solid var(--sheet-lime, #d4ff00);
+  outline-offset: 2px;
+}
+
+.xpanel__hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.xpanel__refusal {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #fbbf24;
+}
+
+.xpanel__error {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #ff8a8a;
+}

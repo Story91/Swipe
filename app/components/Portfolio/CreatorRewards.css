@@ -1,0 +1,65 @@
+/*
+ * Creator rewards, on the shared sheet (app/styles/sheet.css).
+ *
+ * One board, one figure, one button. Deliberately plainer than the portfolio
+ * ledger next to it: this is a balance somebody is owed rather than a book to
+ * read, and giving it a second visual language would make it look like a
+ * promotion.
+ */
+
+.cr-note {
+  margin: 16px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--sheet-paper-3);
+  max-width: 62ch;
+}
+
+.cr-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
+.cr-actions .sheet-action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.cr-actions .sheet-action:disabled:hover {
+  color: var(--sheet-paper-2);
+  border-color: var(--sheet-rule);
+}
+
+.cr-hint {
+  font-size: 13px;
+  color: var(--sheet-paper-3);
+}
+
+.cr-error {
+  margin: 14px 0 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--sheet-loss);
+  font-size: 14px;
+  color: var(--sheet-loss);
+}
+
+.cr-done {
+  margin: 14px 0 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--sheet-lime);
+  font-size: 14px;
+  color: var(--sheet-paper-2);
+}
+
+.cr-done a {
+  color: var(--sheet-lime);
+  text-decoration: none;
+  border-bottom: 1px solid var(--sheet-lime-line);
+}
+
+.cr-done a:hover {
+  border-bottom-color: var(--sheet-lime);
+}

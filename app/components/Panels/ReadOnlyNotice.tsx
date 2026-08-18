@@ -50,8 +50,9 @@ export function ReadOnlyNotice() {
           New markets on {chain.label} run on a new contract, where fees come out
           of the losing side only and betting early counts for more. The older
           ones stay here for reference and take no new bets. Nobody holds the key
-          to those any more, so anything still open on them cannot be settled and
-          a stake left in one cannot be claimed.
+          that settles them, so a market still open on one of those can never be
+          decided. If it settled before the key was lost, the payout is still
+          there to collect.
         </p>
       </aside>
     );

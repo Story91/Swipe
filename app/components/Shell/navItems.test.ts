@@ -53,7 +53,10 @@ describe('sidebar coverage', () => {
 
   it('marks the row that matches the open dashboard', () => {
     expect(activeRowId('tinder')).toBe('markets');
-    expect(activeRowId('usdc-markets')).toBe('usdc');
+    // 'usdc-markets' used to be asserted here; the dashboard merged into the
+    // markets grid and its id left the union, so the second positive case is
+    // now the leaderboard row.
+    expect(activeRowId('leaderboard')).toBe('leaderboard');
     // Reached from inside the dashboard, so no row lights up.
     expect(activeRowId('bet-history')).toBeNull();
   });

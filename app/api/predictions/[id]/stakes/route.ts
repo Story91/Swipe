@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createChainPublicClient } from '@/lib/chains';
+import { chainFromRequest } from '@/lib/chains/requestChain';
 import { redisHelpers } from '../../../../../lib/redis';
 import { RedisUserStake } from '../../../../../lib/types/redis';
 import { CONTRACTS } from '../../../../../lib/contract';
@@ -18,14 +19,33 @@ export async function GET(
       );
     }
 
-    // Initialize public client for Base network
+    // Everything below reads CONTRACTS.V1 / CONTRACTS.V2, which are archived
+    // Base addresses resolved at build time, so the chain client is Base's.
     const publicClient = createChainPublicClient();
 
-    // Pinned to Base, and not from a query parameter. Everything below reads
-    // CONTRACTS.V1 / CONTRACTS.V2, which are Base addresses resolved at build
-    // time, so the Redis record has to be the Base one or the route would be
-    // answering about one chain's market with another chain's positions.
-    const prediction = await redisHelpers.getPrediction(predictionId, 'base');
+    /**
+     * The record is looked up on the chain the caller named, and the answer is
+     * refused unless that record is one of the archived Base contracts.
+     *
+     * The lookup was pinned to 'base' with a comment explaining that the
+     * contracts below are Base contracts. True, and it made the route worse.
+     * Each deployment numbers its markets from 1, so asking about Robinhood
+     * market 5 fetched Base market 5, took ITS participant list, and read V1
+     * positions for those addresses. The route then returned that as market 5's
+     * stakes. Not empty, not an error: another market's positions, on the PnL
+     * page, under the wrong question.
+     *
+     * A live V4 market has no answer here at all, because V4 positions do not
+     * live on V1 or V2. So it says so, with an empty list rather than a
+     * plausible wrong one. Callers already render an empty list as "no stakes
+     * recorded", which is the honest outcome.
+     */
+    const requested = chainFromRequest(request);
+    if (!requested.ok) {
+      return NextResponse.json({ success: false, error: requested.error }, { status: 400 });
+    }
+
+    const prediction = await redisHelpers.getPrediction(predictionId, requested.chain);
     if (!prediction) {
       return NextResponse.json(
         { success: false, error: 'Prediction not found' },
@@ -33,8 +53,23 @@ export async function GET(
       );
     }
 
-    // Determine which contract to use
     const isV2 = prediction.contractVersion === 'V2' || predictionId.startsWith('pred_v2_');
+    const isV1 = prediction.contractVersion === 'V1' || predictionId.startsWith('pred_v1_');
+    if (!isV1 && !isV2) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          predictionId,
+          stakes: [],
+          totalStakers: 0,
+        },
+        // Named so a caller can tell "nobody has bet" apart from "this route
+        // cannot answer for this market".
+        source: 'archived-contracts-only',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     const contract = isV2 ? CONTRACTS.V2 : CONTRACTS.V1;
 
     // Get participants from prediction

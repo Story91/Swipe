@@ -30,7 +30,6 @@ import { Button } from "@/components/ui/button";
 import { Menu, Plus, BarChart3, PlayCircle, Trophy, HelpCircle, Settings } from "lucide-react";
 import { useAccount, useConnect } from "wagmi";
 import { useActiveChain } from "@/lib/chains/activeChain";
-import { getChainConfig } from "@/lib/chains";
 import { useState, useEffect, useRef, Suspense, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -80,7 +79,6 @@ const RecentActivity = dynamic(() => import("./components/Support/RecentActivity
 const SwipeTokenCard = dynamic(() => import("./components/Market/SwipeTokenCard").then(m => m.SwipeTokenCard), { ssr: false, loading });
 const SwipeClaim = dynamic(() => import("./components/Portfolio/SwipeClaim").then(m => m.SwipeClaim), { ssr: false, loading });
 const DailyTasks = dynamic(() => import("./components/Tasks/DailyTasks").then(m => m.DailyTasks), { ssr: false, loading });
-const SwipeMarkets = dynamic(() => import("./components/Markets/SwipeMarkets"), { ssr: false, loading });
 
 // Modals: mounted but closed most of the time, so they cost nothing until opened.
 const CreatePredictionModal = dynamic(() => import("./components/Modals/CreatePredictionModal").then(m => m.CreatePredictionModal), { ssr: false });
@@ -130,15 +128,6 @@ export default function App() {
   const { connect, connectors } = useConnect();
   // The claim badge is per chain, so the count has to be asked for per chain.
   const { chainKey } = useActiveChain();
-  /**
-   * The collateral this network actually settles in, for the nav.
-   *
-   * The markets tab was labelled USDC in the markup. On Robinhood the contract
-   * holds Paxos USDG and cannot hold USDC at all, so the tab named a token that
-   * is not there, and the network switcher changed everything except the one
-   * word that says what you are betting with.
-   */
-  const collateralSymbol = getChainConfig(chainKey).stable.symbol;
   const tinderCardRef = useRef<{ refresh: () => void; goToPrediction?: (id: string) => void } | null>(null);
   const dashboardTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [hasTriedAddMiniApp, setHasTriedAddMiniApp] = useState(false);
@@ -549,7 +538,6 @@ export default function App() {
             onCreate={() => setIsCreateModalOpen(true)}
             onHowToPlay={() => setIsHowToPlayOpen(true)}
             claimCount={readyToClaimCount}
-            collateralSymbol={collateralSymbol}
             isAdmin={!!isAdmin}
           />
         )}
@@ -692,14 +680,11 @@ export default function App() {
             {/* Layout switch lives in the main nav here; on the desktop shell
                 it moves to the top bar. */}
             {viewSwitch}
-            <MenubarMenu>
-              <MenubarTrigger 
-                className="menubar-trigger !bg-gradient-to-r !from-blue-500 !to-green-500 !text-white !font-bold hover:!from-blue-400 hover:!to-green-400" 
-                onClick={() => setActiveDashboard('usdc-markets')}
-              >
-                💵 {collateralSymbol}
-              </MenubarTrigger>
-            </MenubarMenu>
+            {/* The collateral tab that sat here routed to the separate USDC
+                markets list, which merged into the one markets surface. On a
+                phone that surface is Bets, the swipe deck: it bets the same
+                collateral markets on the active chain, and the exit list lives
+                under the deck. The per-market view is /prediction/[id]. */}
             <MenubarMenu>
               <MenubarTrigger 
                 ref={dashboardTriggerRef}
@@ -810,9 +795,6 @@ export default function App() {
               `inert` and `aria-hidden`, which switched off the one control the
               preview has and hid the whole thing from a screen reader. */}
           {activeDashboard === 'daily-tasks' && <DailyTasks />}
-
-          {/* USDC Markets */}
-          {activeDashboard === 'usdc-markets' && <SwipeMarkets />}
 
           {/* Dashboard - moved from 'user' to replace CLAIM */}
           {activeDashboard === 'user' && (

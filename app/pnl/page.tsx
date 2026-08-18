@@ -6,6 +6,129 @@ import { useAccount } from "wagmi";
 import { useMiniKit } from "@coinbase/onchainkit/minikit";
 import { PNLTable } from "../components/Portfolio/WinLossPNL/PNLTable";
 import type { PredictionWithStakes } from "../components/Portfolio/WinLossPNL/PNLTable";
+import { estimatePosition } from "@/lib/positionMath";
+
+/**
+ * P&L for the archived ETH and SWIPE positions on Base.
+ *
+ * Worth being blunt about what this screen covers, because the name suggests
+ * more than it shows. Both routes below are pinned to Base and to the V1 and V2
+ * contracts, so the collateral positions that every current bet is made in
+ * (USDC on Base, USDG on Robinhood) are not in this total at all. PNLTable only
+ * has an ETH and a SWIPE tab to put them in.
+ */
+
+/** The fields this page reads off /api/predictions. */
+interface ApiPrediction {
+  id: string;
+  question: string;
+  deadline: number;
+  resolved?: boolean;
+  outcome?: boolean;
+  cancelled?: boolean;
+  participants?: string[];
+  yesTotalAmount?: number;
+  noTotalAmount?: number;
+  swipeYesTotalAmount?: number;
+  swipeNoTotalAmount?: number;
+}
+
+/**
+ * One entry from /api/predictions/[id]/stakes.
+ *
+ * Read off the route, not guessed. It keys the address as `userId`, puts both
+ * token legs flat on the same object in wei, and reports no payout of any kind.
+ */
+interface RouteStake {
+  userId: string;
+  yesAmount: number;
+  noAmount: number;
+  swipeYesAmount: number;
+  swipeNoAmount: number;
+  claimed: boolean;
+}
+
+type PnlLeg = NonNullable<PredictionWithStakes["userStakes"]>["ETH"];
+
+/**
+ * PredictionMarket_V2's platform cut, in basis points.
+ *
+ * These are V1 and V2 markets and nothing else, so the live 300 plus 50 would
+ * be the wrong rates here. The archived contract takes 100 bps from the losing
+ * pool, pays no creator cut and has no time weighting, which is why the
+ * weighted arguments below are just the raw stake.
+ */
+const ARCHIVED_PLATFORM_FEE_BPS = 100;
+
+/**
+ * What one token leg is worth, from the pools the market carries.
+ *
+ * The page used to read `potentialPayout` and `isWinner` off the stake object.
+ * No route has ever returned either, so both were undefined and both fell to
+ * their `|| 0` and `|| false`. They are worked out here instead, through
+ * estimatePosition, which is the function the portfolio and the swipe card
+ * settle with, so this page cannot quote a different payout from the rest of
+ * the app for the same position.
+ */
+function legFor(
+  prediction: ApiPrediction,
+  token: "ETH" | "SWIPE",
+  yesAmount: number,
+  noAmount: number
+): PnlLeg {
+  const staked = yesAmount + noAmount;
+  if (staked <= 0) return undefined;
+
+  // Same tie-break as legSides in lib/userStake, so one position is never on
+  // YES here and on NO in the portfolio.
+  const backedYes = yesAmount > noAmount;
+  const backing = backedYes ? yesAmount : noAmount;
+
+  const yesPool =
+    (token === "ETH" ? prediction.yesTotalAmount : prediction.swipeYesTotalAmount) ?? 0;
+  const noPool =
+    (token === "ETH" ? prediction.noTotalAmount : prediction.swipeNoTotalAmount) ?? 0;
+
+  const myPool = backedYes ? yesPool : noPool;
+  const losingPool = backedYes ? noPool : yesPool;
+
+  const ifMySideWins = () =>
+    estimatePosition({
+      mine: backing,
+      myWeighted: backing,
+      myWeightedPool: myPool,
+      losingPool,
+      platformFeeBps: ARCHIVED_PLATFORM_FEE_BPS,
+      creatorFeeBps: 0,
+    }).total;
+
+  let potentialPayout = 0;
+  let potentialProfit = 0;
+  let isWinner = false;
+
+  if (prediction.cancelled) {
+    // A cancelled market hands everyone their own stake back, both sides of it.
+    potentialPayout = staked;
+  } else if (prediction.resolved) {
+    isWinner = prediction.outcome === backedYes;
+    if (isWinner) {
+      potentialPayout = ifMySideWins();
+      potentialProfit = potentialPayout - staked;
+    } else {
+      potentialProfit = -staked;
+    }
+  } else if (prediction.deadline > Date.now() / 1000) {
+    // Still running, so this is what the pools would pay if this side wins,
+    // not a result. Nothing is owed yet.
+    potentialPayout = ifMySideWins();
+    potentialProfit = potentialPayout - staked;
+  }
+  // Past its deadline and unresolved is left at zero on purpose. These markets
+  // cannot be resolved any more, the owner key is gone, but calling that a
+  // realised loss would be this page inventing a settlement.
+
+  return { yesAmount, noAmount, potentialPayout, potentialProfit, isWinner };
+}
 
 function PNLPageContent() {
   const searchParams = useSearchParams();
@@ -54,62 +177,86 @@ function PNLPageContent() {
           throw new Error(predictionsData.error || 'Failed to fetch predictions');
         }
 
-        const allPredictions = predictionsData.data;
+        /**
+         * Only the markets this user is listed in.
+         *
+         * The loop below used to ask the stakes route about every market on the
+         * chain, and that route reads the contract once per participant of
+         * each. Several hundred markets meant thousands of RPC calls for a page
+         * that needs a handful of them. The participant list is already in this
+         * response, and the route itself only ever answers about participants,
+         * so nothing is dropped by asking first.
+         */
+        const allPredictions = predictionsData.data as ApiPrediction[];
+        const mine = allPredictions.filter((p) =>
+          (p.participants ?? []).some((a) => a.toLowerCase() === userAddress)
+        );
+
         const userPredictionsWithStakes: PredictionWithStakes[] = [];
 
-        for (const prediction of allPredictions) {
+        for (const prediction of mine) {
           try {
-            // Fetch user stakes for this prediction
+            // No ?userAddress= any more. The route never read it: it answers
+            // with every participant's position and the filtering is done here.
             const stakesResponse = await fetch(
-              `/api/predictions/${prediction.id}/stakes?userAddress=${userAddress}`
+              `/api/predictions/${prediction.id}/stakes`
             );
             const stakesData = await stakesResponse.json();
 
-            if (stakesData.success && stakesData.stakes) {
-              const userStake = stakesData.stakes.find(
-                (s: any) => s.user.toLowerCase() === userAddress.toLowerCase()
-              );
+            /**
+             * The stakes sit under `data`, one level down.
+             *
+             * `stakesData.stakes` was undefined on every market, so the guard
+             * never passed, nothing was ever pushed, and the page told every
+             * user they had no positions at all. The route answers
+             * `{ success, data: { predictionId, stakes, totalStakes } }`.
+             */
+            const stakes: RouteStake[] = stakesData?.data?.stakes ?? [];
+            if (!stakesData?.success || stakes.length === 0) continue;
 
-              if (userStake) {
-                const ethStake = userStake.ethStake;
-                const swipeStake = userStake.swipeStake;
+            // Keyed `userId`, not `user`. Reading `s.user.toLowerCase()` would
+            // have thrown on the first entry even once the depth was right.
+            const userStake = stakes.find(
+              (s) => s.userId?.toLowerCase() === userAddress
+            );
+            if (!userStake) continue;
 
-                userPredictionsWithStakes.push({
-                  id: prediction.id,
-                  question: prediction.question,
-                  resolved: prediction.resolved || false,
-                  outcome: prediction.outcome,
-                  cancelled: prediction.cancelled || false,
-                  status: prediction.resolved
-                    ? 'resolved'
-                    : prediction.cancelled
-                    ? 'cancelled'
-                    : prediction.deadline && prediction.deadline <= Date.now() / 1000
-                    ? 'expired'
-                    : 'active',
-                  userStakes: {
-                    ...(ethStake && {
-                      ETH: {
-                        yesAmount: ethStake.yesAmount || 0,
-                        noAmount: ethStake.noAmount || 0,
-                        potentialProfit: ethStake.potentialProfit || 0,
-                        potentialPayout: ethStake.potentialPayout || 0,
-                        isWinner: ethStake.isWinner || false,
-                      },
-                    }),
-                    ...(swipeStake && {
-                      SWIPE: {
-                        yesAmount: swipeStake.yesAmount || 0,
-                        noAmount: swipeStake.noAmount || 0,
-                        potentialProfit: swipeStake.potentialProfit || 0,
-                        potentialPayout: swipeStake.potentialPayout || 0,
-                        isWinner: swipeStake.isWinner || false,
-                      },
-                    }),
-                  },
-                });
-              }
-            }
+            // Two flat legs in wei, not an `ethStake` and a `swipeStake`
+            // object. A leg the user is not in comes back undefined and is
+            // spread away, so a SWIPE-only position does not gain an empty ETH
+            // row that PNLTable would count as a bet.
+            const eth = legFor(
+              prediction,
+              'ETH',
+              Number(userStake.yesAmount) || 0,
+              Number(userStake.noAmount) || 0
+            );
+            const swipe = legFor(
+              prediction,
+              'SWIPE',
+              Number(userStake.swipeYesAmount) || 0,
+              Number(userStake.swipeNoAmount) || 0
+            );
+            if (!eth && !swipe) continue;
+
+            userPredictionsWithStakes.push({
+              id: prediction.id,
+              question: prediction.question,
+              resolved: prediction.resolved || false,
+              outcome: prediction.outcome,
+              cancelled: prediction.cancelled || false,
+              status: prediction.resolved
+                ? 'resolved'
+                : prediction.cancelled
+                ? 'cancelled'
+                : prediction.deadline && prediction.deadline <= Date.now() / 1000
+                ? 'expired'
+                : 'active',
+              userStakes: {
+                ...(eth && { ETH: eth }),
+                ...(swipe && { SWIPE: swipe }),
+              },
+            });
           } catch (error) {
             console.error(`Error fetching stakes for prediction ${prediction.id}:`, error);
           }

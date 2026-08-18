@@ -4,7 +4,7 @@ import { useAccount, useWriteContract, useReadContract, useWaitForTransactionRec
 import { parseUnits, formatUnits } from 'viem';
 import { CONTRACTS } from '../../../lib/contract';
 import { useAdminRequest } from '../../../lib/auth/useAdminRequest';
-import { isWritableMarket } from '@/lib/chains';
+import { CHAINS, isWritableMarket, type ChainKey } from '@/lib/chains';
 import { useActiveChain } from '@/lib/chains/activeChain';
 import { useMarketWrite } from '@/lib/chains/useMarketWrite';
 import { txUrl } from '@/lib/chains/market';
@@ -40,6 +40,7 @@ import TextType from '@/components/TextType';
 import { SharePreviewModal } from '../Modals/SharePreviewModal';
 import { MarketPools } from './MarketPools';
 import { YourPosition } from './YourPosition';
+import { ExitPanel } from '../Markets/MarketDetail/ExitPanel';
 
 // Just the two entry points the collateral needs. Kept minimal on purpose: the
 // spender and the token address are never literals here, they come from
@@ -73,6 +74,16 @@ const ERC20_ABI = [
     type: 'function'
   }
 ] as const;
+
+// The archived V1 and V2 contracts are Base deployments. Their addresses mean
+// nothing on any other network, and a call to a Base address signed elsewhere
+// does not revert: it reaches an address holding no code, the EVM returns
+// success, and the wallet tells the user the claim went through while nothing
+// moved. So the two calls that are still legitimate against those contracts,
+// both of them claims, name the chain they belong to and pin it.
+const ARCHIVED_CHAIN_KEY: ChainKey = 'base';
+const ARCHIVED_CHAIN_LABEL = CHAINS[ARCHIVED_CHAIN_KEY].label;
+const ARCHIVED_CHAIN_ID = CHAINS[ARCHIVED_CHAIN_KEY].viemChain.id;
 
 interface PredictionData {
   id: number;
@@ -218,7 +229,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   // Track user actions for feedback.
   // `status` distinguishes "a side was picked, the dialog is opening" (set on
   // swipe release) from "the stake actually landed on-chain" (set only once
-  // useWaitForTransactionReceipt confirms, in handleStakeSuccess) — the two used
+  // useWaitForTransactionReceipt confirms, in handleStakeSuccess). The two used
   // to share one "Stake Accepted" label even though only the second is true.
   const [lastAction, setLastAction] = useState<{
     type: 'skip' | 'bet' | null;
@@ -310,7 +321,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
   const { address } = useAccount();
   // The chain the user actually has selected (ChainSwitcher), not the build-time
   // default. handleStakeBet's guard must gate on this, not on DEFAULT_CHAIN_KEY.
-  const { chainKey } = useActiveChain();
+  const { chainKey, chain } = useActiveChain();
   // Signs each admin action; the server verifies it rather than trusting the UI.
   const signAdminRequest = useAdminRequest();
   // Every bet and every approval leaves through this. It resolves address, ABI,
@@ -1241,7 +1252,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     setStakeModal(prev => ({ ...prev, isOpen: false }));
     setIsTransactionLoading(false);
 
-    // The stake has genuinely landed on-chain at this point — this function only
+    // The stake has genuinely landed on-chain at this point, because this only
     // runs once useWaitForTransactionReceipt confirms the transaction. This is
     // the one place "Stake Accepted" is actually true; onSwipe only reports that
     // a side was selected (see its own lastAction, status: 'selected').
@@ -1596,11 +1607,55 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     }, 100);
   };
 
+  /**
+   * Refuses a write to a contract that is not the selected chain's live market.
+   *
+   * Every admin and approver call below reaches for CONTRACTS.V2, an archived
+   * Base deployment whose owner key is gone. None of them can succeed: resolve,
+   * cancel, approve, reject, withdraw and pause are all owner-only there and
+   * nobody can sign as the owner any more. None of them pinned a chainId
+   * either, so with another network selected the call left for a Base address
+   * on a chain where that address holds no code, which does not revert. The
+   * wallet reports success and nothing happened.
+   *
+   * So the guard compares the address about to be written to against the market
+   * of the chain the user actually has selected. An archived address is never
+   * that, which is the point: these refuse, quietly and legibly, instead of
+   * costing a signature to discover.
+   */
+  const refuseArchivedWrite = (target: string, action: string): boolean => {
+    if (isWritableMarket(chainKey, target)) return false;
+    console.warn(`[admin] refused ${action}: ${target} is not ${chainKey}'s market contract.`);
+    alert(
+      `Cannot ${action} here. That contract is archived, nobody holds the key ` +
+      'that could sign for it, and it is not the market this network writes to.'
+    );
+    return true;
+  };
+
   const handleClaimReward = (predictionId: number, token: 'ETH' | 'SWIPE' = 'ETH') => {
     // Determine which contract to use based on prediction creation date
     const prediction = transformedPredictions.find(p => p.id === predictionId);
     const isV1 = prediction && prediction.createdAt < new Date('2024-01-15').getTime() / 1000;
     const contract = isV1 ? CONTRACTS.V1 : CONTRACTS.V2;
+
+    // Claiming is the one thing the archived contracts still do, so this path
+    // is not refused the way the admin calls below are. The lost owner key
+    // stops a market being resolved; it does not stop a market that resolved
+    // before the key went from paying out, and refusing here would strand
+    // money that is genuinely owed.
+    //
+    // What it must not do is leave for the wrong network. Both sends below are
+    // pinned to ARCHIVED_CHAIN_ID so viem asserts the wallet is there rather
+    // than signing wherever it happens to be, and the app refuses outright when
+    // it is pointed at another chain.
+    if (chainKey !== ARCHIVED_CHAIN_KEY) {
+      alert(
+        `These rewards sit on ${ARCHIVED_CHAIN_LABEL} contracts. Switch the app to ` +
+        `${ARCHIVED_CHAIN_LABEL} to claim them.`
+      );
+      return;
+    }
 
     // Execute claim transaction based on token type
     if (token === 'ETH' || isV1) {
@@ -1610,6 +1665,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
         abi: contract.abi,
         functionName: 'claimReward',
         args: [BigInt(predictionId)],
+        chainId: ARCHIVED_CHAIN_ID,
       }, {
         onSuccess: () => {
           console.log('✅ ETH reward claimed successfully');
@@ -1628,6 +1684,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
         abi: contract.abi,
         functionName: 'claimRewardWithToken',
         args: [BigInt(predictionId)],
+        chainId: ARCHIVED_CHAIN_ID,
       }, {
         onSuccess: () => {
           console.log('✅ SWIPE reward claimed successfully');
@@ -1688,6 +1745,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     } else {
       // Handle on-chain prediction - use V2 for new predictions
       const contract = CONTRACTS.V2;
+      if (refuseArchivedWrite(contract.address, 'resolve this market')) return;
       writeContract({
         address: contract.address as `0x${string}`,
         abi: contract.abi,
@@ -1751,6 +1809,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     } else {
       // Handle on-chain prediction - use V2 for new predictions
       const contract = CONTRACTS.V2;
+      if (refuseArchivedWrite(contract.address, 'cancel this market')) return;
       writeContract({
         address: contract.address as `0x${string}`,
         abi: contract.abi,
@@ -1774,6 +1833,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
 
     // Execute real approve prediction transaction - use V2 for new predictions
     const contract = CONTRACTS.V2;
+    if (refuseArchivedWrite(contract.address, 'approve this market')) return;
     writeContract({
       address: contract.address as `0x${string}`,
       abi: contract.abi,
@@ -1819,6 +1879,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
 
     // Execute real reject prediction transaction - use V2 for new predictions
     const contract = CONTRACTS.V2;
+    if (refuseArchivedWrite(contract.address, 'reject this market')) return;
     writeContract({
       address: contract.address as `0x${string}`,
       abi: contract.abi,
@@ -1853,6 +1914,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
 
     // Execute real withdraw fees transaction - use V2 for new fees
     const contract = CONTRACTS.V2;
+    if (refuseArchivedWrite(contract.address, 'withdraw fees')) return;
     writeContract({
       address: contract.address as `0x${string}`,
       abi: contract.abi,
@@ -1866,6 +1928,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
 
     // Execute real pause contract transaction - use V2 for new contract
     const contract = CONTRACTS.V2;
+    if (refuseArchivedWrite(contract.address, 'pause this contract')) return;
     writeContract({
       address: contract.address as `0x${string}`,
       abi: contract.abi,
@@ -2013,7 +2076,7 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
       return;
     }
     
-    // A swipe only picks a side and opens the stake dialog here — nothing has
+    // A swipe only picks a side and opens the stake dialog here. Nothing has
     // been staked yet (no amount chosen, no signature, no transaction). Record
     // it as "selected", not "bet", so the feedback overlay can't claim a stake
     // was accepted before one exists. The genuine "Stake Accepted" feedback is
@@ -2066,38 +2129,32 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     // Można tutaj dodać logikę fallback dla iframe'ów
   };
 
-  // Create a fallback card for when no predictions are available
+  // The card shown when the deck runs out.
+  //
+  // This used to be a changelog: four numbered sections about what V2 added
+  // over V1, ETH and SWIPE minimums, two separate prize pools. None of it was
+  // true any more and none of it was ever something a user could act on. What
+  // replaces it says where they are and what to do next, and it names the
+  // network from the switcher rather than assuming Base, because "no markets
+  // left" is a fact about one chain and the user may be on another.
   const fallbackCard: PredictionData = {
     id: 0,
-    title: "Under Construction",
-    prediction: "New predictions coming soon! Contract V2 on the way",
-    category: "Platform Status",
+    title: "Nothing left to swipe",
+    prediction: `No open markets on ${chain.label} right now`,
+    category: "Markets",
     image: "/under.png",
     isChart: false,
     price: "---",
     change: "+0%",
     votingYes: 50,
-    timeframe: "Check back later • V2 soon",
-    description: `Our prediction platform is currently being updated with exciting new features!
+    timeframe: `${chain.label} • check back later`,
+    description: `You have been through every open market on ${chain.label}. Two ways forward.
 
-KEY USER-FACING CHANGES: V1 → V2
+Propose one. Write the question you want to bet on and send it for approval. Markets you create pay you a cut of the losing pool when they settle.
 
-1. Stake with $SWIPE or ETH
-• Choose your token when placing bets
-• Different minimum stakes: ETH (0.00001) vs SWIPE (100,000)
+Or switch networks. Each network runs its own markets, so there may be open ones where you are not looking. The switcher is on the wallet row.
 
-2. Create Predictions with $SWIPE
-• Pay creation fee in ETH (0.0001) or SWIPE (200,000)
-• Get automatic refund if prediction rejected
-
-3. Two Separate Prize Pools
-• ETH stakers compete for ETH pool
-• SWIPE stakers compete for SWIPE pool
-• Claim rewards separately for each token
-
-4. Better Limits
-• Lower ETH minimum: 0.00001 ETH (was 0.001)
-• SWIPE unlimited maximum stake`,
+New markets land through the day, so it is worth coming back.`,
     confidence: 0,
     creator: address || "0x0000000000000000000000000000000000000000",
     participants: []
@@ -2351,12 +2408,13 @@ KEY USER-FACING CHANGES: V1 → V2
       <div className="tinder-container">
         <div style={{ textAlign: 'center', padding: '60px', color: '#666' }}>
           <div style={{ fontSize: '24px', marginBottom: '16px' }}>⏰</div>
-          <div style={{ fontSize: '18px', marginBottom: '8px' }}>No Active Predictions</div>
+          <div style={{ fontSize: '18px', marginBottom: '8px' }}>No open markets</div>
           <div style={{ fontSize: '14px', marginBottom: '16px' }}>
-            All predictions have expired or no active predictions are available.
+            Nothing is running on {chain.label} right now. Everything here has either
+            settled or closed for betting.
           </div>
           <div style={{ fontSize: '12px', color: '#999' }}>
-            Create a new prediction to get started!
+            Propose a market, or switch to another network and look there.
           </div>
         </div>
       </div>
@@ -2919,6 +2977,19 @@ KEY USER-FACING CHANGES: V1 → V2
         />
       )}
 
+      {/* The exit list, below the deck. One row per side held on the market in
+          front of you, straight from positions() on chain, and nothing when
+          you hold nothing. The component owns its own reads and sends through
+          the same guarded useMarketWrite path as everything else; no send
+          lives in this file for it. */}
+      {transformedPredictions[currentIndex]?.redisId && (
+        <ExitPanel
+          predictionId={transformedPredictions[currentIndex].redisId}
+          question={transformedPredictions[currentIndex]?.question}
+          onExited={refreshPredictions}
+        />
+      )}
+
       {/* Pools and rules. Was two panels reading the archived V2 fields, so on
           every market this app now makes they showed an empty ETH pool and an
           empty SWIPE pool while the real collateral pool was nowhere on screen.
@@ -3046,469 +3117,210 @@ KEY USER-FACING CHANGES: V1 → V2
            </div>
          </div>
 
-      {/* Potential Earnings Section */}
-      {Object.keys(userStakes).length > 0 && (
-        <div className="mt-4 rounded-xl overflow-hidden" style={{ backgroundColor: 'rgba(0, 0, 0, 0.85)' }}>
-          <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-700/50">
-            <span className="text-white font-mono text-xs font-bold">[ POTENTIAL_EARNINGS ]</span>
-            <span className="text-[#d4ff00] font-mono text-sm font-bold">💰</span>
-          </div>
-          <div className="p-3">
-            {(() => {
-              // Get current prediction pool data
-              const currentPred = transformedPredictions[currentIndex];
-              if (!currentPred) return null;
+      {/*
+        The POTENTIAL_EARNINGS table was removed rather than repaired.
 
-              // ETH pools
-              const yesPoolETH = (currentPred.yesTotalAmount || 0);
-              const noPoolETH = (currentPred.noTotalAmount || 0);
-              // SWIPE pools
-              const yesPoolSWIPE = (currentPred.swipeYesTotalAmount || 0);
-              const noPoolSWIPE = (currentPred.swipeNoTotalAmount || 0);
-              const platformFee = 0.01; // 1% fee
+        It computed a payout with `const platformFee = 0.01`, a rate that has
+        never been live: the contract takes 300 bps plus 50 bps, and both come
+        out of the losing pool rather than off the top. It also divided by the
+        raw pool instead of the weighted one, so it handed a late bet the share
+        an early bet paid for, and it rendered two columns per staker in ETH and
+        $SWIPE, which are pools on the archived contracts.
 
-              // Calculate potential earnings for each staker
-              const stakersWithEarnings = Object.entries(userStakes)
-                .filter(([_, data]) => data.totalStaked > 0 || data.totalSwipeStaked > 0)
-                .map(([address, data]) => {
-                  const profile = profiles.find((p: any) => p && p.address === address);
-                  const displayName = profile?.display_name || profile?.username || `${address.slice(0, 6)}...${address.slice(-4)}`;
-                  
-                  // === ETH EARNINGS ===
-                  // Calculate potential ETH payout if YES wins
-                  let ethYesEarnings = 0;
-                  let ethYesProfitPercent = 0;
-                  if (data.yesAmount > 0 && yesPoolETH > 0) {
-                    const shareOfYesPool = data.yesAmount / yesPoolETH;
-                    const winningsFromLosingPool = noPoolETH * (1 - platformFee);
-                    ethYesEarnings = data.yesAmount + (shareOfYesPool * winningsFromLosingPool);
-                    ethYesProfitPercent = ((ethYesEarnings - data.yesAmount) / data.yesAmount) * 100;
-                  }
+        Its data came from /api/predictions/[id]/stakes, which answers only for
+        V1 and V2 markets now, so on a live market the table did not render at
+        all. On an archived one it printed potential earnings for a market whose
+        resolver key is gone and which can therefore never settle.
 
-                  // Calculate potential ETH payout if NO wins
-                  let ethNoEarnings = 0;
-                  let ethNoProfitPercent = 0;
-                  if (data.noAmount > 0 && noPoolETH > 0) {
-                    const shareOfNoPool = data.noAmount / noPoolETH;
-                    const winningsFromLosingPool = yesPoolETH * (1 - platformFee);
-                    ethNoEarnings = data.noAmount + (shareOfNoPool * winningsFromLosingPool);
-                    ethNoProfitPercent = ((ethNoEarnings - data.noAmount) / data.noAmount) * 100;
-                  }
-
-                  // === SWIPE EARNINGS ===
-                  // Calculate potential SWIPE payout if YES wins
-                  let swipeYesEarnings = 0;
-                  let swipeYesProfitPercent = 0;
-                  if (data.swipeYesAmount > 0 && yesPoolSWIPE > 0) {
-                    const shareOfYesPool = data.swipeYesAmount / yesPoolSWIPE;
-                    const winningsFromLosingPool = noPoolSWIPE * (1 - platformFee);
-                    swipeYesEarnings = data.swipeYesAmount + (shareOfYesPool * winningsFromLosingPool);
-                    swipeYesProfitPercent = ((swipeYesEarnings - data.swipeYesAmount) / data.swipeYesAmount) * 100;
-                  }
-
-                  // Calculate potential SWIPE payout if NO wins
-                  let swipeNoEarnings = 0;
-                  let swipeNoProfitPercent = 0;
-                  if (data.swipeNoAmount > 0 && noPoolSWIPE > 0) {
-                    const shareOfNoPool = data.swipeNoAmount / noPoolSWIPE;
-                    const winningsFromLosingPool = yesPoolSWIPE * (1 - platformFee);
-                    swipeNoEarnings = data.swipeNoAmount + (shareOfNoPool * winningsFromLosingPool);
-                    swipeNoProfitPercent = ((swipeNoEarnings - data.swipeNoAmount) / data.swipeNoAmount) * 100;
-                  }
-
-                  return {
-                    address,
-                    displayName,
-                    vote: data.vote,
-                    // ETH data
-                    yesAmount: data.yesAmount,
-                    noAmount: data.noAmount,
-                    ethYesEarnings,
-                    ethNoEarnings,
-                    ethYesProfitPercent,
-                    ethNoProfitPercent,
-                    // SWIPE data
-                    swipeYesAmount: data.swipeYesAmount,
-                    swipeNoAmount: data.swipeNoAmount,
-                    swipeYesEarnings,
-                    swipeNoEarnings,
-                    swipeYesProfitPercent,
-                    swipeNoProfitPercent,
-                    pfp: profile?.pfp_url
-                  };
-                })
-                .sort((a, b) => {
-                  // Sort by total value (ETH + SWIPE combined)
-                  const aTotal = (a.yesAmount + a.noAmount) + (a.swipeYesAmount + a.swipeNoAmount);
-                  const bTotal = (b.yesAmount + b.noAmount) + (b.swipeYesAmount + b.swipeNoAmount);
-                  return bTotal - aTotal;
-                });
-
-              if (stakersWithEarnings.length === 0) {
-                return <div className="text-center text-zinc-400 font-mono text-xs py-4">No stakes data available</div>;
-              }
-
-              // Find current user's stake (if connected)
-              const myStake = address ? stakersWithEarnings.find(s => s.address.toLowerCase() === address.toLowerCase()) : null;
-              
-              // Get other stakers (excluding current user)
-              const allOtherStakers = stakersWithEarnings
-                .filter(s => !address || s.address.toLowerCase() !== address.toLowerCase());
-              
-              // Pagination
-              const ITEMS_PER_PAGE = 10;
-              const totalPages = Math.ceil(allOtherStakers.length / ITEMS_PER_PAGE);
-              const startIdx = earningsPage * ITEMS_PER_PAGE;
-              const endIdx = startIdx + ITEMS_PER_PAGE;
-              const otherStakers = allOtherStakers.slice(startIdx, endIdx);
-
-              // Helper to render a staker row
-              const renderStakerRow = (staker: typeof stakersWithEarnings[0], idx: number, isCurrentUser: boolean) => {
-                const hasEthYes = staker.yesAmount > 0;
-                const hasEthNo = staker.noAmount > 0;
-                const hasSwipeYes = staker.swipeYesAmount > 0;
-                const hasSwipeNo = staker.swipeNoAmount > 0;
-                
-                return (
-                  <div 
-                    key={staker.address} 
-                    className={`grid grid-cols-12 gap-1 items-center px-2 py-2 rounded-lg ${
-                      isCurrentUser 
-                        ? 'bg-[#d4ff00]/15 border border-[#d4ff00]/40' 
-                        : idx % 2 === 0 ? 'bg-zinc-800/50' : 'bg-zinc-900/30'
-                    }`}
-                  >
-                    {/* User info */}
-                    <div className="col-span-4 flex items-center gap-1.5 overflow-hidden">
-                      <Avatar className={`w-5 h-5 flex-shrink-0 ${isCurrentUser ? 'ring-2 ring-[#d4ff00]' : ''}`}>
-                        <AvatarImage src={staker.pfp || undefined} />
-                        <AvatarFallback className={`text-[8px] ${isCurrentUser ? 'bg-[#d4ff00] text-black font-bold' : 'bg-zinc-600 text-white'}`}>
-                          {isCurrentUser ? 'ME' : staker.displayName.slice(0, 2).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className={`text-[10px] font-mono truncate font-medium ${isCurrentUser ? 'text-[#d4ff00]' : 'text-white'}`}>
-                        {isCurrentUser ? '👉 YOU' : (staker.displayName.length > 8 ? staker.displayName.slice(0, 8) + '...' : staker.displayName)}
-                      </span>
-                    </div>
-                    
-                    {/* If YES wins */}
-                    <div className="col-span-4 text-center">
-                      {(hasEthYes || hasSwipeYes) ? (
-                        <div className="space-y-0.5">
-                          {hasEthYes && (
-                            <div className={`text-[10px] font-mono font-bold ${isCurrentUser ? 'text-emerald-300' : 'text-emerald-400'}`}>
-                              +{(staker.ethYesEarnings / 1e18).toFixed(4)} ETH
-                            </div>
-                          )}
-                          {hasSwipeYes && (
-                            <div className="text-[10px] font-mono text-[#d4ff00] font-bold">
-                              +{formatSwipeAmount(staker.swipeYesEarnings / 1e18)} $SWIPE
-                            </div>
-                          )}
-                          <div className={`text-[8px] font-mono ${isCurrentUser ? 'text-emerald-200' : 'text-emerald-300'}`}>
-                            +{(hasEthYes ? staker.ethYesProfitPercent : staker.swipeYesProfitPercent).toFixed(0)}%
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-[10px] text-zinc-500">—</span>
-                      )}
-                    </div>
-                    
-                    {/* If NO wins */}
-                    <div className="col-span-4 text-center">
-                      {(hasEthNo || hasSwipeNo) ? (
-                        <div className="space-y-0.5">
-                          {hasEthNo && (
-                            <div className={`text-[10px] font-mono font-bold ${isCurrentUser ? 'text-rose-300' : 'text-rose-400'}`}>
-                              +{(staker.ethNoEarnings / 1e18).toFixed(4)} ETH
-                            </div>
-                          )}
-                          {hasSwipeNo && (
-                            <div className="text-[10px] font-mono text-[#d4ff00] font-bold">
-                              +{formatSwipeAmount(staker.swipeNoEarnings / 1e18)} $SWIPE
-                            </div>
-                          )}
-                          <div className={`text-[8px] font-mono ${isCurrentUser ? 'text-rose-200' : 'text-rose-300'}`}>
-                            +{(hasEthNo ? staker.ethNoProfitPercent : staker.swipeNoProfitPercent).toFixed(0)}%
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-[10px] text-zinc-500">—</span>
-                      )}
-                    </div>
-                  </div>
-                );
-              };
-
-              return (
-                <div className="space-y-2">
-                  {/* Header row */}
-                  <div className="grid grid-cols-12 gap-1 text-[10px] font-mono px-2 border-b border-zinc-600/50 pb-2">
-                    <div className="col-span-4 text-zinc-400">SWIPER</div>
-                    <div className="col-span-4 text-center text-emerald-400 font-bold">IF YES WINS</div>
-                    <div className="col-span-4 text-center text-rose-400 font-bold">IF NO WINS</div>
-                  </div>
-                  
-                  {/* Current user's stake - always first if they have one */}
-                  {myStake && renderStakerRow(myStake, 0, true)}
-                  
-                  {/* Separator between user and others */}
-                  {myStake && otherStakers.length > 0 && (
-                    <div className="border-t border-zinc-600/50 my-1 pt-1">
-                      <div className="text-[9px] font-mono text-zinc-500 px-2">TOP SWIPERS</div>
-                    </div>
-                  )}
-                  
-                  {/* Other stakers - paginated */}
-                  {otherStakers.map((staker, idx) => renderStakerRow(staker, idx, false))}
-                  
-                  {/* Pagination controls - only if more than 10 other stakers */}
-                  {allOtherStakers.length > ITEMS_PER_PAGE && (
-                    <div className="flex items-center justify-center gap-2 pt-2 border-t border-zinc-700/50 mt-2">
-                      <button
-                        onClick={() => setEarningsPage(p => Math.max(0, p - 1))}
-                        disabled={earningsPage === 0}
-                        className={`px-2 py-1 rounded text-[10px] font-mono font-bold transition-all ${
-                          earningsPage === 0 
-                            ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed' 
-                            : 'bg-zinc-700 text-white hover:bg-zinc-600'
-                        }`}
-                      >
-                        ◀ PREV
-                      </button>
-                      
-                      <div className="flex items-center gap-1">
-                        {Array.from({ length: totalPages }, (_, i) => (
-                          <button
-                            key={i}
-                            onClick={() => setEarningsPage(i)}
-                            className={`w-6 h-6 rounded text-[10px] font-mono font-bold transition-all ${
-                              earningsPage === i 
-                                ? 'bg-[#d4ff00] text-black' 
-                                : 'bg-zinc-700 text-zinc-400 hover:bg-zinc-600 hover:text-white'
-                            }`}
-                          >
-                            {i + 1}
-                          </button>
-                        ))}
-                      </div>
-                      
-                      <button
-                        onClick={() => setEarningsPage(p => Math.min(totalPages - 1, p + 1))}
-                        disabled={earningsPage === totalPages - 1}
-                        className={`px-2 py-1 rounded text-[10px] font-mono font-bold transition-all ${
-                          earningsPage === totalPages - 1 
-                            ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed' 
-                            : 'bg-zinc-700 text-white hover:bg-zinc-600'
-                        }`}
-                      >
-                        NEXT ▶
-                      </button>
-                    </div>
-                  )}
-                  
-                  {/* Total count info */}
-                  {allOtherStakers.length > ITEMS_PER_PAGE && (
-                    <div className="text-center text-zinc-500 font-mono text-[9px] pt-1">
-                      Showing {startIdx + 1}-{Math.min(endIdx, allOtherStakers.length)} of {allOtherStakers.length} swipers
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-        </div>
-      )}
+        The stake dialog already shows a correct preview, built from the live
+        platformFeeBps and creatorFeeBps against the losing pool. This was the
+        stale second copy, and two answers to the same question is worse than
+        one.
+      */}
         </div>
 
       {/* Modern Professional Stake Modal - Compact for Mini App */}
       <Dialog open={stakeModal.isOpen} onOpenChange={(open) => !open && handleCloseStakeModal()}>
-        <DialogContent className="stake-dialog sm:max-w-[500px] max-h-[100vh] min-h-[90vh] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 border border-slate-800/80 text-white p-0 gap-0 overflow-y-auto shadow-2xl backdrop-blur-xl !top-[47%] sm:!top-[50%] sm:max-h-[90vh] sm:min-h-0">
-          {/* Enhanced Glassmorphic Header with Neon Glow Effects */}
-          <div className={`relative overflow-hidden border-b ${stakeModal.isYes ? 'border-lime-400/30' : 'border-red-500/30'} bg-gradient-to-r from-slate-900/95 via-slate-800/80 to-slate-900/95 backdrop-blur-xl`}>
-            {/* Animated neon gradient overlay with pulse - More intense for YES */}
-            <div className={`absolute inset-0 bg-gradient-to-r ${stakeModal.isYes ? 'from-lime-400/60 via-green-400/50 to-emerald-400/30' : 'from-red-500/50 via-rose-500/40 to-pink-500/30'} animate-pulse`} />
-            {/* Neon radial glow effect - More intense for YES */}
-            <div className={`absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] ${stakeModal.isYes ? 'from-lime-400/40 via-green-400/25 to-transparent' : 'from-red-500/30 via-rose-500/15 to-transparent'}`} />
-            {/* Animated neon light streaks - More visible for YES */}
-            <div className={`absolute inset-0 ${stakeModal.isYes ? 'opacity-50' : 'opacity-40'} ${stakeModal.isYes ? 'bg-gradient-to-r from-transparent via-lime-400/60 to-transparent' : 'bg-gradient-to-r from-transparent via-red-500/50 to-transparent'}`} style={{ 
+        <DialogContent className="stake-dialog">
+          {/* Header */}
+          <div className="swipe-stake__head">
+            {/* Retired decorative layers, hidden by .swipe-stake__gone */}
+            <div className="swipe-stake__gone" />
+            <div className="swipe-stake__gone" />
+            <div className="swipe-stake__gone" style={{
               backgroundSize: '200% 100%',
               animation: 'shimmer 3s ease-in-out infinite'
             }} />
-            
-            <DialogHeader className="relative p-4 pb-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  {/* Enhanced Icon with neon glow - smaller for mobile, more intense for YES */}
-                  <div className="relative">
-                    {/* Outer neon glow ring - More intense for YES */}
-                    <div className={`absolute -inset-1.5 ${stakeModal.isYes ? 'bg-lime-400' : 'bg-red-500'} blur-xl ${stakeModal.isYes ? 'opacity-100' : 'opacity-80'} rounded-2xl animate-pulse`} style={{ animationDuration: '2s' }} />
-                    {/* Middle neon glow - More intense for YES */}
-                    <div className={`absolute inset-0 ${stakeModal.isYes ? 'bg-green-400' : 'bg-red-500'} blur-lg ${stakeModal.isYes ? 'opacity-90' : 'opacity-70'} rounded-xl`} />
-                    {/* Icon container with neon gradient and glow - Brighter for YES */}
-                    <div className={`relative w-10 h-10 rounded-xl flex items-center justify-center font-bold shadow-2xl ${stakeModal.isYes ? 'bg-gradient-to-br from-lime-300 via-green-400 to-emerald-500 shadow-lime-400/100' : 'bg-gradient-to-br from-red-400 via-rose-500 to-pink-600 shadow-red-500/90'} border-2 ${stakeModal.isYes ? 'border-lime-300/90' : 'border-red-400/70'}`}>
-                      <div className={`absolute inset-0 ${stakeModal.isYes ? 'bg-lime-400' : 'bg-red-500'} ${stakeModal.isYes ? 'opacity-40' : 'opacity-30'} rounded-xl animate-ping`} style={{ animationDuration: '3s' }} />
-                      {stakeModal.isYes ? <TrendingUp className="w-5 h-5 text-white drop-shadow-lg relative z-10" /> : <TrendingDown className="w-5 h-5 text-white drop-shadow-lg relative z-10" />}
+
+            <DialogHeader className="swipe-stake__headrow">
+              <div className="swipe-stake__topline">
+                <div className="swipe-stake__idblock">
+                  <div className="swipe-stake__iconwrap">
+                    {/* Retired glow layers, hidden by .swipe-stake__gone */}
+                    <div className="swipe-stake__gone" style={{ animationDuration: '2s' }} />
+                    <div className="swipe-stake__gone" />
+                    <div className={`swipe-stake__icon ${stakeModal.isYes ? 'swipe-stake__icon--yes' : 'swipe-stake__icon--no'}`}>
+                      <div className="swipe-stake__gone" style={{ animationDuration: '3s' }} />
+                      {stakeModal.isYes ? <TrendingUp className="swipe-stake__icon-mark" /> : <TrendingDown className="swipe-stake__icon-mark" />}
               </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <DialogTitle className="text-base font-bold text-white mb-0.5 tracking-tight drop-shadow-lg truncate">
+                  <div className="swipe-stake__titles">
+                    <DialogTitle className="swipe-stake__title">
                       Prediction #{stakeModal.predictionId}
                     </DialogTitle>
-                    <DialogDescription className="text-slate-300 text-xs flex items-center gap-1.5 truncate">
-                      <Target className={`w-3 h-3 flex-shrink-0 ${stakeModal.isYes ? 'text-lime-400' : 'text-red-500'}`} />
-                      <span className="truncate">Betting <span className={`font-bold ${stakeModal.isYes ? 'text-lime-300 drop-shadow-[0_0_12px_rgba(132,204,22,0.8)]' : 'text-red-400 drop-shadow-[0_0_12px_rgba(239,68,68,0.8)]'}`}>{stakeModal.isYes ? 'YES' : 'NO'}</span></span>
+                    <DialogDescription className={`swipe-stake__side ${stakeModal.isYes ? 'swipe-stake__side--yes' : 'swipe-stake__side--no'}`}>
+                      <Target className="swipe-stake__side-ico" />
+                      <span className="swipe-stake__side-text">Betting <span className="swipe-stake__side-word">{stakeModal.isYes ? 'YES' : 'NO'}</span></span>
                     </DialogDescription>
                   </div>
                 </div>
-                {/* Enhanced Badge - smaller for mobile */}
-                <Badge variant="outline" className={`px-2.5 py-1 text-[10px] font-bold border-2 backdrop-blur-sm relative overflow-hidden flex-shrink-0 ${stakeModal.isYes ? 'border-lime-400/90 text-lime-200 bg-green-500/30 shadow-lg shadow-lime-400/60' : 'border-red-500/90 text-red-200 bg-rose-600/30 shadow-lg shadow-red-500/60'}`}>
-                  {/* Animated neon shine effect */}
-                  <div className={`absolute inset-0 ${stakeModal.isYes ? 'bg-gradient-to-r from-transparent via-lime-300/50 to-transparent' : 'bg-gradient-to-r from-transparent via-red-400/50 to-transparent'}`} style={{ 
+                <Badge variant="outline" className={`swipe-stake__flag ${stakeModal.isYes ? 'swipe-stake__flag--yes' : 'swipe-stake__flag--no'}`}>
+                  {/* Retired shine layer, hidden by .swipe-stake__gone */}
+                  <div className="swipe-stake__gone" style={{
                     backgroundSize: '200% 100%',
                     animation: 'shimmer 2s ease-in-out infinite'
                   }} />
-                  <span className={`relative z-10 drop-shadow-sm ${stakeModal.isYes ? 'text-lime-100' : 'text-red-100'}`}>{stakeModal.isYes ? 'BULLISH ↗' : 'BEARISH ↘'}</span>
+                  <span>{stakeModal.isYes ? 'BULLISH ↗' : 'BEARISH ↘'}</span>
                 </Badge>
               </div>
             </DialogHeader>
             </div>
 
-          <Separator className="bg-gradient-to-r from-transparent via-slate-700/50 to-transparent h-px" />
+          <Separator className="swipe-stake__rule" />
 
           {/* Bet amount, in this chain's collateral. One token, no selector:
               V3 pulls a single ERC-20 and has no payable function. */}
-          <div className="p-4 pt-3">
-            <Card className="bg-gradient-to-br from-slate-900/90 via-slate-800/60 to-slate-900/90 border-slate-700/60 backdrop-blur-xl shadow-xl">
-              <CardContent className="p-3">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs text-[#d4ff00] font-semibold flex items-center gap-1.5">
-                      <Wallet className="w-3.5 h-3.5" />
+          <div className="swipe-stake__body">
+            <Card className="swipe-stake__panel">
+              <CardContent className="swipe-stake__panel-in">
+                <div className="swipe-stake__stack">
+                  <div className="swipe-stake__labelrow">
+                    <label className="swipe-stake__label">
+                      <Wallet className="swipe-stake__label-ico" />
                       Bet amount ({collateralSymbol})
                     </label>
-                    <span className="text-[10px] text-slate-400 font-medium">
+                    <span className="swipe-stake__bal">
                       Balance {formattedCollateralBalance} {collateralSymbol}
                     </span>
                   </div>
 
                   {/* Quick amounts */}
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="swipe-stake__quick">
                     {['1', '5', '10', '25'].map((amount) => (
                       <Button
                         key={amount}
                         onClick={() => handleStakeAmountChange(amount)}
                         variant="outline"
-                        className="h-8 rounded-lg border-2 border-[#d4ff00]/50 bg-slate-900/50 text-white font-bold text-[10px] hover:bg-[#d4ff00]/20 hover:border-[#d4ff00]/80 hover:scale-105 transition-all duration-200 backdrop-blur-sm"
+                        className="swipe-stake__chip"
                       >
                         {amount}
                       </Button>
                     ))}
                   </div>
 
-                  <div className="mt-3 relative">
-                    <div className="relative">
+                  <div className="swipe-stake__inputblock">
+                    <div className="swipe-stake__inputwrap">
                       <Input
                         type="text"
                         inputMode="decimal"
                         value={stakeModal.stakeAmount}
                         onChange={(e) => handleStakeAmountChange(e.target.value.replace(/[^0-9.]/g, ''))}
                         placeholder={minBetDisplay}
-                        className="w-full h-12 text-2xl font-extrabold bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-2 border-[#d4ff00]/40 rounded-xl text-[#d4ff00] text-center placeholder:text-slate-600 focus:border-[#d4ff00] focus:ring-2 focus:ring-[#d4ff00]/20 focus:shadow-lg focus:shadow-[#d4ff00]/10 transition-all duration-300 backdrop-blur-sm"
+                        className="swipe-stake__input"
                         style={{
                           WebkitAppearance: 'none',
                           MozAppearance: 'textfield',
                         }}
                       />
-                      <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-[#d4ff00]/0 via-[#d4ff00]/5 to-[#d4ff00]/0 pointer-events-none" />
+                      <div className="swipe-stake__gone" />
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-center gap-2 py-2 px-3 bg-gradient-to-r from-[#d4ff00]/15 via-[#d4ff00]/10 to-[#d4ff00]/15 rounded-lg border border-[#d4ff00]/30 backdrop-blur-sm">
-                    <Info className="w-3.5 h-3.5 text-[#d4ff00]" />
-                    <span className="text-slate-300 text-[10px] font-medium">
+                  <div className="swipe-stake__note">
+                    <Info className="swipe-stake__note-ico" />
+                    <span>
                       Minimum {minBetDisplay} {collateralSymbol}
                     </span>
                   </div>
 
                   {marketWrite.wrongNetwork && (
-                    <div className="flex items-center justify-center gap-2 py-2 px-3 bg-amber-500/10 rounded-lg border border-amber-500/30">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-                      <span className="text-amber-200 text-[10px] font-medium">
+                    <div className="swipe-stake__note swipe-stake__note--warn">
+                      <AlertTriangle className="swipe-stake__note-ico" />
+                      <span>
                         Your wallet is on another network. It will be asked to switch before signing.
                       </span>
                     </div>
                   )}
                 </div>
 
-                {/* Potential Earnings - Compact Table */}
-                <Card className="bg-gradient-to-br from-slate-900/90 via-emerald-950/30 to-slate-900/90 border-2 border-emerald-500/20 backdrop-blur-xl shadow-2xl mt-3">
-                  <CardContent className="p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-1.5">
-                        <Calculator className="w-3.5 h-3.5 text-[#d4ff00]" />
-                        <span className="text-xs font-bold text-[#d4ff00]">Potential earnings</span>
+                {/* Potential Earnings - the ledger */}
+                <Card className="swipe-stake__ledger">
+                  <CardContent className="swipe-stake__ledger-in">
+                    <div className="swipe-stake__ledgerhead">
+                      <div className="swipe-stake__ledgertitle">
+                        <Calculator className="swipe-stake__ledger-ico" />
+                        <span>Potential earnings</span>
                       </div>
-                      <Badge variant="outline" className="text-[9px] border-[#d4ff00]/40 text-[#d4ff00] bg-[#d4ff00]/10 font-semibold px-1.5 py-0.5">EST.</Badge>
+                      <Badge variant="outline" className="swipe-stake__est">EST.</Badge>
                     </div>
                     {potentialEarnings ? (
                       <Table>
                         <TableBody>
-                          <TableRow className="border-slate-700/50 hover:bg-slate-800/30">
-                            <TableCell className="py-2 text-[10px] text-blue-300 font-medium">
-                              <div className="flex items-center gap-1.5">
-                                <ArrowUpRight className="w-3 h-3 text-blue-400" />
+                          <TableRow className="swipe-stake__tr">
+                            <TableCell className="swipe-stake__td swipe-stake__td--key">
+                              <div className="swipe-stake__keywrap">
+                                <ArrowUpRight className="swipe-stake__key-ico" />
                                 <span>Payout</span>
                               </div>
                             </TableCell>
-                            <TableCell className="py-2 text-right">
-                              <div className="text-xs font-extrabold text-[#d4ff00]">
+                            <TableCell className="swipe-stake__td swipe-stake__td--val">
+                              <div className="swipe-stake__val swipe-stake__val--lime">
                                 {potentialEarnings.payout.toFixed(2)} {potentialEarnings.token}
                               </div>
                             </TableCell>
                           </TableRow>
 
-                          <TableRow className="border-slate-700/50 hover:bg-slate-800/30">
-                            <TableCell className="py-2 text-[10px] text-emerald-300 font-medium">
-                              <div className="flex items-center gap-1.5">
-                                <TrendingUp className="w-3 h-3 text-emerald-400" />
+                          <TableRow className="swipe-stake__tr">
+                            <TableCell className="swipe-stake__td swipe-stake__td--key">
+                              <div className="swipe-stake__keywrap">
+                                <TrendingUp className="swipe-stake__key-ico" />
                                 <span>Profit</span>
                               </div>
                             </TableCell>
-                            <TableCell className="py-2 text-right">
-                              <div className="text-xs font-extrabold text-[#d4ff00]">
+                            <TableCell className="swipe-stake__td swipe-stake__td--val">
+                              <div className="swipe-stake__val swipe-stake__val--lime">
                                 +{potentialEarnings.profit.toFixed(2)} {potentialEarnings.token}
                               </div>
-                              <div className="text-[9px] text-amber-300 font-semibold mt-0.5">
+                              <div className="swipe-stake__sub">
                                 {potentialEarnings.profitPercent.toFixed(1)}% ROI
                               </div>
                             </TableCell>
                           </TableRow>
 
-                          <TableRow className="border-slate-700/50 hover:bg-slate-800/30">
-                            <TableCell className="py-2 text-[10px] text-blue-300 font-medium">
-                              <div className="flex items-center gap-1.5">
-                                <PieChart className="w-3 h-3 text-blue-400" />
+                          <TableRow className="swipe-stake__tr">
+                            <TableCell className="swipe-stake__td swipe-stake__td--key">
+                              <div className="swipe-stake__keywrap">
+                                <PieChart className="swipe-stake__key-ico" />
                                 <span>Share of pool</span>
                               </div>
                             </TableCell>
-                            <TableCell className="py-2 text-right">
-                              <div className="text-xs font-bold text-blue-300 mb-1">
+                            <TableCell className="swipe-stake__td swipe-stake__td--val">
+                              <div className="swipe-stake__val">
                                 {potentialEarnings.sharePercent.toFixed(2)}%
                               </div>
-                              <Progress value={Math.min(potentialEarnings.sharePercent, 100)} className="h-1.5 bg-slate-800/60" />
+                              <Progress value={Math.min(potentialEarnings.sharePercent, 100)} className="swipe-stake__meter" />
                             </TableCell>
                           </TableRow>
 
-                          <TableRow className="border-slate-700/50 hover:bg-slate-800/30">
-                            <TableCell className="py-2 text-[10px] text-purple-300 font-medium">
-                              <div className="flex items-center gap-1.5">
-                                <Info className="w-3 h-3 text-purple-400" />
+                          <TableRow className="swipe-stake__tr">
+                            <TableCell className="swipe-stake__td swipe-stake__td--key">
+                              <div className="swipe-stake__keywrap">
+                                <Info className="swipe-stake__key-ico" />
                                 <span>Pool after bet</span>
                               </div>
                             </TableCell>
-                            <TableCell className="py-2 text-right">
-                              <div className="text-xs font-bold text-purple-300">
+                            <TableCell className="swipe-stake__td swipe-stake__td--val">
+                              <div className="swipe-stake__val">
                                 {potentialEarnings.totalPoolAfter.toFixed(2)} {potentialEarnings.token}
                               </div>
                             </TableCell>
@@ -3516,12 +3328,12 @@ KEY USER-FACING CHANGES: V1 → V2
                         </TableBody>
                       </Table>
                     ) : (
-                      <div className="text-center py-3 text-cyan-300 text-xs flex items-center justify-center gap-2">
-                        <Info className="w-3.5 h-3.5 text-[#d4ff00]" />
+                      <div className="swipe-stake__empty">
+                        <Info className="swipe-stake__note-ico" />
                         <span>Enter an amount to preview potential payout</span>
                       </div>
                     )}
-                    <p className="text-[9px] text-slate-500 mt-2 leading-snug">
+                    <p className="swipe-stake__caveat">
                       An estimate on the pools as they stand. Your share of the losing pool is also weighted by how early you bet, which this does not model.
                     </p>
                   </CardContent>
@@ -3531,40 +3343,40 @@ KEY USER-FACING CHANGES: V1 → V2
             </Card>
               </div>
 
-          {/* Modern Footer Actions - Compact */}
-          <DialogFooter className="p-4 pt-3 gap-2 border-t border-slate-800/80 bg-slate-900/40 backdrop-blur-sm">
+          {/* Footer actions */}
+          <DialogFooter className="swipe-stake__foot">
             <Button
               variant="outline"
               onClick={handleCloseStakeModal}
               disabled={isTransactionLoading}
-              className="flex-1 h-11 bg-slate-900/60 border-2 border-slate-700/60 hover:bg-slate-800/80 hover:border-slate-600 text-white font-semibold rounded-lg transition-all duration-200 backdrop-blur-sm text-sm"
+              className="swipe-stake__btn swipe-stake__btn--quiet"
             >
                   Cancel
             </Button>
             <Button
                   onClick={handleConfirmStake}
                   disabled={isTransactionLoading || !marketWrite.ready}
-              className="flex-1 h-11 font-bold text-sm rounded-lg transition-all duration-300 shadow-xl hover:scale-[1.02] active:scale-[0.98] bg-gradient-to-r from-[#d4ff00] via-[#b8e600] to-[#d4ff00] hover:from-[#c4ef00] hover:via-[#a8cc00] hover:to-[#c4ef00] text-black shadow-[#d4ff00]/30 disabled:opacity-60"
+              className={`swipe-stake__btn swipe-stake__btn--go${isTransactionLoading ? ' swipe-stake__btn--busy' : ''}`}
                 >
                   {isTransactionLoading ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin border-black" />
-                  <span className="text-sm">Processing...</span>
+                <div className="swipe-stake__btnrow">
+                  <div className="swipe-stake__spin" />
+                  <span>Processing...</span>
                 </div>
                   ) : !marketWrite.ready ? (
-                    <div className="flex items-center gap-1.5">
-                      <AlertTriangle className="w-4 h-4" />
-                      <span className="text-sm">No market on this network</span>
+                    <div className="swipe-stake__btnrow">
+                      <AlertTriangle className="swipe-stake__btn-ico" />
+                      <span>No market on this network</span>
                     </div>
                   ) : needsApproval ? (
-                    <div className="flex items-center gap-1.5">
-                      <Zap className="w-4 h-4" />
-                      <span className="text-sm">Approve and bet {stakeModal.stakeAmount} {collateralSymbol}</span>
+                    <div className="swipe-stake__btnrow">
+                      <Zap className="swipe-stake__btn-ico" />
+                      <span>Approve and bet {stakeModal.stakeAmount} {collateralSymbol}</span>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-1.5">
-                      <Target className="w-4 h-4" />
-                      <span className="text-sm">Bet {stakeModal.stakeAmount} {collateralSymbol}</span>
+                    <div className="swipe-stake__btnrow">
+                      <Target className="swipe-stake__btn-ico" />
+                      <span>Bet {stakeModal.stakeAmount} {collateralSymbol}</span>
                     </div>
                   )}
             </Button>
@@ -3869,10 +3681,10 @@ KEY USER-FACING CHANGES: V1 → V2
                               
                               <p className="text-zinc-500 text-xs font-light">
                                 {aiModal.confidence === 'HIGH' 
-                                  ? 'Strong signal — high confidence'
+                                  ? 'Strong signal, high confidence'
                                   : aiModal.confidence === 'MEDIUM'
-                                  ? 'Moderate signal — consider risk tolerance'
-                                  : 'Weak signal — proceed with caution'
+                                  ? 'Moderate signal, weigh your risk tolerance'
+                                  : 'Weak signal, proceed with caution'
                                 }
                               </p>
                             </div>

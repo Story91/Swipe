@@ -1,5 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
-import { getMarketContract, txUrl, addressUrl, exitValue, wouldEmptyPool } from './market';
+import {
+  getMarketContract,
+  txUrl,
+  addressUrl,
+  exitValue,
+  wouldEmptyPool,
+  decodePositionSides,
+  exitQuote,
+} from './market';
 import { CHAINS } from './index';
 
 const usdc = (n: number) => BigInt(Math.round(n * 1e6));
@@ -174,5 +182,93 @@ describe('the final-quarter rule against emptying a side', () => {
     expect(
       wouldEmptyPool({ ...base, isYes: false, amount: usdc(50), now: BigInt(70000) })
     ).toBe(true);
+  });
+});
+
+describe('decoding a position without merging its sides', () => {
+  it('hands back both sides, because the contract holds both at once', () => {
+    const p = decodePositionSides([usdc(10), usdc(25), usdc(11), usdc(26), false]);
+    expect(p).not.toBeNull();
+    // The dominant-side collapse this replaces would have kept only 25 here.
+    expect(p!.yesAmount).toBe(usdc(10));
+    expect(p!.noAmount).toBe(usdc(25));
+    expect(p!.claimed).toBe(false);
+  });
+
+  it('refuses a malformed read rather than inventing zeros', () => {
+    expect(decodePositionSides(undefined)).toBeNull();
+    expect(decodePositionSides([])).toBeNull();
+    expect(decodePositionSides(['10', '25', '0', '0', false])).toBeNull();
+  });
+});
+
+describe('the exit preflight answers before the wallet opens', () => {
+  // A day-long market: created at 1000, deadline 87400, final quarter from
+  // now = 65800. YES holds 100, NO holds 50, the user holds 40 of YES.
+  const open = {
+    isYes: true,
+    held: usdc(40),
+    yesPool: usdc(100),
+    noPool: usdc(50),
+    createdAt: BigInt(1000),
+    deadline: BigInt(87400),
+    now: BigInt(30000),
+    earlyExitFeeBps: BigInt(500),
+    resolved: false,
+    cancelled: false,
+    refundable: false,
+  };
+
+  it('quotes the same value exitValue computes, and no refusal', () => {
+    const q = exitQuote({ ...open, amount: usdc(40) });
+    const v = exitValue({
+      amount: usdc(40),
+      isYes: true,
+      yesPool: usdc(100),
+      noPool: usdc(50),
+      earlyExitFeeBps: BigInt(500),
+    });
+    expect(q.refusal).toBeNull();
+    expect(q.gross).toBe(v.gross);
+    expect(q.fee).toBe(v.fee);
+    expect(q.net).toBe(v.net);
+  });
+
+  it('refuses each closed market state with its own sentence', () => {
+    expect(exitQuote({ ...open, amount: usdc(1), resolved: true }).refusal).toMatch(/settled/);
+    expect(exitQuote({ ...open, amount: usdc(1), cancelled: true }).refusal).toMatch(/cancelled/);
+    expect(exitQuote({ ...open, amount: usdc(1), refundable: true }).refusal).toMatch(/refund/);
+    expect(
+      exitQuote({ ...open, amount: usdc(1), now: BigInt(87400) }).refusal
+    ).toMatch(/closed/);
+  });
+
+  it('refuses more than is held on the side being exited, not the merged total', () => {
+    // Held 40 on YES. A merged-position UI would offer 40 + whatever NO holds.
+    expect(exitQuote({ ...open, amount: usdc(41) }).refusal).toMatch(/hold less/);
+    expect(exitQuote({ ...open, amount: usdc(40) }).refusal).toBeNull();
+    expect(exitQuote({ ...open, amount: BigInt(0) }).refusal).toMatch(/amount/);
+  });
+
+  it('refuses the pool-emptying exit only inside the final quarter', () => {
+    const soleBacker = { ...open, held: usdc(100), amount: usdc(100) };
+    expect(exitQuote({ ...soleBacker, now: BigInt(65799) }).refusal).toBeNull();
+    expect(exitQuote({ ...soleBacker, now: BigInt(65800) }).refusal).toMatch(/last quarter/);
+    // A partial exit stays legal at the same moment.
+    expect(
+      exitQuote({ ...soleBacker, amount: usdc(99), now: BigInt(65800) }).refusal
+    ).toBeNull();
+  });
+
+  it('refuses an exit that rounds to nothing after the fee', () => {
+    // One raw unit against a lopsided pool: gross truncates to 0.
+    const q = exitQuote({
+      ...open,
+      amount: BigInt(1),
+      yesPool: usdc(1000000),
+      noPool: BigInt(1),
+    });
+    expect(q.net).toBe(BigInt(0));
+    expect(q.refusal).toMatch(/round/);
   });
 });

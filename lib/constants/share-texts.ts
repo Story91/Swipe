@@ -1,6 +1,23 @@
 /**
- * Share texts for different sharing scenarios
- * Centralized location for all share text variants
+ * Every line the app can post to a public feed on a user's behalf.
+ *
+ * Three rules, learned the hard way, because a wrong line here is not a bug in
+ * a page nobody reads, it is a claim published under someone's name.
+ *
+ * Name no token. Bets settle in the chain's own stablecoin, USDC on Base and
+ * Paxos USDG on Robinhood, and the symbol is passed in by the caller from the
+ * chain config. There are no ETH or SWIPE bets any more; those live on archived
+ * contracts. This file used to print "💰 ETH Pool: 0.0000 ETH" next to a market
+ * whose money was all collateral, and a "SWIPE Pool" beside it.
+ *
+ * Promise no earnings. Swipe is parimutuel: the winning side splits what the
+ * losing side put in, less 300 bps to the platform and 50 bps to the creator,
+ * both taken from the losing pool only. Nobody is paid for showing up, so a
+ * line reading "start earning today" is a claim the contract does not make.
+ *
+ * Quote no rate. Fees can be changed by the contract owner, so a percentage
+ * frozen into a share text goes stale silently. The FAQ and the manifesto are
+ * where the numbers live.
  */
 
 // ============================================
@@ -17,13 +34,13 @@ export function getStakeShareIntros(platform: 'farcaster' | 'twitter' = 'farcast
     `⚡ Just locked in my bet on ${tag}!`,
     "🎰 Going all in on this prediction!",
     `💎 Diamond hands on ${tag}!`,
-    "🚀 Just bet on this - LFG!",
+    "🚀 Just bet on this. LFG!",
     `🎯 Placed my stake on ${tag}!`,
     `💪 Just made my move on ${tag}!`,
     "🏆 Betting big on this one!",
-    "🔮 Made my prediction - feeling good!",
+    "🔮 Made my prediction, feeling good!",
     "⚡ Just swiped on this prediction!",
-    "💰 Locked in my bet - what's yours?",
+    "💰 Locked in my bet. What's yours?",
     `🎯 Just took a position on ${tag}!`,
     "🔥 This prediction called to me!"
   ];
@@ -93,8 +110,8 @@ export function getRandomStakeCTA(): string {
 /**
  * Build complete share text for staked prediction
  * @param predictionText - The prediction question
- * @param formattedAmount - Formatted stake amount (e.g., "0.001" or "50K")
- * @param token - Token symbol (ETH or SWIPE)
+ * @param formattedAmount - Formatted stake amount (e.g., "25.00")
+ * @param token - The chain's collateral symbol, USDC on Base and USDG on Robinhood
  * @param predictionUrl - URL to the prediction
  * @param platform - Platform for sharing (farcaster or twitter)
  * @returns Complete share text ready to post
@@ -195,51 +212,64 @@ export function getRandomCurrentPredictionOutro(platform: 'farcaster' | 'twitter
   return outros[Math.floor(Math.random() * outros.length)];
 }
 
+/** A pool, in the collateral the market actually holds. */
+export interface SharePool {
+  /** Readable units, already divided by the token's decimals. */
+  amount: number;
+  /** USDC on Base, USDG on Robinhood. From the chain config, never a literal. */
+  symbol: string;
+}
+
 /**
- * Build share text for current prediction (before user bets)
- * @param predictionText - The prediction question
- * @param poolInfoETH - Optional ETH pool size
- * @param poolInfoSwipe - Optional SWIPE pool size
- * @param participants - Number of participants
- * @param platform - Platform for sharing (farcaster or twitter)
- * @returns Share text and URL
+ * Build share text for a market the user is looking at but has not bet on.
+ *
+ * The two archived pool figures are still in the signature and are ignored.
+ * They used to produce the two worst lines this file could post: an "ETH Pool"
+ * off `yesTotalAmount` and a "SWIPE Pool" off `swipeYesTotalAmount`, neither of
+ * which anything has written since the role split. On every market the app can
+ * currently bet on, both read zero, so the share either said nothing or, on an
+ * old market that still carries archived totals, told a public feed the pool
+ * was denominated in a token the market does not take.
+ *
+ * They stay in place rather than being deleted because the caller is
+ * app/components/Main/TinderCard.tsx and it still passes them positionally.
+ * Pass `pool` to get a pool line back, with the currency named.
+ *
+ * @param predictionText The prediction question
+ * @param _archivedEthPool Ignored. The V2 ETH pool, kept for call compatibility
+ * @param _archivedSwipePool Ignored. The V2 SWIPE pool, same reason
+ * @param participants Number of swipers on this market
+ * @param platform Where the text is going
+ * @param pool The collateral pool and its symbol, if the caller knows them
  */
 export function buildCurrentPredictionShareText(
   predictionText: string,
-  poolInfoETH?: number,
-  poolInfoSwipe?: number,
+  _archivedEthPool?: number,
+  _archivedSwipePool?: number,
   participants?: number,
-  platform: 'farcaster' | 'twitter' = 'farcaster'
+  platform: 'farcaster' | 'twitter' = 'farcaster',
+  pool?: SharePool
 ): { text: string; includeStats: boolean } {
   const intro = getRandomCurrentPredictionIntro(platform);
   const outro = getRandomCurrentPredictionOutro(platform);
-  
+
   let shareText = `${intro}\n\n"${predictionText}"`;
-  
-  // Add pool info if available
+
   let hasStats = false;
-  if (poolInfoETH && poolInfoETH > 0) {
-    shareText += `\n\n💰 ETH Pool: ${poolInfoETH.toFixed(4)} ETH`;
+  if (pool && pool.amount > 0) {
+    const amount =
+      pool.amount >= 1000 ? `${(pool.amount / 1000).toFixed(1)}k` : pool.amount.toFixed(2);
+    shareText += `\n\n💰 Pool: ${amount} ${pool.symbol}`;
     hasStats = true;
   }
-  
-  if (poolInfoSwipe && poolInfoSwipe > 0) {
-    const formattedSwipe = poolInfoSwipe >= 1000000 
-      ? `${(poolInfoSwipe / 1000000).toFixed(1)}M`
-      : poolInfoSwipe >= 1000 
-      ? `${(poolInfoSwipe / 1000).toFixed(0)}K`
-      : poolInfoSwipe.toFixed(0);
-    shareText += `\n🎯 SWIPE Pool: ${formattedSwipe}`;
-    hasStats = true;
-  }
-  
+
   if (participants && participants > 0) {
     shareText += `\n👥 ${participants} swipers`;
     hasStats = true;
   }
-  
+
   shareText += `\n\n${outro}`;
-  
+
   return {
     text: shareText,
     includeStats: hasStats
@@ -286,7 +316,7 @@ export function getLossShareIntros(platform: 'farcaster' | 'twitter' = 'farcaste
     "🔄 On to the next one",
     `💡 Lesson learned on ${tag}`,
     "🌊 Riding out this L",
-    "🎰 House won this round",
+    "🎰 The other side called it",
     "📉 Red candle this time",
     "🤔 Didn't see that coming",
     "⚖️ Wrong side of history",
@@ -420,18 +450,10 @@ export function formatTimeLeft(deadline: number): string {
   return `${minutes}m`;
 }
 
-/**
- * Format SWIPE amount with K/M suffixes
- */
-export function formatSwipeAmount(amount: number): string {
-  if (amount >= 1000000) {
-    return `${(amount / 1000000).toFixed(1)}M`;
-  }
-  if (amount >= 1000) {
-    return `${(amount / 1000).toFixed(0)}K`;
-  }
-  return amount.toFixed(0);
-}
+// formatSwipeAmount lived here. Nothing imported it, and no bet is denominated
+// in SWIPE any more, so the only thing it could do was tempt a caller into
+// printing a SWIPE figure on a market that settles in stablecoin. TinderCard
+// has its own local copy for the archived leaderboard it still renders.
 
 // ============================================
 // CLAIM REWARD SHARE (After claiming winnings)
@@ -459,21 +481,21 @@ export const CLAIM_SHARE_INTROS = [
 export function getClaimShareOutros(platform: 'farcaster' | 'twitter' = 'farcaster'): string[] {
   const tag = getPlatformTag(platform);
   return [
-    `Predict on ${tag} and Earn:`,
+    `Predict on ${tag}:`,
     "Join the winning side:",
     "Your turn to win:",
-    "Start earning too:",
-    "Make predictions, earn rewards:",
-    `Earn on ${tag}:`,
+    "Take a side:",
+    "Make your own call:",
+    `Swipe on ${tag}:`,
     "Join the action:",
-    "Bet and earn:",
-    "Prediction markets that pay:",
+    "Pick a side:",
+    "Winners split the losing pool:",
     `Win with ${tag}:`,
-    "Earn with your predictions:",
-    "Profitable predictions await:",
+    "Back your own read:",
+    "The market is open:",
     "Join winning predictions:",
     "Start your winning streak:",
-    "Predict and profit:"
+    "Call it before the deadline:"
   ];
 }
 
@@ -562,15 +584,15 @@ export function getPortfolioShareOutros(platform: 'farcaster' | 'twitter' = 'far
     "Start your journey! 💰",
     "Make your predictions! 🔮",
     "Bet on the future! ⚡",
-    "Earn with predictions! 💵",
+    "Back your own read! 💵",
     "Join winning traders! 🏆",
-    "Predict and profit! 📈",
+    "Call it early! 📈",
     "Your turn to win! 🎰",
-    "Start earning today! 💎",
+    "Take your first swipe! 💎",
     "Join the community! 🤝",
     "Make your mark! ✨",
     "Bet smart, win big! 🎯",
-    "Join the revolution! 🔥",
+    "Get in the market! 🔥",
     "Predict your future! 🌟"
   ];
 }

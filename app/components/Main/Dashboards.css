@@ -488,100 +488,10 @@
   }
 }
 
-/* Stake Modal Styles */
-.stake-modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(10px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  animation: fadeIn 0.3s ease-out;
-}
-
-.stake-modal {
-  background: var(--sheet-surface);
-  backdrop-filter: blur(20px);
-  border-radius: 0;
-  max-width: 420px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-  border: 1px solid var(--sheet-paper-3);
-  box-shadow: none;
-  animation: slideUp 0.3s ease-out;
-}
-
-.stake-modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 25px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-.stake-modal-header h3 {
-  margin: 0;
-  color: rgba(0, 0, 0, 0.8);
-  font-size: 1.4em;
-  font-weight: 600;
-}
-
-
-
-.stake-modal-content {
-  padding: 25px;
-}
-
-.stake-prediction-info {
-  text-align: center;
-  margin-bottom: 25px;
-}
-
-.stake-prediction-title {
-  font-size: 1.1em;
-  font-weight: 600;
-  color: rgba(0, 0, 0, 0.8);
-  margin-bottom: 10px;
-}
-
-.stake-choice {
-  margin-bottom: 20px;
-}
-
-
-.choice-indicator.yes {
-  background: var(--sheet-surface);
-  color: white;
-}
-
-.choice-indicator.no {
-  background: var(--sheet-surface);
-  color: white;
-}
-
-.stake-amount-section {
-  margin-bottom: 25px;
-}
-
-.stake-amount-section label {
-  display: block;
-  font-weight: 600;
-  color: rgba(0, 0, 0, 0.8);
-  margin-bottom: 10px;
-  font-size: 1em;
-}
-
-.stake-input-container {
-  position: relative;
-  margin-bottom: 8px;
-}
-
+/* The .stake-modal-* skin that sat here is deleted: no TSX renders those
+   classNames, and revived it would have painted rgba(0,0,0,0.8) headings on
+   --sheet-surface, dark on dark. The .stake-input and .eth-label rules below
+   stay because UserDashboard.tsx still renders them. */
 .stake-input {
   width: 100%;
   padding: 15px 50px 15px 15px;
@@ -608,84 +518,6 @@
   color: rgba(0, 0, 0, 0.6);
   font-weight: 600;
   font-size: 0.9em;
-}
-
-.stake-limits {
-  font-size: 0.85em;
-  color: rgba(0, 0, 0, 0.6);
-  text-align: center;
-}
-
-.stake-quick-amounts {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  margin-bottom: 25px;
-}
-
-.stake-quick-amounts button {
-  padding: 10px;
-  border: 2px solid rgba(0, 0, 0, 0.1);
-  border-radius: 0;
-  background: var(--sheet-paper);
-  color: rgba(0, 0, 0, 0.8);
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-size: 0.9em;
-}
-
-.stake-quick-amounts button:hover {
-  border-color: #3b82f6;
-  background: rgba(59, 130, 246, 0.1);
-  transform: translateY(-1px);
-}
-
-.stake-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 15px;
-}
-
-.btn-cancel {
-  padding: 15px;
-  border: 2px solid rgba(0, 0, 0, 0.2);
-  border-radius: 0;
-  background: var(--sheet-paper);
-  color: rgba(0, 0, 0, 0.7);
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s;
-  font-size: 1em;
-}
-
-.btn-cancel:hover {
-  background: rgba(0, 0, 0, 0.1);
-  border-color: rgba(0, 0, 0, 0.3);
-}
-
-
-
-
-.btn-confirm.loading {
-  pointer-events: none;
-  opacity: 0.8;
-}
-
-.btn-confirm.loading .loading-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--sheet-paper-3);
-  border-radius: 0;
-  border-top-color: white;
-  animation: spin 1s ease-in-out infinite;
-  margin-right: 8px;
-  display: inline-block;
-}
-
-.btn-cancel:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 @keyframes spin {
@@ -846,28 +678,6 @@
 
 /* Mobile Responsiveness for Modal */
 @media (max-width: 768px) {
-  .stake-modal {
-    width: 95%;
-    margin: 10px;
-  }
-
-  .stake-modal-header {
-    padding: 15px 20px;
-  }
-
-  .stake-modal-content {
-    padding: 20px;
-  }
-
-  .stake-quick-amounts {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .stake-actions {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-
   .history-header {
     flex-direction: column;
     gap: 10px;

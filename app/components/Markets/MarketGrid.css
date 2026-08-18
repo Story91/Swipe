@@ -2,7 +2,7 @@
  * Desktop market grid.
  *
  * The page background is the brand lime (var(--sheet-lime)). Cards are near-black so that
- * content reads as foreground against it — the previous desktop layout put lime
+ * content reads as foreground against it. The previous desktop layout put lime
  * panels on a lime page, which left nothing for the eye to lock onto.
  */
 
@@ -315,6 +315,63 @@
   color: var(--sheet-ink-text-2);
 }
 
+/* ---------- chain identity ----------
+   Every layer under the grid (the list fetch, the history batch, the detail
+   route, the write guard) is keyed to one active chain, so the grid is
+   per-chain and every card on screen settles on the same network. The badge
+   and the border tint are per card anyway: a tile has to name its network and
+   collateral on its own, without the switcher in frame. The colours are the
+   networks' own: Base blue, Robinhood lime. Muted with alpha so neither
+   fights the lime hover/focus accent, which keeps full strength. A chain
+   without a rule here keeps the default border and the lettered mark. */
+
+.mgcard--chain-base {
+  border-color: rgba(0, 82, 255, 0.65);
+}
+
+.mgcard--chain-robinhood {
+  border-color: rgba(212, 255, 0, 0.55);
+}
+
+.mgcard__chain {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--sheet-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sheet-ink-text-2);
+}
+
+.mgcard__chain-mark {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+}
+
+.mgcard__chain-mark--letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 12px;
+  line-height: 1;
+  background: var(--sheet-ink-4);
+  color: var(--sheet-ink-text);
+}
+
+/* Same argument as the category name above: over a bright photo the muted
+   grey falls under contrast, and nothing short of white survives the top of
+   the scrim. */
+.mgcard--photo .mgcard__chain {
+  color: #ffffff;
+}
+
 /* Amber, not red. A busy market is worth noticing, it is not a warning. */
 .mgcard__flag {
   flex: 0 0 auto;
@@ -356,6 +413,20 @@
   flex-direction: column;
   gap: 6px;
   margin-top: auto;
+}
+
+/* An empty market says so in words, and takes the same slot the two side rows
+   and the bar would have taken, so a grid of new markets does not shuffle
+   card heights against a grid of busy ones. The height is the two 24px rows
+   plus the bar plus two 6px gaps. */
+.mgcard__odds--empty {
+  justify-content: center;
+  min-height: 60px;
+  margin: 0;
+  margin-top: auto;
+  color: var(--sheet-ink-text-2);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 /* One row per side: a named pill and the number it is running at.
@@ -686,4 +757,105 @@
 .mgcard__result dd.is-no {
   color: var(--sheet-paper);
   font-weight: 600;
+}
+
+/* ---------- the odds line ----------
+
+   The same slot as the mark above, and the same argument: this is the card's
+   art on a market with no photo, so it lives inside the ground layer and under
+   the scrim rather than over the card's own text. The offsets carry the layer's
+   28px, which is what puts the band back on the card box.
+
+   Bottom aligned rather than centred like the mark. The line crosses the card's
+   own numbers wherever it goes, and the scrim is heaviest at the bottom, so
+   that is where a stroke costs the reader least.
+
+   Nothing here can move the card. The layer is absolutely positioned and inset
+   from the card box, so a line that arrives a second after paint has no height
+   to reserve and no row to push. */
+
+.mgcard__spark {
+  position: absolute;
+  left: 28px;
+  right: 28px;
+  bottom: 30px;
+  height: 96px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 6px;
+  /* .mgcard__bg sets this: the generated ground's hue, or lime. */
+  color: inherit;
+}
+
+.mgcard__spark-svg {
+  display: block;
+  width: 100%;
+  height: 76px;
+  /* The end dot is a round cap sitting on the edge of the box. */
+  overflow: visible;
+}
+
+/* Quieter than the 0.85 the glyph runs at, because a glyph sits beside the
+   card's text and a line runs through it. */
+.mgcard__spark-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.7;
+}
+
+.mgcard__spark-area {
+  fill: currentColor;
+  stroke: none;
+  opacity: 0.12;
+}
+
+/* Dashed, and only ever the 50 cent rule. Solid would say the market sat level
+   all along, which is a claim about data nobody recorded. */
+.mgcard__spark-rule {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-dasharray: 4 5;
+  opacity: 0.45;
+}
+
+.mgcard__spark-dot {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 5;
+  stroke-linecap: round;
+  opacity: 0.8;
+}
+
+/* The words that stop a degenerate shape from reading as a chart. 12px, the
+   floor, right aligned so it sits over the newest end of the line. */
+.mgcard__spark-note {
+  align-self: flex-end;
+  font-family: var(--sheet-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: currentColor;
+  opacity: 0.68;
+}
+
+/* ---------- sparkline crossings ----------
+   The band is bottom-anchored, so a market trading low draws its stroke where
+   the foot row's text sits. Measured at the crossing: .mgcard__stat drops from
+   9.18:1 to 3.49:1 where the 2px stroke passes under a glyph, below AA. Same
+   defence the photo cards use - the shadow follows the glyph, so it protects
+   exactly the pixels that need it and nothing else. Applied only on cards that
+   actually carry a line. */
+.mgcard--spark .mgcard__stat,
+.mgcard--spark .mgcard__dot,
+.mgcard--spark .mgcard__side-pct,
+.mgcard--spark .mgcard__result dt,
+.mgcard--spark .mgcard__result dd,
+.mgcard--spark .mgcard__badge {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 12px rgba(0, 0, 0, 0.7);
 }

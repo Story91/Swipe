@@ -1,6 +1,7 @@
 import { useComposeCast } from '@coinbase/onchainkit/minikit';
 import { useState, useCallback } from 'react';
 import sdk from '@farcaster/miniapp-sdk';
+import { useActiveChain } from '@/lib/chains/activeChain';
 
 interface PredictionData {
   id: string;
@@ -28,6 +29,7 @@ export default function SharePredictionButton({
   children 
 }: SharePredictionButtonProps) {
   const { composeCast: minikitComposeCast } = useComposeCast();
+  const { chainKey } = useActiveChain();
   const [isSharing, setIsSharing] = useState(false);
 
   // Universal composeCast function (works in both Base app and Warpcast)
@@ -56,9 +58,16 @@ export default function SharePredictionButton({
     }
   }, [minikitComposeCast]);
 
-  // Get unique prediction URL for sharing
+  /**
+   * The market's link, with the chain on it.
+   *
+   * Both deployments number their markets from 1, so /prediction/5 alone is two
+   * different questions depending on who opens it. Without the chain the link
+   * resolves to whichever one is the default, and the person who followed it
+   * sees a market that is not the one that was shared.
+   */
   const getPredictionUrl = () => {
-    return `${window.location.origin}/prediction/${prediction.id}`;
+    return `${window.location.origin}/prediction/${prediction.id}?chain=${chainKey}`;
   };
 
   // Calculate pool stats
@@ -209,6 +218,7 @@ export default function SharePredictionButton({
 
 // Hook for easy integration with unique prediction URLs
 export function useSharePrediction() {
+  const { chainKey } = useActiveChain();
   const { composeCast: minikitComposeCast } = useComposeCast();
   
   const composeCast = useCallback(async (params: { text: string; embeds?: string[] }) => {
@@ -237,8 +247,8 @@ export function useSharePrediction() {
   }, [minikitComposeCast]);
   
   const sharePrediction = async (prediction: PredictionData, type: 'prediction' | 'achievement' | 'challenge' = 'prediction') => {
-    // Unique prediction URL - will show custom OG image when shared
-    const predictionUrl = `${window.location.origin}/prediction/${prediction.id}`;
+    // The chain has to be on the link, see getPredictionUrl above.
+    const predictionUrl = `${window.location.origin}/prediction/${prediction.id}?chain=${chainKey}`;
     
     let shareText = '';
     

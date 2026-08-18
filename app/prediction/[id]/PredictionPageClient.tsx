@@ -1,16 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useMiniKit } from "@coinbase/onchainkit/minikit";
 import { ArrowLeft, Share2 } from "lucide-react";
 import sdk from "@farcaster/miniapp-sdk";
 import { useComposeCast } from "@coinbase/onchainkit/minikit";
 import type { RedisPrediction } from "@/lib/types/redis";
-import { useActiveChain } from "@/lib/chains/activeChain";
+import { useActiveChain, setActiveChain } from "@/lib/chains/activeChain";
+import { getMarketContract } from "@/lib/chains/market";
+import { isChainKey } from "@/lib/chains/requestChain";
+import { useIsDesktop } from "@/lib/hooks/useMediaQuery";
 import { OddsChart } from "@/app/components/Markets/MarketDetail/OddsChart";
 import { PriceCards } from "@/app/components/Markets/MarketDetail/PriceCards";
 import { MarketStatsRow } from "@/app/components/Markets/MarketDetail/MarketStatsRow";
+import { BetPanel } from "@/app/components/Markets/MarketDetail/BetPanel";
+import { ExitPanel } from "@/app/components/Markets/MarketDetail/ExitPanel";
 import { formatPool, yesPriceOf } from "@/app/components/Markets/MarketDetail/marketDetail";
 import type { PricePoint } from "@/app/components/Markets/MarketDetail/marketDetail";
 import "@/app/components/Markets/MarketDetail/MarketDetail.css";
@@ -32,18 +37,21 @@ import "@/app/components/Markets/MarketDetail/MarketDetail.css";
  * It also fetched without `?chain=`, and that endpoint defaults an absent chain
  * to Base, so a Robinhood user was shown Base's market of the same number.
  *
- * The betting path is deliberately untouched. The button is a router.push into
- * the swipe deck, exactly as before, and no contract call was added here: a real
- * placeBet on this page would be a second staking implementation, and it would
- * also owe the price-history POST that keeps the chart above it moving.
+ * Betting: on a phone the button is still a router.push into the swipe deck,
+ * where staking lives. On desktop the rail carries BetPanel, which stakes here
+ * through the same useMarketWrite path the deck uses, behind the same address
+ * guard, and pays the price-history POST that keeps the chart above it moving.
+ * The exit rows under it are ExitPanel, one row per side held, same rules.
  */
-export default function PredictionPage() {
+export default function PredictionPageClient() {
   const params = useParams();
   const router = useRouter();
+  const search = useSearchParams();
   const predictionId = params.id as string;
   const { setFrameReady, isFrameReady } = useMiniKit();
   const { composeCast: minikitComposeCast } = useComposeCast();
   const { chainKey, chain, isReadOnly } = useActiveChain();
+  const isDesktop = useIsDesktop();
 
   const [prediction, setPrediction] = useState<RedisPrediction | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,6 +59,10 @@ export default function PredictionPage() {
   const [isSharing, setIsSharing] = useState(false);
   const [history, setHistory] = useState<PricePoint[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  // Bumped after a confirmed bet or exit, so the record and the price line
+  // re-fetch without waiting for a navigation.
+  const [refreshTick, setRefreshTick] = useState(0);
+  const reload = useCallback(() => setRefreshTick((t) => t + 1), []);
 
   useEffect(() => {
     if (!isFrameReady) {
@@ -58,13 +70,32 @@ export default function PredictionPage() {
     }
   }, [setFrameReady, isFrameReady]);
 
+  /**
+   * A shared link says which chain it is about, and the app follows it.
+   *
+   * Without this the page opens on whatever chain the switcher happens to hold,
+   * which for a cold visit is always the default. Market 5 exists on both
+   * chains and they are different questions, so a Robinhood link would render
+   * Base's market 5, and the switcher in the nav would agree with the wrong
+   * answer. Runs on the id as well as the query, because navigating between two
+   * markets on different chains is the same problem a second time.
+   */
+  useEffect(() => {
+    const requested = search?.get('chain');
+    if (requested && isChainKey(requested)) {
+      setActiveChain(requested);
+    }
+  }, [search, predictionId]);
+
   useEffect(() => {
     if (!predictionId) return;
     let cancelled = false;
 
     const fetchPrediction = async () => {
       try {
-        setLoading(true);
+        // Only the first load earns the full-page spinner. A refetch after a
+        // confirmed bet or exit keeps the page up and swaps the numbers.
+        if (refreshTick === 0) setLoading(true);
         // Market 1 exists on both chains and they are different markets, so the
         // id alone does not identify one.
         const response = await fetch(
@@ -95,7 +126,7 @@ export default function PredictionPage() {
     return () => {
       cancelled = true;
     };
-  }, [predictionId, chainKey]);
+  }, [predictionId, chainKey, refreshTick]);
 
   // Unconditional, unlike the card's, which is gated on an expanded state this
   // page does not have. The endpoint answers with an empty history rather than
@@ -104,7 +135,7 @@ export default function PredictionPage() {
     if (!predictionId) return;
     let cancelled = false;
 
-    setHistoryLoading(true);
+    if (refreshTick === 0) setHistoryLoading(true);
     fetch(`/api/predictions/${predictionId}/price-history?chain=${chainKey}`)
       .then((res) => res.json())
       .then((data) => {
@@ -121,10 +152,16 @@ export default function PredictionPage() {
     return () => {
       cancelled = true;
     };
-  }, [predictionId, chainKey]);
+  }, [predictionId, chainKey, refreshTick]);
 
   const sym = chain.stable.symbol;
   const decimals = chain.stable.decimals;
+
+  // Read-only here: the address and its explorer, so the page can point at
+  // the contract holding this market's money. Writes stay in BetPanel and
+  // ExitPanel, behind useMarketWrite. Null on a chain with nothing deployed,
+  // and the link simply does not render.
+  const liveContract = getMarketContract(chainKey);
 
   const pools = useMemo(() => {
     const yes = prediction?.usdcYesTotalAmount ?? 0;
@@ -304,10 +341,32 @@ export default function PredictionPage() {
                   has no live contract to stake into.
                 </p>
               </section>
-            ) : (
+            ) : settled || !isDesktop ? (
+              // Phones keep the route into the swipe deck, where staking
+              // lives, and a settled market routes to its results either way.
               <button type="button" className="mdet-cta" onClick={handleOpenInApp}>
                 {prediction.resolved ? "View results" : "Place your bet"}
               </button>
+            ) : (
+              <BetPanel
+                predictionId={prediction.id}
+                question={prediction.question}
+                creator={prediction.creator}
+                yesPool={pools.yes}
+                noPool={pools.no}
+                onPlaced={reload}
+              />
+            )}
+
+            {/* One exit row per side held, straight from positions() on
+                chain. Renders nothing when the connected wallet holds
+                nothing here. */}
+            {!archived && !settled && (
+              <ExitPanel
+                predictionId={prediction.id}
+                question={prediction.question}
+                onExited={reload}
+              />
             )}
 
             <section className="mdet-panel">
@@ -347,10 +406,35 @@ export default function PredictionPage() {
                     shared between them.
                   </dd>
                 </div>
+                <div>
+                  <dt>You can leave early</dt>
+                  <dd>
+                    A stake can be pulled out before the deadline, minus a fee
+                    the contract sets. In the final quarter of a market&apos;s
+                    life an exit that would empty a side&apos;s pool is
+                    refused, and the exit control says so before anything is
+                    signed.
+                  </dd>
+                </div>
               </dl>
             </section>
 
-            <p className="mdet__id">Market {prediction.id}</p>
+            <p className="mdet__id">
+              Market {prediction.id}
+              {liveContract && (
+                <>
+                  {" · "}
+                  <a
+                    className="mdet__contract"
+                    href={`${liveContract.explorer}/address/${liveContract.address}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    contract on {chain.label}
+                  </a>
+                </>
+              )}
+            </p>
           </div>
         </div>
       </div>
