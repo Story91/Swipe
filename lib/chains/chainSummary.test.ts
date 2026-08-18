@@ -398,18 +398,28 @@ describe('the modal does not carry the numbers itself', () => {
     }
   });
 
-  it('takes every one of them from the contract read', () => {
+  it('takes every number it shows from the contract read', () => {
+    // The fee rows and the minimum bet left the modal on purpose: they are
+    // identical on every deployment, so they cannot help anyone choose a
+    // network, and four extra rows per card doubled the dialog's height. What
+    // remains is what differs between the networks - and every one of those
+    // must still come from the contract read, never be typed in.
     for (const field of [
-      'stats.fees.platformBps',
-      'stats.fees.creatorBps',
-      'stats.fees.earlyExitBps',
-      'stats.minBet',
       'stats.collateral.symbol',
       'stats.collateral.decimals',
       'stats.marketCount',
       'stats.balance',
     ]) {
       expect(source, `MarketChooserModal must render ${field}`).toContain(field);
+    }
+  });
+
+  it('shows no fee schedule at all, read or hardcoded', () => {
+    // Guards the other half of the decision above: if fees ever return to this
+    // dialog, they must come back through the contract read AND someone must
+    // consciously delete this test, not sneak in as literals.
+    for (const field of ['fees.platformBps', 'fees.creatorBps', 'fees.earlyExitBps']) {
+      expect(source, `MarketChooserModal renders ${field}, which was removed by design`).not.toContain(field);
     }
   });
 

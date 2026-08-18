@@ -6,13 +6,13 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import {
   chainOptions,
   formatAmount,
-  formatBps,
   readChainStats,
   selectChain,
   type ChainOption,
   type ChainStats,
 } from '@/lib/chains/chainSummary';
 import { useActiveChain } from '@/lib/chains/activeChain';
+import { chainMark } from './ChainSwitcher';
 import type { ChainKey } from '@/lib/chains/types';
 import './MarketChooserModal.css';
 
@@ -174,10 +174,10 @@ function ChainCard({
   return (
     <section className={classes}>
       <header className="market-chooser__card-head">
-        <span
-          className={`chain-switcher__dot${option.selectable ? '' : ' chain-switcher__dot--archived'}`}
-          aria-hidden="true"
-        />
+        {/* The network's own artwork, the same mark the trigger shows. A
+            coloured dot said "this one is selectable" and nothing about which
+            network it was, which is the one thing a picker has to answer. */}
+        <ChainMark option={option} />
         <h3 className="market-chooser__name">{option.label}</h3>
         {option.testnet && <span className="market-chooser__tag">testnet</span>}
         {active && <span className="market-chooser__tag market-chooser__tag--active">selected</span>}
@@ -198,10 +198,15 @@ function ChainCard({
         </div>
       )}
 
+      {/* Only what differs between the networks, because that is the only thing
+          a picker can help you choose with. The platform, creator and early
+          exit fees and the minimum bet were four more rows per card and they
+          are identical on every deployment, so they answered a question nobody
+          was asking here and doubled the height of the dialog doing it. They
+          are on the Help page, where a reader is asking about fees. */}
       {option.selectable && state.status === 'ready' && (
         <dl className="market-chooser__stats">
-          <Row label="collateral" value={state.stats.collateral.symbol} />
-          {connected && (
+          {connected ? (
             <Row
               label="your balance"
               value={
@@ -210,21 +215,16 @@ function ChainCard({
                   : `${formatAmount(state.stats.balance, state.stats.collateral.decimals, 2)} ${state.stats.collateral.symbol}`
               }
             />
+          ) : (
+            <Row label="settles in" value={state.stats.collateral.symbol} />
           )}
           <Row
-            label="markets registered"
+            label="markets"
             value={
               state.stats.marketCount === null
                 ? 'unknown'
                 : `${state.stats.marketCount}${state.stats.countIsFloor ? '+' : ''}`
             }
-          />
-          <Row label="platform fee" value={formatBps(state.stats.fees.platformBps)} />
-          <Row label="creator fee" value={formatBps(state.stats.fees.creatorBps)} />
-          <Row label="early exit fee" value={formatBps(state.stats.fees.earlyExitBps)} />
-          <Row
-            label="minimum bet"
-            value={`${formatAmount(state.stats.minBet, state.stats.collateral.decimals)} ${state.stats.collateral.symbol}`}
           />
         </dl>
       )}
@@ -249,6 +249,28 @@ function label(option: ChainOption, active: boolean, busy: boolean): string {
   if (active) return 'Currently selected';
   if (busy) return 'Waiting for your wallet';
   return `Switch to ${option.label}`;
+}
+
+/**
+ * The network's own logo, from the same source the trigger uses. Falls back to
+ * a lettered tile so a chain with no artwork still gets a mark of the same size
+ * and the card does not reflow around it.
+ */
+function ChainMark({ option }: { option: ChainOption }) {
+  const mark = chainMark(option.key);
+  return (
+    <span
+      className={`market-chooser__mark${option.selectable ? '' : ' market-chooser__mark--off'}`}
+      aria-hidden="true"
+    >
+      {mark.src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={mark.src} alt="" width={20} height={20} />
+      ) : (
+        mark.letter
+      )}
+    </span>
+  );
 }
 
 function Row({ label: name, value }: { label: string; value: string }) {
