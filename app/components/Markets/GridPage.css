@@ -214,3 +214,15 @@
     padding: 14px 14px 18px;
   }
 }
+
+/* The Grid/Swipe toggle is retired: desktop is grid, full stop, per the
+   user's direction - the swipe layout on a wide screen looked wrong, and once
+   the detail page gained a real bet panel there was nothing it could do that
+   the grid cannot. The hook behind it (lib/hooks/desktopViewMode.ts) is
+   clamped to 'grid', so these buttons could only ever render one dead and one
+   stuck; hiding them here spares an edit to app/page.tsx, which another
+   session holds. Delete the markup together with the hook when that file is
+   free. */
+.nav-view-switch {
+  display: none;
+}

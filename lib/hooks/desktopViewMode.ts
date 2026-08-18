@@ -1,17 +1,28 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 /**
- * Desktop-only view mode.
+ * Desktop-only view mode - retired to a single mode, on the user's direction.
  *
- * `grid`  - many markets at once, full width, no side rails. The default,
- *           because a desktop visitor arrives to scan what is on offer.
- * `swipe` - one large card plus product side rails, preserving the mechanic
- *           the app is named after.
+ * There used to be two: `grid` and `swipe`, with a toggle in the top bar and
+ * the preference in localStorage. The swipe layout on a wide screen was judged
+ * to look wrong ("źle wygląda strasznie ten tryb swipe w wersji desktop"), and
+ * once the market detail page gained a real bet panel there was nothing swipe
+ * mode could do on desktop that the grid and the detail page cannot. Desktop
+ * is grid, full stop.
  *
- * Mobile never reads this: below the desktop breakpoint the app stays on the
- * swipe layout regardless.
+ * The shape of the hook survives so its consumers compile and behave without
+ * edits - app/page.tsx is concurrently being edited by another session, and
+ * this file is the one place the mode is decided. `setMode` is deliberately
+ * inert: the one caller that used to switch to 'swipe' (the ?prediction= deep
+ * link handler) now simply lands on the grid, which shows the market it was
+ * seeking. Stored preferences are neither read nor written, so a visitor who
+ * once chose 'swipe' is not resurrected into a retired layout.
+ *
+ * Mobile never read this hook; below the desktop breakpoint the app stays on
+ * the swipe deck, which is the product. Deleting the type and the hook wants
+ * an edit to page.tsx, and belongs to the day that file is free.
  */
 export type DesktopViewMode = 'grid' | 'swipe';
 
@@ -24,26 +35,10 @@ export function parseViewMode(value: string | null | undefined): DesktopViewMode
 }
 
 export function useDesktopViewMode() {
-  // Always start from the default so server and first client render agree;
-  // the stored preference is applied after mount to avoid a hydration mismatch.
-  const [mode, setMode] = useState<DesktopViewMode>(DEFAULT_DESKTOP_VIEW_MODE);
+  const [mode] = useState<DesktopViewMode>('grid');
 
-  useEffect(() => {
-    try {
-      setMode(parseViewMode(window.localStorage.getItem(DESKTOP_VIEW_MODE_KEY)));
-    } catch {
-      // Storage can throw in private mode or when cookies are blocked;
-      // the default is already in state, so there is nothing to recover.
-    }
-  }, []);
-
-  const changeMode = useCallback((next: DesktopViewMode) => {
-    setMode(next);
-    try {
-      window.localStorage.setItem(DESKTOP_VIEW_MODE_KEY, next);
-    } catch {
-      // Preference simply will not persist; the session still works.
-    }
+  const changeMode = useCallback((_next: DesktopViewMode) => {
+    // Inert on purpose; see the header comment.
   }, []);
 
   return { mode, setMode: changeMode };
