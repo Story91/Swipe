@@ -72,7 +72,6 @@ const ActiveBets = dynamic(() => import("./components/Portfolio/ActiveBets").the
 const BetHistory = dynamic(() => import("./components/Portfolio/BetHistory").then(m => m.BetHistory), { ssr: false, loading });
 const PlatformAnalytics = dynamic(() => import("./components/Admin/PlatformAnalytics").then(m => m.PlatformAnalytics), { ssr: false, loading });
 const SystemSettings = dynamic(() => import("./components/Admin/SystemSettings").then(m => m.SystemSettings), { ssr: false, loading });
-const AuditLogs = dynamic(() => import("./components/Admin/AuditLogs").then(m => m.AuditLogs), { ssr: false, loading });
 const HelpAndFaq = dynamic(() => import("./components/Support/HelpAndFaq").then(m => m.HelpAndFaq), { ssr: false, loading });
 const Leaderboard = dynamic(() => import("./components/Market/Leaderboard").then(m => m.Leaderboard), { ssr: false, loading });
 const RecentActivity = dynamic(() => import("./components/Support/RecentActivity").then(m => m.RecentActivity), { ssr: false, loading });
@@ -776,7 +775,10 @@ export default function App() {
 
           {activeDashboard === 'admin' && <AdminPanel />}
 
-          {activeDashboard === 'approver' && <AdminPanel />}
+          {/* 'approver' rendered the same AdminPanel as 'admin' above and
+              nothing could navigate to it. AdminDashboard shows the proposal
+              queue inline through ProposalCard, so the second door led to the
+              same room. */}
 
           {/* SWIPE Token Card — the Base token's fee stream sits in an archived
               contract, so this is being rebuilt on the new token. */}
@@ -803,17 +805,12 @@ export default function App() {
             </div>
           )}
 
-          {/* Claim Page - kept for future use but not accessible from nav */}
-          {activeDashboard === 'claim' && (
-            <div style={{ padding: '20px' }}>
-              <ComingSoonOverlay
-                title="Claims are paused"
-                message="$SWIPE claims are moving to the new token on Robinhood Chain. Claims against the old contract cannot be processed."
-              >
-                <SwipeClaim />
-              </ComingSoonOverlay>
-            </div>
-          )}
+          {/* The claim screen is parked, so its mount is gone rather than
+              sitting here unreachable. SwipeClaim and ComingSoonOverlay are
+              still in the repo; when the new token ships on Robinhood chain
+              this comes back as four lines plus a nav row. A screen that
+              renders behind a condition nothing can set is not "kept for future
+              use", it is code nobody will find when the future arrives. */}
 
           {/* No overlay. Every figure here is now read from the live contract
               in the chain's own symbol, or sits under an "archived" heading
@@ -824,9 +821,11 @@ export default function App() {
           {/* Portfolio Components */}
           {activeDashboard === 'my-portfolio' && <MyPortfolio />}
 
-          {activeDashboard === 'active-bets' && <ActiveBets />}
-
-          {activeDashboard === 'bet-history' && <BetHistory />}
+          {/* ActiveBets and BetHistory were mounted here with nothing able to
+              navigate to them, and the Portfolio row supersedes both: its open
+              and history tabs are the same two lists, per token, from the same
+              /api/portfolio read. Two implementations of one screen is how they
+              drift apart. */}
 
           {/* Support Components */}
           {activeDashboard === 'help-faq' && <HelpAndFaq />}
@@ -840,7 +839,6 @@ export default function App() {
 
           {activeDashboard === 'settings' && <SystemSettings />}
 
-          {activeDashboard === 'audit-logs' && <AuditLogs />}
         </main>
       </div>
 

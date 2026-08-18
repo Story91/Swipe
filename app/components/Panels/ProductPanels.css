@@ -2,158 +2,471 @@
  * Product panels: one component, two arrangements.
  *   .pp--bar  - horizontal strip above the market grid
  *   .pp--rail - vertical stack inside the desktop side panels
- * Cards are near-black for the same reason the market cards are: the page
- * background is the brand lime, so content has to read as foreground.
+ *
+ * Faces are opaque #0d0d0d, the same literal SwipeTokenCard, HowToPlayModal and
+ * MarketChooserModal all use. The app's ground is the brand lime; a translucent
+ * panel puts that behind body text and makes it unreadable. Everything else is
+ * a --sheet-* token from app/styles/tokens.css. Radius is 0 throughout,
+ * matching the rest of the house.
+ *
+ * Mobile first. One column on a phone, two side by side from 900px, and the
+ * rail is one column at every width because it is 248px wide.
+ *
+ * NOTHING HERE CAN WIDEN THE PAGE. The activity track is deliberately wider
+ * than its box, and every ancestor between it and the grid carries min-width: 0
+ * so it cannot push against the layout. `.pp-slider` clips. If a horizontal
+ * scrollbar ever appears on the body, that rule is the first place to look.
+ *
+ * MOTION, and where it came from. The vocabulary is SwipeTokenCard's: panels
+ * rise in on a stagger, a lime beam sweeps the top edge, the live dot pulses.
+ * The feed's own scrolling and the counters run on animation frames in
+ * JavaScript, so they are switched off in the component rather than here.
+ *
+ * The reduce block at the bottom is where the fill-mode trap lives.
+ * `animation: none` drops the keyframe entirely, so an element whose start
+ * state is written in the rule renders at that start state forever. That is why
+ * pp-rise carries `opacity: 0` inside the keyframe and not in the rule: with
+ * the animation gone the panel is simply visible.
  */
 
 .pp {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
-}
-
-.pp--bar {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: stretch;
-  margin-bottom: 16px;
-}
-
-.pp--rail {
-  flex-direction: column;
-}
-
-.pp--loading {
-  min-height: 84px;
-  border-radius: 0;
-  background: rgba(0, 0, 0, 0.06);
-}
-
-/* ---------- card ---------- */
-
-.pp-card {
-  background: #0d0d0d;
-  border: 1px solid #262626;
-  border-radius: 0;
-  padding: 12px 14px;
-  color: #f0f0f0;
-}
-
-.pp--bar .pp-card {
-  flex: 1 1 220px;
   min-width: 0;
 }
 
-.pp--bar .pp-card--activity {
-  flex: 2 1 420px;
+.pp--bar {
+  margin-bottom: 16px;
 }
 
-.pp-card__title {
-  margin: 0 0 8px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #8a8a8a;
+/* Two panels side by side once there is room for both to stay readable. The
+   feed gets the wider share because it is the one with sentences in it. */
+@media (min-width: 900px) {
+  .pp--bar {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+    align-items: start;
+  }
 }
 
-.pp-card__sub {
-  margin: 2px 0 0;
-  font-size: 12px;
-  color: #8a8a8a;
+/* ---------------------------------------------------------------- panels */
+
+.pp-panel {
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+  padding: 13px 14px 14px;
+  background: #0d0d0d;
+  border: 1px solid var(--sheet-ink-line);
+  border-radius: 0;
+  color: var(--sheet-paper);
+  animation: pp-rise 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
-/* ---------- ready to claim ---------- */
+.pp-panel:nth-child(2) { animation-delay: 70ms; }
+.pp-panel:nth-child(3) { animation-delay: 140ms; }
 
-.pp-card--claim {
+@keyframes pp-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pp-panel--claim {
   border-color: var(--sheet-lime);
 }
 
-.pp-claim__count {
+/* A light crossing the top edge. Clipped by the panel, so it cannot add
+   scroll. Decorative: it stays hidden under reduced motion, the same choice
+   SwipeTokenCard made for the same element. */
+.pp-panel__beam {
+  position: absolute;
+  top: 0;
+  left: -40%;
+  width: 40%;
+  height: 2px;
+  opacity: 0;
+  background: linear-gradient(90deg, transparent, var(--sheet-lime), transparent);
+  animation: pp-sweep 3800ms ease-in-out infinite;
+  pointer-events: none;
+}
+
+.pp-panel--feed .pp-panel__beam { animation-delay: 900ms; }
+
+@keyframes pp-sweep {
+  0%   { transform: translateX(0);    opacity: 0; }
+  12%  { opacity: 1; }
+  88%  { opacity: 1; }
+  100% { transform: translateX(350%); opacity: 0; }
+}
+
+.pp-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 11px;
+}
+
+h3.pp-panel__title {
   margin: 0;
-  font-size: 26px;
-  line-height: 1;
-  font-weight: 800;
+  font-family: var(--sheet-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--sheet-lime);
+  overflow-wrap: anywhere;
+}
+
+.pp-panel__status {
+  margin: 0;
+  font-family: var(--sheet-body);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--sheet-paper-3);
+}
+
+.pp-panel__note {
+  margin: 10px 0 0;
+  font-family: var(--sheet-body);
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--sheet-paper-3);
+}
+
+.pp-panel__hint {
+  margin: 8px 0 0;
+  font-family: var(--sheet-body);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--sheet-paper-3);
+}
+
+/* -------------------------------------------------------------- live dot */
+
+.pp-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.pp-live__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 0;
+}
+
+.pp-live__dot--on {
+  background: var(--sheet-lime);
+  animation: pp-pulse 2000ms ease-out infinite;
+}
+
+.pp-live__dot--off {
+  background: transparent;
+  border: 1px solid var(--sheet-rule-strong);
+}
+
+@keyframes pp-pulse {
+  0%   { box-shadow: 0 0 0 0 var(--sheet-lime-line); }
+  70%  { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.pp-live__word {
+  font-family: var(--sheet-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sheet-paper-3);
+}
+
+.pp-live__dot--on + .pp-live__word {
   color: var(--sheet-lime);
 }
 
-/* ---------- stats ---------- */
+/* ---------------------------------------------------------------- claim */
+
+.pp-claim__count {
+  margin: 0;
+  font-family: var(--sheet-data);
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--sheet-lime);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------- stats */
 
 .pp-stats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 14px;
-  margin: 0;
-}
-
-.pp-stats div {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.pp-stats dt {
-  font-size: 12px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: #8a8a8a;
-}
-
-.pp-stats dd {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 700;
-  color: #f0f0f0;
-  white-space: nowrap;
-}
-
-/* ---------- activity ---------- */
-
-.pp-activity {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
   gap: 8px;
+  margin: 0;
 }
 
-.pp-activity__row {
+.pp-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px 10px;
+  background: var(--sheet-surface);
+  border-left: 2px solid var(--sheet-rule-strong);
+}
+
+/* The one figure that answers "can I bet right now". */
+.pp-stat--accent {
+  border-left-color: var(--sheet-lime);
+  background: var(--sheet-wash);
+}
+
+.pp-stat__label {
+  font-family: var(--sheet-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sheet-paper-3);
+}
+
+.pp-stat__value {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  font-size: 12px;
-  line-height: 1.35;
+  gap: 4px;
+  margin: 0;
+  min-width: 0;
+  font-family: var(--sheet-data);
+  font-size: 17px;
+  line-height: 1.1;
+  color: var(--sheet-paper);
+  /* Digits of equal width, so a counter running up does not shuffle the row
+     sideways on every frame. */
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.pp-stat--accent .pp-stat__value {
+  color: var(--sheet-lime);
+}
+
+.pp-stat__unit {
+  font-family: var(--sheet-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--sheet-paper-3);
+}
+
+/* --------------------------------------------------------------- slider */
+
+.pp-slider {
+  position: relative;
+  /* The clip. Everything below is wider than this box on purpose. */
+  overflow: hidden;
+  min-width: 0;
+  /* Vertical scrolling still belongs to the page; sideways is ours. */
+  touch-action: pan-y;
+  cursor: grab;
+  /* Alpha stops, not colours: the cards fade out at both edges rather than
+     being sliced mid word. */
+  -webkit-mask-image: linear-gradient(90deg, transparent, rgba(0, 0, 0, 1) 6%, rgba(0, 0, 0, 1) 94%, transparent);
+  mask-image: linear-gradient(90deg, transparent, rgba(0, 0, 0, 1) 6%, rgba(0, 0, 0, 1) 94%, transparent);
+}
+
+/* Drawn inside, because the panel around it clips and an outset ring would be
+   half cut off. */
+.pp-slider:focus-visible {
+  outline: 2px solid var(--sheet-lime);
+  outline-offset: -2px;
+}
+
+.pp-slider--dragging {
+  cursor: grabbing;
+}
+
+/* Not enough cards to loop, so they sit still and the reader can scroll them
+   by hand instead. Same when the reader has asked for less motion. */
+.pp-slider--parked {
+  overflow-x: auto;
+  cursor: default;
+  scrollbar-width: thin;
+}
+
+.pp-slider__track {
+  display: flex;
+  width: max-content;
+  will-change: transform;
+}
+
+.pp-slider__copy {
+  display: flex;
+  flex: 0 0 auto;
+  /* A drag that selects the text under it feels broken. */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.pp-act {
+  flex: 0 0 auto;
+  width: 218px;
+  margin-right: 8px;
+  padding: 9px 10px;
+  background: var(--sheet-ink-2);
+  border: 1px solid var(--sheet-ink-line-2);
+  border-radius: 0;
+}
+
+.pp-act__head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   min-width: 0;
 }
 
-.pp-activity__avatar {
+.pp-act__avatar {
   flex: 0 0 auto;
-  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  font-size: 12px;
+  line-height: 1;
+  background: var(--sheet-ink-4);
+  border: 1px solid var(--sheet-ink-line-2);
 }
 
-.pp-activity__text {
+.pp-act__who {
   flex: 1 1 auto;
   min-width: 0;
-  color: #c8c8c8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--sheet-data);
+  font-size: 11px;
+  color: var(--sheet-ink-text);
+}
+
+.pp-act__when {
+  flex: 0 0 auto;
+  font-family: var(--sheet-body);
+  font-size: 10px;
+  white-space: nowrap;
+  color: var(--sheet-paper-3);
+}
+
+.pp-act__deed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 5px;
+  margin: 8px 0 0;
+  min-width: 0;
+}
+
+.pp-act__verb {
+  font-family: var(--sheet-body);
+  font-size: 11px;
+  color: var(--sheet-paper-2);
+}
+
+.pp-act__side {
+  padding: 1px 5px;
+  font-family: var(--sheet-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  border: 1px solid currentColor;
+}
+
+.pp-act__side--yes { color: var(--sheet-lime); }
+.pp-act__side--no  { color: var(--sheet-loss); }
+
+.pp-act__amount {
+  font-family: var(--sheet-data);
+  font-size: 11px;
+  color: var(--sheet-paper);
+  font-variant-numeric: tabular-nums;
+}
+
+.pp-act__market {
+  margin: 7px 0 0;
+  font-family: var(--sheet-body);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--sheet-paper-3);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-.pp-activity__who {
-  color: #f0f0f0;
-  font-weight: 700;
+/* ----------------------------------------------------------------- rail */
+
+/* 248px of content box, so the cards get narrower rather than the panel
+   getting a scrollbar it did not ask for. */
+.pp--rail .pp-act {
+  width: 186px;
 }
 
-.pp-activity__what {
-  color: #9a9a9a;
+.pp--rail .pp-stats {
+  gap: 7px;
 }
 
-.pp-activity__when {
-  flex: 0 0 auto;
-  font-size: 12px;
-  color: #6f6f6f;
-  white-space: nowrap;
+.pp--rail .pp-stat__value {
+  font-size: 15px;
+}
+
+/* --------------------------------------------------------------- desktop */
+
+@media (min-width: 900px) {
+  .pp--bar .pp-panel {
+    padding: 15px 16px 16px;
+  }
+
+  .pp--bar .pp-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .pp--bar .pp-act {
+    width: 240px;
+  }
+}
+
+/*
+ * Everything that moves, stopped.
+ *
+ * pp-rise holds its start state inside the keyframe, so dropping the animation
+ * leaves each panel at full opacity rather than invisible. The beam is
+ * decorative and stays hidden. The dot keeps its lime fill and just stops
+ * pulsing, so it still reports whether a read landed. The slider's own motion
+ * lives in JavaScript and is cut in usePrefersReducedMotion, which also drops
+ * the duplicated track; the rule below is what makes the remaining copy
+ * scrollable by hand.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .pp-panel,
+  .pp-panel__beam,
+  .pp-live__dot--on {
+    animation: none;
+  }
+
+  .pp-slider {
+    overflow-x: auto;
+    cursor: default;
+  }
+
+  .pp-slider__track {
+    transform: none !important;
+    will-change: auto;
+  }
 }

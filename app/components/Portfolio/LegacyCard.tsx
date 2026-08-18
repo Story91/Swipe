@@ -5,6 +5,8 @@ import { RedisPrediction } from '../../../lib/types/redis';
 import { Share2 } from 'lucide-react';
 import sdk from '@farcaster/miniapp-sdk';
 import { useComposeCast, useOpenUrl } from '@coinbase/onchainkit/minikit';
+import { useActiveChain } from '@/lib/chains/activeChain';
+import { tokenSymbol, COLLATERAL_LEG } from '@/lib/userStake';
 import './LegacyCard.css';
 
 interface LegacyCardProps {
@@ -85,6 +87,20 @@ interface LegacyCardProps {
 }
 
 export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, onShareResult }: LegacyCardProps) {
+  /**
+   * The collateral's real name on this chain.
+   *
+   * Every label here was the literal "USDC" with a dollar sign in front of the
+   * figures. On Robinhood chain the collateral is Paxos USDG, so the card told
+   * people they were claiming a token they do not hold. The claim itself routes
+   * correctly, which made it a lie rather than a loss, and a lie on the button
+   * you press to take your money is not a small one.
+   *
+   * The parent already computes this and did not pass it down. Reading the
+   * switcher here keeps the card usable from anywhere.
+   */
+  const { chainKey } = useActiveChain();
+  const collateral = tokenSymbol(COLLATERAL_LEG, chainKey);
   const [showShareDropdown, setShowShareDropdown] = useState(false);
   const { composeCast: minikitComposeCast } = useComposeCast();
   const minikitOpenUrl = useOpenUrl();
@@ -739,12 +755,12 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, on
               {hasUsdcStake && (
                 <tr className="usdc-row">
                   <td className="token-cell">
-                    <span className="usdc-icon">$</span>
+                    <span className="usdc-icon">{collateral}</span>
                   </td>
-                  <td className="value-cell staked">${formatUsdc(usdcTotalStaked)}</td>
-                  <td className="value-cell payout">${formatUsdc(usdcStake?.potentialPayout || 0)}</td>
+                  <td className="value-cell staked">{formatUsdc(usdcTotalStaked)}</td>
+                  <td className="value-cell payout">{formatUsdc(usdcStake?.potentialPayout || 0)}</td>
                   <td className={`value-cell profit ${(usdcStake?.potentialProfit || 0) >= 0 ? 'positive' : 'negative'}`}>
-                    {(usdcStake?.potentialProfit || 0) >= 0 ? '+' : '-'}${formatUsdc(Math.abs(usdcStake?.potentialProfit || 0))}
+                    {(usdcStake?.potentialProfit || 0) >= 0 ? '+' : '-'}{formatUsdc(Math.abs(usdcStake?.potentialProfit || 0))}
                   </td>
                 </tr>
               )}
@@ -824,12 +840,12 @@ export function LegacyCard({ prediction, onClaimReward, isTransactionLoading, on
                     : prediction.status === 'expired'
                       ? 'Waiting for prediction to be resolved'
                       : 'Cannot claim - you lost this prediction'
-                  : 'Claim USDC reward'
+                  : `Claim ${collateral} reward`
             }
           >
             {isTransactionLoading ? '...' :
-             usdcStake?.claimed ? '✅ USDC Claimed' :
-             usdcStake?.canClaim ? '💵 Claim USDC' :
+             usdcStake?.claimed ? `✅ ${collateral} claimed` :
+             usdcStake?.canClaim ? `💵 Claim ${collateral}` :
              prediction.status === 'active' ? '⏳ Wait' :
              prediction.status === 'expired' ? '⏰ In Waiting' :
              '❌ Lost'}

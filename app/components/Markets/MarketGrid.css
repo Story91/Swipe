@@ -30,7 +30,7 @@
   padding-bottom: 40px;
 }
 
-/* ---------- status filter ---------- */
+/* ---------- status and category filters ---------- */
 
 .market-filter-bar {
   display: flex;
@@ -46,6 +46,30 @@
   flex-wrap: wrap;
 }
 
+/* Its own line, always. `flex-basis: 100%` in a wrapping row is the one way to
+   force a break without turning the bar into a column, which would drop the
+   hint off the end of the status row and move it under the chips. The status
+   row and its hint stay exactly where they were. */
+.market-filter--topics {
+  flex-basis: 100%;
+  padding-top: 2px;
+  animation: market-filter-rise 240ms ease-out both;
+}
+
+/* The row can arrive after the status chips, when switching to a filter that
+   has more than one category in it. Same rise the card and the how-to-play
+   modal use, shorter, because this is a row of buttons and not a hero. */
+@keyframes market-filter-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .market-filter__hint {
   margin: 0;
   font-size: 12px;
@@ -55,6 +79,7 @@
 }
 
 .market-filter__chip {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -76,9 +101,46 @@
   background: var(--sheet-wash);
 }
 
+/* The selected chip, borrowing the SWIPE card's two smallest gestures.
+   `pulse` is the ring the card puts round the stage you are standing on: it
+   runs once, when the class lands, so pressing a chip is acknowledged and then
+   the page goes quiet. `ants` is the marching dash the card runs between its
+   stages, laid flat along the bottom edge, which is the only thing on this bar
+   that keeps moving and marks the one chip that is doing something. */
 .market-filter__chip--active {
   background: #000;
   color: var(--sheet-lime);
+  animation: market-filter-pulse 620ms ease-out 1;
+}
+
+@keyframes market-filter-pulse {
+  0%   { box-shadow: 0 0 0 0 var(--sheet-lime-line); }
+  70%  { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.market-filter__chip--active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--sheet-lime) 0 4px,
+    transparent 4px 10px
+  );
+  background-size: 10px 2px;
+  animation: market-filter-ants 760ms linear infinite;
+}
+
+/* The 0 frame is written out rather than left implicit. Stopping this
+   animation has to leave the dashes sitting at the start of their run, not
+   leave the chip with nothing under it. */
+@keyframes market-filter-ants {
+  from { background-position-x: 0; }
+  to   { background-position-x: 10px; }
 }
 
 .market-filter__chip:focus-visible {
@@ -548,6 +610,95 @@
   color: #ff8a8a;
 }
 
+/* A proposal is not a market yet, and the badge is the one place on the card
+   that says which of the two you are looking at. Amber rather than lime: lime
+   is the colour of a settled YES on this card, and a proposal has not settled
+   anything. */
+.mgcard__badge--proposed {
+  background: rgba(255, 176, 32, 0.16);
+  color: #ffb020;
+  box-shadow: inset 0 0 0 1px rgba(255, 176, 32, 0.4);
+}
+
+/* ---------- the like on a proposal ---------- */
+
+/* Sits in the foot row beside the badge. It is inside a card that is itself a
+   link, so it needs its own hit area and its own focus ring; the click handler
+   stops propagation so liking never opens the market. */
+.mgcard__like {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: 6px;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: var(--shell-radius);
+  background: var(--sheet-ink-line);
+  color: var(--sheet-ink-text-2);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.mgcard__like svg {
+  width: 13px;
+  height: 13px;
+  display: block;
+}
+
+.mgcard__like:hover:not(:disabled) {
+  color: var(--sheet-lime);
+  transform: translateY(-1px);
+}
+
+.mgcard__like:focus-visible {
+  outline: 2px solid var(--sheet-lime);
+  outline-offset: 2px;
+}
+
+/* Disabled means no wallet connected. It still shows the count, because the
+   number is worth reading even when you cannot add to it, so it dims rather
+   than greys out to nothing. */
+.mgcard__like:disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+
+.mgcard__like--on {
+  background: rgba(212, 255, 0, 0.14);
+  color: var(--sheet-lime);
+  box-shadow: inset 0 0 0 1px rgba(212, 255, 0, 0.38);
+}
+
+/* One beat when the like lands, borrowed from the SWIPE card's pulse. It fires
+   on the class change rather than on every render, because the class only
+   changes when the state does. */
+.mgcard__like--on svg {
+  animation: mgcard-like-pop 320ms ease-out;
+}
+
+@keyframes mgcard-like-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.32);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* The write failed and the count rolled back. Says so for a moment without an
+   alert, because a like is not worth interrupting anyone over. */
+.mgcard__like--failed {
+  color: #ff8a8a;
+}
+
 /* ---------- pagination ---------- */
 
 .market-pagination {
@@ -685,6 +836,33 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* The dashes stay, they just stop marching: the start frame is inside the
+     keyframe, so the selected chip keeps its underline. The pulse and the rise
+     are both entrances and leave nothing behind, so cancelling them costs the
+     reader nothing. */
+  .market-filter--topics,
+  .market-filter__chip--active,
+  .market-filter__chip--active::after {
+    animation: none;
+  }
+
+  .market-filter__chip {
+    transition: none;
+  }
+
+  /* The pop is an entrance and leaves nothing behind, so cancelling it costs
+     the reader nothing: the filled heart and the count are both still there. */
+  .mgcard__like--on svg {
+    animation: none;
+  }
+
+  .mgcard__like {
+    transition: none;
+  }
+  .mgcard__like:hover:not(:disabled) {
+    transform: none;
+  }
+
   .mgcard,
   .mgcard__bar-yes,
   .mgcard__bg-img {

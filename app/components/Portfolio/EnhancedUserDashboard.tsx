@@ -6,6 +6,10 @@ import { useActiveChain } from '@/lib/chains/activeChain';
 import { tokenSymbol, COLLATERAL_LEG } from '@/lib/userStake';
 import { getMarketContract, txUrl } from '@/lib/chains/market';
 import { getChainConfig } from '@/lib/chains';
+import {
+  ARCHIVED_CHAIN_ID,
+  archivedClaimBlocked,
+} from '@/lib/chains/archived';
 import { parseMarketId, CURRENT_GENERATION } from '@/lib/marketId';
 import { CONTRACTS, getV1Contract, getV2Contract, getContractForPrediction, USDC_DUALPOOL_CONTRACT_ADDRESS, USDC_DUALPOOL_ABI } from '../../../lib/contract';
 import { ethers } from 'ethers';
@@ -175,7 +179,6 @@ export function EnhancedUserDashboard() {
   /** The same, for the positions list. */
   const [stakesError, setStakesError] = useState<string | null>(null);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
-  const [syncingBlockchain, setSyncingBlockchain] = useState(false);
   
   // Local state for tracking claimed stakes
   const [claimedStakes, setClaimedStakes] = useState<Set<string>>(new Set());
@@ -500,37 +503,24 @@ export function EnhancedUserDashboard() {
     }
   }, [address, claimChainKey]);
 
-  // Sync transactions from blockchain (recover historical data)
-  const syncFromBlockchain = useCallback(async () => {
-    if (!address) return;
-    
-    setSyncingBlockchain(true);
-    try {
-      console.log('🔄 Syncing transactions from blockchain...');
-      const response = await fetch('/api/user-transactions/sync-blockchain', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: address.toLowerCase() })
-      });
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        console.log(`✅ Synced ${result.newTransactions} transactions from blockchain`);
-        alert(`✅ Synced ${result.newTransactions} new transactions from blockchain!\n\nBets: ${result.totalEvents?.bets || 0}\nClaims: ${result.totalEvents?.claims || 0}`);
-        // Refresh transactions list
-        await fetchUserTransactions(true);
-      } else {
-        console.error('Failed to sync:', result.error);
-        alert(`❌ Failed to sync: ${result.error}`);
-      }
-    } catch (error) {
-      console.error('Failed to sync from blockchain:', error);
-      alert('❌ Failed to sync from blockchain');
-    } finally {
-      setSyncingBlockchain(false);
-    }
-  }, [address, fetchUserTransactions]);
+  /*
+    "Read from chain" was removed rather than repaired.
+
+    It POSTed to /api/user-transactions/sync-blockchain, which has never
+    existed: app/api/user-transactions holds route.ts and nothing else. The 404
+    came back as an HTML page, response.json() threw on it, and the catch
+    alerted "Failed to sync from blockchain". So the one control offering to
+    recover a missing history was guaranteed to fail, for everyone, every time.
+
+    Building the route is not a small fix. positions(id, user) is state, and
+    state carries no timestamp and no transaction hash, so a history cannot be
+    rebuilt from it, only a list of current positions. A real history has to
+    come from event logs across the whole of both chains, which is rate limited
+    and is its own piece of work rather than a button.
+
+    The live path is unaffected: every bet and every claim posts to
+    /api/user-transactions as it happens.
+  */
 
          // No more cache - always fetch fresh from Redis
 
@@ -1481,8 +1471,24 @@ export function EnhancedUserDashboard() {
               
               showClaimModal(txHash, txUrl(claimChainKey, txHash));
               
+              /**
+               * Refresh this market's pools after the claim.
+               *
+               * This posted to /api/sync, which is not a route: app/api/sync
+               * holds prediction, usdc and v2 and no handler of its own, so the
+               * call 404d, the catch logged, and the pools on screen stayed at
+               * whatever they were before the claim until something else
+               * happened to sync them.
+               *
+               * /api/sync/usdc is the collateral sync, and it wants the market
+               * ids and the chain. Same call postTx.ts makes after a bet.
+               */
               try {
-                await fetch('/api/sync', { method: 'POST' });
+                await fetch('/api/sync/usdc', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ chain: claimChainKey, predictionIds: [predictionId] }),
+                });
               } catch (e) {
                 console.error('Sync failed:', e);
               }
@@ -1498,7 +1504,30 @@ export function EnhancedUserDashboard() {
 
         // All predictions use V2 contract (pred_v1_ are synced V1 predictions on V2)
         const contract = CONTRACTS.V2;
-        
+
+        /**
+         * The claim has to leave for Base, and only for Base.
+         *
+         * This send carried no chainId, so viem asserted nothing and the
+         * transaction went out on whatever chain the wallet happened to hold.
+         * The app's chain and the wallet's chain diverge routinely, because
+         * setActiveChain never touches the wallet. On a chain where the V2
+         * address holds no code the CALL succeeds and returns empty, the
+         * transaction mines with status 1, and onSuccess below fires on the
+         * hash rather than on a receipt: markStakeAsClaimed runs, the PUT
+         * writes status 'success', and the position reads "Claimed" forever
+         * while the money is still sitting on Base.
+         *
+         * TinderCard fixed exactly this on the same two functions. The
+         * constants are shared now so the two cannot drift again.
+         */
+        const blocked = archivedClaimBlocked(claimChainKey);
+        if (blocked) {
+          showErrorModal(blocked);
+          setIsTransactionLoading(false);
+          return;
+        }
+
         console.log(`🎯 Using V2 contract for claim (all predictions are on V2)`);
 
         // Determine function name based on token type
@@ -1511,6 +1540,7 @@ export function EnhancedUserDashboard() {
           abi: contract.abi,
           functionName: functionName,
           args: [BigInt(numericId)],
+          chainId: ARCHIVED_CHAIN_ID,
         }, {
           onSuccess: async (txHash: string) => {
             console.log('🎯 Claim transaction sent:', txHash);
@@ -2407,14 +2437,6 @@ export function EnhancedUserDashboard() {
       <div className="section">
         <div className="section-header-with-action">
           <h3>Transaction history</h3>
-          <button
-            onClick={syncFromBlockchain}
-            disabled={syncingBlockchain}
-            className="sync-blockchain-btn"
-            title="Recover historical transactions from blockchain"
-          >
-            {syncingBlockchain ? 'Reading the chain' : 'Read from chain'}
-          </button>
         </div>
         {loadingTransactions ? (
           <div className="loading-container">

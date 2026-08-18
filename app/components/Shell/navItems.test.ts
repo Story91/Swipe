@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'node:url';
 import {
   DASHBOARDS,
   NAV_ITEMS,
@@ -59,5 +62,53 @@ describe('sidebar coverage', () => {
     expect(activeRowId('leaderboard')).toBe('leaderboard');
     // Reached from inside the dashboard, so no row lights up.
     expect(activeRowId('bet-history')).toBeNull();
+  });
+});
+
+/**
+ * An excluded dashboard must not still be rendered.
+ *
+ * The check above accepts a dashboard that is on a row OR on the exclusion
+ * list, and never looks at whether the excuse in the string is true. Seven
+ * screens shipped behind it with no way in, each with a reason that read fine
+ * and described something that does not exist: "a tab inside AdminPanel" for a
+ * 64 line component with no navigation, "reachable by deep link" for a
+ * mechanism where four call sites write ?dashboard= and nothing reads it.
+ *
+ * The costly one was my-portfolio. It is the only mount of the refunds and
+ * creator reward panels, so the only routes in the app to money the contract is
+ * already holding sat behind a screen nothing could open, while the Help and
+ * FAQ told people to go there.
+ *
+ * So this reads app/page.tsx and pairs the two facts the other test keeps
+ * apart: a dashboard that page.tsx renders has to be one the nav can reach.
+ */
+describe('an excluded dashboard is not still mounted', () => {
+  const pageSource = readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'page.tsx'),
+    'utf8'
+  );
+
+  /** Which dashboards app/page.tsx actually renders. */
+  const mounted = DASHBOARDS.filter((d) =>
+    pageSource.includes(`activeDashboard === '${d}'`)
+  );
+
+  it('finds the mounts, so a green run means something', () => {
+    expect(mounted.length).toBeGreaterThan(5);
+  });
+
+  it('renders nothing the nav cannot open', () => {
+    const reachable = NAV_ITEMS.flatMap((item) =>
+      item.action.kind === 'dashboard' ? [item.action.dashboard as string] : []
+    );
+    // 'tinder' is the initial state rather than a destination, and it is also
+    // on a row, so it needs no special case. Anything else that renders must be
+    // reachable.
+    const orphaned = mounted.filter((d) => !reachable.includes(d));
+    expect(
+      orphaned,
+      `app/page.tsx renders these and nothing can navigate to them:\n${orphaned.join('\n')}`
+    ).toEqual([]);
   });
 });

@@ -73,23 +73,45 @@ export async function GET(request: NextRequest) {
     // Aggregate user statistics
     const userStats: { [address: string]: LeaderboardEntry } = {};
 
-    // Get all unique users from predictions and stakes
+    /**
+     * Everyone the board should rank, each of them once.
+     *
+     * Two faults, and they produced the two things you could see on screen.
+     *
+     * The set was built from the addresses exactly as stored. A creator written
+     * checksummed and the same person written lowercased in a participants
+     * array are two different strings, so the set held both and the loop below
+     * emitted two rows for one wallet. Both rows resolved to the same profile,
+     * so the board showed the same name twice. Lowercasing here is what makes
+     * one person one entry, and it matches REDIS_KEYS.USER_STAKES, which
+     * normalises the same way.
+     *
+     * And it read only `participants`, the array the archived V2 contract
+     * writes. Every collateral bet lands in `usdcParticipants` instead, written
+     * by /api/sync/usdc. So a wallet whose only bet was in USDC or USDG was
+     * never added at all: not ranked low, absent. That is the whole live
+     * product missing from its own leaderboard.
+     */
     const allUsers = new Set<string>();
 
-    // Add creators
-    filteredPredictions.forEach(p => {
-      if (p.creator) allUsers.add(p.creator);
-    });
-
-    // Add participants
-    filteredPredictions.forEach(p => {
-      p.participants.forEach(participant => allUsers.add(participant));
-    });
+    for (const p of filteredPredictions) {
+      if (p.creator) allUsers.add(p.creator.toLowerCase());
+      for (const participant of p.participants ?? []) {
+        allUsers.add(participant.toLowerCase());
+      }
+      for (const participant of p.usdcParticipants ?? []) {
+        allUsers.add(participant.toLowerCase());
+      }
+    }
 
     // Process each user
     for (const userAddress of allUsers) {
       // Get user's predictions
-      const userPredictions = filteredPredictions.filter(p => p.creator === userAddress);
+      // Compared raw, so a checksummed creator never matched its own
+      // lowercased entry and the count came back zero.
+      const userPredictions = filteredPredictions.filter(
+        p => p.creator?.toLowerCase() === userAddress
+      );
       const predictionsCreated = userPredictions.length;
 
       // Get user's stakes across all predictions

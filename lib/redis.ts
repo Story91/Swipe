@@ -135,8 +135,36 @@ export const REDIS_KEYS = {
   SWIPE_CLAIM_HISTORY: (userId: string) => `swipe_claim_history:${userId}`,
   // Farcaster profile cache (TTL: 7 days)
   FARCASTER_PROFILE: (address: string) => `farcaster_profile:${address.toLowerCase()}`,
-  // PNL OG image URL cache
-  USER_PNL_OG_IMAGE: (address: string) => `user:pnl:ogImageUrl:${address.toLowerCase()}`,
+  /**
+   * The published P&L card for one wallet on one chain.
+   *
+   * A card is a picture of one chain's positions, priced in that chain's
+   * currency, so two chains cannot share the slot. They did. One key held one
+   * image per address, the second share overwrote the first, and /api/og/pnl
+   * redirected to the survivor whatever `?chain=` asked for: bet on Base,
+   * share, switch to Robinhood, share again, and the Robinhood post carried
+   * Base's numbers with USDC written on them.
+   *
+   * Base stays the identity namespace, so every card already uploaded keeps the
+   * exact key it has now and nothing has to be migrated.
+   */
+  USER_PNL_OG_IMAGE: (address: string, chain?: ChainKey) =>
+    `${chainNamespace(chain)}user:pnl:ogImageUrl:${address.toLowerCase()}`,
+  /**
+   * Which chain this wallet last published a card for.
+   *
+   * Deliberately not namespaced, and it cannot be: its value is the namespace.
+   *
+   * It exists because /pnl/[address] puts its metadata in a layout, and Next
+   * hands a layout's generateMetadata `params` and nothing else. Check the
+   * generated route types if that sounds like a detail worth arguing with:
+   * .next/types/app/pnl/[address]/layout.ts declares LayoutProps as
+   * `{ children, params }` while PageProps next to it also has `searchParams`.
+   * So that page cannot read `?chain=` off the URL a crawler fetched, and
+   * without a pointer it would read Base's key for everyone, handing a
+   * Robinhood sharer the fallback hero image instead of their own card.
+   */
+  USER_PNL_OG_CHAIN: (address: string) => `user:pnl:ogImageChain:${address.toLowerCase()}`,
   // USDC Price history for charts
   USDC_PRICE_HISTORY: (predictionId: string, chain?: ChainKey) => `${chainNamespace(chain)}usdc:price_history:${predictionId}`,
 } as const;

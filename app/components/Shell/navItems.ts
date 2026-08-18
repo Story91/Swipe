@@ -20,7 +20,6 @@ export const DASHBOARDS = [
   'market-stats',
   'analytics',
   'settings',
-  'audit-logs',
   'my-portfolio',
   'active-bets',
   'bet-history',
@@ -39,19 +38,30 @@ export const DASHBOARDS = [
 export type DashboardType = (typeof DASHBOARDS)[number];
 
 /**
- * Reached from inside AdminPanel or EnhancedUserDashboard, not from the top
- * nav. None of these were in the horizontal menubar either, so leaving them out
- * of the sidebar loses nothing.
+ * Dashboards with no row of their own, and the honest reason for each.
+ *
+ * Every reason in here used to be false. "A tab inside AdminPanel" described a
+ * component that is 64 lines long and contains no navigation. "A tab inside the
+ * dashboard" described EnhancedUserDashboard, which is mounted with no props
+ * and so has no callback that could change the parent's screen. "Only reachable
+ * by deep link" described a mechanism that does not exist: four call sites
+ * write ?dashboard=, and app/page.tsx reads one query key, which is ?prediction.
+ *
+ * So seven screens shipped with no way in, and my-portfolio was the expensive
+ * one: it is the only mount of the refunds and creator reward panels, which are
+ * the only routes in the app to money the contract is already holding. It has a
+ * row now.
+ *
+ * The rest stay out because they are genuinely superseded, not because they are
+ * reachable somewhere else. A screen listed here renders nowhere, and the test
+ * beside this file checks that the claim in each string is true rather than
+ * accepting the string.
  */
 export const NOT_IN_SIDEBAR: Record<string, string> = {
-  approver: 'AdminPanel routes to it; the row would say Admin twice.',
-  analytics: 'A tab inside AdminPanel.',
-  settings: 'A tab inside AdminPanel.',
-  'audit-logs': 'A tab inside AdminPanel.',
-  'my-portfolio': 'A tab inside the dashboard.',
-  'active-bets': 'A tab inside the dashboard.',
-  'bet-history': 'A tab inside the dashboard.',
-  claim: 'Claims are paused, and the page is only reachable by deep link.',
+  approver: 'Superseded. AdminDashboard renders the proposal queue inline.',
+  'active-bets': 'Superseded by the Portfolio row, which has an open tab.',
+  'bet-history': 'Superseded by the Portfolio row, which has a history tab.',
+  claim: 'The $SWIPE rewards contracts are archived and their key is gone.',
 };
 
 export type NavIconName =
@@ -88,6 +98,10 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { id: 'markets', label: 'Markets', icon: 'markets', group: 'main', action: { kind: 'dashboard', dashboard: 'tinder' } },
   { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', group: 'main', action: { kind: 'dashboard', dashboard: 'user' }, badge: true },
+  // The per-token ledger, plus the two panels that are the app's only route to
+  // a creator fee and to a refund on an abandoned market. Both are money the
+  // contract is holding, and until this row existed neither had a button.
+  { id: 'portfolio', label: 'Portfolio', icon: 'dashboard', group: 'main', action: { kind: 'dashboard', dashboard: 'my-portfolio' } },
   { id: 'leaderboard', label: 'Leaderboard', icon: 'leaderboard', group: 'main', action: { kind: 'dashboard', dashboard: 'leaderboard' } },
   { id: 'stats', label: 'Stats', icon: 'stats', group: 'main', action: { kind: 'dashboard', dashboard: 'market-stats' } },
 
@@ -99,6 +113,11 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'activity', label: 'Activity', icon: 'activity', group: 'utility', action: { kind: 'dashboard', dashboard: 'recent-activity' } },
   { id: 'help', label: 'Help and FAQ', icon: 'help', group: 'utility', action: { kind: 'dashboard', dashboard: 'help-faq' } },
   { id: 'admin', label: 'Admin', icon: 'admin', group: 'utility', action: { kind: 'dashboard', dashboard: 'admin' }, adminOnly: true },
+  // Both of these work and neither had a way in. Analytics reads the collateral
+  // pools per chain, and settings is a read-only ledger of what the contract
+  // says, which is the one screen that answers "what rate is actually live".
+  { id: 'analytics', label: 'Analytics', icon: 'stats', group: 'utility', action: { kind: 'dashboard', dashboard: 'analytics' }, adminOnly: true },
+  { id: 'settings', label: 'Contract settings', icon: 'admin', group: 'utility', action: { kind: 'dashboard', dashboard: 'settings' }, adminOnly: true },
 ];
 
 export const GROUP_LABEL: Record<NavGroup, string | null> = {
@@ -129,7 +148,6 @@ export const CRUMB: Record<DashboardType, CrumbEntry> = {
   'market-stats': { crumb: ['Markets', 'Stats'], title: 'Market stats' },
   analytics: { crumb: ['Admin', 'Analytics'], title: 'Platform analytics' },
   settings: { crumb: ['Admin', 'Settings'], title: 'System settings' },
-  'audit-logs': { crumb: ['Admin', 'Audit log'], title: 'Audit log' },
   'my-portfolio': { crumb: ['You', 'Portfolio'], title: 'Your portfolio' },
   'active-bets': { crumb: ['You', 'Open bets'], title: 'Open bets' },
   'bet-history': { crumb: ['You', 'History'], title: 'Bet history' },

@@ -68,14 +68,46 @@ export async function GET(request: NextRequest) {
 
     // Get all predictions
     const allPredictions = await redisHelpers.getAllPredictions(chain);
-    const consideredPredictions = allPredictions.slice(-100); // Last 100 for performance
+    /**
+     * The hundred newest markets, which is the opposite of what this took.
+     *
+     * getAllPredictions sorts newest first, `b.createdAt - a.createdAt`, in both
+     * the snapshot path and the cold rebuild. slice(-100) takes the last hundred
+     * of that, so with 245 markets on Base this window was markets 146 to 245 by
+     * age: the oldest ones, and every recent market excluded.
+     *
+     * That is the whole reason the activity panel showed three rows dated a
+     * month ago and the admin activity page showed nothing at all. Not a
+     * missing feed, a feed pointed at the far end of the list.
+     */
+    const consideredPredictions = allPredictions.slice(0, 100);
 
     // Batch-read every stake up front. This used to be one redis.get per
     // participant inside a nested loop; against Upstash each is an HTTP round
     // trip, which measured at ~118s for this endpoint alone.
+    /**
+     * Everyone who bet on a market, both lists, deduplicated.
+     *
+     * This walked `participants` alone. That array is written by the archived
+     * V2 contract, and every collateral bet lands in `usdcParticipants`
+     * instead, written by /api/sync/usdc. So the activity feed could only ever
+     * show ETH and SWIPE bets from contracts nobody has used in months, which
+     * is why the panel showed the same three rows dated a month ago while
+     * people were betting that day.
+     *
+     * Deduplicated and lowercased because a wallet can appear in both arrays,
+     * and REDIS_KEYS.USER_STAKES normalises the same way.
+     */
+    const bettorsOn = (prediction: { participants?: string[]; usdcParticipants?: string[] }) => [
+      ...new Set([
+        ...(prediction.participants ?? []),
+        ...(prediction.usdcParticipants ?? []),
+      ].map((a) => a.toLowerCase())),
+    ];
+
     const stakeKeys: string[] = [];
     for (const prediction of consideredPredictions) {
-      for (const participant of prediction.participants || []) {
+      for (const participant of bettorsOn(prediction)) {
         // From REDIS_KEYS, so the key carries the chain prefix and matches the
         // one the lookup below builds.
         stakeKeys.push(REDIS_KEYS.USER_STAKES(participant, prediction.id, chain));
@@ -136,8 +168,8 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      // Process stakes for this prediction
-      for (const participant of prediction.participants) {
+      // Process stakes for this prediction. Both participant lists, see bettorsOn.
+      for (const participant of bettorsOn(prediction)) {
         const stakeKey = REDIS_KEYS.USER_STAKES(participant, prediction.id, chain);
         const stakeData = stakesByKey.get(stakeKey);
 

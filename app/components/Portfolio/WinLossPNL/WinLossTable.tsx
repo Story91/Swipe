@@ -1,48 +1,29 @@
 "use client";
 
 import React from 'react';
+import type { PnlPrediction } from './pnlTotals';
+import { recordOn, outcomeOf, PNL_TOKENS } from './pnlTotals';
 import './WinLossPNL.css';
 
-interface PredictionWithStakes {
-  id: string;
-  question: string;
-  resolved: boolean;
-  outcome?: boolean;
-  userStakes?: {
-    ETH?: {
-      isWinner: boolean;
-      potentialProfit: number;
-    };
-    SWIPE?: {
-      isWinner: boolean;
-      potentialProfit: number;
-    };
-  };
-  status: 'active' | 'resolved' | 'expired' | 'cancelled';
-}
-
 interface WinLossTableProps {
-  allUserPredictions: PredictionWithStakes[];
+  allUserPredictions: PnlPrediction[];
 }
 
+/**
+ * The settled markets, split into the ones that came in and the ones that did
+ * not.
+ *
+ * Nothing renders this today, and it stayed on the two archived tokens while
+ * every current bet moved to the chain's stablecoin. It reads the collateral
+ * leg through the same helpers as the P&L card rather than keeping a second
+ * opinion about which markets a user won.
+ */
 export function WinLossTable({ allUserPredictions }: WinLossTableProps) {
-  // Filter only resolved predictions
-  const resolvedPredictions = allUserPredictions.filter(p => p.status === 'resolved');
-
-  // Separate wins and losses
-  const wins = resolvedPredictions.filter(p => {
-    const ethStake = p.userStakes?.ETH;
-    const swipeStake = p.userStakes?.SWIPE;
-    return (ethStake?.isWinner) || (swipeStake?.isWinner);
-  });
-
-  const losses = resolvedPredictions.filter(p => {
-    const ethStake = p.userStakes?.ETH;
-    const swipeStake = p.userStakes?.SWIPE;
-    const ethLost = ethStake && !ethStake.isWinner && (ethStake.potentialProfit || 0) < 0;
-    const swipeLost = swipeStake && !swipeStake.isWinner && (swipeStake.potentialProfit || 0) < 0;
-    return (ethLost || swipeLost) && p.status === 'resolved';
-  });
+  // A market can be settled on the collateral contract and still open on the
+  // archived one, so the filter is per token rather than one status field for
+  // the whole row.
+  const wins = allUserPredictions.filter((p) => recordOn(p).won);
+  const losses = allUserPredictions.filter((p) => recordOn(p).lost);
 
   const formatQuestion = (question: string) => {
     if (question.length > 60) {
@@ -51,10 +32,19 @@ export function WinLossTable({ allUserPredictions }: WinLossTableProps) {
     return question;
   };
 
+  /** The side that won, taken from whichever contract has called it. */
+  const settledSide = (prediction: PnlPrediction) => {
+    for (const token of PNL_TOKENS) {
+      const outcome = outcomeOf(prediction, token);
+      if (outcome !== undefined) return outcome ? 'YES' : 'NO';
+    }
+    return '';
+  };
+
   return (
     <div className="win-loss-container">
-      <h3 className="win-loss-title">Wins & Losses</h3>
-      
+      <h3 className="win-loss-title">Wins and losses</h3>
+
       <div className="win-loss-tables-wrapper">
         {/* Wins Table */}
         <div className="win-loss-table-wrapper win-table-wrapper">
@@ -76,7 +66,7 @@ export function WinLossTable({ allUserPredictions }: WinLossTableProps) {
                     <tr key={prediction.id} className="win-row">
                       <td className="win-loss-question">{formatQuestion(prediction.question)}</td>
                       <td className="win-loss-outcome">
-                        <span className="neon-green-text">{prediction.outcome ? 'YES' : 'NO'}</span>
+                        <span className="neon-green-text">{settledSide(prediction)}</span>
                       </td>
                     </tr>
                   ))}
@@ -108,7 +98,7 @@ export function WinLossTable({ allUserPredictions }: WinLossTableProps) {
                     <tr key={prediction.id} className="loss-row">
                       <td className="win-loss-question">{formatQuestion(prediction.question)}</td>
                       <td className="win-loss-outcome">
-                        <span className="neon-red-text">{prediction.outcome ? 'YES' : 'NO'}</span>
+                        <span className="neon-red-text">{settledSide(prediction)}</span>
                       </td>
                     </tr>
                   ))}

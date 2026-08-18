@@ -53,7 +53,16 @@ export async function GET(request: NextRequest) {
       recentActivity: {
         predictionsLast7Days: recentPredictions.length,
         totalStakesLast7Days: recentPredictions.reduce((sum, p) => sum + p.totalStakes, 0),
-        newParticipantsLast7Days: new Set(recentPredictions.flatMap(p => p.participants)).size
+        // Both participant lists, lowercased. participants is the archived V2
+        // array and usdcParticipants is where every collateral bet lands, so
+        // counting one of them reported the archived contracts as the whole of
+        // the last seven days. Lowercased because a wallet appears cased
+        // differently in the two arrays and would be counted twice.
+        newParticipantsLast7Days: new Set(
+          recentPredictions.flatMap(p =>
+            [...(p.participants ?? []), ...(p.usdcParticipants ?? [])].map(a => a.toLowerCase())
+          )
+        ).size
       },
       highStakes: {
         highStakePredictionsCount: highStakePredictions.length,

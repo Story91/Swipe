@@ -16,6 +16,7 @@ import { PriceCards } from "@/app/components/Markets/MarketDetail/PriceCards";
 import { MarketStatsRow } from "@/app/components/Markets/MarketDetail/MarketStatsRow";
 import { BetPanel } from "@/app/components/Markets/MarketDetail/BetPanel";
 import { ExitPanel } from "@/app/components/Markets/MarketDetail/ExitPanel";
+import { ProposalLike } from "@/app/components/Markets/ProposalLike";
 import { formatPool, yesPriceOf } from "@/app/components/Markets/MarketDetail/marketDetail";
 import type { PricePoint } from "@/app/components/Markets/MarketDetail/marketDetail";
 import "@/app/components/Markets/MarketDetail/MarketDetail.css";
@@ -175,6 +176,22 @@ export default function PredictionPageClient() {
   const settled = !!prediction?.resolved || !!prediction?.cancelled;
   const archived = isReadOnly && !settled;
 
+  /**
+   * A proposal that no admin has registered yet.
+   *
+   * Nothing exists on chain for it, so there is no pool to join and no contract
+   * to stake into. Until the grid learned to show proposals this page could
+   * only be reached for a real market, and BetPanel's own needsApproval is the
+   * ERC20 allowance rather than this, so nothing here was checking. Rendering
+   * the bet panel would put a working amount field in front of a market that
+   * does not exist, and the failure would arrive as a revert after the user had
+   * already approved the token.
+   *
+   * The page still works, it just offers the one action that makes sense on a
+   * proposal, which is saying you want it.
+   */
+  const proposed = prediction?.needsApproval === true && !settled;
+
   const handleGoBack = useCallback(() => router.push("/"), [router]);
 
   // Unchanged. Resolved markets go to the results screen, live ones seek the
@@ -333,7 +350,18 @@ export default function PredictionPageClient() {
           </div>
 
           <div className="mdet__rail">
-            {archived ? (
+            {proposed ? (
+              <section className="mdet-panel mdet-notice">
+                <h2 className="mdet-notice__title">Waiting to be registered</h2>
+                <p className="mdet-notice__body">
+                  Somebody proposed this question and it has not been put on
+                  chain yet, so there is nothing to bet into. The deadline below
+                  is the one they asked for, not one a contract is keeping. If
+                  you want to see it run, say so and it moves up the queue.
+                </p>
+                <ProposalLike predictionId={prediction.id} chainKey={chainKey} />
+              </section>
+            ) : archived ? (
               <section className="mdet-panel mdet-notice">
                 <h2 className="mdet-notice__title">Archived market</h2>
                 <p className="mdet-notice__body">
@@ -361,7 +389,7 @@ export default function PredictionPageClient() {
             {/* One exit row per side held, straight from positions() on
                 chain. Renders nothing when the connected wallet holds
                 nothing here. */}
-            {!archived && !settled && (
+            {!archived && !settled && !proposed && (
               <ExitPanel
                 predictionId={prediction.id}
                 question={prediction.question}

@@ -1,143 +1,23 @@
-import type { Metadata } from "next";
-import { redis, REDIS_KEYS } from "@/lib/redis";
-import type { RedisPrediction } from "@/lib/types/redis";
-
-interface Props {
-  params: Promise<{ id: string }>;
-}
-
-// Generate dynamic metadata for each prediction page
-// This allows custom OG images when sharing on Farcaster/social media
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { id } = await params;
-  const URL = process.env.NEXT_PUBLIC_URL || 'https://swipe-app.vercel.app';
-  
-  try {
-    // Fetch prediction data from Redis
-    const predictionData = await redis.get(REDIS_KEYS.PREDICTION(id, 'base'));
-    
-    if (!predictionData) {
-      return getDefaultMetadata(URL);
-    }
-    
-    const prediction: RedisPrediction = typeof predictionData === 'string' 
-      ? JSON.parse(predictionData) 
-      : predictionData as RedisPrediction;
-    
-    const title = `${prediction.question} | Swipe Predictions`;
-    const description = prediction.description || `Join this prediction market and bet on: ${prediction.question}`;
-    
-    // Calculate stats for image
-    const totalPool = prediction.yesTotalAmount + prediction.noTotalAmount;
-    const yesPercentage = totalPool > 0 ? Math.round((prediction.yesTotalAmount / totalPool) * 100) : 50;
-    
-    // Dynamic OG image URL
-    // Priority:
-    // 1. For crypto predictions: use cached ImgBB URL if exists, otherwise dynamic generator
-    // 2. For regular predictions with an image: use that image directly
-    // 3. Fallback to dynamic generator
-    const isCryptoPrediction = prediction.includeChart || prediction.imageUrl?.includes('geckoterminal.com');
-    
-    let ogImageUrl: string;
-    if (isCryptoPrediction) {
-      // Crypto prediction - use cached ImgBB URL or dynamic generator
-      if (prediction.ogImageUrl) {
-        ogImageUrl = prediction.ogImageUrl;
-      } else {
-        ogImageUrl = `${URL}/api/og/prediction/${id}`;
-      }
-    } else if (prediction.imageUrl) {
-      // Regular prediction with direct image URL - use original image
-      ogImageUrl = prediction.imageUrl;
-    } else {
-      // No image - fallback to dynamic generator
-      ogImageUrl = `${URL}/api/og/prediction/${id}`;
-    }
-    
-    // Prediction-specific URL
-    const predictionUrl = `${URL}/prediction/${id}`;
-    
-    return {
-      title,
-      description,
-      openGraph: {
-        title,
-        description,
-        url: predictionUrl,
-        siteName: "Swipe Predictions",
-        images: [
-          {
-            url: ogImageUrl,
-            width: 1200,
-            height: 628,
-            alt: prediction.question,
-          },
-        ],
-        locale: "en_US",
-        type: "website",
-      },
-      twitter: {
-        card: "summary_large_image",
-        title,
-        description,
-        images: [ogImageUrl],
-      },
-      // Farcaster Frame metadata for direct embedding
-      other: {
-        "fc:frame": JSON.stringify({
-          version: "next",
-          imageUrl: ogImageUrl,
-          button: {
-            title: prediction.resolved ? "View Results" : "Place Your Bet",
-            action: {
-              type: "launch_frame",
-              name: "Swipe Predictions",
-              url: predictionUrl,
-              splashImageUrl: process.env.NEXT_PUBLIC_SPLASH_IMAGE,
-              splashBackgroundColor: "#d4ff00",
-            },
-          },
-        }),
-        // Additional OG tags for better Farcaster compatibility
-        "og:image": ogImageUrl,
-        "og:image:width": "1200",
-        "og:image:height": "628",
-      },
-    };
-  } catch (error) {
-    console.error('Error generating metadata for prediction:', error);
-    return getDefaultMetadata(URL);
-  }
-}
-
-function getDefaultMetadata(URL: string): Metadata {
-  return {
-    title: "Prediction | Swipe",
-    description: "Make predictions and win crypto on Swipe!",
-    openGraph: {
-      title: "Swipe Predictions",
-      description: "Make predictions and win crypto on Swipe!",
-      images: [process.env.NEXT_PUBLIC_APP_HERO_IMAGE || `${URL}/hero.png`],
-    },
-    other: {
-      "fc:frame": JSON.stringify({
-        version: "next",
-        imageUrl: process.env.NEXT_PUBLIC_APP_HERO_IMAGE,
-        button: {
-          title: "Predict, Swipe, Win!",
-          action: {
-            type: "launch_frame",
-            name: "Swipe Predictions",
-            url: URL,
-            splashImageUrl: process.env.NEXT_PUBLIC_SPLASH_IMAGE,
-            splashBackgroundColor: "#d4ff00",
-          },
-        },
-      }),
-    },
-  };
-}
-
+/**
+ * A pass-through. The metadata for this route lives in page.tsx.
+ *
+ * This file held a generateMetadata that read Redis with a hardcoded 'base' and
+ * built its og:image and frame url with no chain on either. Both deployments
+ * number their markets from 1, so a Robinhood market's record lives under
+ * `robinhood:prediction:pred_v4_N`, the Base lookup missed it, and every
+ * Robinhood share fell back to the generic card with no question on it.
+ *
+ * It cannot be fixed here. A layout's generateMetadata is handed `params` and
+ * nothing else, so it can never see `?chain=`. That is why the page was split
+ * into a server component plus PredictionPageClient: a page's generateMetadata
+ * does get searchParams. The same split is documented at length in
+ * app/pnl/[address]/layout.tsx, which hit this first.
+ *
+ * The file stays rather than being deleted because it has now been deleted and
+ * restored twice by two people working in parallel, each reading its absence as
+ * the missing link previews. The previews are in page.tsx and they carry the
+ * chain. Nothing needs to be restored here.
+ */
 export default function PredictionLayout({
   children,
 }: {
@@ -145,4 +25,3 @@ export default function PredictionLayout({
 }) {
   return <>{children}</>;
 }
-

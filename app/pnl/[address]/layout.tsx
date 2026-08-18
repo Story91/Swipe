@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { redis, REDIS_KEYS } from "@/lib/redis";
+import { DEFAULT_CHAIN_KEY } from "@/lib/chains";
+import { isChainKey } from "@/lib/chains/requestChain";
+import type { ChainKey } from "@/lib/chains/types";
 
 interface Props {
   children: React.ReactNode;
@@ -19,21 +22,50 @@ export async function generateMetadata({ params }: { params: Promise<{ address: 
   const title = "P&L Overview | Swipe Predictions";
   const description = "Check your trading performance and profit & loss on Swipe Predictions";
   
+  /**
+   * Which chain's card this page embeds, and why it is not read off the URL.
+   *
+   * A layout's generateMetadata is handed `params` and nothing else. That is
+   * not a guess: Next generates the check itself, and
+   * .next/types/app/pnl/[address]/layout.ts declares
+   * `LayoutProps { children, params }` beside a `PageProps` that also carries
+   * `searchParams`. Adding `?chain=` to the share link would not reach this
+   * file however it were written.
+   *
+   * app/prediction/[id] answered the same problem by splitting into a server
+   * page plus a client component, and that is the right answer here too, but it
+   * is a change to app/pnl/[address]/page.tsx, which is another agent's file
+   * this round. So the chain comes from the pointer that /api/og/upload/pnl and
+   * /api/pnl/save-og-url write next to the card: the chain the wallet actually
+   * published from. No pointer means Base, which is where every card published
+   * before this change already sits, so nothing that exists today moves.
+   */
+  let chain: ChainKey = DEFAULT_CHAIN_KEY;
+  try {
+    const lastShared = await redis.get(REDIS_KEYS.USER_PNL_OG_CHAIN(userAddressLower));
+    // Validated, never trusted. This value goes on to select a Redis keyspace.
+    if (isChainKey(lastShared)) {
+      chain = lastShared;
+    }
+  } catch (error) {
+    console.error('Error reading last shared PNL chain from Redis:', error);
+  }
+
   // Get cached OG image URL from Redis (uploaded to ImgBB during share)
   let ogImageUrl = `${URL}/hero.png`; // fallback
-  
+
   try {
-    const cachedUrl = await redis.get(REDIS_KEYS.USER_PNL_OG_IMAGE(userAddressLower));
+    const cachedUrl = await redis.get(REDIS_KEYS.USER_PNL_OG_IMAGE(userAddressLower, chain));
     if (cachedUrl && typeof cachedUrl === 'string') {
       ogImageUrl = cachedUrl;
-      console.log(`📸 Using cached PNL OG image for ${userAddressLower}: ${ogImageUrl}`);
+      console.log(`📸 Using cached PNL OG image for ${userAddressLower} on ${chain}: ${ogImageUrl}`);
     } else {
-      console.log(`⚠️ No cached PNL OG image for ${userAddressLower}, using fallback`);
+      console.log(`⚠️ No cached PNL OG image for ${userAddressLower} on ${chain}, using fallback`);
     }
   } catch (error) {
     console.error('Error fetching PNL OG image from Redis:', error);
   }
-  
+
   const pnlUrl = `${URL}/pnl/${address}`;
   
   // After clicking the button, user is redirected to dashboard with PNL tab open

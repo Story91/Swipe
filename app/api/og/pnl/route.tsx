@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { NextRequest, NextResponse } from 'next/server';
 import { redis, redisHelpers, REDIS_KEYS } from '@/lib/redis';
-import { chainFromRequest } from '@/lib/chains/requestChain';
+import { CHAIN_PARAM, resolveChainParam } from '@/lib/chains/requestChain';
 import { DEFAULT_CHAIN_KEY } from '@/lib/chains';
 import { getFeeBps } from '@/lib/chains/fees';
 import { stakeLegs, tokenSymbol } from '@/lib/userStake';
@@ -50,21 +50,22 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     let userAddress = searchParams.get('user');
+    let chainParam = searchParams.get(CHAIN_PARAM);
 
-    // PNL is per chain, since it is summed from one chain's pools. An unknown
-    // chain falls back rather than 400s, because this endpoint returns an image
-    // and a crawler renders whatever body it is handed.
-    const requestedChain = chainFromRequest(request);
-    const chain = requestedChain.ok ? requestedChain.chain : DEFAULT_CHAIN_KEY;
-
-    // If user param not in query, try to extract from referer
-    // Farcaster crawler will include the page URL with ?user=0x... in the referer header
-    if (!userAddress) {
+    // The Farcaster crawler fetches the card with the page URL in the referer
+    // rather than in the query, so both values are recovered from there when
+    // the request itself is missing them.
+    //
+    // Both, not just the address. Recovering the user and letting the chain
+    // fall through to Base is how a Robinhood share came back rendered from
+    // Base's pools: the wallet was right and the money was somebody else's.
+    if (!userAddress || !chainParam) {
       const referer = request.headers.get('referer') || request.headers.get('x-forwarded-url');
       if (referer) {
         try {
           const refererUrl = new URL(referer);
-          userAddress = refererUrl.searchParams.get('user');
+          userAddress = userAddress || refererUrl.searchParams.get('user');
+          chainParam = chainParam || refererUrl.searchParams.get(CHAIN_PARAM);
         } catch (e) {
           console.error('Error parsing referer URL:', e);
           // Ignore referer parsing errors
@@ -72,10 +73,22 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // If we have user address, check Redis for cached ImgBB URL (like crypto predictions)
+    // PNL is per chain, since it is summed from one chain's pools. An unknown
+    // chain falls back rather than 400s, because this endpoint returns an image
+    // and a crawler renders whatever body it is handed.
+    const requestedChain = resolveChainParam(chainParam);
+    const chain = requestedChain.ok ? requestedChain.chain : DEFAULT_CHAIN_KEY;
+
+    // Cached card, looked up on the chain that was asked for.
+    //
+    // The chain is settled above this block and not below it. The redirect used
+    // to build a key with no chain in it at all: the value of `?chain=` was
+    // parsed into a variable and then not used here, so whichever card the
+    // wallet published last was served for every request afterwards, and an
+    // explicit `?chain=robinhood` changed nothing about which one came back.
     if (userAddress) {
       try {
-        const cacheKey = REDIS_KEYS.USER_PNL_OG_IMAGE(userAddress.toLowerCase());
+        const cacheKey = REDIS_KEYS.USER_PNL_OG_IMAGE(userAddress, chain);
         const cachedUrl = await redis.get(cacheKey);
         if (cachedUrl && typeof cachedUrl === 'string') {
           // Redirect to cached ImgBB URL (like crypto predictions do)

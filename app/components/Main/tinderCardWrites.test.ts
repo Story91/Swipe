@@ -3,6 +3,11 @@ import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'node:url';
 import { CHAINS, isWritableMarket, type ChainKey } from '../../../lib/chains';
+import {
+  ARCHIVED_CHAIN_ID,
+  ARCHIVED_CHAIN_KEY,
+  archivedClaimBlocked,
+} from '../../../lib/chains/archived';
 import { CONTRACTS } from '../../../lib/contract';
 
 /**
@@ -115,10 +120,28 @@ describe('TinderCard write guards', () => {
 
   it('names the archived chain instead of assuming the default', () => {
     // The claims are pinned to whatever ARCHIVED_CHAIN_KEY resolves to, so that
-    // key has to be a real chain with a real id. 'base' as a bare string in the
-    // component would type-check and then pin nothing.
-    expect(CODE).toMatch(/const ARCHIVED_CHAIN_KEY: ChainKey = 'base';/);
-    expect(CHAINS.base.viemChain.id).toBeGreaterThan(0);
+    // key has to be a real chain with a real id. 'base' as a bare string would
+    // type-check and then pin nothing.
+    //
+    // The constants moved to lib/chains/archived.ts, because
+    // EnhancedUserDashboard has the same two sends and had neither the pin nor
+    // the refusal, which is what a copied constant buys you. So this checks the
+    // import rather than a local declaration: what matters is that the pin
+    // resolves to a real chain id, not which file the word is typed in.
+    expect(CODE).toContain("from '@/lib/chains/archived'");
+    expect(CODE).toContain('ARCHIVED_CHAIN_ID');
+    expect(ARCHIVED_CHAIN_KEY).toBe('base');
+    expect(ARCHIVED_CHAIN_ID).toBe(CHAINS[ARCHIVED_CHAIN_KEY].viemChain.id);
+    expect(ARCHIVED_CHAIN_ID).toBeGreaterThan(0);
+  });
+
+  it('refuses an archived claim from another chain, with a sentence', () => {
+    // The guard is a returned message rather than an alert, so both callers can
+    // say it their own way. Null means the send is allowed to go.
+    expect(archivedClaimBlocked('base')).toBeNull();
+    const blocked = archivedClaimBlocked('robinhood');
+    expect(blocked).toBeTruthy();
+    expect(blocked).toContain(CHAINS.base.label);
   });
 
   it('leaves no V1-to-V2 changelog in the empty state', () => {

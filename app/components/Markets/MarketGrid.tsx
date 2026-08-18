@@ -17,6 +17,17 @@ import {
   type StakeToken,
 } from "@/lib/userStake";
 import { pageWindow } from "./pageWindow";
+import { ProposalLike } from "./ProposalLike";
+import {
+  categoryOptions,
+  countMatching,
+  isOpen,
+  isProposed,
+  playerCount,
+  selectMarkets,
+  type CategoryFilter,
+  type StatusFilter,
+} from "./marketFilters";
 import { thumbKindFor, hueFromSeed, initialsFor } from "./marketThumb";
 import type { ThumbKind } from "./marketThumb";
 import { Sparkline } from "./Sparkline";
@@ -45,24 +56,6 @@ function formatPool(units: number): string {
   if (units < 0.01) return "<0.01";
   if (units >= 1000) return `${(units / 1000).toFixed(1)}k`;
   return units.toFixed(2);
-}
-
-/**
- * How many people are actually in this market.
- *
- * `participants` is the V2 array, written by the ETH and SWIPE sync. A market
- * on the live contract gets `usdcParticipants` instead, so counting the old
- * array reports zero players on every market anyone is currently betting in,
- * and drops settled collateral markets out of the filters below for looking
- * empty. Same precedent as adminMarkets.ts and /prediction/[id].
- */
-function playerCount(p: HybridPrediction): number {
-  return (
-    p.usdcParticipants?.length ??
-    p.usdcParticipantCount ??
-    p.participants?.length ??
-    0
-  );
 }
 
 /**
@@ -125,13 +118,20 @@ function formatTimeLeft(deadline: number): { label: string; urgent: boolean } {
   return { label: `${minutes}m left`, urgent: true };
 }
 
-type StatusFilter = "open" | "resolved" | "all";
-
 const FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "open", label: "Open" },
+  { key: "proposed", label: "Proposed" },
   { key: "resolved", label: "Resolved" },
   { key: "all", label: "All" },
 ];
+
+/** How the status filter reads inside a sentence. */
+const STATUS_WORD: Record<StatusFilter, string> = {
+  open: "open",
+  proposed: "proposed",
+  resolved: "settled",
+  all: "",
+};
 
 /** Divisible by 2, 3 and 4 so the last row is full at every column count. */
 const PAGE_SIZE = 24;
@@ -142,10 +142,6 @@ const PAGE_SIZE = 24;
  * market stops looking like its creator and three friends.
  */
 const HOT_PLAYER_THRESHOLD = 8;
-
-function isOpen(p: HybridPrediction, now: number): boolean {
-  return !p.resolved && !p.cancelled && p.deadline > now;
-}
 
 /**
  * The card's ground.
@@ -263,6 +259,15 @@ function MarketCard({
   const settled = prediction.resolved || prediction.cancelled;
   const players = playerCount(prediction);
   const hot = !settled && players >= HOT_PLAYER_THRESHOLD;
+  /**
+   * A proposal, not a market.
+   *
+   * Nothing is registered on chain for it, so it has no pool, it cannot be bet
+   * on, and the countdown beside it is the deadline somebody asked for rather
+   * than one the contract is keeping. The card says so in words instead of
+   * looking identical to a live one with an empty pool.
+   */
+  const proposed = isProposed(prediction, Math.floor(Date.now() / 1000));
 
   // A dead image URL falls back to the drawn ground rather than leaving the
   // card blank, same as the tile used to.
@@ -401,7 +406,12 @@ function MarketCard({
           </>
         )}
         <span className="mgcard__spacer" />
-        {prediction.cancelled ? (
+        {proposed ? (
+          <>
+            <ProposalLike predictionId={prediction.id} chainKey={chainKey} />
+            <span className="mgcard__badge mgcard__badge--proposed">Proposed</span>
+          </>
+        ) : prediction.cancelled ? (
           <span className="mgcard__badge">Cancelled</span>
         ) : settled ? (
           <span
@@ -427,6 +437,7 @@ export function MarketGrid() {
     useHybridPredictions();
   const { chainKey } = useActiveChain();
   const [filter, setFilter] = useState<StatusFilter>("open");
+  const [category, setCategory] = useState<CategoryFilter>(null);
   const [page, setPage] = useState(1);
 
   // The hook loads only open markets by default, so the settled filters would
@@ -451,33 +462,30 @@ export function MarketGrid() {
     }
   }, [loading, predictions, filter]);
 
-  const { visible, openCount } = useMemo(() => {
+  // Every decision about what appears is in ./marketFilters, including the
+  // approval gate that keeps a proposal nobody has registered on chain out of
+  // the grid. What is left here is arithmetic for the chips.
+  const { visible, openCount, statusCounts, categories } = useMemo(() => {
     const now = Math.floor(Date.now() / 1000);
     const all = predictions ?? [];
-    const open = all.filter((p) => isOpen(p, now));
 
-    // A settled market nobody bet on has nothing to show: no pool, no players,
-    // no result worth reading. Those were filling the grid with empty tiles, so
-    // they are dropped from the settled and combined views. Open markets are
-    // never dropped for having no players yet - having none is what an open
-    // market with room in it looks like.
-    const worthShowing = (p: HybridPrediction) =>
-      !(p.resolved || p.cancelled) || playerCount(p) > 0;
-
-    const list =
-      filter === "open"
-        ? open
-        : filter === "resolved"
-          ? all.filter((p) => (p.resolved || p.cancelled) && worthShowing(p))
-          : all.filter(worthShowing);
-
-    // Open markets read best soonest-first; settled ones most-recent-first.
-    const sorted = [...list].sort((a, b) =>
-      filter === "open" ? a.deadline - b.deadline : b.deadline - a.deadline
-    );
-
-    return { visible: sorted, openCount: open.length };
-  }, [predictions, filter]);
+    return {
+      visible: selectMarkets(all, { status: filter, category, now }),
+      // Ignores the category on purpose. It answers "is anything open on this
+      // chain", which is what the hint below and the fallback above are about,
+      // and neither of those is a statement about the category filter.
+      openCount: countMatching(all, "open", null, now),
+      // Each status chip counts itself against the category that is on, and
+      // each category chip counts itself against the status that is on. Press
+      // either and you get the number it showed you.
+      statusCounts: {
+        open: countMatching(all, "open", category, now),
+        resolved: countMatching(all, "resolved", category, now),
+        all: countMatching(all, "all", category, now),
+      } as Record<StatusFilter, number>,
+      categories: categoryOptions(all, filter, now, category),
+    };
+  }, [predictions, filter, category]);
 
   const pageCount = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
   // Clamp rather than reset: if the list shrinks under us (a background refresh,
@@ -520,6 +528,18 @@ export function MarketGrid() {
    */
   const openMarket = (id: string) => router.push(`/prediction/${id}?chain=${chainKey}`);
 
+  const clearFilters = () => {
+    setFilter("all");
+    setCategory(null);
+    setPage(1);
+  };
+
+  // The category row is worth a line of the page only when there is a choice in
+  // it. One category is not a filter. It stays up while a selection is on, even
+  // at zero, so a combination with nothing in it can still be undone from the
+  // row that made it.
+  const showCategories = categories.length > 1 || category !== null;
+
   const filterBar = (
     <div className="market-filter-bar">
       <div className="market-filter" role="group" aria-label="Filter markets">
@@ -535,16 +555,52 @@ export function MarketGrid() {
             }}
           >
             {label}
-            {key === "open" && openCount > 0 && (
-              <span className="market-filter__count">{openCount}</span>
+            {statusCounts[key] > 0 && (
+              <span className="market-filter__count">{statusCounts[key]}</span>
             )}
           </button>
         ))}
       </div>
+
       {openCount === 0 && !loading && (
         <p className="market-filter__hint">
           No markets are open right now, showing past ones.
         </p>
+      )}
+
+      {showCategories && (
+        <div
+          className="market-filter market-filter--topics"
+          role="group"
+          aria-label="Filter by category"
+        >
+          <button
+            type="button"
+            className={`market-filter__chip${category === null ? " market-filter__chip--active" : ""}`}
+            aria-pressed={category === null}
+            onClick={() => {
+              setCategory(null);
+              setPage(1);
+            }}
+          >
+            All topics
+          </button>
+          {categories.map(({ name, count }) => (
+            <button
+              key={name}
+              type="button"
+              className={`market-filter__chip${category === name ? " market-filter__chip--active" : ""}`}
+              aria-pressed={category === name}
+              onClick={() => {
+                setCategory(category === name ? null : name);
+                setPage(1);
+              }}
+            >
+              {name}
+              {count > 0 && <span className="market-filter__count">{count}</span>}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -574,24 +630,52 @@ export function MarketGrid() {
 
       {visible.length === 0 ? (
         <div className="market-grid__notice">
-          <h2>
-            {filter === "open"
-              ? "No open markets right now"
-              : "Nothing here yet"}
-          </h2>
-          <p>
-            {filter === "open"
-              ? "Every market has passed its deadline. New ones appear here as soon as they are created."
-              : "No markets match this filter."}
-          </p>
-          {filter === "open" && (
-            <button
-              type="button"
-              className="market-grid__notice-action"
-              onClick={() => setFilter("resolved")}
-            >
-              Browse settled markets
-            </button>
+          {category !== null ? (
+            // A combination with nothing in it. Name both filters, because the
+            // category row can be two rows down the page and the reader is
+            // owed the reason the grid is blank.
+            <>
+              <h2>
+                {filter === "all"
+                  ? `Nothing in ${category} yet`
+                  : `No ${STATUS_WORD[filter]} markets in ${category}`}
+              </h2>
+              <p>
+                {filter === "all"
+                  ? `The ${category} filter is on and nothing in it has anything to show.`
+                  : `Two filters are on, ${STATUS_WORD[filter]} and ${category}. Drop them and the rest of the grid comes back.`}
+              </p>
+              <button
+                type="button"
+                className="market-grid__notice-action"
+                onClick={clearFilters}
+              >
+                Clear filters
+              </button>
+            </>
+          ) : filter === "open" ? (
+            <>
+              <h2>No open markets right now</h2>
+              <p>
+                Every market has passed its deadline. New ones appear here as
+                soon as they are created.
+              </p>
+              <button
+                type="button"
+                className="market-grid__notice-action"
+                onClick={() => {
+                  setFilter("resolved");
+                  setPage(1);
+                }}
+              >
+                Browse settled markets
+              </button>
+            </>
+          ) : (
+            <>
+              <h2>Nothing here yet</h2>
+              <p>No markets match this filter.</p>
+            </>
           )}
         </div>
       ) : (

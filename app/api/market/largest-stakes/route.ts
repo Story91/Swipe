@@ -71,7 +71,14 @@ export async function GET(request: NextRequest) {
     // Get all unique users from predictions
     const allUsers = new Set<string>();
     filteredPredictions.forEach(p => {
-      p.participants.forEach(participant => allUsers.add(participant));
+      // Both lists, lowercased. participants is the archived V2 array; every
+      // collateral bet lands in usdcParticipants, so reading one of them ranked
+      // the archived contracts and ignored the live one. Lowercased because the
+      // same wallet appears cased differently in the two arrays and would
+      // otherwise be counted twice.
+      for (const participant of [...(p.participants ?? []), ...(p.usdcParticipants ?? [])]) {
+        allUsers.add(participant.toLowerCase());
+      }
     });
 
     console.log(`👥 Found ${allUsers.size} unique users`);

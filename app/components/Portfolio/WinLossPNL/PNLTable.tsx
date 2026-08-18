@@ -1,45 +1,49 @@
 "use client";
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { Download, Share2 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { useComposeCast, useOpenUrl } from '@coinbase/onchainkit/minikit';
 import { useAccount } from 'wagmi';
 import sdk from '@farcaster/miniapp-sdk';
 import { uploadToImgBB } from '@/lib/imgbb';
+import { useActiveChain } from '@/lib/chains/activeChain';
+import { tokenSymbol, COLLATERAL_LEG, type StakeToken } from '@/lib/userStake';
+import type { PnlPrediction, PnlSummary } from './pnlTotals';
+import { summarisePnl, formatTokenAmount, formatSignedAmount, formatRoi } from './pnlTotals';
 import './WinLossPNL.css';
 
-export interface PredictionWithStakes {
-  id: string;
-  question: string;
-  resolved: boolean;
-  outcome?: boolean;
-  cancelled: boolean;
-  userStakes?: {
-    ETH?: {
-      yesAmount: number;
-      noAmount: number;
-      potentialProfit: number;
-      potentialPayout: number;
-      isWinner: boolean;
-    };
-    SWIPE?: {
-      yesAmount: number;
-      noAmount: number;
-      potentialProfit: number;
-      potentialPayout: number;
-      isWinner: boolean;
-    };
-  };
-  status: 'active' | 'resolved' | 'expired' | 'cancelled';
-}
+/**
+ * The shape a page hands this card, defined once in pnlTotals and re-exported
+ * under the name the two P&L pages already import.
+ */
+export type { PnlPrediction as PredictionWithStakes } from './pnlTotals';
+
+/**
+ * The tabs, collateral first because it is the only leg still live.
+ *
+ * Every bet placed today settles in the chain's stablecoin, USDC on Base and
+ * Paxos USDG on Robinhood, and until now this card had nowhere to put one: the
+ * type knew about ETH and SWIPE, the switch had two buttons, and the formatter
+ * divided everything by 1e18. So the whole current product read as zero and
+ * both P&L screens were archive viewers.
+ *
+ * ETH and SWIPE stay reachable and stay marked. They sat on the Base contracts
+ * whose owner key is gone, so nothing new is placed there, and a tab that looks
+ * current invites someone to read an old number as today's.
+ */
+const TOKEN_TABS: ReadonlyArray<{ token: StakeToken; icon: string; archived: boolean }> = [
+  { token: COLLATERAL_LEG, icon: '/usdc.png', archived: false },
+  { token: 'ETH', icon: '/Ethereum-icon-purple.svg', archived: true },
+  { token: 'SWIPE', icon: '/splash.png', archived: true },
+];
 
 interface PNLTableProps {
-  allUserPredictions: PredictionWithStakes[];
+  allUserPredictions: PnlPrediction[];
 }
 
 export function PNLTable({ allUserPredictions }: PNLTableProps) {
-  const [selectedToken, setSelectedToken] = useState<'ETH' | 'SWIPE'>('ETH');
+  const [selectedToken, setSelectedToken] = useState<StakeToken>(COLLATERAL_LEG);
   const cardRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
@@ -47,138 +51,38 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
   const { composeCast: minikitComposeCast } = useComposeCast();
   const openUrl = useOpenUrl();
   const { address } = useAccount();
+  /**
+   * What the collateral is called on the network the user is looking at.
+   *
+   * The leg is stored under the key 'USDC' on every chain, Robinhood included,
+   * where the token is actually Paxos USDG. Printing the key would tell a
+   * Robinhood user they hold the wrong dollar.
+   */
+  const { chainKey } = useActiveChain();
+  const symbolFor = (token: StakeToken) => tokenSymbol(token, chainKey);
+  const symbol = symbolFor(selectedToken);
 
-  const weiToEth = (wei: number): number => {
-    return wei / Math.pow(10, 18);
-  };
+  /**
+   * A separate set of totals per token, never a sum across them.
+   *
+   * ETH is 18 decimals and the collateral is 6, so a single figure over both is
+   * the wei leg and nothing else. All three are worked out because the empty
+   * state needs to know which other tab holds something. The arithmetic is in
+   * pnlTotals, which is a .ts so a test can import it.
+   */
+  const summaries = useMemo(() => {
+    const out = {} as Record<StakeToken, PnlSummary>;
+    for (const { token } of TOKEN_TABS) out[token] = summarisePnl(allUserPredictions, token);
+    return out;
+  }, [allUserPredictions]);
 
-  const formatEth = (wei: number): string => {
-    const eth = weiToEth(wei);
-    if (eth === 0) return '0.0000';
-    return eth.toFixed(6);
-  };
-
-  const formatSwipe = (wei: number): string => {
-    const swipe = weiToEth(wei);
-    if (swipe === 0) return '0';
-    
-    const absSwipe = Math.abs(swipe);
-    const sign = swipe < 0 ? '-' : '';
-    
-    if (absSwipe >= 1000000) {
-      return `${sign}${(absSwipe / 1000000).toFixed(2)}M`;
-    } else if (absSwipe >= 1000) {
-      return `${sign}${(absSwipe / 1000).toFixed(2)}K`;
-    } else if (absSwipe >= 1) {
-      return `${sign}${absSwipe.toFixed(2)}`;
-    } else {
-      return `${sign}${absSwipe.toFixed(4)}`;
-    }
-  };
-
-  // Calculate PNL data
-  const calculatePNL = () => {
-    let totalStaked = 0;
-    let totalPayout = 0;
-    let totalProfit = 0;
-    const positions: Array<{
-      id: string;
-      question: string;
-      staked: number;
-      payout: number;
-      profit: number;
-      status: string;
-      isWinner: boolean;
-    }> = [];
-
-    allUserPredictions.forEach(prediction => {
-      const stake = prediction.userStakes?.[selectedToken];
-      if (!stake) return;
-
-      const staked = stake.yesAmount + stake.noAmount;
-      const payout = stake.potentialPayout || 0;
-      const profit = stake.potentialProfit || 0;
-
-      if (staked > 0) {
-        totalStaked += staked;
-        totalPayout += payout;
-        totalProfit += profit;
-
-        let status = 'Active';
-        if (prediction.status === 'resolved') {
-          status = stake.isWinner ? 'Win' : 'Loss';
-        } else if (prediction.cancelled) {
-          status = 'Cancelled';
-        } else if (prediction.status === 'expired') {
-          status = 'Expired';
-        }
-
-        positions.push({
-          id: prediction.id,
-          question: prediction.question,
-          staked,
-          payout,
-          profit,
-          status,
-          isWinner: stake.isWinner || false
-        });
-      }
-    });
-
-    return { totalStaked, totalPayout, totalProfit, positions };
-  };
-
-  const { totalStaked, totalPayout, totalProfit, positions } = calculatePNL();
-
-  const formatAmount = (wei: number) => {
-    return selectedToken === 'ETH' ? formatEth(wei) : formatSwipe(wei);
-  };
-
-  // Calculate ROI (Return on Investment) - same as PNL percentage
-  const calculateROI = () => {
-    if (totalStaked === 0) return 0;
-    return (totalProfit / totalStaked) * 100;
-  };
-
-  const roi = calculateROI();
+  const summary = summaries[selectedToken];
+  const { staked: totalStaked, payout: totalPayout, profit: totalProfit, roi, wins, losses } =
+    summary;
+  const tabsWithBets = TOKEN_TABS.filter(({ token }) => summaries[token].bets > 0);
   const isProfit = totalProfit >= 0;
 
-  // Calculate wins and losses - count across all tokens
-  const calculateWinsLosses = () => {
-    const resolvedPredictions = allUserPredictions.filter(p => p.status === 'resolved');
-    
-    let wins = 0;
-    let losses = 0;
-
-    resolvedPredictions.forEach(prediction => {
-      const ethStake = prediction.userStakes?.ETH;
-      const swipeStake = prediction.userStakes?.SWIPE;
-      
-      // Check if user has any stake in this prediction
-      const hasAnyStake = ethStake || swipeStake;
-      if (!hasAnyStake) return;
-
-      // Check if user won in any token
-      const wonInEth = ethStake?.isWinner || false;
-      const wonInSwipe = swipeStake?.isWinner || false;
-      const hasWin = wonInEth || wonInSwipe;
-
-      // Check if user lost in all tokens where they had stakes
-      const lostInEth = ethStake && !ethStake.isWinner && (ethStake.potentialProfit || 0) < 0;
-      const lostInSwipe = swipeStake && !swipeStake.isWinner && (swipeStake.potentialProfit || 0) < 0;
-      const hasLoss = (ethStake && lostInEth) || (swipeStake && lostInSwipe);
-
-      if (hasWin) {
-        wins++;
-      } else if (hasLoss) {
-        losses++;
-      }
-    });
-
-    return { wins, losses };
-  };
-
-  const { wins, losses } = calculateWinsLosses();
+  const formatAmount = (amount: number) => formatTokenAmount(amount, selectedToken);
 
   const handleExportImage = async () => {
     if (!cardRef.current) return;
@@ -195,7 +99,7 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
       });
 
       const link = document.createElement('a');
-      link.download = `PNL_${selectedToken}_${Date.now()}.png`;
+      link.download = `PNL_${symbol}_${Date.now()}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
     } catch (error) {
@@ -235,7 +139,7 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
   const handleShare = async (platform: 'farcaster' | 'twitter') => {
     if (!cardRef.current || !address) {
       if (!address) {
-        alert('Please connect your wallet to share PNL');
+        alert('Connect your wallet to share your P&L.');
       }
       return;
     }
@@ -266,7 +170,7 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
       });
 
       // Convert blob to File
-      const file = new File([blob], `PNL_${selectedToken}_${Date.now()}.png`, { type: 'image/png' });
+      const file = new File([blob], `PNL_${symbol}_${Date.now()}.png`, { type: 'image/png' });
 
       // Upload to ImgBB
       const uploadResult = await uploadToImgBB(file);
@@ -343,17 +247,12 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
       let shareText = '';
       
       // Add PNL stats with intro
-      if (isProfit && totalProfit > 0) {
-        const profitFormatted = formatAmount(totalProfit);
-        shareText = `📊 My ${selectedToken} P&L on ${tag}:\n\n`;
-        shareText += `💰 Total P&L: +${profitFormatted} ${selectedToken}\n`;
-        shareText += `📈 ROI: +${Math.round(roi)}%\n`;
-      } else {
-        const pnlFormatted = formatAmount(totalProfit);
-        shareText = `📊 My ${selectedToken} P&L on ${tag}:\n\n`;
-        shareText += `📉 Total P&L: ${pnlFormatted} ${selectedToken}\n`;
-        shareText += `📊 ROI: ${Math.round(roi)}%\n`;
-      }
+      // The currency is named on every figure. A number with no unit beside it
+      // is the reason a 25 dollar bet once went out as "25000000 ETH".
+      const pnlFormatted = formatSignedAmount(totalProfit, selectedToken);
+      shareText = `📊 My ${symbol} P&L on ${tag}:\n\n`;
+      shareText += `${isProfit ? '💰' : '📉'} Total P&L: ${pnlFormatted} ${symbol}\n`;
+      shareText += `${isProfit ? '📈' : '📊'} ROI: ${formatRoi(roi)}\n`;
       
       // Add wins/losses count
       shareText += `🏆 Wins: ${wins} | Losses: ${losses}\n\n`;
@@ -382,13 +281,6 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
     }
   };
 
-  const formatQuestion = (question: string) => {
-    if (question.length > 60) {
-      return question.substring(0, 60) + '...';
-    }
-    return question;
-  };
-
   const formatDate = () => {
     return new Date().toLocaleString('pl-PL', {
       day: '2-digit',
@@ -403,29 +295,27 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
   return (
     <div className="pnl-container">
       <div className="pnl-header">
-        <h3 className="pnl-title">P&L Overview</h3>
+        <h3 className="pnl-title">P&L overview</h3>
         <div className="pnl-controls">
           <div className="pnl-token-switch">
-            <button
-              className={`pnl-switch-btn ${selectedToken === 'ETH' ? 'active' : ''}`}
-              onClick={() => setSelectedToken('ETH')}
-            >
-              <img src="/Ethereum-icon-purple.svg" alt="ETH" className="pnl-switch-icon" />
-              ETH
-            </button>
-            <button
-              className={`pnl-switch-btn ${selectedToken === 'SWIPE' ? 'active' : ''}`}
-              onClick={() => setSelectedToken('SWIPE')}
-            >
-              <img src="/splash.png" alt="SWIPE" className="pnl-switch-icon" />
-              SWIPE
-            </button>
+            {TOKEN_TABS.map(({ token, icon, archived }) => (
+              <button
+                key={token}
+                className={`pnl-switch-btn ${selectedToken === token ? 'active' : ''}`}
+                onClick={() => setSelectedToken(token)}
+                title={archived ? 'Archived, no new bets settle here' : undefined}
+              >
+                <img src={icon} alt="" className="pnl-switch-icon" />
+                {symbolFor(token)}
+                {archived && <span className="pnl-switch-tag">old</span>}
+              </button>
+            ))}
           </div>
           <button
             className="pnl-export-btn pnl-export-icon-only"
             onClick={handleExportImage}
             disabled={isExporting}
-            title="Export PNL Card"
+            title="Save the card as an image"
           >
             <Download size={16} />
           </button>
@@ -434,7 +324,7 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
               className="pnl-export-btn pnl-share-btn pnl-share-icon-only"
               onClick={() => setShowShareDropdown(!showShareDropdown)}
               disabled={isSharing}
-              title="Share PNL Card"
+              title="Share the card"
             >
               <Share2 size={16} />
             </button>
@@ -473,12 +363,44 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
         </div>
       </div>
 
+      {/*
+        Two things worth saying before someone reads the figures. Which tab they
+        are on, when it is one nobody can settle any more. And that an empty tab
+        is empty, because a card of zeros reads as a losing account rather than
+        as no account at all.
+      */}
+      {(selectedToken !== COLLATERAL_LEG || summary.bets === 0) && (
+        <p className="pnl-archived-note">
+          {selectedToken !== COLLATERAL_LEG && (
+            <>
+              {selectedToken} bets ran on the old Base contracts. Nothing new settles there,
+              so this tab is history.{' '}
+            </>
+          )}
+          {summary.bets === 0 && (
+            <>
+              Nothing staked in {symbol}.
+              {tabsWithBets.length > 0 &&
+                ` Your positions are under ${tabsWithBets
+                  .map(({ token }) => symbolFor(token))
+                  .join(' and ')}.`}
+            </>
+          )}
+        </p>
+      )}
+
       {/* PNL Card - Horizontal Layout */}
       <div ref={cardRef} className="pnl-card pnl-card-horizontal">
         <div className="pnl-card-content">
           <div className="pnl-card-left">
             <div className="pnl-card-header">
               <div className="pnl-wins-losses">
+                {/*
+                  The record is this token's, not every token's. It used to
+                  count a win in any currency, so an ETH call from the archived
+                  contracts landed on a card headed with dollar figures.
+                */}
+                <span className="pnl-card-token">{symbol}</span>
                 <span className="pnl-wins-text">WINS: <span className="pnl-wins-count">{wins}</span></span>
                 <span className="pnl-losses-text">LOSSES: <span className="pnl-losses-count">{losses}</span></span>
               </div>
@@ -487,17 +409,17 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
             <div className="pnl-card-main-horizontal">
               <div className="pnl-metrics-row">
                 <div className="pnl-metric-item">
-                  <span className="pnl-metric-label">Total Staked:</span>
-                  <span className="pnl-metric-value">{formatAmount(totalStaked)} {selectedToken}</span>
+                  <span className="pnl-metric-label">Total staked:</span>
+                  <span className="pnl-metric-value">{formatAmount(totalStaked)} {symbol}</span>
                 </div>
                 <div className="pnl-metric-item">
-                  <span className="pnl-metric-label">Total Payout:</span>
-                  <span className="pnl-metric-value">{formatAmount(totalPayout)} {selectedToken}</span>
+                  <span className="pnl-metric-label">Total payout:</span>
+                  <span className="pnl-metric-value">{formatAmount(totalPayout)} {symbol}</span>
                 </div>
                 <div className="pnl-metric-item">
                   <span className="pnl-metric-label">Total P&L:</span>
                   <span className={`pnl-metric-value ${isProfit ? 'pnl-profit-text' : 'pnl-loss-text'}`}>
-                    {isProfit ? '+' : ''}{formatAmount(totalProfit)} {selectedToken}
+                    {formatSignedAmount(totalProfit, selectedToken)} {symbol}
                   </span>
                 </div>
               </div>
@@ -511,7 +433,7 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
             <div className="pnl-percentages-container">
               <div className="pnl-percentage-main">
                 <div className="pnl-percentage-value" style={{ color: isProfit ? '#00ff41' : '#ff0040' }}>
-                  {isProfit ? '+' : ''}{Math.round(roi)}%
+                  {formatRoi(roi)}
                 </div>
               </div>
             </div>
@@ -520,7 +442,7 @@ export function PNLTable({ allUserPredictions }: PNLTableProps) {
 
         <div className="pnl-card-footer">
           <div className="pnl-sharing-time">
-            Sharing Time: {formatDate()}
+            Shared at {formatDate()}
           </div>
         </div>
       </div>

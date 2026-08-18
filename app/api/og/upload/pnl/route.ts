@@ -58,18 +58,21 @@ export async function POST(request: NextRequest) {
     
     // Save URL to Redis so layout.tsx can use it for og:image meta tag.
     //
-    // Known gap, deliberately not papered over here: this key holds one image
-    // per address with no chain in it, so a Base card and a Robinhood card for
-    // the same wallet overwrite each other and /api/og/pnl then redirects to
-    // whichever was uploaded last, whatever chain it was asked about. Fixing it
-    // means changing REDIS_KEYS.USER_PNL_OG_IMAGE in lib/redis.ts, which is
-    // also read by app/pnl/[address]/layout.tsx and /api/pnl/save-og-url, and
-    // all four have to move together.
+    // Under the chain this card was rendered for. It used to be one image per
+    // address with no chain in it, so a Base card and a Robinhood card for the
+    // same wallet overwrote each other and /api/og/pnl redirected to whichever
+    // landed last.
     const userAddressLower = userAddress.toLowerCase();
-    const cacheKey = REDIS_KEYS.USER_PNL_OG_IMAGE(userAddressLower);
+    const cacheKey = REDIS_KEYS.USER_PNL_OG_IMAGE(userAddressLower, chain);
     await redis.set(cacheKey, permanentUrl);
-    
-    console.log(`💾 Saved ogImageUrl to Redis for user: ${userAddressLower}`);
+
+    // And a pointer at the chain, because the share link is /pnl/<address>
+    // with nothing else in it. That page's metadata lives in a layout, which
+    // Next never hands searchParams, so this is the only thing that can tell it
+    // which of the two cards to embed.
+    await redis.set(REDIS_KEYS.USER_PNL_OG_CHAIN(userAddressLower), chain);
+
+    console.log(`💾 Saved ogImageUrl to Redis for user: ${userAddressLower} (${chain})`);
     
     return NextResponse.json({ 
       success: true, 

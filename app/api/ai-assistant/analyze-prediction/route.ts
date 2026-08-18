@@ -10,8 +10,21 @@ interface PredictionAnalysisRequest {
   category: string;
   yesPercentage: number;
   noPercentage: number;
-  totalPoolETH: number;
-  totalPoolSWIPE: number;
+  /**
+   * Whether anybody has staked at all.
+   *
+   * The two percentages used to fall back to 50 on an empty market, and the
+   * pool was read off the archived ETH fields, which no live market has
+   * written since the role split. So every current market reached the model as
+   * "YES 50% / NO 50%, Pool: 0.0000 ETH" and the model was asked which side
+   * was mispriced. It cannot answer that about a market with no prices in it,
+   * and it answered anyway, above two buttons that place a bet.
+   */
+  hasPool: boolean;
+  /** The collateral pool, in readable units, both sides together. */
+  totalPool: number;
+  /** USDC on Base, USDG on Robinhood. Never assumed. */
+  poolSymbol: string;
   participantsCount: number;
   deadline: number; // Unix timestamp
   selectedCrypto?: string; // For crypto predictions with charts
@@ -35,8 +48,9 @@ export async function POST(request: NextRequest) {
       category,
       yesPercentage,
       noPercentage,
-      totalPoolETH,
-      totalPoolSWIPE,
+      hasPool,
+      totalPool,
+      poolSymbol,
       participantsCount,
       deadline,
       selectedCrypto
@@ -75,8 +89,10 @@ export async function POST(request: NextRequest) {
     const analysisPrompt = `You are Swiper, an AI analyst for prediction markets. Be CONCISE - max 2-3 sentences per section.
 
 PREDICTION: "${question}"
-Category: ${category} | Current Market: YES ${yesPercentage.toFixed(0)}% / NO ${noPercentage.toFixed(0)}%
-Pool: ${totalPoolETH.toFixed(4)} ETH | Time left: ${timeLeftDays > 0 ? `${timeLeftDays}d` : `${timeLeftHours}h`}
+Category: ${category} | ${hasPool
+  ? `Current market: YES ${yesPercentage.toFixed(0)}% / NO ${noPercentage.toFixed(0)}%`
+  : 'Nobody has staked on this market yet, so it has no market price. Do not describe either side as undervalued or overvalued; give your own probability and say the market is empty.'}
+Pool: ${hasPool ? `${totalPool.toFixed(2)} ${poolSymbol}` : `0 ${poolSymbol}`} | Time left: ${timeLeftDays > 0 ? `${timeLeftDays}d` : `${timeLeftHours}h`}
 ${selectedCrypto ? `Crypto: ${selectedCrypto}` : ''}
 
 TODAY: ${currentDate}
@@ -176,10 +192,14 @@ YES: [X]% | NO: [Y]%
       marketData: {
         yesPercentage,
         noPercentage,
-        yesOdds: parseFloat(yesOdds) || null,
-        noOdds: parseFloat(noOdds) || null,
-        totalPoolETH,
-        totalPoolSWIPE
+        // Odds only mean something once there is money on both sides. On an
+        // empty market the old code divided 100 by a fabricated 50 and
+        // reported evens, which is a price nobody offered.
+        yesOdds: hasPool ? parseFloat(yesOdds) || null : null,
+        noOdds: hasPool ? parseFloat(noOdds) || null : null,
+        hasPool,
+        totalPool,
+        poolSymbol
       },
       generatedAt: new Date().toISOString(),
       source: 'OpenAI GPT-4o-mini'

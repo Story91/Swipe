@@ -49,8 +49,22 @@ export async function GET(request: NextRequest) {
     // out of it. Splitting on ':' and taking everything after the second colon
     // only works while the key has no prefix; on a namespaced chain it would
     // hand back the user address as the market id and every lookup would miss.
+    /**
+     * Both participant lists.
+     *
+     * This filtered on `participants` alone, the array the archived V2 contract
+     * writes. Every collateral bet lands in `usdcParticipants` instead, so a
+     * wallet whose only position is in USDC or USDG was filtered out here and
+     * told it had nothing to claim, while its payout sat on the contract. The
+     * count feeds the badge that tells someone money is waiting, so a false
+     * zero is the one answer that costs them.
+     */
+    const backs = (p: { participants?: string[]; usdcParticipants?: string[] }) =>
+      [...(p.participants ?? []), ...(p.usdcParticipants ?? [])]
+        .some(a => a.toLowerCase() === normalizedUserId);
+
     const stakeEntries = allPredictions
-      .filter(p => (p.participants || []).some(a => a.toLowerCase() === normalizedUserId))
+      .filter(backs)
       .map(p => ({ key: REDIS_KEYS.USER_STAKES(normalizedUserId, p.id, chain), predictionId: p.id }));
     const stakeKeys = stakeEntries.map(e => e.key);
 

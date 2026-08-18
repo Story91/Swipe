@@ -5,6 +5,11 @@ import { parseUnits, formatUnits } from 'viem';
 import { CONTRACTS } from '../../../lib/contract';
 import { useAdminRequest } from '../../../lib/auth/useAdminRequest';
 import { CHAINS, isWritableMarket, type ChainKey } from '@/lib/chains';
+import {
+  ARCHIVED_CHAIN_KEY,
+  ARCHIVED_CHAIN_LABEL,
+  ARCHIVED_CHAIN_ID,
+} from '@/lib/chains/archived';
 import { useActiveChain } from '@/lib/chains/activeChain';
 import { useMarketWrite } from '@/lib/chains/useMarketWrite';
 import { txUrl } from '@/lib/chains/market';
@@ -81,9 +86,8 @@ const ERC20_ABI = [
 // success, and the wallet tells the user the claim went through while nothing
 // moved. So the two calls that are still legitimate against those contracts,
 // both of them claims, name the chain they belong to and pin it.
-const ARCHIVED_CHAIN_KEY: ChainKey = 'base';
-const ARCHIVED_CHAIN_LABEL = CHAINS[ARCHIVED_CHAIN_KEY].label;
-const ARCHIVED_CHAIN_ID = CHAINS[ARCHIVED_CHAIN_KEY].viemChain.id;
+// Moved to lib/chains/archived.ts, because EnhancedUserDashboard has the same
+// send and had neither the pin nor the refusal. See the note there.
 
 interface PredictionData {
   id: number;
@@ -1409,16 +1413,29 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
     });
     
     try {
-      // Calculate pool data
-      const yesETH = (currentPrediction.yesTotalAmount || 0) / 1e18;
-      const noETH = (currentPrediction.noTotalAmount || 0) / 1e18;
-      const totalETH = yesETH + noETH;
-      const yesSWIPE = (currentPrediction.swipeYesTotalAmount || 0) / 1e18;
-      const noSWIPE = (currentPrediction.swipeNoTotalAmount || 0) / 1e18;
-      const totalSWIPE = yesSWIPE + noSWIPE;
-      
-      const yesPercentage = totalETH > 0 ? (yesETH / totalETH) * 100 : 50;
-      const noPercentage = totalETH > 0 ? (noETH / totalETH) * 100 : 50;
+      /**
+       * The pools the model is asked to price against.
+       *
+       * These were the archived ETH and SWIPE legs. Nothing has written
+       * yesTotalAmount on a live market since the role split: propose sets it
+       * to 0 and /api/sync/usdc only ever touches the usdc fields. So totalETH
+       * was 0 on every current market, yesPercentage fell to the literal 50,
+       * and the prompt went out as "Current Market: YES 50% / NO 50%, Pool:
+       * 0.0000 ETH". The model was then asked which side the market had
+       * mispriced, about a market it had been told was even and empty, above
+       * two buttons that place the bet.
+       *
+       * The collateral pair is on the same record, two lines below in
+       * transformedPredictions. An empty market now says it is empty rather
+       * than claiming an even split, and the prompt says so too.
+       */
+      const yesPool = (currentPrediction.usdcYesTotalAmount || 0) / 1e6;
+      const noPool = (currentPrediction.usdcNoTotalAmount || 0) / 1e6;
+      const totalPool = yesPool + noPool;
+      const hasPool = totalPool > 0;
+
+      const yesPercentage = hasPool ? (yesPool / totalPool) * 100 : 0;
+      const noPercentage = hasPool ? (noPool / totalPool) * 100 : 0;
       
       const response = await fetch('/api/ai-assistant/analyze-prediction', {
         method: 'POST',
@@ -1430,8 +1447,9 @@ const TinderCardComponent = forwardRef<{ refresh: () => void }, TinderCardProps>
           category: currentCard.category,
           yesPercentage,
           noPercentage,
-          totalPoolETH: totalETH,
-          totalPoolSWIPE: totalSWIPE,
+          hasPool,
+          totalPool,
+          poolSymbol: chain.stable.symbol,
           participantsCount: currentCardParticipants.length,
           deadline: currentPrediction.deadline,
           selectedCrypto: currentPrediction.selectedCrypto
