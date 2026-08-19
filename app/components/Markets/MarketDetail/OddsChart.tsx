@@ -22,30 +22,28 @@ import type { PricePoint } from './marketDetail';
  * keys off the viewer's operating system rather than off the app. Dropped onto
  * a dark page by a viewer in light mode, they are dark text on a dark face.
  */
-export function OddsChart({
-  history,
-  yesPrice,
-  noPrice,
-  totalPool,
-  loading,
-}: {
+interface OddsChartProps {
   history: PricePoint[];
   yesPrice: number;
   noPrice: number;
   totalPool: number;
   loading: boolean;
-}) {
+}
+
+/**
+ * Just the plot, no panel/title - MarketChart.tsx is the only caller now, and
+ * it puts this behind a chart-source toggle inside its own `.mdet-panel`, so
+ * a second panel/title wrapper here would nest one inside the other.
+ */
+export function OddsChartPlot({ history, yesPrice, noPrice, totalPool, loading }: OddsChartProps) {
   const data = useMemo(
     () => chartPoints(history, yesPrice, noPrice, totalPool),
     [history, yesPrice, noPrice, totalPool]
   );
 
   return (
-    <section className="mdet-panel mdet-chart">
-      <h2 className="mdet-panel__title">Odds over time</h2>
-
-      <div className="mdet-chart__plot">
-        {loading ? (
+    <div className="mdet-chart__plot">
+      {loading ? (
           <div className="mdet-chart__state">
             <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
             <span>Loading the price line</span>
@@ -120,9 +118,6 @@ export function OddsChart({
             <span>The line starts at the first bet</span>
           </div>
         )}
-      </div>
-    </section>
+    </div>
   );
 }
-
-export default OddsChart;

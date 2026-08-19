@@ -69,7 +69,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const URL = process.env.NEXT_PUBLIC_URL || 'https://theswipe.app';
   const title = process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME || "Swipe";
   const description = "Swipe - Betting on the Future. Predict, Swipe, Win!";
-  const ogImage = process.env.NEXT_PUBLIC_APP_HERO_IMAGE || `${URL}/hero.png`;
+  const ogImage = process.env.NEXT_PUBLIC_APP_HERO_IMAGE || `${URL}/thumbn.png`;
   
   return {
     title,

@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useActiveChain } from '@/lib/chains/activeChain';
-import { tokenSymbol, COLLATERAL_LEG } from '@/lib/userStake';
+import { tokenSymbol, COLLATERAL_LEG, toDisplayUnits, type StakeToken } from '@/lib/userStake';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { getMarketContract, txUrl } from '@/lib/chains/market';
 import { getChainConfig } from '@/lib/chains';
 import {
@@ -24,6 +25,7 @@ import { useComposeCast, useOpenUrl } from '@coinbase/onchainkit/minikit';
 import sdk from '@farcaster/miniapp-sdk';
 import { Share2 } from 'lucide-react';
 import { PNLTable } from './WinLossPNL/PNLTable';
+import { formatTokenAmount } from './WinLossPNL/pnlTotals';
 import './EnhancedUserDashboard.css';
 import { buildClaimShareText, getRandomPortfolioIntro, getRandomPortfolioOutro } from '../../../lib/constants/share-texts';
 
@@ -198,7 +200,7 @@ export function EnhancedUserDashboard() {
   const [shareStep, setShareStep] = useState<'type' | 'platform'>('type');
   const [selectedShareType, setSelectedShareType] = useState<'profit-only' | 'full'>('profit-only');
   const [modalType, setModalType] = useState<'claim' | 'success' | 'error'>('claim');
-  const [modalData, setModalData] = useState<{txHash?: string, basescanUrl?: string, message?: string, predictionId?: string, tokenType?: 'ETH' | 'SWIPE', amount?: number}>({});
+  const [modalData, setModalData] = useState<{txHash?: string, basescanUrl?: string, message?: string, predictionId?: string, tokenType?: StakeToken, amount?: number}>({});
   
   // Claimed prediction for share
   const [claimedPrediction, setClaimedPrediction] = useState<PredictionWithStakes | null>(null);
@@ -371,7 +373,7 @@ export function EnhancedUserDashboard() {
     // No auto-close - user must close manually
   };
 
-  const showSuccessModal = (txHash: string, basescanUrl: string, predictionId?: string, tokenType?: 'ETH' | 'SWIPE', amount?: number) => {
+  const showSuccessModal = (txHash: string, basescanUrl: string, predictionId?: string, tokenType?: StakeToken, amount?: number) => {
     setModalType('success');
     setModalData({ txHash, basescanUrl, predictionId, tokenType, amount });
     setShowModal(true);
@@ -410,35 +412,22 @@ export function EnhancedUserDashboard() {
     const stake = claimedPrediction.userStakes?.[modalData.tokenType];
     const payout = stake?.potentialPayout || 0;
     const profit = stake?.potentialProfit || 0;
-    const tokenSymbol = modalData.tokenType === 'ETH' ? 'ETH' : 'SWIPE';
-    
-    // Format amounts - always round to millions for SWIPE
-    const formatAmount = (wei: number) => {
-      const amount = wei / Math.pow(10, 18);
-      if (modalData.tokenType === 'SWIPE') {
-        // Always show in millions for SWIPE (e.g., 25.1M instead of 25100.00K)
-        if (amount >= 1000000) {
-          const millions = amount / 1000000;
-          return millions >= 10 ? `${millions.toFixed(1)}M` : `${millions.toFixed(2)}M`;
-        }
-        if (amount >= 1000) {
-          const thousands = amount / 1000;
-          return `${thousands.toFixed(0)}K`;
-        }
-        return amount.toFixed(0);
-      }
-      // ETH - show 6 decimals
-      return amount.toFixed(6);
-    };
-    
+    // The chain-resolved symbol, not a raw ETH/SWIPE literal: on the
+    // collateral leg this prints USDC on Base and USDG on Robinhood.
+    const shareTokenSymbol = tokenSymbol(modalData.tokenType, claimChainKey);
+
+    // Same formatting the PNL table already uses for this token, so a share
+    // and the portfolio it was shared from never disagree on the number.
+    const formatAmount = (raw: number) => formatTokenAmount(toDisplayUnits(raw, modalData.tokenType!), modalData.tokenType!);
+
     const profitFormatted = formatAmount(profit);
     const payoutFormatted = formatAmount(payout);
-    
+
     // Build share text with random variants from share-texts.ts
     const text = buildClaimShareText(
       payoutFormatted,
       profitFormatted,
-      tokenSymbol,
+      shareTokenSymbol,
       claimedPrediction.question,
       claimedPrediction.outcome || false
     );
@@ -1336,7 +1325,7 @@ export function EnhancedUserDashboard() {
   // Handle claim reward
   const handleClaimReward = async (predictionId: string, tokenType?: 'ETH' | 'SWIPE' | 'USDC') => {
     if (!address) {
-      alert('❌ Please connect your wallet first');
+      showErrorModal('Please connect your wallet first');
       return;
     }
 
@@ -1350,13 +1339,13 @@ export function EnhancedUserDashboard() {
     // Use allUserPredictions instead of userPredictions to avoid filtering issues
     const prediction = allUserPredictions.find(p => p.id === predictionId);
     if (!prediction) {
-      alert('❌ Prediction not found');
+      showErrorModal('Prediction not found');
       return;
     }
 
     const stake = prediction.userStakes?.[tokenType || 'ETH'];
     if (!stake) {
-      alert('❌ No stake found for this prediction');
+      showErrorModal('No stake found for this prediction');
       return;
     }
 
@@ -1364,13 +1353,13 @@ export function EnhancedUserDashboard() {
     const stakeKey = `${predictionId}-${tokenType || 'ETH'}`;
     const isLocallyClaimed = claimedStakes.has(stakeKey);
     if (stake.claimed || isLocallyClaimed) {
-      alert('❌ This reward has already been claimed');
+      showErrorModal('This reward has already been claimed');
       return;
     }
 
     // Check if can claim
     if (!stake.canClaim) {
-      alert('❌ Cannot claim this reward - you lost this prediction');
+      showErrorModal('Cannot claim this reward - you lost this prediction');
       return;
     }
 
@@ -1389,7 +1378,7 @@ export function EnhancedUserDashboard() {
         // and gains new ones without another arm being added here.
         const claimRef = parseMarketId(predictionId);
         if (!claimRef) {
-          alert('❌ Invalid prediction ID');
+          showErrorModal('Invalid prediction ID');
           return;
         }
         const numericId = claimRef.numericId;
@@ -1469,8 +1458,11 @@ export function EnhancedUserDashboard() {
                 console.error('Failed to save USDC transaction:', e);
               }
               
-              showClaimModal(txHash, txUrl(claimChainKey, txHash));
-              
+              // showClaimModal only ever shows the pending state, which carries
+              // no amount or token - a USDC/USDG claim never reached the
+              // "Claimed" success screen the legacy ETH/SWIPE path below does.
+              showSuccessModal(txHash, txUrl(claimChainKey, txHash), predictionId, 'USDC', usdcStake?.potentialPayout || 0);
+
               /**
                * Refresh this market's pools after the claim.
                *
@@ -1763,7 +1755,7 @@ export function EnhancedUserDashboard() {
       }
     } catch (error) {
       console.error('Failed to claim reward:', error);
-      alert(`❌ Failed to claim reward: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      showErrorModal(`Failed to claim reward: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsTransactionLoading(false);
     }
@@ -2635,140 +2627,98 @@ export function EnhancedUserDashboard() {
         <PNLTable allUserPredictions={allUserPredictions} />
       )}
 
-      {/* Custom Modal - Dark Theme */}
-      {showModal && (
-        <div className="claim-modal-overlay" onClick={closeModal}>
-          <div className="claim-modal-content" onClick={(e) => e.stopPropagation()}>
-            {/* Close button */}
-            <button className="claim-modal-close" onClick={closeModal}>✕</button>
-            
-            {/* Pending State */}
-            {modalType === 'claim' && (
-              <>
-                {/* Header with logos */}
-                <div className="claim-modal-logos">
-                  <img src="/farc.png" alt="Farcaster" className="claim-modal-logo" />
-                  <span className="claim-modal-logo-divider">×</span>
-                  <img src="/Base_square_blue.png" alt="Base" className="claim-modal-logo" />
-                </div>
-                
-                {/* Loading spinner */}
-                <div className="claim-modal-loading">
-                  <div className="claim-modal-spinner"></div>
-                </div>
-                
-                <h2 className="claim-modal-title">Claim sent</h2>
-                <p className="claim-modal-subtitle">Waiting for it to mine. Nothing has moved until it does.</p>
-                
-                <div className="claim-modal-tx-info">
-                  <span className="claim-modal-tx-label">Transaction:</span>
-                  <a 
-                    href={modalData.basescanUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="claim-modal-tx-link"
-                  >
-                    {modalData.txHash?.slice(0, 10)}...{modalData.txHash?.slice(-8)}
-                  </a>
-                </div>
-                
-                <a 
-                  href={modalData.basescanUrl} 
-                  target="_blank" 
+      {/* Claim modal. Three states share one Dialog: pending (tx sent, not yet
+          mined), success (mined, amount known) and error. Radix Dialog rather
+          than a hand-rolled overlay div, matching MarketChooserModal - the
+          rest of the app's stake-affecting dialogs. */}
+      <Dialog open={showModal} onOpenChange={(next) => !next && closeModal()}>
+        <DialogContent className="claim-modal">
+          {modalType === 'claim' && (
+            <>
+              <DialogTitle className="claim-modal__title">Claim sent</DialogTitle>
+              <DialogDescription className="claim-modal__subtitle">
+                Waiting for it to mine. Nothing has moved until it does.
+              </DialogDescription>
+
+              <div className="claim-modal__spinner" aria-hidden="true" />
+
+              <div className="claim-modal__tx">
+                <span className="claim-modal__tx-label">Transaction</span>
+                <a
+                  href={modalData.basescanUrl}
+                  target="_blank"
                   rel="noopener noreferrer"
-                  className="claim-modal-basescan-btn"
+                  className="claim-modal__tx-link"
                 >
-                  View the transaction
+                  {modalData.txHash?.slice(0, 10)}...{modalData.txHash?.slice(-8)}
                 </a>
-              </>
-            )}
-            
-            {/* Success State */}
-            {modalType === 'success' && (
-              <>
-                {/* Success icon */}
-                <div className="claim-modal-success-icon">
-                  <div className="claim-modal-success-circle">
-                    <span>✓</span>
-                  </div>
+              </div>
+
+              <a
+                href={modalData.basescanUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="claim-modal__btn"
+              >
+                View the transaction
+              </a>
+            </>
+          )}
+
+          {modalType === 'success' && (
+            <>
+              <DialogTitle className="claim-modal__title">Claimed</DialogTitle>
+              <DialogDescription className="claim-modal__subtitle">
+                The payout is in your wallet.
+              </DialogDescription>
+
+              {/* Amount claimed. The token label is the chain's own symbol
+                  (USDC on Base, USDG on Robinhood) rather than the leg name
+                  the amount is stored under, which is 'USDC' everywhere. */}
+              {modalData.amount !== undefined && modalData.tokenType && (
+                <div className="claim-modal__amount">
+                  <span className="claim-modal__amount-value">
+                    +{formatTokenAmount(toDisplayUnits(modalData.amount, modalData.tokenType), modalData.tokenType)}
+                  </span>
+                  <span className="claim-modal__amount-token">
+                    {tokenSymbol(modalData.tokenType, claimChainKey)}
+                  </span>
                 </div>
-                
-                <h2 className="claim-modal-title">Claimed</h2>
-                <p className="claim-modal-subtitle">The payout is in your wallet.</p>
-                
-                {/* Amount claimed */}
-                {modalData.amount && modalData.tokenType && (
-                  <div className="claim-modal-amount">
-                    <span className="claim-modal-amount-value">
-                      +{modalData.tokenType === 'SWIPE' 
-                        ? (modalData.amount / Math.pow(10, 18) >= 1000 
-                          ? `${(modalData.amount / Math.pow(10, 18) / 1000).toFixed(2)}K` 
-                          : (modalData.amount / Math.pow(10, 18)).toFixed(2))
-                        : (modalData.amount / Math.pow(10, 18)).toFixed(6)
-                      }
-                    </span>
-                    <span className="claim-modal-amount-token">{modalData.tokenType}</span>
-                  </div>
-                )}
-                
-                <p className="claim-modal-description">Share your win and challenge your friends!</p>
-                
-                {/* Share button with logos */}
-                <button 
-                  onClick={shareClaimedPrediction}
-                  className="claim-modal-share-btn"
-                >
-                  <span className="share-btn-text">Share on</span>
-                  <div className="share-btn-logos">
-                    <img src="/farc.png" alt="Farcaster" className="share-btn-logo" />
-                    <img src="/Base_square_blue.png" alt="Base" className="share-btn-logo" />
-                  </div>
-                </button>
-                
-                {/* Basescan link */}
-                <a 
-                  href={modalData.basescanUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="claim-modal-basescan-link"
-                >
-                  View the transaction
-                </a>
-                
-                {/* Close link */}
-                <button 
-                  onClick={closeModal}
-                  className="claim-modal-close-link"
-                >
-                  Close
-                </button>
-              </>
-            )}
-            
-            {/* Error State */}
-            {modalType === 'error' && (
-              <>
-                {/* Error icon */}
-                <div className="claim-modal-error-icon">
-                  <div className="claim-modal-error-circle">
-                    <span>✕</span>
-                  </div>
-                </div>
-                
-                <h2 className="claim-modal-title claim-modal-title-error">Error</h2>
-                <p className="claim-modal-error-message">{modalData.message}</p>
-                
-                <button 
-                  onClick={closeModal}
-                  className="claim-modal-ok-btn"
-                >
-                  OK
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+              )}
+
+              <p className="claim-modal__hint">Share your win and challenge your friends.</p>
+
+              <button onClick={shareClaimedPrediction} className="claim-modal__share">
+                <span>Share on</span>
+                <span className="claim-modal__share-logos">
+                  <img src="/farc.png" alt="Farcaster" className="claim-modal__logo" />
+                  <img src="/Base_square_blue.png" alt="Base" className="claim-modal__logo" />
+                </span>
+              </button>
+
+              <a
+                href={modalData.basescanUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="claim-modal__link"
+              >
+                View the transaction
+              </a>
+            </>
+          )}
+
+          {modalType === 'error' && (
+            <>
+              <DialogTitle className="claim-modal__title claim-modal__title--error">Error</DialogTitle>
+              <DialogDescription className="claim-modal__subtitle">{modalData.message}</DialogDescription>
+
+              <button onClick={closeModal} className="claim-modal__btn claim-modal__btn--error">
+                OK
+              </button>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
     </div>
   );
