@@ -711,12 +711,21 @@ export const redisHelpers = {
   // Update compact stats cache
   async updateCompactStats(chain: ChainKey = DEFAULT_CHAIN_KEY): Promise<void> {
     try {
-      const [marketStats, allPredictions] = await Promise.all([
-        this.getMarketStats(chain),
-        this.getAllPredictions(chain)
-      ]);
+      const marketStats = await this.getMarketStats(chain);
 
-      if (!marketStats) return;
+      if (!marketStats) {
+        // Nothing has ever built market stats for this chain. No cron or sync
+        // route touches any chain but Base, so a chain that has never had its
+        // stats page opened has no MARKET_STATS record, this bails, and the
+        // compact-stats cache stays null forever - every panel reading it
+        // 404s on every single request, no matter how many times it retries.
+        // updateMarketStats writes MARKET_STATS and calls this function again
+        // once it exists, which is what actually produces the compact stats.
+        await this.updateMarketStats(chain);
+        return;
+      }
+
+      const allPredictions = await this.getAllPredictions(chain);
 
       // Calculate ETH and SWIPE volumes from ALL predictions (V1 and V2)
       let totalETH = 0;

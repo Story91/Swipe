@@ -1,0 +1,59 @@
+/* Chart-source toggle: the market's own odds vs. a live token price embed.
+   Only rendered for a market with a parseable GeckoTerminal pool - see
+   MarketChart.tsx / tokenChart.ts. Colours and type from the tokens at
+   :root, same as the rest of MarketDetail.css. */
+
+.mdet-chartswitch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.mdet-chartswitch__title {
+  margin: 0;
+}
+
+.mdet-chartswitch__tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--sheet-ink-0);
+  border: 1px solid var(--sheet-ink-line);
+  padding: 2px;
+}
+
+.mdet-chartswitch__tab {
+  padding: 5px 10px;
+  background: transparent;
+  border: none;
+  font-family: var(--sheet-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sheet-ink-text-3);
+  cursor: pointer;
+  transition: color 140ms ease, background-color 140ms ease;
+}
+
+.mdet-chartswitch__tab:hover {
+  color: var(--sheet-ink-text-2);
+}
+
+.mdet-chartswitch__tab--active,
+.mdet-chartswitch__tab--active:hover {
+  background: var(--sheet-lime);
+  color: #000;
+}
+
+.mdet-chartswitch__frame {
+  overflow: hidden;
+}
+
+.mdet-chartswitch__frame iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}

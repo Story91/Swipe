@@ -52,7 +52,7 @@ export async function generateMetadata({ params }: { params: Promise<{ address: 
   }
 
   // Get cached OG image URL from Redis (uploaded to ImgBB during share)
-  let ogImageUrl = `${URL}/hero.png`; // fallback
+  let ogImageUrl = `${URL}/thumbn.png`; // fallback
 
   try {
     const cachedUrl = await redis.get(REDIS_KEYS.USER_PNL_OG_IMAGE(userAddressLower, chain));

@@ -5,7 +5,8 @@ import { chainFromRequest, chainFromRequestOrBody } from '@/lib/chains/requestCh
 import type { ChainKey } from '@/lib/chains/types';
 import { getMarketContract } from '@/lib/chains/market';
 import { parseMarketId, CURRENT_GENERATION, type MarketRef } from '@/lib/marketId';
-import { redis, REDIS_KEYS, invalidatePredictionsCache } from '@/lib/redis';
+import { redis, redisHelpers, REDIS_KEYS } from '@/lib/redis';
+import type { RedisPrediction } from '@/lib/types/redis';
 
 /**
  * Pulls a market's pools and positions off chain into Redis.
@@ -211,6 +212,13 @@ async function syncMarket(ref: MarketRef, chain: ChainKey, client: PublicClient)
       usdcWeightedYes: weightedYes,
       usdcWeightedNo: weightedNo,
       contractVersion: source.contractVersion,
+      // The chain read above lands on usdc* first, above, but marketFilters.ts
+      // and useHybridPredictions read only these base fields to decide what is
+      // "Resolved". Writing usdc* without these left every USDC-generation
+      // market permanently invisible in the Resolved tab once resolved on chain.
+      resolved,
+      outcome,
+      cancelled,
     };
 
     if (participantCount > 0) {
@@ -296,24 +304,16 @@ async function syncMarket(ref: MarketRef, chain: ChainKey, client: PublicClient)
       }
     }
 
-    await redis.set(REDIS_KEYS.PREDICTION(ref.redisId, chain), JSON.stringify(updated));
-
     /**
-     * Drop this chain's listing snapshot, or the new pools are invisible.
-     *
-     * `/api/predictions` does not read these records. It reads
-     * `predictions:index`, a denormalised copy of the whole list that exists so
-     * a listing is one round trip instead of hundreds. That snapshot is rebuilt
-     * only when something invalidates it, and `redisHelpers.savePrediction`
-     * does. This route does not go through savePrediction; it writes the record
-     * straight, so it was updating the record and leaving the list serving the
-     * pools from before the bet.
-     *
-     * That is the whole reason a bet did not appear under the card until much
-     * later. The chain had it, the record had it, and the one thing the UI
-     * actually reads still did not.
+     * Goes through savePrediction rather than a raw redis.set for two reasons
+     * that both bit before: it invalidates this chain's `predictions:index`
+     * listing snapshot, so the new pools do not sit unread behind a stale
+     * cache, and it moves the record between the active/resolved/pending Redis
+     * sets based on the resolved/cancelled fields just above, so a market
+     * resolved on chain actually migrates into PREDICTIONS_RESOLVED instead of
+     * staying parked in PREDICTIONS_ACTIVE forever.
      */
-    invalidatePredictionsCache(chain);
+    await redisHelpers.savePrediction(updated as unknown as RedisPrediction, chain);
 
     return {
       success: true,

@@ -11,7 +11,7 @@ import { useActiveChain, setActiveChain } from "@/lib/chains/activeChain";
 import { getMarketContract } from "@/lib/chains/market";
 import { isChainKey } from "@/lib/chains/requestChain";
 import { useIsDesktop } from "@/lib/hooks/useMediaQuery";
-import { OddsChart } from "@/app/components/Markets/MarketDetail/OddsChart";
+import { MarketChart } from "@/app/components/Markets/MarketDetail/MarketChart";
 import { PriceCards } from "@/app/components/Markets/MarketDetail/PriceCards";
 import { MarketStatsRow } from "@/app/components/Markets/MarketDetail/MarketStatsRow";
 import { BetPanel } from "@/app/components/Markets/MarketDetail/BetPanel";
@@ -318,7 +318,8 @@ export default function PredictionPageClient() {
 
         <div className="mdet__body">
           <div className="mdet__main">
-            <OddsChart
+            <MarketChart
+              imageUrl={prediction.imageUrl}
               history={history}
               yesPrice={yesPrice}
               noPrice={noPrice}
