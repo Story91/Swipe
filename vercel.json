@@ -1,0 +1,6 @@
+{
+  "crons": [
+    { "path": "/api/cron/create-weekly-markets", "schedule": "7 12 * * 3" },
+    { "path": "/api/cron/resolve-expired-markets", "schedule": "11 * * * *" }
+  ]
+}
