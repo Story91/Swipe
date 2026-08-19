@@ -168,4 +168,44 @@ describe('resolveExpiredMarkets', () => {
     expect(result.resolved).toEqual([]);
     expect(removed).toEqual(['pred_v4_100']);
   });
+
+  it('flags a refundable market and never sends resolvePrediction into a revert', async () => {
+    const record = routineRecord();
+    const { deps, saves, removed, resolveTx } = makeDeps(record, {
+      writer: () => ({
+        address: '0xregistrar',
+        readPrediction: async () => ({
+          registered: true, creator: '0xregistrar', deadline: record.deadline,
+          resolved: false, cancelled: false, outcome: false, refundable: true,
+        }),
+        registerPrediction: vi.fn(),
+        resolvePrediction: resolveTx,
+      }),
+    });
+    const result = await resolveExpiredMarkets(deps, { chainKey: 'base', dryRun: false });
+    expect(resolveTx).not.toHaveBeenCalled();
+    expect(result.flagged).toEqual(['pred_v4_100']);
+    expect(removed).toEqual(['pred_v4_100']);
+    expect(saves).toEqual([]);
+  });
+
+  it('dry run flags a refundable market without writing or removing anything', async () => {
+    const record = routineRecord();
+    const { deps, saves, removed, resolveTx } = makeDeps(record, {
+      writer: () => ({
+        address: '0xregistrar',
+        readPrediction: async () => ({
+          registered: true, creator: '0xregistrar', deadline: record.deadline,
+          resolved: false, cancelled: false, outcome: false, refundable: true,
+        }),
+        registerPrediction: vi.fn(),
+        resolvePrediction: resolveTx,
+      }),
+    });
+    const result = await resolveExpiredMarkets(deps, { chainKey: 'base', dryRun: true });
+    expect(resolveTx).not.toHaveBeenCalled();
+    expect(result.flagged).toEqual(['pred_v4_100']);
+    expect(removed).toEqual([]);
+    expect(saves).toEqual([]);
+  });
 });

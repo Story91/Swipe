@@ -125,6 +125,19 @@ export async function resolveExpiredMarkets(
       }
       continue;
     }
+    if (onChain.refundable) {
+      // enableRefundsAfterGrace is callable by anyone once a market has sat
+      // unsettled for 30 days past its deadline, and it sets refundable
+      // without setting cancelled. resolvePrediction reverts on a refundable
+      // market, so this is not an outcome to send, it is a stuck market for a
+      // human to look at. Drop it from the pending set so the routine stops
+      // retrying it forever.
+      if (!dryRun) {
+        await deps.removePending(chainKey, id);
+      }
+      result.flagged.push(id);
+      continue;
+    }
 
     let observation: PriceObservation;
     try {
