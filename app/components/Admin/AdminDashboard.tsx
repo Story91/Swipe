@@ -10,6 +10,7 @@ import { addressUrl } from '@/lib/chains/market';
 import { groupMarkets, settlesOnChain, shortAddress, type AdminMarket } from './adminMarkets';
 import { ProposalCard } from './ProposalCard';
 import { MarketCard } from './MarketCard';
+import { RoutineCard } from './RoutineCard';
 import '../../styles/sheet.css';
 import './AdminDashboard.css';
 
@@ -652,6 +653,8 @@ It leaves the queue and the market number is burned. Give a reason, for the reco
             )}
           </div>
         </header>
+
+        <RoutineCard />
 
         <main className="sheet-body">{body}</main>
       </div>
