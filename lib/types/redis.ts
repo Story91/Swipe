@@ -61,6 +61,9 @@ export interface RedisPrediction {
   usdcRefundable?: boolean;
   resolved: boolean;
   outcome?: boolean;
+  /** Unix timestamp of the run that flipped resolved to true, chain-backfill
+   *  included. Absent on markets resolved before this field existed. */
+  resolvedAt?: number;
   cancelled: boolean;
   createdAt: number; // Unix timestamp
   creator: string;

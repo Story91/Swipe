@@ -3,9 +3,11 @@ import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { isCronAuthorized } from '@/lib/marketRoutine/routeAuth';
 import { createWeeklyMarkets } from '@/lib/marketRoutine/createWeeklyMarkets';
 import { realCreateDeps } from '@/lib/marketRoutine/serverDeps';
+import { redisHelpers } from '@/lib/redis';
 import type { ChainKey } from '@/lib/chains';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
 
 const ROUTINE_CHAINS: ChainKey[] = ['base', 'robinhood'];
 
@@ -24,6 +26,14 @@ export async function GET(request: NextRequest) {
   for (const chainKey of ROUTINE_CHAINS) {
     try {
       results.push(await createWeeklyMarkets(realCreateDeps(), { chainKey, dryRun: false }));
+      try {
+        await redisHelpers.updateMarketStats(chainKey);
+      } catch (statsError) {
+        // A stats-recompute failure must not turn an otherwise-successful
+        // create into an error entry; market:stats just stays stale until
+        // the next run that manages to recompute it.
+        console.error(`⚠️ market:stats recompute failed for ${chainKey}:`, statsError);
+      }
     } catch (error) {
       console.error(`❌ create-weekly-markets cron failed for ${chainKey}:`, error);
       results.push({
@@ -32,7 +42,15 @@ export async function GET(request: NextRequest) {
       });
     }
   }
-  return NextResponse.json({ success: true, results });
+  // A chain that threw must not read as a healthy run: an all-200 cron log is
+  // how a broken routine (missing key, dead RPC, ungranted role) goes unnoticed
+  // for weeks. The full results array still comes back either way, so a
+  // healthy chain's outcome is visible alongside the failed one.
+  const anyErrored = results.some((r) => 'error' in r);
+  return NextResponse.json(
+    { success: !anyErrored, results },
+    anyErrored ? { status: 502 } : undefined
+  );
 }
 
 /** The admin card calls POST, one chain at a time, dry run unless told live. */

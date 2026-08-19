@@ -189,6 +189,81 @@ describe('resolveExpiredMarkets', () => {
     expect(saves).toEqual([]);
   });
 
+  it('one throwing market does not stop a healthy market in the same run', async () => {
+    const healthy = routineRecord({ id: 'pred_v4_100' });
+    const broken = routineRecord({ id: 'pred_v4_101' });
+    const records: Record<string, RedisPrediction> = {
+      pred_v4_100: healthy,
+      pred_v4_101: broken,
+    };
+    const saves: RedisPrediction[] = [];
+    const removed: string[] = [];
+    const deps: ResolveDeps = {
+      listPending: async () => ['pred_v4_101', 'pred_v4_100'],
+      getRecord: async (id) => records[id] ?? null,
+      saveRecord: async (r) => { saves.push(structuredClone(r)); },
+      removePending: async (_c, id) => { removed.push(id); },
+      writer: () => ({
+        address: '0xregistrar',
+        readPrediction: async (numericId: number) => {
+          if (numericId === 101) throw new Error('rpc blew up');
+          return {
+            registered: true, creator: '0xregistrar', deadline: healthy.deadline,
+            resolved: false, cancelled: false, outcome: false, refundable: false,
+          };
+        },
+        registerPrediction: vi.fn(),
+        resolvePrediction: vi.fn(async () => '0xresolvetx'),
+      }),
+      fetchObservation: async (spec) => ({
+        price: 12.5, sourceUrl: `https://proof/${spec.poolAddress}`, fetchedAt: NOW, raw: {},
+      }),
+      invalidateListing: () => {},
+      now: () => NOW,
+    };
+    const result = await resolveExpiredMarkets(deps, { chainKey: 'base', dryRun: false });
+    expect(result.errored).toEqual(['pred_v4_101']);
+    expect(result.resolved.map((r) => r.id)).toEqual(['pred_v4_100']);
+    expect(removed).toEqual(['pred_v4_100']);
+  });
+
+  it('a throwing resolvePrediction after a normal read is also isolated to that market', async () => {
+    const healthy = routineRecord({ id: 'pred_v4_100' });
+    const broken = routineRecord({ id: 'pred_v4_101' });
+    const records: Record<string, RedisPrediction> = {
+      pred_v4_100: healthy,
+      pred_v4_101: broken,
+    };
+    const removed: string[] = [];
+    const deps: ResolveDeps = {
+      listPending: async () => ['pred_v4_101', 'pred_v4_100'],
+      getRecord: async (id) => records[id] ?? null,
+      saveRecord: async () => {},
+      removePending: async (_c, id) => { removed.push(id); },
+      writer: () => ({
+        address: '0xregistrar',
+        readPrediction: async () => ({
+          registered: true, creator: '0xregistrar', deadline: healthy.deadline,
+          resolved: false, cancelled: false, outcome: false, refundable: false,
+        }),
+        registerPrediction: vi.fn(),
+        resolvePrediction: vi.fn(async (numericId: number) => {
+          if (numericId === 101) throw new Error('tx reverted');
+          return '0xresolvetx';
+        }),
+      }),
+      fetchObservation: async (spec) => ({
+        price: 12.5, sourceUrl: `https://proof/${spec.poolAddress}`, fetchedAt: NOW, raw: {},
+      }),
+      invalidateListing: () => {},
+      now: () => NOW,
+    };
+    const result = await resolveExpiredMarkets(deps, { chainKey: 'base', dryRun: false });
+    expect(result.errored).toEqual(['pred_v4_101']);
+    expect(result.resolved.map((r) => r.id)).toEqual(['pred_v4_100']);
+    expect(removed).toEqual(['pred_v4_100']);
+  });
+
   it('dry run flags a refundable market without writing or removing anything', async () => {
     const record = routineRecord();
     const { deps, saves, removed, resolveTx } = makeDeps(record, {

@@ -88,6 +88,12 @@ describe('selectBaseTokens', () => {
       'https://www.geckoterminal.com/base/pools/0xaeropool?embed=1&info=0&swaps=0&light_chart=1&chart_type=price&resolution=1d&bg_color=ffffff'
     );
   });
+
+  it('returns no tokens instead of throwing when the top-level response is null', async () => {
+    const fetchJson: JsonFetch = async () => null;
+    const out = await selectBaseTokens(fetchJson);
+    expect(out).toEqual([]);
+  });
 });
 
 describe('selectRobinhoodTokens', () => {
@@ -138,5 +144,32 @@ describe('selectRobinhoodTokens', () => {
     expect(out[0].chartUrl).toBe(
       'https://dexscreener.com/robinhood/0xdeep?embed=1&theme=dark&trades=0&info=0'
     );
+  });
+
+  it('skips a candidate whose fetch throws and still returns the others', async () => {
+    const fetchJson: JsonFetch = async (url) => {
+      if (url.includes('q=CASHCAT')) {
+        throw new Error('rate limited');
+      }
+      if (url.includes('q=BRODIE')) {
+        return {
+          pairs: [
+            {
+              chainId: 'robinhood',
+              pairAddress: '0xbrodiepool',
+              priceUsd: '0.02',
+              baseToken: { symbol: 'BRODIE' },
+              liquidity: { usd: 200_000 },
+              volume: { h24: 50_000 },
+              priceChange: { h24: 3 },
+            },
+          ],
+        };
+      }
+      return { pairs: [] };
+    };
+    const out = await selectRobinhoodTokens(fetchJson, ['CASHCAT', 'BRODIE']);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ symbol: 'BRODIE', poolAddress: '0xbrodiepool' });
   });
 });

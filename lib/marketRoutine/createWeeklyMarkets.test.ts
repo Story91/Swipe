@@ -24,6 +24,7 @@ function makeDeps(over: Partial<CreateDeps> = {}) {
   let nextId = 100;
   const deps: CreateDeps = {
     selectTokens: async () => [token('AAA', 10), token('BBB', 20), token('CCC', 30)],
+    claimWeeklyBatch: async () => true,
     allocateId: async () => nextId++,
     writer: () => ({
       address: '0xregistrar',
@@ -97,6 +98,29 @@ describe('createWeeklyMarkets', () => {
     const result = await createWeeklyMarkets(deps, { chainKey: 'base', dryRun: false });
     expect(result.created).toHaveLength(2);
     expect(result.trimmed).toBe(1);
+  });
+
+  it('dry run never calls claimWeeklyBatch, it is a preview', async () => {
+    const { deps } = makeDeps();
+    const claim = vi.fn(async () => true);
+    deps.claimWeeklyBatch = claim;
+    await createWeeklyMarkets(deps, { chainKey: 'base', dryRun: true });
+    expect(claim).not.toHaveBeenCalled();
+  });
+
+  it('an already-claimed batch is skipped without allocating or registering anything', async () => {
+    const { deps, saved, pending } = makeDeps({ claimWeeklyBatch: async () => false });
+    const allocate = vi.fn();
+    deps.allocateId = allocate as unknown as CreateDeps['allocateId'];
+    const writerFn = vi.fn(deps.writer);
+    deps.writer = writerFn as unknown as CreateDeps['writer'];
+    const result = await createWeeklyMarkets(deps, { chainKey: 'base', dryRun: false });
+    expect(result.alreadyBatched).toBe(true);
+    expect(result.created).toEqual([]);
+    expect(allocate).not.toHaveBeenCalled();
+    expect(writerFn).not.toHaveBeenCalled();
+    expect(saved).toEqual([]);
+    expect(pending).toEqual([]);
   });
 
   it('registers on chain before writing Redis', async () => {

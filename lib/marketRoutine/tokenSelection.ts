@@ -95,9 +95,14 @@ export async function selectBaseTokens(
 ): Promise<SelectedToken[]> {
   const json = (await fetchJson(
     'https://api.geckoterminal.com/api/v2/networks/base/trending_pools'
-  )) as { data?: GtPool[] };
+  )) as { data?: GtPool[] } | null;
 
-  const candidates: PoolCandidate[] = (json.data ?? []).flatMap((p) => {
+  // A malformed or empty top-level response (null, or anything not an
+  // object) must fall back to no candidates rather than throw reading
+  // .data off of null.
+  const data = json && typeof json === 'object' ? json.data : undefined;
+
+  const candidates: PoolCandidate[] = (data ?? []).flatMap((p) => {
     const a = p.attributes ?? {};
     const symbol = (a.name ?? '').split('/')[0].trim();
     const priceUsd = Number(a.base_token_price_usd);
@@ -145,29 +150,36 @@ export async function selectRobinhoodTokens(
   const pools: PoolCandidate[] = [];
 
   for (const symbol of candidates) {
-    const json = (await fetchJson(
-      `https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(symbol)}`
-    )) as { pairs?: DsPair[] };
+    // One candidate's rate limit, timeout, or malformed response must not
+    // take down the whole week's Robinhood selection; skip it and keep
+    // ranking whatever the rest of the candidates returned.
+    try {
+      const json = (await fetchJson(
+        `https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(symbol)}`
+      )) as { pairs?: DsPair[] };
 
-    const best = (json.pairs ?? [])
-      .filter(
-        (p) =>
-          p.chainId === 'robinhood' &&
-          p.pairAddress &&
-          (p.baseToken?.symbol ?? '').toUpperCase() === symbol.toUpperCase() &&
-          Number.isFinite(Number(p.priceUsd))
-      )
-      .sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0))[0];
+      const best = (json.pairs ?? [])
+        .filter(
+          (p) =>
+            p.chainId === 'robinhood' &&
+            p.pairAddress &&
+            (p.baseToken?.symbol ?? '').toUpperCase() === symbol.toUpperCase() &&
+            Number.isFinite(Number(p.priceUsd))
+        )
+        .sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0))[0];
 
-    if (!best) continue;
-    pools.push({
-      symbol: symbol.toUpperCase(),
-      poolAddress: best.pairAddress as string,
-      priceUsd: Number(best.priceUsd),
-      liquidityUsd: best.liquidity?.usd ?? 0,
-      volume24hUsd: best.volume?.h24 ?? 0,
-      change24hPct: best.priceChange?.h24 ?? 0,
-    });
+      if (!best) continue;
+      pools.push({
+        symbol: symbol.toUpperCase(),
+        poolAddress: best.pairAddress as string,
+        priceUsd: Number(best.priceUsd),
+        liquidityUsd: best.liquidity?.usd ?? 0,
+        volume24hUsd: best.volume?.h24 ?? 0,
+        change24hPct: best.priceChange?.h24 ?? 0,
+      });
+    } catch {
+      continue;
+    }
   }
 
   return filterAndRank(pools, max).map((c) => ({

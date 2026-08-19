@@ -28,6 +28,11 @@ export function realCreateDeps(): CreateDeps {
       chainKey === 'robinhood'
         ? selectRobinhoodTokens(fetchJson)
         : selectBaseTokens(fetchJson),
+    claimWeeklyBatch: async (chainKey, weekKey) => {
+      const key = REDIS_KEYS.ROUTINE_BATCH_CLAIM(weekKey, chainKey);
+      const result = await redis.set(key, '1', { nx: true, ex: 14 * 24 * 3600 });
+      return result === 'OK';
+    },
     allocateId: (chainKey) =>
       allocateMarketId(redis, (id) => REDIS_KEYS.PREDICTION(id, chainKey)),
     writer: makeChainWriter,

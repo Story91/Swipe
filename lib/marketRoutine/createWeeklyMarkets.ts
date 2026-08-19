@@ -20,6 +20,11 @@ const MAX_OPEN_MARKETS = 12;
 
 export interface CreateDeps {
   selectTokens(chainKey: ChainKey): Promise<SelectedToken[]>;
+  /** Atomically claims this chain's weekly batch, keyed by the batch's own
+   *  Friday deadline. Returns true if this call newly claimed it (proceed),
+   *  false if it was already claimed (skip, someone/something already ran
+   *  or is running this week's batch on this chain). */
+  claimWeeklyBatch(chainKey: ChainKey, weekKey: string): Promise<boolean>;
   allocateId(chainKey: ChainKey): Promise<number>;
   writer(chainKey: ChainKey): RoutineChainWriter;
   savePrediction(record: RedisPrediction, chain: ChainKey): Promise<void>;
@@ -44,6 +49,10 @@ export interface CreateResult {
   planned: PlannedMarket[];
   created: string[];
   trimmed: number;
+  /** True when this week's batch on this chain was already claimed by an
+   *  earlier run (a retried cron invocation, a second admin click), and this
+   *  call skipped without allocating or registering anything. */
+  alreadyBatched: boolean;
 }
 
 export async function createWeeklyMarkets(
@@ -73,8 +82,22 @@ export async function createWeeklyMarkets(
     };
   });
 
-  const result: CreateResult = { chain: chainKey, dryRun, planned, created: [], trimmed };
+  const result: CreateResult = {
+    chain: chainKey,
+    dryRun,
+    planned,
+    created: [],
+    trimmed,
+    alreadyBatched: false,
+  };
   if (dryRun) return result;
+
+  // Claim before allocating or registering anything, so a retried cron
+  // invocation or a second admin click is a no-op instead of a duplicate
+  // batch. A dry run never reaches here, and never claims: it's a preview.
+  const weekKey = String(deadlines[0]);
+  const claimed = await deps.claimWeeklyBatch(chainKey, weekKey);
+  if (!claimed) return { ...result, alreadyBatched: true };
 
   const writer = deps.writer(chainKey);
 

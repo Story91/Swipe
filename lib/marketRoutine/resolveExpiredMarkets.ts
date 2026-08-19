@@ -45,6 +45,11 @@ export interface ResolveResult {
   fetchFailed: string[];
   flagged: string[];
   notDue: string[];
+  /** A market whose on-chain read/write or Redis write threw unexpectedly.
+   *  Distinct from fetchFailed: this is not a rejected price fetch, it is
+   *  everything else, and it must not stop the rest of the pending set from
+   *  being attempted. */
+  errored: string[];
 }
 
 export async function resolveExpiredMarkets(
@@ -61,6 +66,7 @@ export async function resolveExpiredMarkets(
     fetchFailed: [],
     flagged: [],
     notDue: [],
+    errored: [],
   };
 
   const pending = await deps.listPending(chainKey);
@@ -89,111 +95,122 @@ export async function resolveExpiredMarkets(
       continue;
     }
 
-    const onChain = await writer.readPrediction(numericId);
-
-    if (onChain.resolved) {
-      if (!dryRun) {
-        record.resolved = true;
-        record.outcome = onChain.outcome;
-        record.resolutionProof = {
-          source: 'chain',
-          sourceUrl: null,
-          observedPrice: null,
-          threshold: spec.threshold,
-          comparator: 'above',
-          outcome: onChain.outcome,
-          fetchedAt: now,
-          deadline: record.deadline,
-          resolvedTx: null,
-          note:
-            'Backfilled from on-chain state. The resolution transaction landed ' +
-            'in an earlier run that failed before writing Redis.',
-        };
-        await deps.saveRecord(record, chainKey);
-        await deps.removePending(chainKey, id);
-        changed = true;
-      }
-      result.backfilled.push(id);
-      continue;
-    }
-    if (onChain.cancelled) {
-      if (!dryRun) {
-        record.cancelled = true;
-        await deps.saveRecord(record, chainKey);
-        await deps.removePending(chainKey, id);
-        changed = true;
-      }
-      continue;
-    }
-    if (onChain.refundable) {
-      // enableRefundsAfterGrace is callable by anyone once a market has sat
-      // unsettled for 30 days past its deadline, and it sets refundable
-      // without setting cancelled. resolvePrediction reverts on a refundable
-      // market, so this is not an outcome to send, it is a stuck market for a
-      // human to look at. Drop it from the pending set so the routine stops
-      // retrying it forever.
-      if (!dryRun) {
-        await deps.removePending(chainKey, id);
-      }
-      result.flagged.push(id);
-      continue;
-    }
-
-    let observation: PriceObservation;
     try {
-      observation = await deps.fetchObservation(spec, now);
-    } catch {
-      const failures = (record.resolveFailures ?? 0) + 1;
-      if (!dryRun) {
-        record.resolveFailures = failures;
-        await deps.saveRecord(record, chainKey);
+      const onChain = await writer.readPrediction(numericId);
+
+      if (onChain.resolved) {
+        if (!dryRun) {
+          record.resolved = true;
+          record.outcome = onChain.outcome;
+          record.resolvedAt = now;
+          record.resolutionProof = {
+            source: 'chain',
+            sourceUrl: null,
+            observedPrice: null,
+            threshold: spec.threshold,
+            comparator: 'above',
+            outcome: onChain.outcome,
+            fetchedAt: now,
+            deadline: record.deadline,
+            resolvedTx: null,
+            note:
+              'Backfilled from on-chain state. The resolution transaction landed ' +
+              'in an earlier run that failed before writing Redis.',
+          };
+          await deps.saveRecord(record, chainKey);
+          await deps.removePending(chainKey, id);
+          changed = true;
+        }
+        result.backfilled.push(id);
+        continue;
       }
-      result.fetchFailed.push(id);
-      if (failures >= FLAG_AFTER_FAILURES) result.flagged.push(id);
-      continue;
-    }
+      if (onChain.cancelled) {
+        if (!dryRun) {
+          record.cancelled = true;
+          await deps.saveRecord(record, chainKey);
+          await deps.removePending(chainKey, id);
+          changed = true;
+        }
+        continue;
+      }
+      if (onChain.refundable) {
+        // enableRefundsAfterGrace is callable by anyone once a market has sat
+        // unsettled for 30 days past its deadline, and it sets refundable
+        // without setting cancelled. resolvePrediction reverts on a refundable
+        // market, so this is not an outcome to send, it is a stuck market for a
+        // human to look at. Drop it from the pending set so the routine stops
+        // retrying it forever.
+        if (!dryRun) {
+          await deps.removePending(chainKey, id);
+        }
+        result.flagged.push(id);
+        continue;
+      }
 
-    const outcome = evaluateOutcome(spec, observation);
+      let observation: PriceObservation;
+      try {
+        observation = await deps.fetchObservation(spec, now);
+      } catch {
+        const failures = (record.resolveFailures ?? 0) + 1;
+        if (!dryRun) {
+          record.resolveFailures = failures;
+          await deps.saveRecord(record, chainKey);
+        }
+        result.fetchFailed.push(id);
+        if (failures >= FLAG_AFTER_FAILURES) result.flagged.push(id);
+        continue;
+      }
 
-    if (dryRun) {
+      const outcome = evaluateOutcome(spec, observation);
+
+      if (dryRun) {
+        result.resolved.push({
+          id,
+          outcome,
+          observedPrice: observation.price,
+          threshold: spec.threshold,
+          tx: null,
+        });
+        continue;
+      }
+
+      const tx = await writer.resolvePrediction(numericId, outcome);
+
+      record.resolved = true;
+      record.outcome = outcome;
+      record.resolvedAt = now;
+      record.resolveFailures = 0;
+      record.resolutionProof = {
+        source: spec.source,
+        sourceUrl: observation.sourceUrl,
+        observedPrice: observation.price,
+        threshold: spec.threshold,
+        comparator: 'above',
+        outcome,
+        fetchedAt: observation.fetchedAt,
+        deadline: record.deadline,
+        resolvedTx: tx,
+        raw: observation.raw,
+      };
+      await deps.saveRecord(record, chainKey);
+      await deps.removePending(chainKey, id);
+      changed = true;
+
       result.resolved.push({
         id,
         outcome,
         observedPrice: observation.price,
         threshold: spec.threshold,
-        tx: null,
+        tx,
       });
+    } catch {
+      // readPrediction, resolvePrediction, saveRecord or removePending threw
+      // unexpectedly. One market's failure must not stop the rest of the
+      // pending set from being attempted on this run, so it is flagged and
+      // left untouched in Redis for the next run to retry.
+      result.errored.push(id);
       continue;
     }
-
-    const tx = await writer.resolvePrediction(numericId, outcome);
-
-    record.resolved = true;
-    record.outcome = outcome;
-    record.resolveFailures = 0;
-    record.resolutionProof = {
-      source: spec.source,
-      sourceUrl: observation.sourceUrl,
-      observedPrice: observation.price,
-      threshold: spec.threshold,
-      comparator: 'above',
-      outcome,
-      fetchedAt: observation.fetchedAt,
-      deadline: record.deadline,
-      resolvedTx: tx,
-      raw: observation.raw,
-    };
-    await deps.saveRecord(record, chainKey);
-    await deps.removePending(chainKey, id);
-    changed = true;
-
-    result.resolved.push({
-      id,
-      outcome,
-      observedPrice: observation.price,
-      threshold: spec.threshold,
-      tx,
-    });
   }
 
   if (changed) deps.invalidateListing(chainKey);
