@@ -76,6 +76,12 @@ export const REDIS_KEYS = {
   /** Denormalised snapshot of every prediction, so a listing is one read. */
   PREDICTIONS_INDEX: (chain?: ChainKey) => `${chainNamespace(chain)}predictions:index`,
   /**
+   * Markets the weekly routine created and has not yet resolved. The resolver
+   * reads this set instead of scanning predictions:active, which still holds
+   * hundreds of stale V2 ids.
+   */
+  ROUTINE_PENDING: (chain?: ChainKey) => `${chainNamespace(chain)}routine:pending`,
+  /**
    * A wallet address, cased one way, always.
    *
    * Redis keys are bytes and 0xAbC is not 0xabc. Most writers lowercased and
