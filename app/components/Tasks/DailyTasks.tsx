@@ -92,8 +92,9 @@ export function DailyTasks() {
           so you can see the shape of it before it is built.
         </p>
         <p className="daily-tasks__line">
-          A new Swipe token is planned on Robinhood Chain. There is no date for it, and no
-          reward amounts have been decided, so no task below shows one.
+          $WIPE is live on Robinhood Chain and the $SWIPE tab will sell you some. Nothing
+          has been decided about paying these tasks in it, so no task below shows an
+          amount.
         </p>
       </section>
 
@@ -169,7 +170,7 @@ export function DailyTasks() {
         </button>
         <p className="daily-tasks__claim-note">
           In the finished version this collects the day in one transaction. There is no
-          balance on this page because there is no token yet to hold one in.
+          balance on this page because no token has been attached to these tasks.
         </p>
       </section>
 

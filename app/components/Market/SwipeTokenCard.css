@@ -17,10 +17,11 @@
  *
  * Radius is 0 everywhere, matching the rest of the house.
  *
- * MOTION. This screen is meant to feel like something is about to happen, so
- * five things move: sections rise in on a stagger, a beam sweeps the hero, the
- * marquee scrolls, the connector into the unscheduled stage marches, and the
- * two live nodes pulse. Every one of them is switched off in the reduce block
+ * MOTION. This screen is meant to feel live, because now it is: sections rise
+ * in on a stagger, a beam sweeps the hero, the marquee scrolls, the connectors
+ * between stages march, and every stage node pulses. The breathing node that
+ * used to mark an event with no date is gone with the claim it stood for.
+ * Every one of them is switched off in the reduce block
  * at the bottom, which is also where the fill-mode trap lives: `animation:
  * none` drops the keyframe entirely, so an element that starts at opacity 0
  * inside a keyframe renders at its natural opacity rather than staying blank.
@@ -191,8 +192,7 @@ h2.swipe-token-card__headline {
 }
 
 /* The connector runs from under this stage's node to the next node. The last
-   stage has nothing below it, which is the point: the sequence stops at an
-   event with no date on it. */
+   stage has nothing below it, because there is nothing after it yet. */
 .swipe-token-card__stage-rail::after {
   content: '';
   position: absolute;
@@ -207,7 +207,7 @@ h2.swipe-token-card__headline {
   display: none;
 }
 
-/* Marching dashes out of the present and into the stage with no date. */
+/* Marching dashes between the stages that are actually running. */
 .swipe-token-card__stage--now .swipe-token-card__stage-rail::after {
   background-image: repeating-linear-gradient(
     to bottom,
@@ -230,7 +230,10 @@ h2.swipe-token-card__headline {
   background: transparent;
 }
 
-.swipe-token-card__stage--now .swipe-token-card__stage-node {
+/* Both live stages get the solid node. The third one used to breathe instead,
+   which read as pending, and it is not pending any more. */
+.swipe-token-card__stage--now .swipe-token-card__stage-node,
+.swipe-token-card__stage--next .swipe-token-card__stage-node {
   border-color: var(--sheet-lime);
   background: var(--sheet-lime);
   animation: swipe-token-card-pulse 2000ms ease-out infinite;
@@ -240,16 +243,6 @@ h2.swipe-token-card__headline {
   0%   { box-shadow: 0 0 0 0 var(--sheet-lime-line); }
   70%  { box-shadow: 0 0 0 8px transparent; }
   100% { box-shadow: 0 0 0 0 transparent; }
-}
-
-.swipe-token-card__stage--next .swipe-token-card__stage-node {
-  border-color: var(--sheet-lime);
-  animation: swipe-token-card-breathe 2600ms ease-in-out infinite;
-}
-
-@keyframes swipe-token-card-breathe {
-  0%, 100% { opacity: 0.35; transform: scale(0.85); }
-  50%      { opacity: 1;    transform: scale(1.15); }
 }
 
 .swipe-token-card__stage-body {
@@ -453,6 +446,125 @@ h3.swipe-token-card__panel-title {
   color: var(--sheet-paper);
 }
 
+/* -------------------------------------------------------------------- buy */
+
+/* The one interactive block on the page. Everything in it is 44px tall or
+   taller on the tap targets, and the input is 16px so iOS does not zoom the
+   viewport when it takes focus. */
+
+.swipe-token-card__buy {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sheet-rule);
+}
+
+.swipe-token-card__buy-label {
+  font-family: var(--sheet-body);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--sheet-paper-3);
+}
+
+.swipe-token-card__buy-input {
+  width: 100%;
+  padding: 10px 12px;
+  font-family: var(--sheet-data);
+  /* Below 16px mobile Safari zooms the page on focus and never zooms back. */
+  font-size: 16px;
+  color: var(--sheet-paper);
+  background: transparent;
+  border: 1px solid var(--sheet-rule-strong);
+  border-radius: 0;
+  outline: none;
+  transition: border-color 140ms ease;
+}
+
+.swipe-token-card__buy-input:focus {
+  border-color: var(--sheet-lime);
+}
+
+.swipe-token-card__buy-presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.swipe-token-card__chip {
+  padding: 6px 10px;
+  min-height: 32px;
+  font-family: var(--sheet-data);
+  font-size: 12px;
+  color: var(--sheet-paper-2);
+  background: transparent;
+  border: 1px solid var(--sheet-rule-strong);
+  border-radius: 0;
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.swipe-token-card__chip:hover {
+  color: var(--sheet-lime);
+  border-color: var(--sheet-lime-line);
+}
+
+.swipe-token-card__chip--on {
+  color: var(--sheet-lime);
+  border-color: var(--sheet-lime);
+}
+
+.swipe-token-card__buy-balance {
+  margin-left: auto;
+  font-family: var(--sheet-body);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--sheet-paper-3);
+}
+
+/* The slippage row puts its label first, so the auto margin above would push
+   it away from its own buttons. */
+.swipe-token-card__buy-presets .swipe-token-card__buy-balance:first-child {
+  margin-left: 0;
+  margin-right: 4px;
+}
+
+.swipe-token-card__buy-go {
+  padding: 12px 14px;
+  min-height: 44px;
+  font-family: var(--sheet-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #0d0d0d;
+  background: var(--sheet-lime);
+  border: 1px solid var(--sheet-lime);
+  border-radius: 0;
+  cursor: pointer;
+  transition: opacity 140ms ease;
+}
+
+.swipe-token-card__buy-go:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.swipe-token-card__buy-go:disabled {
+  color: var(--sheet-paper-3);
+  background: transparent;
+  border-color: var(--sheet-rule-strong);
+  cursor: not-allowed;
+}
+
+.swipe-token-card__buy-input:focus-visible,
+.swipe-token-card__chip:focus-visible,
+.swipe-token-card__buy-go:focus-visible {
+  outline: 2px solid var(--sheet-lime);
+  outline-offset: 2px;
+}
+
 /* ------------------------------------------------------------------ links */
 
 .swipe-token-card__links {
@@ -554,7 +666,7 @@ a.swipe-token-card__link:focus-visible {
 /* Everything that moves, stopped. The rise keyframe holds its own start state,
    so dropping the animation leaves each section at full opacity rather than
    invisible. The beam is decorative and stays hidden, the marquee parks on its
-   first items and is still readable, and both nodes keep their static colour. */
+   first items and is still readable, and every node keeps its static colour. */
 @media (prefers-reduced-motion: reduce) {
   .swipe-token-card > *,
   .swipe-token-card__beam,
@@ -566,13 +678,11 @@ a.swipe-token-card__link:focus-visible {
     animation: none;
   }
 
-  .swipe-token-card__stage--next .swipe-token-card__stage-node {
-    opacity: 1;
-    transform: none;
-  }
-
   .swipe-token-card__copy,
   .swipe-token-card__retry,
+  .swipe-token-card__chip,
+  .swipe-token-card__buy-input,
+  .swipe-token-card__buy-go,
   a.swipe-token-card__link {
     transition: none;
   }
