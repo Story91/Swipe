@@ -1,4 +1,35 @@
 // Redis types - safe to import on client side
+
+/** How a routine-created market is settled: read this pool, compare to this
+ *  threshold. Written at creation so resolution never guesses. */
+export interface ResolutionSpec {
+  source: 'geckoterminal' | 'dexscreener';
+  /** The source's network id, 'base' or 'robinhood'. */
+  network: string;
+  poolAddress: string;
+  comparator: 'above';
+  /** USD. Strictly above wins YES; equality resolves NO. */
+  threshold: number;
+  template: 'price_at_close';
+}
+
+/** What the resolver actually observed before it sent the transaction.
+ *  source 'chain' marks a backfill: the transaction landed in an earlier run
+ *  that died before writing Redis, so the outcome was read back on-chain. */
+export interface ResolutionProof {
+  source: 'geckoterminal' | 'dexscreener' | 'chain';
+  sourceUrl: string | null;
+  observedPrice: number | null;
+  threshold: number;
+  comparator: 'above';
+  outcome: boolean;
+  fetchedAt: number;
+  deadline: number;
+  resolvedTx: string | null;
+  raw?: unknown;
+  note?: string;
+}
+
 export interface RedisPrediction {
   id: string;
   question: string;
@@ -30,6 +61,9 @@ export interface RedisPrediction {
   usdcRefundable?: boolean;
   resolved: boolean;
   outcome?: boolean;
+  /** Unix timestamp of the run that flipped resolved to true, chain-backfill
+   *  included. Absent on markets resolved before this field existed. */
+  resolvedAt?: number;
   cancelled: boolean;
   createdAt: number; // Unix timestamp
   creator: string;
@@ -55,6 +89,12 @@ export interface RedisPrediction {
   // Which contract generation minted this market. V3 registered four empty
   // markets on Base and nothing else; V4 is what the app writes to now.
   contractVersion?: 'V1' | 'V2' | 'V3' | 'V4';
+  // Weekly routine bookkeeping. Absent on every hand-made market.
+  createdByRoutine?: boolean;
+  resolutionSpec?: ResolutionSpec;
+  resolutionProof?: ResolutionProof;
+  /** Consecutive failed price fetches; 24 flags the market in the admin card. */
+  resolveFailures?: number;
 }
 
 export interface RedisUserStake {

@@ -132,3 +132,11 @@ describe('address casing cannot split a key in two', () => {
     expect(REDIS_KEYS.USER_TRANSACTIONS(MIXED, 'robinhood')).toMatch(/^robinhood:/);
   });
 });
+
+describe('ROUTINE_PENDING', () => {
+  it('is unprefixed on Base and prefixed on Robinhood', () => {
+    expect(REDIS_KEYS.ROUTINE_PENDING()).toBe('routine:pending');
+    expect(REDIS_KEYS.ROUTINE_PENDING('base')).toBe('routine:pending');
+    expect(REDIS_KEYS.ROUTINE_PENDING('robinhood')).toBe('robinhood:routine:pending');
+  });
+});

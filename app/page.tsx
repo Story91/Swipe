@@ -780,13 +780,13 @@ export default function App() {
               queue inline through ProposalCard, so the second door led to the
               same room. */}
 
-          {/* SWIPE Token Card — the Base token's fee stream sits in an archived
-              contract, so this is being rebuilt on the new token. */}
-          {/* No overlay, for the same reason as the tasks screen below. The
-              page now says the old token is finished and the new one has no
-              date, so covering it repeats the message while blurring it out.
+          {/* SWIPE Token Card. $WIPE is live on Robinhood chain and this screen
+              buys it off the Pons curve, so it is the one dashboard here that
+              sends a transaction of its own. */}
+          {/* No overlay, and now emphatically so. It used to blur a screen that
+              had nothing to offer; the screen has a live price and a buy box.
               The overlay also sets pointer-events: none, aria-hidden and inert,
-              which put the live chain readout, its retry button and every link
+              which would put the amount field, the buy button and every link
               out of reach of a mouse and a keyboard alike. */}
           {activeDashboard === 'swipe-token' && <SwipeTokenCard />}
 

@@ -76,6 +76,19 @@ export const REDIS_KEYS = {
   /** Denormalised snapshot of every prediction, so a listing is one read. */
   PREDICTIONS_INDEX: (chain?: ChainKey) => `${chainNamespace(chain)}predictions:index`,
   /**
+   * Markets the weekly routine created and has not yet resolved. The resolver
+   * reads this set instead of scanning predictions:active, which still holds
+   * hundreds of stale V2 ids.
+   */
+  ROUTINE_PENDING: (chain?: ChainKey) => `${chainNamespace(chain)}routine:pending`,
+  /**
+   * Claims one chain's weekly create batch, keyed by the batch's own Friday
+   * deadline. An atomic SET NX against this key is what makes a retried cron
+   * invocation or a second admin click a no-op instead of a duplicate batch —
+   * a plain read-then-write here would have the exact race this guards against.
+   */
+  ROUTINE_BATCH_CLAIM: (weekKey: string, chain?: ChainKey) => `${chainNamespace(chain)}routine:batch:${weekKey}`,
+  /**
    * A wallet address, cased one way, always.
    *
    * Redis keys are bytes and 0xAbC is not 0xabc. Most writers lowercased and
